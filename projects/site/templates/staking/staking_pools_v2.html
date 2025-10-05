@@ -1,0 +1,62 @@
+<form>
+    <select class="form-select" id="status" onchange="val()">
+        {% for pool_status in PoolStatus %}
+            <option value="{{pool_status.name}}" {% if pool_status.name == status%}selected{%endif%}>{{pool_status.value}}</option>
+        {% endfor %}
+    </select>
+</form>
+<p class="text-end mt-3"><small>* Columns are sortable</small></p>    
+<table id="main" class="table sortable asc table-borderless ">
+    <thead>
+        <tr class="sm-text">
+            <td class="text-secondary-emphasis" scope="col"></td>
+            <td class="text-secondary-emphasis" scope="col"></td>
+            <td class="text-secondary-emphasis text-end" scope="col">Delegator</td>
+            <td class="text-secondary-emphasis text-center hide-if-small" scope="col" colspan="2">Commission Rates</td>
+            
+            
+
+        </tr>
+        <tr class="sm-text">
+            <th class="text-secondary-emphasis" scope="col">Validator ID</th>
+            <th class="text-secondary-emphasis hide-if-small" scope="col">Node Name</th>
+            
+            <th class="text-secondary-emphasis text-end" scope="col">180d APY</th>
+            <th class="text-secondary-emphasis text-end" scope="col">Block</th>
+            <th class="text-secondary-emphasis text-end hide-if-small" scope="col">Tx</th>
+            <th class="text-secondary-emphasis text-end hide-if-small" scope="col">Total Stake</th>
+            <th class="text-secondary-emphasis text-end " scope="col">% of Cap</th>
+            
+
+        </tr>
+    </thead>
+    <tbody>
+        {% if pools|length == 0 %}
+        <tr class="sm-text">
+            <td colspan="7" class="text-secondary-emphasis text-center">No pools found</td>
+        </tr>
+        {% else %}
+        {% for validator_id, row in pools.items() %}
+        <tr class="sm-text">
+            <td class="text-secondary-emphasis" data-sort="{{row.baker_id}}"><a href="/mainnet/account/{{row.baker_id}}">{{row.baker_id}}</a> {% if row.url %}
+                <a href="{{ row.url }}">(i)</a>
+                {% endif %}
+            </td>
+            <td class="text-secondary-emphasis text-start hide-if-small" data-sort="{{row.node_name}}">{% if row.node_name%}{{row.node_name}}{%endif%}</td>
+            <td class="text-secondary-emphasis text-end ccd" data-sort="{{row.d180.apy}}">{{
+                row.d180.apy|apy_perc}}</td>
+
+                
+                <td class="text-secondary-emphasis text-end ccd" data-sort="{{row.block_commission_rate}}">{{row.block_commission_rate|apy_perc}}</td>
+                <td class="text-secondary-emphasis text-end hide-if-small ccd" data-sort="{{row.tx_commission_rate}}">{{row.tx_commission_rate|apy_perc}}</td>
+                <td class="text-secondary-emphasis text-end hide-if-small ccd" data-sort="{{row.effective_stake}}">{{row.effective_stake | micro_ccd_no_decimals|safe}}</td>
+                <td class="text-secondary-emphasis text-end ccd " data-sort="{{row.delegated_percentage}}">{% if row.delegated_capital_cap > 0 %}     
+                                    {{'%0.2f'|format(row.delegated_percentage|float)}}
+                                        %{% else %}
+                    -
+                                            {% endif %}</td>
+        </tr>
+        {% endfor %}
+        {% endif %}
+    </tbody>
+</table>

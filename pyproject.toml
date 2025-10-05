@@ -1,0 +1,128 @@
+[project]
+name = "ccdexplorer"
+version = "0.1.0"
+description = "The MonoRepo for the CCDExplorer Universe"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "rich",
+    "python-dateutil",
+    "base58",
+    "eth-hash",
+    "pycryptodome",
+    "pytest",
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+    "googleapis-common-protos",
+    "betterproto[compiler]==2.0.0b6",
+    "leb128",
+    "pydantic",
+    "pymongo",
+    "requests",
+    "apprise",
+    "py-graphql-client",
+    "chardet",
+    "pre-commit",
+    "cbor2",
+    "python-dotenv",
+    "aiohttp",
+    "redis",
+    "celery[redis,mongodb]",
+    "httpx",
+    "ccdexplorer-schema-parser==0.1.4",
+    "sortedcontainers>=2.4.0",
+    "scheduler>=0.8.8",
+    "python-telegram-bot[job-queue]>=22.5",
+    "fastapi[uvicorn]>=0.118.2",
+    "fastapi-restful>=0.6.0",
+    "uvicorn>=0.35.0",
+    "sentry-sdk[fastapi]>=2.41.0",
+    "asgi-ratelimit>=0.10.0",
+    "fastapi-login>=1.10.3",
+    "passlib>=1.7.4",
+    "bcrypt==4.0.1",
+    "prometheus-fastapi-instrumentator>=7.1.0",
+    "pandas>=2.3.3",
+    "humanize>=4.13.0",
+    "typing-inspect>=0.9.0",
+    "python-multipart>=0.0.20",
+    "asgi-lifespan>=2.1.0",
+    "dagster>=1.11.14",
+    "dagster-postgres>=0.27.14",
+    "dagster-docker>=0.27.14",
+    "gitpython>=3.1.45",
+    "polars>=1.34.0",
+]
+
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pre-commit",
+    "betterproto[compiler]",
+    "grpcio-tools",
+    "deptry>=0.23.1",
+    "flower>=2.0.1",
+    "griffe>=1.14.0",
+    "mkdocs>=1.4.3",
+    "mkdocs-autorefs>=0.30.1",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "polylith-cli>=1.35.0",
+    "pytest-asyncio>=1.2.0",
+    "marimo>=0.16.5",
+    "pytest-cov>=7.0.0",
+    "coverage>=7.10.7",
+    "pytest-xdist>=3.8.0",
+]
+
+
+[build-system]
+requires      = [ "hatchling" ]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+dev-mode-dirs = [ "components", "bases", "development", "." ]
+
+[tool.polylith.bricks]
+"components/ccdexplorer/celery_app"        = "ccdexplorer/celery_app"
+"components/ccdexplorer/ccdscan"           = "ccdexplorer/ccdscan"
+"components/ccdexplorer/cis"               = "ccdexplorer/cis"
+"components/ccdexplorer/cns"               = "ccdexplorer/cns"
+"components/ccdexplorer/concordium-client" = "ccdexplorer/concordium-client"
+"components/ccdexplorer/domain"            = "ccdexplorer/domain"
+"components/ccdexplorer/env"               = "ccdexplorer/env"
+"components/ccdexplorer/grpc_client"       = "ccdexplorer/grpc_client"
+"components/ccdexplorer/mongodb"           = "ccdexplorer/mongodb"
+"components/ccdexplorer/tooter"            = "ccdexplorer/tooter"
+"components/ccdexplorer/wasm_decoder"      = "ccdexplorer/wasm_decoder"
+
+
+"bases/ccdexplorer/api"                   = "ccdexplorer/api"
+"bases/ccdexplorer/site"                  = "ccdexplorer/site"
+"bases/ccdexplorer/dagster_paydays"       = "ccdexplorer/dagster_paydays"
+"bases/ccdexplorer/ms_block_analyser"     = "ccdexplorer/ms_block_analyser"
+"bases/ccdexplorer/ms_events_and_impacts" = "ccdexplorer/ms_events_and_impacts"
+"bases/ccdexplorer/ms_indexers"           = "ccdexplorer/ms_indexers"
+"bases/ccdexplorer/ms_instances"          = "ccdexplorer/ms_instances"
+"bases/ccdexplorer/ms_metadata"           = "ccdexplorer/ms_metadata"
+"bases/ccdexplorer/ms_modules"            = "ccdexplorer/ms_modules"
+"bases/ccdexplorer/ms_plt"                = "ccdexplorer/ms_plt"
+
+
+[tool.ruff]
+line-length    = 100
+indent-width   = 4
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style               = "double"
+indent-style              = "space"
+skip-magic-trailing-comma = false
+
+[tool.uv]
+default-groups = [ "dev" ]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

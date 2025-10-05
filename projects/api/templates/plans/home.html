@@ -1,0 +1,68 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<h2>CCDExplorer.io API</h2>
+<br/>
+<p>Welcome to the premier API service for the Concordium Blockchain. Choose a plan to start using the API today.</p>
+<p>The API is authenticated and rate-limited. </p>
+<h4>Authentication</h4>
+<p>API <b>v2</b> is authenticated using a header key <code>x-ccdexplorer-key</code>. 
+    
+<h4>Rate Limits</h4>
+<p>The API <b>v2</b> endpoints are all rate limited.</p>
+
+<h4>Purchase Process</h4>
+<ol>
+    <li>Select a Plan below. </li>
+    <li>If you are already logged in, you can continue to the next step, otherwise you can create an account.</li>
+    <li>For the paid plans (Standard/Pro), payment is in any PLT on the Concordium blockchain that tracks EUR ({%- for t in eur_plts -%}
+  <a href="https://ccdexplorer.io/mainnet/tokens/{{ t|urlencode }}">{{ t|e }}</a>{% if not loop.last %}, {% endif %}
+{%- endfor -%}).
+    </li>
+    
+</ol>
+
+<div class="row ">
+    
+{% for plan_name in ["free", "standard", "pro"]%}
+<div class="col-md-4 ">
+
+
+        <div class="card h-100">
+            <div class="p-4">
+                <div class="text-cap fw-medium text-primary mb-1">{{plan_name.capitalize()}}</div>
+                <h4 class="mb-0">{{plans_for_display[plan_name].price}}</h4>
+                
+                </div>
+        <div class="card-body d-flex flex-column justify-content-between ps-4">
+            <ul class="list-unstyled d-flex flex-column gap-2">
+            <li class=" d-flex align-items-baseline">
+            
+            <span>{{plans_for_display[plan_name].server_limit}}</span>
+            </li>
+            <li class=" d-flex align-items-baseline">
+            <span>{{plans_for_display[plan_name].day_limit}}</span>
+            </li>
+            <li class=" d-flex align-items-baseline">
+            <span>All endpoints</span>
+            </li>
+            {% if plans_for_display[plan_name].note %}
+            <li class=" d-flex align-items-baseline">
+            <span class="small text-secondary-emphasis mb-1">({{plans_for_display[plan_name].note}})</span>
+        </li>
+            {%endif %}
+            </ul>
+            <button hx-post="/plans/set"    hx-vals='{"plan": "{{plan_name}}"}' {% if user.plan %} disabled {% endif %} class="btn btn-primary">Get {{plan_name.capitalize()}} Plan</button>
+            
+            </div>
+        </div>
+    </div>
+        {% endfor %}
+  
+</div>
+
+
+
+<br/><br/><br/>
+{% include "/plans/faq.html"%}
+{% endblock content %}

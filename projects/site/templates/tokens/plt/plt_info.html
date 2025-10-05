@@ -1,0 +1,69 @@
+{% set ip = plt_info.tag_information.initialization_parameters %}
+{% set ts = plt_info.token_state %}
+{% set ms = plt_info.token_state.module_state %}
+
+<table class="table table-borderless">
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Token Name</td>
+            <td class="text-end text-secondary-emphasis text-break">
+                    {{ ip.name }}
+                </td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Token Symbol</td>
+            <td class="text-end text-secondary-emphasis text-break">
+                    {{ token_id }}
+                </td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Governance Account</td>
+        <td class="text-end text-secondary-emphasis">{{ ms.governance_account.account|account_link(net,user,tags,request.app)|safe}}
+            
+            </td>
+    </tr>
+    {% if ip.initial_supply %}
+        <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Initial Supply</td>
+        <td class="text-end text-secondary-emphasis ">
+            {{ ip.initial_supply.value|token_amount_using_decimals_rounded(ip.initial_supply.decimals, 0) |safe}} <span class="ccd">{{ token_id }}</span>
+            </td>
+        </tr>
+    {%endif%}
+        <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Total Supply</td>
+        <td class="text-end text-secondary-emphasis">
+            {{ ts.total_supply.value|token_amount_using_decimals_rounded(ts.total_supply.decimals, 0)|safe }} <span class="ccd">{{ token_id }}</span>
+            </td>
+        </tr>
+
+        <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Decimals</td>
+        <td class="text-end text-secondary-emphasis ccd">
+            {{ ts.decimals|safe }}
+            </td>
+        </tr>
+       
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Allow list?</td>
+        <td class="text-end text-secondary-emphasis">{% if ms.allow_list%}<i style="color:green;" class="bi bi-toggle-on"></i>{% else %}<i class="bi bi-toggle-off"></i>{%endif%}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Deny list?</td>
+        <td class="text-end text-secondary-emphasis">{% if ms.deny_list%}<i style="color:green;" class="bi bi-toggle-on"></i>{% else %}<i class="bi bi-toggle-off"></i>{%endif%}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Mintable?</td>
+        <td class="text-end text-secondary-emphasis">{% if ms.mintable%}<i style="color:green;" class="bi bi-toggle-on"></i>{% else %}<i class="bi bi-toggle-off"></i>{%endif%}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Burnable?</td>
+        <td class="text-end text-secondary-emphasis">{% if ms.burnable%}<i style="color:green;" class="bi bi-toggle-on"></i>{% else %}<i class="bi bi-toggle-off"></i>{%endif%}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Paused?</td>
+        <td class="text-end text-secondary-emphasis">{% if ms.paused%}<i style="color:green;" class="bi bi-toggle-on"></i>{% else %}<i class="bi bi-toggle-off"></i>{%endif%}</td>
+    </tr>
+    
+</tbody>
+</table>
+

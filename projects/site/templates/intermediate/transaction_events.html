@@ -1,0 +1,41 @@
+{% if transaction.show_table %}
+        {% if transaction.events|length == 1 %}
+            <table class="table table-borderless">
+                <tbody>
+        {% else %}
+            <table class="table table-borderless">
+                <tbody>
+                    <thead>
+                    <tr>
+                        <th  scope="col">Action</th>
+                        <th  scope="col">Value</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+        {% endif %}    
+        <table class="table table-borderless">
+            <thead>
+                <tr class="sm-text">
+                    
+                    <th  scope="col" class="text-secondary-emphasis text-start">Unlock Date</th>
+                    <th  scope="col" class="text-secondary-emphasis text-end">Amount</th>
+                    
+                    </tr>
+            </thead>
+            <tbody>
+        {% for schedule in transaction.schedule %}
+        
+        <tr class="sm-text">
+            
+            <td class="text-start text-secondary-emphasis"><span class="ccd">{{schedule.timestamp|datetime_regular }}</span></td>
+            <td class="text-end text-secondary-emphasis"><span >{{schedule.amount |micro_ccd_no_decimals|safe}}</span>  </td>    
+        </tr>
+        {% endfor %}
+            </tbody>
+        </table>
+        <hr/>
+            </tbody>
+        </table>
+        
+    
+{% endif %}

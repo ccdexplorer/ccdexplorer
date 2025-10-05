@@ -1,0 +1,31 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+{% if user %}
+Already logged in. <br/>
+{{user}}
+{% else %}
+
+<h1>Login</h1>
+
+{% for error in errors %}
+    <p style="color: red">{{ error }}</p>
+{% endfor %}
+<form action="/auth/login" method="post">
+    <p>
+        <p><label for="">Email</label></p>
+        <input type="email" class=" ms-0 border" style="width:300px;" name="username" value="{{ username }}" required>
+    </p>
+    <p>
+        <p><label for="">Password</label></p>
+        <input type="password" class="ms-0 border" style="width:300px;" name="password" value="{{ password }}" required>
+    </p>
+    <button type="submit" value="Submit" class="btn btn-primary">Submit</button>
+</form>
+
+{% endif %}
+<br/>
+<p>Don't have an account yet? <a href="/auth/register">Register new account</a><br/>
+Forgot your password? <a href="/auth/forgot-password">Reset password</a></p>
+{% endblock content %}

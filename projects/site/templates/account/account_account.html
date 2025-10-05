@@ -1,0 +1,683 @@
+{% extends "base/base.html" %}
+
+{% block js %}
+<script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tabs = [
+    {
+      btn: '#pills-txsfilter-tab',
+      containerId: 'transactions-tab-content',
+      url:   `/account/transactions-tab-content/{{net}}/{{account_id}}`,
+      init:  () => init_txs_table?.(),
+    },
+    {
+      btn: '#tokens-pills-tab',
+      containerId: 'tokens-tab-content',
+      url:   `/account/tokens-tab-content/{{net}}/{{account_id}}`,
+      init:  () => {
+        init_plt_tokens_table?.();
+        init_tokens_fungible_verified_table?.();
+        init_tokens_non_fungible_verified_table?.();
+        init_tokens_unverified_table?.();
+
+      },
+    },
+    {
+      btn: '#pills-validator-tab',
+      containerId: 'validator-tab-content',
+      url:   `/account/validator-tab-content/{{net}}/{{account_id}}`,
+      init:  () => {
+        init_validator_tally_table?.();
+        init_validator_transactions_table?.();
+        init_validator_rewards_table?.();
+      },
+    },
+  ];
+
+  tabs.forEach(({ btn, containerId, url, init }) => {
+    const tabButton = document.querySelector(btn);
+    if (!tabButton) return;
+
+    let loaded = false;
+    const loadTabContent = () => {
+      if (loaded) return;
+      fetch(url)
+        .then(r => r.text())
+        .then(html => {
+          const container = document.getElementById(containerId);
+          container.innerHTML = html;
+          window.htmx && htmx.process(container);
+          init();
+        })
+        .catch(console.error);
+      loaded = true;
+    };
+
+    // Run when the tab becomes active
+    tabButton.addEventListener('shown.bs.tab', loadTabContent);
+
+    // Also run right away if it’s already active on page load
+    if (tabButton.classList.contains('active')) {
+      loadTabContent();
+    }
+  });
+});
+</script>
+{% endblock %}
+
+{% block ogp %}
+<meta property="og:title" content="Account {{account_index}} on Concordium {{net}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{env.SITE_URL}}/{{net}}/account/{{account_index}}" />
+{% endblock %}
+
+{% block content %}
+
+{% if error %}
+<p>An error occured: <b>{{error.errorMessage}}</b></p>
+{% else %}
+{% if show_tab %}
+{% set show_tab_list = show_tab.split('-') %}
+{% else %}
+{% set show_tab_list = [] %}
+
+{% endif %}
+<!-- <script>
+  // Create a new URL object
+let url = new URL(window.location.href);
+
+// Get the referrer, if there is one
+let ref = url.searchParams.get('ref');
+
+// If there's a referrer...
+if (ref) {
+
+	// store their ID as a cookie
+	document.cookie = `affiliate_id=${ref}; path=/; max-age=${60 * 60 * 24 * 28};`;
+
+	// Remove the query string parameter from the URL
+	url.searchParams.delete('ref');
+	history.replaceState(history.state, '', url.href);
+
+}
+
+</script> -->
+
+
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+    <div class="row row-flex">
+      <div class=" col-md-6  col-sm-12">
+        <div class="border content curved-border ">
+          {% set title= "Account Info" %}{% include 'base/box_title.html' %}
+          {% include "account/account_info.html" %}</div>
+        
+        
+      </div>  
+      <div class=" col-md-6  col-sm-12">
+        <div class="border content curved-border mb-2">
+          {% set title= "More Info" %}{% include 'base/box_title.html' %}
+          {% include "account/account_more_info.html" %}</div>
+        
+      </div> 
+      
+    </div>
+    <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+        
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active explorer bg-secondary-subtle" id="pills-txsfilter-tab" data-bs-toggle="pill" data-bs-target="#pills-txsfilter" type="button" role="tab" aria-controls="pills-txsfilter" aria-selected="true">
+            <span class="tab-text-large">Transactions</span><span class="tab-text-small">Txs</span>
+        </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-creds-tab" data-bs-toggle="pill" data-bs-target="#pills-creds" type="button" role="tab" aria-controls="pills-creds" aria-selected="true">
+            <span class="tab-text-large">Credentials</span><span class="tab-text-small">ID</span>
+        </button>
+        </li>
+        {% if tokens_available %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link  explorer bg-secondary-subtle" id="tokens-pills-tab" data-bs-toggle="pill" data-bs-target="#pills-tokens" type="button" role="tab" aria-controls="pills-tokens" aria-selected="true">
+            <span class="tab-text-large">Tokens (PLT & CIS-2)</span><span class="tab-text-small">Tokens</span>
+        </button>
+        </li>
+      {% endif %}  
+      {% if net=='mainnet' %}  
+        {% if delegation %}
+        <li class="nav-item" role="presentation"></li>
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-delegation-tab" data-bs-toggle="pill" data-bs-target="#pills-delegation" type="button" role="tab" aria-controls="pills-delegation" aria-selected="true">
+            <span class="tab-text-large">Delegation</span><span class="tab-text-small">Delegation</span>
+        </button>
+        </li>
+        {% endif %}
+        
+          {% if rewards_no_stake %}
+          <li class="nav-item" role="presentation"></li>
+            <button class="nav-link  explorer bg-secondary-subtle" id="pills-nostake-tab" data-bs-toggle="pill" data-bs-target="#pills-nostake" type="button" role="tab" aria-controls="pills-nostake" aria-selected="true">
+              <span class="tab-text-large">Rewards</span><span class="tab-text-small">Rewards</span>
+          </button>
+          </li>
+          {% endif %}
+          {% endif %}
+        {% if account_is_validator %}
+        <li class="nav-item" role="presentation"></li>
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-validator-tab" data-bs-toggle="pill" data-bs-target="#pills-validator" type="button" role="tab" aria-controls="pills-validator" aria-selected="true">
+            <span class="tab-text-large">Validator</span><span class="tab-text-small">Validator</span>
+        </button>
+        </li>
+        {% endif %}
+        {% if pool %}
+        <li class="nav-item" role="presentation"></li>
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-pool-tab" data-bs-toggle="pill" data-bs-target="#pills-pool" type="button" role="tab" aria-controls="pills-pool" aria-selected="true">
+            <span class="tab-text-large">Pool</span><span class="tab-text-small">Pool</span>
+        </button>
+        </li>
+        {% endif %}
+        {% if net == 'mainnet' %}
+        <li class="nav-item" role="presentation"></li>
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-analytics-tab" data-bs-toggle="pill" data-bs-target="#pills-analytics" type="button" role="tab" aria-controls="pills-analytics" aria-selected="true">
+            <span class="tab-text-large">Analytics</span><span class="tab-text-small">Analytics</span>
+        </button>
+        </li>
+        {% endif %}
+</ul>
+
+<div class="tab-content" id="pills-tabContent">
+  
+  <div class="tab-pane fade show active" id="pills-txsfilter" role="tabpanel" aria-labelledby="pills-txsfilter-tab" tabindex="0">
+    <div class="row mt-4">
+      <div class=" col-md-12  col-sm-12">
+        <div class="border curved-border" >
+          <div id="transactions-tab-content">Loading...</div> 
+    </div>  
+      
+    </div>
+      
+    </div>
+  </div>
+  <div class="tab-pane fade show " id="pills-creds" role="tabpanel" aria-labelledby="pills-creds-tab" tabindex="0">
+    <div class="row mt-4">
+      <div class=" col-md-12  col-sm-12">
+        
+          <div class="border curved-border">{% include "account/account_credentials.html" %}</div>
+        
+      </div>  
+      
+    </div>
+  </div>
+  {% if tokens_available %}
+  <div class="tab-pane fade show " id="pills-tokens" role="tabpanel" aria-labelledby="pills-tokens-tab" tabindex="0">
+        <div id="tokens-tab-content">Loading...</div> 
+      
+      
+  </div>
+  {% endif %}
+  {% if rewards_no_stake %}
+  <div class="tab-pane fade show " id="pills-nostake" role="tabpanel" aria-labelledby="pills-nostake-tab" tabindex="0">
+    {% include "account/account_rewards_no_stake.html" %}
+    {% include "account/account_cooldowns.html"%}
+ 
+</div>
+  {% endif %}
+  {% if delegation %}
+  <div class="tab-pane fade show " id="pills-delegation" role="tabpanel" aria-labelledby="pills-delegation-tab" tabindex="0">
+       {% include "account/account_delegation.html" %}
+       {% include "account/account_cooldowns.html"%}
+  </div>
+  {% endif %}
+  {% if account_is_validator %}
+  <div class="tab-pane fade show " id="pills-validator" role="tabpanel" aria-labelledby="pills-validator-tab" tabindex="0">
+    <div id="validator-tab-content" class="ps-3">Loading...</div>   
+    
+    
+  </div>
+  {% endif %}
+  {% if pool %}
+  <div class="tab-pane fade show " id="pills-pool" role="tabpanel" aria-labelledby="pills-pool-tab" tabindex="0">
+       {% include "pool/pool.html" %}
+    
+  </div>
+  {% endif %}
+  {% if net == 'mainnet' %}
+    <div class="tab-pane fade show " id="pills-analytics" role="tabpanel" aria-labelledby="pills-analytics-tab" tabindex="0">
+      <div class="border content curved-border " >
+          {% include "account/account_analytics.html" %}
+        </div>  
+    </div>
+  {% endif %}
+ 
+</div>
+
+{% endif %}
+
+<!-- Tabulator Tables -->
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+
+<!-- transactions -->
+{% set ccd_tabulator_table ='txsfilter'%}
+{% set tabulator_ajax_filtering_url = '/account_transactions_with_filter/'+net+'/'+account_id%}
+{% set filename='transactions-filtered-'+account_id|string +'-'+range(1000,10000)|random|string+'.csv' %}
+ {% include 'base/tabulator/tabulator-custom-formatters.html' %}
+<script>
+  function init_txs_table() {
+    const columns = [
+  {
+        title: "Hash", field: "hash", 
+        minWidth: 60,
+        maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        accessorDownload: (value, data) => data.hash_download,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Age", field: "transaction_block_info_slot_time", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 50,
+        formatter: isoDateTimeHumanDiff,
+        headerSort:false,
+        titleDownload:"Timestamp",
+        accessorDownload: (value, data) => data.transaction_block_info_slot_time_download,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Cost", field: "transaction_account_transaction_cost", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 100,
+        minWidth: 100,
+        maxWidth: 100, 
+        sorter: "number",
+        headerSort: false,
+        accessorDownload: (value, data) => data.transaction_account_transaction_cost/1000000,
+        formatter: microCCDFormatter,
+      },
+      {
+        title: "Primary Type", field: "transaction_type_contents", hozAlign: "left", headerHozAlign: "left", 
+        responsive: 0,
+        minWidth: 170,
+        // maxWidth: 170, 
+        formatter:txTypeFormatter,
+        headerSort: false,
+        
+      },
+      {
+        title: "", field: "type_additional_info", hozAlign: "right", 
+        responsive: 70,
+        minWidth: 200,
+        maxWidth: 200, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.type_additional_info_download,
+        headerSort: false,
+        
+      },
+      {
+        title: "Block", field: "block_height", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 90,
+        minWidth: 120,
+        maxWidth: 130, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.block_height_download,
+        headerSort: true,
+        
+      },
+      {
+        
+        title: "Sender", field: "sender", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 30,
+        minWidth: 120,
+        // maxWidth: 180, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.sender_download,
+        headerSort: false,
+        
+      }
+
+    ];
+  
+  window["{{ccd_tabulator_table}}_columns"] = columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'block_height';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+
+  // 1) Define your two helper functions first:
+  function updateFilterOnly() {
+    const table  = window["{{ccd_tabulator_table}}_table"];
+    const select = document.getElementById("tx_type_contents_selector");
+    table.setFilter("type", "=", select.value);
+    console.log("Filter applied:", select.value);
+  }
+
+  function initialLoad() {
+    const table  = window["{{ccd_tabulator_table}}_table"];
+    const select = document.getElementById("tx_type_contents_selector");
+    table.setFilter("type", "=", select.value);
+    console.log("Initial filter:", select.value);
+    table.setData("{{tabulator_ajax_filtering_url}}");
+    console.log("Data reloaded once at:", "{{tabulator_ajax_filtering_url}}");
+  }
+
+  // 2) Wait for the DOM so your <div> and <select> exist, then build Tabulator:
+  const table = new Tabulator("#{{ccd_tabulator_table}}", {
+    ajaxURL: "{{tabulator_ajax_filtering_url}}",
+    columns:  columns,
+    layout: "fitColumns",
+    maxHeight: "400px",           // fixed outer height
+    heightGrow: false,
+    responsiveLayout: "hide",
+    paginationMode: "remote",
+    filterMode: "remote",
+    sortMode: "remote",
+    ajaxConfig: "POST",
+    ajaxContentType: "json",
+    paginationSizeSelector: window["{{ccd_tabulator_table}}_size_selector"] || [10,25,50,100,500],
+    paginationSize: (window["{{ccd_tabulator_table}}_size_selector"] || [10,25,50,100,500])[1],
+    paginationButtonCount: 3,
+    pagination: true,
+    paginationDataReceived: { data: "data", total_rows: "total", last_page: (raw, p) => Math.ceil(raw.total/p.size) },
+    paginationCounter: function(ps, cr, cp, tr, tp) {
+        if (tr == null) return `<span class="ccd">${cr.toLocaleString()}</span>`;
+        const humanize = n =>
+          n < 1000
+            ? n.toLocaleString()
+            : new Intl.NumberFormat("en", {
+                notation: "compact",
+                compactDisplay: "short",
+                maximumFractionDigits: 1,
+              }).format(n);
+        const start = ((cp - 1)*ps + 1).toLocaleString();
+        const end   = Math.min(cp*ps, tr).toLocaleString();
+        const total = tr < 5000 ? tr.toLocaleString() : humanize(tr);
+        return `<span class="ccd">${start} – ${end} of ${total}</span>`;
+      },
+    initialSort: [
+      { column: window["{{ccd_tabulator_table}}_default_sort_field"],
+        dir: window["{{ccd_tabulator_table}}_default_sort_field_direction"] }
+    ],
+    rowFormatter(row){ row.getElement().classList.add("sm-text"); },
+
+    // 4) tableBuilt fires once the table DOM is in place
+    tableBuilt(){
+      console.log("Tabulator table built, applying initial filter and data load.");
+      initialLoad();
+    },
+  });
+
+  // 5) Expose and wire up your filter-change listener
+  window["{{ccd_tabulator_table}}_table"] = table;
+  document
+    .getElementById("tx_type_contents_selector")
+    .addEventListener("change", updateFilterOnly);
+
+
+  
+const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (downloadBtn) {
+      document.getElementById("transactions-tab-content").addEventListener("click", e => {
+  if (e.target.matches("#{{ccd_tabulator_table}}-download-csv")) {
+    table.download(
+      "csv",
+      "{{filename}}",
+      { bom: true, downloadDataFormatter: data => data }
+    );
+  }
+});
+  }
+};
+
+</script>
+
+
+
+
+<!-- validator tally -->
+{% set ccd_tabulator_table ='validator_tally_table'%}
+{% set tabulator_ajax_url = '/account/validator-tally/'+net+'/'+ account_index|string %}
+{% set filename='validator-tally-'+ account_index|string+'-'+range(1000,10000)|random|string+'.csv' %}
+
+{% include 'base/tabulator/tabulator-common-options-get.html' %}
+
+<script>
+function init_validator_tally_table() {
+  const validator_tally_table_columns = [
+  {
+        title: "Date", field: "date", 
+        minWidth: 95,
+        // maxWidth: 70,
+        responsive: 0,
+        
+        formatter: ccdClassFormatterForString,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "LP(%)", field: "lp", 
+        minWidth: 90,
+        maxWidth: 90,
+        responsive: 10,
+        formatter: LotteryPowerFormatter,
+        accessorDownload: (value, data) => data.lp*100,
+        headerSort:false,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Expectation", field: "expectation", 
+        minWidth: 120,
+        maxWidth: 120,
+        responsive: 0,
+        formatter: intFormatterRounded,
+        headerSort:false,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Actual", field: "actuals", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 0,
+        formatter: intFormatterRounded,
+        headerSort:false,
+        
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      
+    ];
+  window["validator_tally_table_filename"] = '{{filename}}';
+
+  window["validator_tally_table_table"] = new Tabulator("#validator_tally_table", {
+    ...commonTabulatorOptionsGET,
+    columns: validator_tally_table_columns,
+    ajaxURL: "{{tabulator_ajax_url}}",
+    ajaxRequesting: function(url, params){
+    return true; // must return true to allow the request
+  },
+  });
+
+  window["validator_tally_table_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+  const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (downloadBtn) {
+      document.getElementById("validator-tab-content").addEventListener("click", e => {
+  if (e.target.matches("#{{ccd_tabulator_table}}-download-csv")) {
+    window.validator_tally_table_table.download(
+      "csv",
+      window.validator_tally_table_filename,
+      { bom: true, downloadDataFormatter: data => data }
+    );
+  }
+});
+  }
+}
+</script>
+
+
+<!-- validator tally -->
+
+<!-- validator transactions -->
+ {% set ccd_tabulator_table ='validator_transactions_table'%}
+{% set tabulator_ajax_url = '/account_validator_transactions/'+net+'/'+ account_id%}
+{% set filename='validator-transactions-'+ account_index|string+'-'+range(1000,10000)|random|string+'.csv' %}
+
+{% include 'base/tabulator/tabulator-common-options-get.html' %}
+
+<script>
+function init_validator_transactions_table() {
+  const validator_transactions_table_columns = [
+  {
+        title: "Hash", field: "hash", 
+        minWidth: 60,
+        maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        accessorDownload: (value, data) => data.hash_download,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Age", field: "transaction_block_info_slot_time", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 50,
+        formatter: isoDateTimeHumanDiff,
+        headerSort:false,
+        titleDownload:"Timestamp",
+        accessorDownload: (value, data) => data.transaction_block_info_slot_time_download,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        
+        title: "Event", field: "first_event", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 30,
+        minWidth: 250,
+        // maxWidth: 180, 
+        formatter: "html",
+        accessorDownload: (value, data) => StripHTMLFormatterOnString(data.first_event),
+        headerSort: false,
+        
+      }
+      
+    ];
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+
+  window["validator_transactions_table_table"] = new Tabulator("#validator_transactions_table", {
+    ...commonTabulatorOptionsGET,
+    columns: validator_transactions_table_columns,
+    ajaxURL: "{{tabulator_ajax_url}}",
+    ajaxRequesting: function(url, params){
+    return true; // must return true to allow the request
+  },
+  });
+
+  window["validator_transactions_table_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+  const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (downloadBtn) {
+      document.getElementById("validator-tab-content").addEventListener("click", e => {
+  if (e.target.matches("#{{ccd_tabulator_table}}-download-csv")) {
+    window["validator_transactions_table_table"].download(
+      "csv",
+      window["{{ccd_tabulator_table}}_filename"],
+      { bom: true, downloadDataFormatter: data => data }
+    );
+  }
+});
+  }
+}
+</script>
+
+
+<!-- validator transactions -->
+
+
+<!-- validator rewards -->
+ {% set ccd_tabulator_table ='validator_rewards_table'%}
+{% set tabulator_ajax_url = '/account_rewards/'+net+'/'+ account_id%}
+{% set filename='validator_rewards-'+ account_id+'-'+range(1000,10000)|random|string+'.csv' %}
+
+{% include 'base/tabulator/tabulator-common-options-get.html' %}
+
+<script>
+function init_validator_rewards_table() {
+  const validator_rewards_table_columns = [
+  
+     {
+        title: "Date", field: "date", 
+        minWidth: 95,
+        maxWidth: 95,
+        responsive: 0,
+        
+        formatter: ccdClassFormatterForString,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        
+        title: "Staking Rewards", field: "sum_of_rewards", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 0,
+        minWidth: 230,
+        // maxWidth: 230, 
+        formatter: "html",
+        accessorDownload: (value, data) => StripHTMLFormatterOnString(data.sum_of_rewards),
+        headerSort: false,
+        
+      }
+      
+    ];
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+
+  window["validator_rewards_table_table"] = new Tabulator("#validator_rewards_table", {
+    ...commonTabulatorOptionsGET,
+    columns: validator_rewards_table_columns,
+    ajaxURL: "{{tabulator_ajax_url}}",
+    ajaxRequesting: function(url, params){
+    return true; // must return true to allow the request
+  },
+  });
+
+  window["validator_rewards_table_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+  const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (downloadBtn) {
+      document.getElementById("validator-tab-content").addEventListener("click", e => {
+  if (e.target.matches("#{{ccd_tabulator_table}}-download-csv")) {
+    window["validator_rewards_table_table"].download(
+      "csv",
+      window["{{ccd_tabulator_table}}_filename"],
+      { bom: true, downloadDataFormatter: data => data }
+    );
+  }
+});
+  }
+}
+</script>
+
+
+<!-- validator rewards -->
+
+
+<!-- Tokens-->
+{% include "base/tabulator/tabulator-plt-tokens.html" %}
+{% include "base/tabulator/tabulator-cis-2-tokens.html" %}
+
+{% endblock content %}

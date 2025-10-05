@@ -1,0 +1,87 @@
+site_name: CCDExplorer.io - Documentation
+site_description: Documentation for CCDExplorer.io
+site_author: CCDExplorer.io
+site_url: https://docs.ccdexplorer.io
+
+nav:
+  - Home: index.md
+  - Entities:
+    - Block: entities/block.md
+    - Transaction: entities/transaction.md
+    - Account: entities/account.md
+    - Module: entities/module.md
+    - Token: entities/token.md
+    - Community Labels: entities/community_labels.md
+  - Services:
+    - Projects: services/projects.md
+    - Every Block:
+      - Heartbeat: services/every_block/heartbeat.md
+      - Events and Impacted Addresses: services/every_block/events_impacted_addresses.md
+      - Token Accounting: services/every_block/token_accounting.md
+    - End of Day:
+      - Accounts: services/end_of_day/accounts.md
+      - Transactions by Type/Contents: services/end_of_day/transactions_by_type_contents.md
+      - Statistics Daily Holders: services/end_of_day/statistics_daily_holders.md
+      - Statistics Daily Limits: services/end_of_day/statistics_daily_limits.md
+      - Account Graphs: services/end_of_day/account_graph.md
+      - Transactions by projects: services/end_of_day/transactions_by_projects.md
+      - Unique Active Addresses: services/end_of_day/statistics_unique_addresses.md
+      - Statistics Transaction Fees: services/end_of_day/statistics_fees.md
+    - Messages:
+      - New Account Address: services/messages/new_address.md
+      - New/Upgraded Contract: services/messages/new_contract.md
+      - New/Upgraded Module: services/messages/new_module.md
+  - Reference:
+    - Celery: reference/celery.md
+    - CIS: reference/cis.md
+    - CNS: reference/cns.md
+    - Domain: reference/domain.md
+    - GRPC: reference/grpc.md
+    - MongoDB: reference/mongodb.md
+    - SchemaParser: reference/schema-parser.md
+    - Tooter: reference/tooter.md
+    - WasmDecoder: reference/wasmdecoder.md
+docs_dir: docs
+
+markdown_extensions:
+  - admonition  
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - autorefs:
+      resolve_closest: true
+  - mkdocstrings:
+      enabled: !ENV [ENABLE_MKDOCSTRINGS, true]
+      default_handler: python
+      handlers:
+        python:
+          # Make your monorepo code importable for mkdocstrings/griffe:
+          paths:
+            - "."  # repo root; adjust if needed
+          setup_commands:
+            - "import os, sys; sys.path.insert(0, os.path.abspath('.'))"
+          options:
+            show_bases: false
+            docstring_options:
+              ignore_init_summary: true
+            heading_level: 2
+            inherited_members: true
+            show_source: false
+            summary: true
+
+theme:
+  name: material
+  primary: deep purple
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle: { icon: material/brightness-auto, name: Switch to light mode }
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: { icon: material/brightness-7, name: Switch to dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: lime
+      toggle: { icon: material/brightness-4, name: Switch to system preference }

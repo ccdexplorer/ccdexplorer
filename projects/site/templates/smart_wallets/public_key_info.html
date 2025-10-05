@@ -1,0 +1,36 @@
+<table class="table table-borderless">
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Public Key</td>
+        <td  class=" text-end align-middle text-secondary-emphasis">
+            {% set copy_value = public_key %}
+            {% set value_type = "public_key" %}
+            {% set display_value = public_key | shorten_address(address=True)|safe %}
+            {% include "base/copy_to_clipboard.html"%}
+        </td>
+    </tr>
+    
+    
+
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Deployed in tx</td>
+        <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
+            
+            </td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Age</td>
+        {% if not deployed_in_genesis_block %}
+            <td class="text-end text-secondary-emphasis">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
+        {% else %}
+            <td class="text-end text-secondary-emphasis">{{genesis_block_slot_time|datetime_delta_format_since}}</td>
+        {% endif %}
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis"># Transactions</td>
+        <td  class="text-end text-secondary-emphasis ccd" id="block_tx_count">{{tx_count_dict.tx_count}}
+        </td>
+    </tr>
+   
+
+</tbody>
+</table>

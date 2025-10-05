@@ -1,0 +1,36 @@
+<table class="table table-borderless">
+    
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Module Name</td>
+        <td class="text-end text-secondary-emphasis">{{module.module_name}}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Module Reference</td>
+        <td class="text-end text-secondary-emphasis">
+            {% set copy_value = module.id %}
+            {% set value_type = "module_ref" %}
+            {% set display_value = module.id[:10]|safe %}
+            {% include "base/copy_to_clipboard.html"%}
+            </td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Verification Status</td>
+        <td class="text-end text-secondary-emphasis">{% if module.verification.verification_status == "not_started" %}Not Started{%elif module.verification.verification_status == "verified_success"%}Verified <i class="text-success bi bi-patch-check-fill"></i>{% else %}Unverifiable{% endif %}
+            
+            </td>
+    </tr>
+    
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Age</td>
+        <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Sender</td>
+        <td class="text-end text-secondary-emphasis">{{tx_deployed.account_transaction.sender|account_link(net,user,tags,request.app)|safe }}
+            
+            </td>
+    </tr>
+    
+    
+</tbody>
+</table>

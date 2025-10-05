@@ -1,0 +1,110 @@
+<div class="row row-flex">
+      
+  {% set title= "Day: "+date %}{% include 'base/box_title.html' %}
+    <div class=" col-sm-6 mb-3"> 
+      <div class="border content curved-border text-center" >
+        Block range: 
+          <span class="text-start text-secondary-emphasis sm-text ccd">
+            <a href="/{{net}}/block/{{today_in.day_data.height_for_first_block}}">
+              <span class="ccd" >{{today_in.day_data.height_for_first_block|round_x_decimal_with_comma(0)}}</span>
+            </a>
+            ...<a href="/{{net}}/block/{{today_in.day_data.height_for_last_block}}">
+              <span class="ccd" >{{today_in.day_data.height_for_last_block|round_x_decimal_with_comma(0)}}</span>
+            </a>
+          </span>
+    </div>
+  </div>
+   
+      <div class=" col-sm-3 mb-3">   
+        <div class="border content curved-border  text-center" >
+      <span class="sm-text"># Txs: <span class="text-start text-secondary-emphasis ccd">{{today_in.tx_count|round_x_decimal_with_comma(0)}}</span></span>
+      </div>
+    </div>
+    <div class=" col-sm-3 mb-3"> 
+      <div class="border content curved-border text-center" >
+        <span class="sm-text">Fees: <span class="text-center text-secondary-emphasis ccd">{{today_in.fee_for_day|micro_ccd_no_decimals|safe}}</span></span>
+    </div>
+  </div>
+<!-- </div> -->
+<!-- </div>   -->
+</div>
+<!-- https://codepen.io/ondrejsvestka/pen/gWPpPo for equal height columns -->
+  <div class="row  row-flex">
+      
+      <div class="col-md-4 col-sm-12">
+          
+    <div class="border content curved-border " >
+      {% set title= "Transaction Types" %}{% include 'base/box_title.html' %}
+      <table class="table table-borderless">
+          <tbody>
+            {% for tx_type in today_in.tx_types.keys() %}
+                <tr  class="sm-text">
+                    <td class="text-start text-secondary-emphasis">{{tx_type}}</td>
+                    <td class="text-end text-secondary-emphasis ccd">{{today_in.tx_types[tx_type]|round_x_decimal_with_comma(0)}}</td>
+                </tr>    
+            {% endfor %}
+          </tbody>    
+      </table>     
+    </div>
+  </div>
+  <div class=" col-md-4  col-sm-12">
+          
+    <div class="border content curved-border " >
+      {% set title= "Logged Events by Contract" %}{% include 'base/box_title.html' %}
+      <table class="table table-borderless">
+          <tbody>
+            {% for contract_info in today_in.logged_events_by_contract %}
+                <tr  class="sm-text">
+                    <td class="text-start text-secondary-emphasis">{{contract_info._id|instance_link_from_str(net, tags=tags)|safe}}</td>
+                    <td class="text-end text-secondary-emphasis ccd">{{contract_info.count|round_x_decimal_with_comma(0)}}</td>
+                </tr>    
+            {% endfor %}
+          </tbody>    
+      </table>
+      
+</div>
+</div>
+
+<div class=" col-md-4  col-sm-12">
+          
+  <div class="border content curved-border " >
+    {% set title= "Validator Logs" %}{% include 'base/box_title.html' %}
+    {% if today_in.primed_suspended|length == 0%}
+      <div class="text-start text-secondary-emphasis">No logs found.</div>
+    {% else %}
+      <table class="table table-borderless">
+          <tbody>
+            {% for action in today_in.primed_suspended %}
+                <tr  class="sm-text">
+                    <td class="text-start text-secondary-emphasis">{{action.baker_id|account_link(net,user,tags,request.app)|safe }}</td>
+                    <td class="text-end text-secondary-emphasis ccd">{% if action.action == "suspended"%}Suspended{% else %}Primed for Suspension{% endif%}</td>
+                </tr>    
+            {% endfor %}
+          </tbody>    
+      </table>
+    {% endif %}
+    
+</div>
+</div>
+  </div>
+    <div class="row row-flex">
+      <div class=" col-md-12  col-sm-12">
+          
+          <div class="border content curved-border " >
+            {% set title= "Impacted Addresses" %}{% include 'base/box_title.html' %}
+            <table class="table table-borderless">
+              <tbody>
+                {% for ia in today_in.impacted_addresses %}
+                      <tr  class="sm-text">
+                          <td class="text-start text-secondary-emphasis">{{ia._id|account_link(net,user,tags,request.app)|safe }}</td>
+                          <td class="text-end text-secondary-emphasis ccd">{{ia.count|round_x_decimal_with_comma(0)}}</td>
+                      </tr>    
+                  {% endfor %}
+              </tbody>    
+          </table>     
+            
+      </div>
+    
+      
+    </div>
+  

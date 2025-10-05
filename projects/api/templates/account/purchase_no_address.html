@@ -1,0 +1,12 @@
+
+<h5>Register Paying Account</h5>
+    
+In order to register your paying account, you can send any amount of CCD to <code>3GjqwYXv5sGY1QZdhx3uBdNz1LWUofQAn4tyV6wQu8cg9592Ur</code> with a memo field <code>{{user.api_account_id[:8]}}</code>.
+    Make note of the <i>tx hash</i> for this transaction and paste is here.<br/>
+      <div>
+        
+        <input type="text" name="tx_hash" class="border m-2 ms-0" style="width:200px;" >
+      </div>
+      
+      <button hx-post="/account/record-tx-hash-paying-account" hx-target = "#record_tx_hash" hx-include="[name='tx_hash']"class="btn btn-primary">Submit</button>
+    

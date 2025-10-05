@@ -1,0 +1,16 @@
+{% for error in errors %}
+    <p style="color: red">{{ error }}</p>
+{% endfor %}
+<form action="/auth/register" method="post">
+    <p>
+        <p><label for="">Email</label></p>
+        <input type="email" class="ms-0 border" style="width:300px;" name="username" value="{{ username }}" required>
+    </p>
+    <p>
+        <p><label for="">Password</label></p>
+        <input type="password" class="ms-0 border" style="width:300px;"  name="password" value="{{ password }}" required>
+    </p>
+    <button type="submit" value="Submit" class="btn btn-primary">Submit</button>
+
+    <!-- <input type="submit" value="Submit"> -->
+</form>

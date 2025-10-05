@@ -1,0 +1,32 @@
+<div class="row mt-4 row-flex">
+  <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+        {% set title= "Pool Info" %}{% include 'base/box_title.html' %}
+        {% include "pool/pool_info.html" %}</div>
+  </div>
+  {% if pool.pool_info.open_status != "closed_for_all" %}
+  <div class="col-md-6  col-sm-12">
+      <div id="validator_rewards" class=" content border curved-border  " >
+        {% set title= "Pool Rewards" %}{% include 'base/box_title.html' %}
+        {% include "pool/pool_rewards.html" %}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if pool.pool_info.open_status != "closed_for_all" %}
+<div class="row mt-4 row-flex">
+  
+  <div class="col-md-6  col-sm-12">
+      
+          <div id="passive_delegators" class=" content border curved-border  ">
+            {% set title= "Pool Delegators" %}{% include 'base/box_title.html' %}
+            <span class="htmx-indicator-c">
+            {% set ccd_tabulator_table ='pool_delegators_table'%}
+            {% set tabulator_ajax_url = '/account_pool_delegators/'+net+'/'+ account_index|string%}
+            {% set filename='pool-delegators-'+ account_index|string+'-'+range(1000,10000)|random|string+'.csv' %}
+            {% include "base/tabulator/tabulator-pool-delegators.html" %}
+          </span></div>  
+  </div>
+</div>
+{% endif %}
+

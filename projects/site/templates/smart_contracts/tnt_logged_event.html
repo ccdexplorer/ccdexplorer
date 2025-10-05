@@ -1,0 +1,12 @@
+        
+       
+    {% set tt = event.event_info.event_type.split('_')[0]%}
+<tr>
+    <td class="text-secondary-emphasis  text-start">{{event.tx_info.tx_hash|tx_hash_link(net)|safe}}</td>
+    <td class="text-secondary-emphasis    text-start"><span class="ccd">{{event.tx_info.date}}</span></td>
+    <td class="text-secondary-emphasis    text-start"><span class="ccd">{%if "created" in event.event_info.event_type%}Created Item{%else%}Status Changed{%endif%}</span></td>  
+    <td class=" text-end">{%if event.recognized_event.initial_status%}{{event.recognized_event.initial_status}}{%else%}{{event.recognized_event.new_status}}{%endif%}</td>
+        
+</tr>
+            
+            

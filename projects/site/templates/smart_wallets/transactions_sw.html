@@ -1,0 +1,121 @@
+
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+{% set ccd_tabulator_table ='latest_smart_wallets_txs'%}
+{% set REFRESH = 60_000%}
+<div class="row">
+  <div class="col">
+  <span class="text-uppercase sm-text text-secondary-emphasis">Latest Transactions from Smart Wallets</span>
+  </div>
+{% include 'base/tabulator/timer-display.html' %}
+</div>
+<div id="{{ccd_tabulator_table}}" ></div>
+<script>
+  
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Hash", field: "hash", 
+        minWidth: 60,
+        // maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        accessorDownload: (value, data) => data.hash_download,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Age", field: "human_age", 
+        minWidth: 100,
+        maxWidth: 140,
+        responsive: 50,
+        formatter: "html",
+        headerSort:false,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Cost", field: "transaction_account_transaction_cost", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 130,
+        minWidth: 100,
+        maxWidth: 100, 
+        sorter: "number",
+        headerSort: false,
+        formatter: microCCDFormatter,
+      },
+      {
+        title: "Public Key", field: "public_key", hozAlign: "left", headerHozAlign: "left", 
+        responsive: 0,
+        minWidth: 170,
+        maxWidth: 170, 
+        formatter:"html",
+        headerSort: false,
+        
+      },
+      
+      {
+        title: "Block", field: "block_height", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 90,
+        minWidth: 120,
+        maxWidth: 130, 
+        formatter: "html",
+        headerSort: false,
+        
+      },
+      {
+        
+        title: "Smart Wallet", field: "wallet_contract_address", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 30,
+        minWidth: 120,
+        // maxWidth: 180, 
+        formatter: "html",
+        headerSort: false,
+        
+      }
+     
+
+    ];
+
+  
+  
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+  layout: "fitColumns",
+  height: "600px",
+  responsiveLayout: "hide",
+  ajaxURL: "/{{net}}/ajax_smart_wallets_txs",              // your paged endpoint
+  paginationSize: 25,                // rows per “page”
+  progressiveLoad: "scroll",         // infinite scroll mode
+  progressiveLoadScrollMargin: 300,  // trigger next load 300px from bottom
+  columns: window["{{ccd_tabulator_table}}_columns"],
+});
+window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+  document.querySelectorAll(".tabulator-col-title").forEach(el => {
+    el.classList.add("sm-text");
+  });
+});
+async function pollNewSmarts(){
+    const data = window["{{ccd_tabulator_table}}_table"].getData();
+    const since = data.length ? data[0].block_height_since : 0;
+    nextRefresh = Date.now() + REFRESH_INTERVAL;
+    try {
+      const resp = await fetch(`/{{net}}/ajax_smart_wallets/new?height=${since}`);
+      if (!resp.ok) throw new Error(resp.statusText);
+      const newBlocks = await resp.json();
+
+      if (newBlocks.length){
+        await window["{{ccd_tabulator_table}}_table"].addData(newBlocks, true);
+      }
+    } catch (e) {
+      
+    }
+  }
+
+ 
+</script>
+{% include 'base/tabulator/timer-js.html' %}
+<script>
+  setInterval(pollNewSmarts, {{REFRESH}});
+</script>
+

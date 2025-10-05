@@ -1,0 +1,203 @@
+
+
+<style>
+  .noUi-target {
+background: #0f0f0f;
+
+}
+#slider-ccd-pretty {
+  padding: 0 16px;
+}
+#slider-date-pretty {
+  padding: 0 16px;
+}
+.c-2-color { background: #2485DF }
+
+.noUi-tooltip {
+display: block;
+position: absolute;
+border: 1px solid #D9D9D9;
+font-size: smaller;
+border-radius: 4px;
+background: #0f0f0f;
+color: #a7acb1;
+padding: 5px;
+text-align: center;
+}
+</style>
+
+<script>
+  async function getTransactions(requested_page, total_rows) {
+    const transactions = document.getElementById('search-results');
+    
+    // Collect the same values as in the HTMX call
+    const theme = document.querySelector("HTML").getAttribute("data-bs-theme");
+    const start_date = document.getElementById("event-start-pretty").innerText;
+    const end_date = document.getElementById("event-end-pretty").innerText;
+    const gte = document.getElementById("event-start-ccd-pretty").innerText;
+    const lte = document.getElementById("event-end-ccd-pretty").innerText;
+    const memo = document.getElementById("memo_search").value;
+    const sort_key = document.querySelector("input[name=\"sort_key\"]:checked").id;
+    const sort_direction = document.querySelector("input[name=\"sort_direction\"]:checked").id;
+
+    // Construct the URL
+    const url = `/{{net}}/ajax_tools/transactions-search/transfer/${requested_page}`;
+
+    // Set the spinner while waiting for the response
+    transactions.innerHTML = '<span><img src="/static/misc/bars.svg"/> Searching...</span>';
+
+    // Perform the fetch request
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        theme: theme,
+        start_date: start_date,
+        end_date: end_date,
+        gte: gte,
+        lte: lte,
+        memo: memo,
+        sort_key: sort_key,
+        sort_direction: sort_direction,
+      }),
+    })
+      .then((response) => response.text())
+      .then((data) => {
+        // Update the transactions element with the response
+        transactions.innerHTML = data;
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }
+
+  function prev_txs(requested_page, total_rows) {
+    getTransactions(requested_page, total_rows)
+  };
+  function next_txs(requested_page, total_rows) {
+    getTransactions(requested_page, total_rows)
+  };
+
+  
+</script>
+
+
+<div class="row">
+  {% set title= "Search for transfers" %}{% include 'base/box_title.html' %}
+  </div>
+<div class="row">
+  <div class="col-md-3 mb-3">
+    <p>Select date range</p>
+    </div>
+    <div class="col-md-9 mb-3">
+    <div class=" me-5" id="slider-date-pretty"></div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-3 mb-3">
+    <p>Select value range</p>
+    </div>
+    <div class="col-md-9">
+    <div class=" me-5" id="slider-ccd-pretty"></div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-md-3 mt-2">
+    <p>Search for memo</p>
+  </div>
+  <div class="col-md-5 ">
+    <div class="align-center input-group input-group-sm" id="memo">
+      <input class="form-control " type="search" id="memo_search"
+       name="search" placeholder=""
+       hx-ext='json-enc'
+    hx-encoding="json"
+       hx-post="/{{net}}/ajax_tools/transactions-search/transfer/{{requested_page}}"
+    hx-vals='js:{
+        theme: document.querySelector("HTML").getAttribute("data-bs-theme"),
+        start_date: document.getElementById("event-start-pretty").innerText,
+        end_date: document.getElementById("event-end-pretty").innerText,
+        gte: document.getElementById("event-start-ccd-pretty").innerText,
+        lte: document.getElementById("event-end-ccd-pretty").innerText,
+        memo:document.getElementById("memo_search").value,
+        sort_key: document.querySelector("input[name=\"sort_key\"]:checked").id,
+        sort_direction: document.querySelector("input[name=\"sort_direction\"]:checked").id,
+        }'
+       hx-trigger="input changed delay:500ms, keyup[key=='Enter'], load"
+       hx-target="#search-results"
+       hx-indicator=".htmx-indicator">
+
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="btn-group-sm" role="group"  id="btnradio_sort_key">
+    Sort By:<input type="radio" class="btn-check" name="sort_key" id="amount" autocomplete="off" checked>
+    <label class="btn btn-outline-secondary " for="amount">Amount</label>
+  
+    <input type="radio" class="btn-check" name="sort_key" id="date" autocomplete="off">
+    <label class="btn btn-outline-secondary " for="date">Date</label>
+  </div>
+</div>
+
+<div class="row mt-3">
+  <div class="btn-group-sm" role="group"  id="btnradio_grouping_direction">
+    Direction:<input type="radio" class="btn-check" name="sort_direction" id="ascending" autocomplete="off" >
+    <label class="btn btn-outline-secondary " for="ascending">Ascending</label>
+  
+    <input type="radio" class="btn-check" name="sort_direction" id="descending" autocomplete="off" checked>
+    <label class="btn btn-outline-secondary " for="descending">Descending</label>
+  </div>
+</div>
+
+
+
+
+
+
+<span id="event-start-pretty" class="d-none"></span><br/>
+<span id="event-end-pretty" class="d-none"></span>
+<span id="event-start-ccd-pretty" class="d-none"></span><br/>
+<span id="event-end-ccd-pretty" class="d-none"></span>
+<button  type="button" id="update" class="d-none">Update</button>
+{% include 'charts/slider.html' %}
+
+{% include 'charts/slider_ccd.html' %}
+<span class="htmx-indicator">
+  <img src="/static/misc/bars.svg"/> Searching...
+ </span>
+<div    
+id="search-results"
+    class=""
+    hx-ext='json-enc'
+    hx-encoding="json"
+    hx-indicator=".htmx-indicator"
+
+    hx-trigger="update_event from:#update delay:100ms" 
+    hx-post="/{{net}}/ajax_tools/transactions-search/transfer/{{requested_page}}"
+    hx-vals='js:{
+        theme: document.querySelector("HTML").getAttribute("data-bs-theme"),
+        start_date: document.getElementById("event-start-pretty").innerText,
+        end_date: document.getElementById("event-end-pretty").innerText,
+        gte: document.getElementById("event-start-ccd-pretty").innerText,
+        lte: document.getElementById("event-end-ccd-pretty").innerText,
+        memo:document.getElementById("memo_search").value,
+        sort_key: document.querySelector("input[name=\"sort_key\"]:checked").id,
+        sort_direction: document.querySelector("input[name=\"sort_direction\"]:checked").id,
+        }'
+></div>
+<script>
+  document.querySelectorAll('input[name="sort_key"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        var event = new CustomEvent('update_event');
+        document.getElementById('update').dispatchEvent(event);
+    });
+});
+document.querySelectorAll('input[name="sort_direction"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        var event = new CustomEvent('update_event');
+        document.getElementById('update').dispatchEvent(event);
+    });
+});
+</script>

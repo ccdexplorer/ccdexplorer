@@ -1,0 +1,180 @@
+{% extends "base/base.html" %}
+{% block content %}
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<script>
+
+  function getNodes(category, key, direction) {
+    nodes = document.getElementById('nodes');
+    url = '/ajax_nodes_to_html/{{net}}/' + category + '/' + key + '/' + direction + '/' + api_key;
+
+    fetch(url)
+      .then((response) => {
+        return response.text();
+      })
+      .then((data) => {
+        nodes.innerHTML = data;
+
+      })
+      .catch(function (error) {
+        console.log(error);
+      });
+
+
+  }
+
+  function val() {
+
+    // Get the select menu
+    var key = document.querySelector('#key');
+    var direction = document.querySelector('#direction');
+    var category = document.querySelector('#category');
+
+    // Returns the selected value
+    getNodes(category.value, key.value, direction.value);
+  }
+
+  window.addEventListener('load', (event) => {
+    getNodes('reporting_validators', 'total_stake', 'descending');
+
+  });
+</script>
+<div id="nodes"></div>
+{% set ccd_tabulator_table ='nodes_table'%}
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+{% set tabulator_ajax_url = '/mainnet/ajax_nodes_tabulator' %}
+{% set filename='nodes-validators-'+range(1000,10000)|random|string+'.csv' %}
+{% include 'base/tabulator/tabulator-table-full-width-with-totals.html' %}
+
+<script>
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_columns"]= [
+      
+      {
+        title: "Validator", field: "baker_id", 
+        minWidth: 100,
+        // maxWidth: 180,
+        responsive: 0,
+        hozAlign: "left", headerHozAlign: "left",
+        formatter: function (cell) {
+          const rowData = cell.getData();
+          const visibleText = cell.getValue();
+
+          if (visibleText === null) {
+            return "Not a validator";
+          }
+
+          const link = document.createElement("a");
+          link.href = "/{{net}}/account/" + rowData.id;
+          link.innerHTML = '<span style="font-family: monospace, monospace;" class="small">'+visibleText+'</span>';
+          return link;
+        }
+      },
+      {
+        title: "Node Name",
+        field: "name",
+        responsive: 0,
+        minWidth: 190,
+        formatter: function (cell) {
+          const rowData = cell.getData();
+          const visibleText = cell.getValue();
+
+          if (visibleText === "Not reporting") {
+            return visibleText;
+          }
+
+          const link = document.createElement("a");
+          link.href = "/{{net}}/node/" + rowData.node;
+          link.innerHTML = '<span style="font-family: monospace, monospace;"  class="small">'+visibleText+'</span>';
+          return link;
+        }
+      },
+      {
+        title: "Stake", field: "stake", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 0,
+        maxWidth: 100, 
+        sorter: "number",
+        formatter: function (cell) {
+          let value = cell.getValue();
+          if (value === null || value === undefined) {
+            return "-";
+          }
+          const span = document.createElement("span");
+          span.classList.add("small");
+          span.style.fontFamily = "monospace, monospace";
+          span.textContent = (value * 100).toFixed(3) + "%";
+          return span;
+        }
+      },
+      {
+        title: "Ping (ms)", field: "ping", 
+        responsive: 10,
+        hozAlign: "right", minWidth: 120, maxWidth: 120,
+        headerHozAlign: "right", responsive: 5, formatter: function (cell) {
+          let value = cell.getValue();
+          if (value === null || value === undefined) {
+            return "-";
+          }
+          const span = document.createElement("span");
+          span.classList.add("small");
+          span.style.fontFamily = "monospace, monospace";
+          span.textContent = (value).toFixed(1);
+          return span;
+          
+        }
+      },
+      {
+        title: "Uptime", field: "uptime", 
+        responsive: 15,
+        hozAlign: "right", minWidth: 100, maxWidth: 100,
+        headerHozAlign: "right", formatter: isoDateTimeHumanDiff,
+      },
+      {
+        title: "Fin. Length", field: "finalizedBlockHeight", 
+        responsive: 15,
+        hozAlign: "right", minWidth: 140, maxWidth: 140,
+        headerHozAlign: "right", formatter: function (cell) {
+          let value = cell.getValue();
+          if (value === null || value === undefined) {
+            return "-";
+          }
+          const span = document.createElement("span");
+          span.classList.add("small");
+          span.style.fontFamily = "monospace, monospace";
+          span.textContent = (value).toFixed(0);
+          span.textContent = value.toLocaleString();
+          return span;
+          
+        }
+      },
+      { title: "Version", field: "version", 
+      responsive: 10,
+      maxWidth: 110,
+      hozAlign: "right", headerHozAlign: "right" ,formatter: function (cell) {
+          let value = cell.getValue();
+          if (value === null || value === undefined) {
+            return "-";
+          }
+          const span = document.createElement("span");
+          span.classList.add("small");
+          span.style.fontFamily = "monospace, monospace";
+          span.textContent = (value);
+          
+          return span;
+          
+        }
+        
+        },
+      // { title: "# Peers", field: "peers", 
+      // responsive: 10,
+      // hozAlign: "right", headerHozAlign: "right", minWidth: 90, maxWidth: 90,  },
+    ];
+    window["{{ccd_tabulator_table}}_sort"]= [
+    { column: "stake", dir: "desc" } 
+    ];
+
+</script>
+{% include 'base/tabulator/tabulator-table-execute-ajax.html' %}
+{% include 'base/tabulator/tabulator-table-download-link.html' %}
+
+{% endblock %}

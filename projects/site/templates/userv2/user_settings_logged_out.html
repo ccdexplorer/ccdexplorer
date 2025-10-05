@@ -1,0 +1,14 @@
+<div class="row">
+<div class="col">
+    <h4 class="ms-1 sm-text">Not logged in...</h4>
+
+<p class="sm-text">Request a link to login by sending <i>/login</i> to 
+{% if env.SITE_URL != 'https://ccdexplorer.io' %}
+<a class="sm-text" href="https://telegram.me/ce_dev_bot">ccdexplorer DEV Bot</a>
+{% else %}
+<a class="sm-text" href="https://telegram.me/concordium_explorer_bot">ccdexplorer Bot</a>
+
+{% endif %}
+. </p><p class="sm-text">This will create an account if you haven't registered before. Follow the link in the chat with ccdexplorer Bot to come back here, where you add your accounts to follow and other notification preferences.</p>  
+</div>
+</div>

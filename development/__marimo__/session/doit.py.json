@@ -1,0 +1,46 @@
+{
+  "version": "1",
+  "metadata": {
+    "marimo_version": "0.16.5"
+  },
+  "cells": [
+    {
+      "id": "Hbol",
+      "code_hash": "050d1623af058189717d31d5dce94db9",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": []
+    },
+    {
+      "id": "QRgZ",
+      "code_hash": "00a408c79afbeec9440198dce741bf5a",
+      "outputs": [
+        {
+          "type": "data",
+          "data": {
+            "text/plain": ""
+          }
+        }
+      ],
+      "console": [
+        {
+          "type": "stream",
+          "name": "stdout",
+          "text": "[17:50:49] 8.0.0                                                                                                                                                                                  core.py:203\n"
+        }
+      ]
+    },
+    {
+      "id": "lcwO",
+      "code_hash": null,
+      "outputs": [],
+      "console": []
+    }
+  ]
+}

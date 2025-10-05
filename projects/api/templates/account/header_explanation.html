@@ -1,0 +1,10 @@
+<h4  class="sm-text">How to use the API key</h4>
+<p class="sm-text">API <b>v2</b> can only be used when authenticated using a header key (<code>x-ccdexplorer-key</code>). 
+   {% if user_api_keys|length == 0 %}
+   <p class="sm-text">Generate an API key first.</p>
+   {% else %} 
+    <br/>You can include the following header to authenticate with the API:<br/><br/>
+    <code>x-ccdexplorer-key: {{sample_key}}</code><br/><small>* Replace API key to use other keys</small></p>
+  
+    <p class="sm-text small"></p>
+    {% endif %}

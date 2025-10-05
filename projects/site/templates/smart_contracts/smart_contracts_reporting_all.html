@@ -1,0 +1,48 @@
+<!-- <div class="table-responsive"> -->
+    <!-- - Module Contracts table -->
+    
+    <!-- <p><small>The following modules are included in the report:</small></p>
+    <ul>
+        {% for sm in results.keys() %}
+        <li><span class="ccd">{{source_to_name[sm]}}</span></li>
+        {% endfor %}
+    </ul> -->
+    
+    <h6 class="mt-2">All Selected Modules Combined*</h6>
+    <p><small><i><span class="small">* Note that double counting can occur, as a single tx can involve multiple contracts from a module.</span></i></small></p>
+    {% if results_all|length == 0 %}
+    <p><small>No results found...</small></p>
+    {% endif %}
+    <table class="table table-striped ms-1 me-1 small">
+    {% for c in results_all|reverse %}
+        
+                
+            
+                <tr><td class="ccd">
+                    {% if period=='1W'%}
+                        Week
+                    {% endif %}
+                    {% if period=='1M'%}
+                        Month
+                    {% endif %}
+                    
+                    ending...</td>
+                    <td class="ccd text-start " >{{(c.date)|datetime_timestamp_reporting}}</td>
+                    <td class="ccd text-end" style="min-width:50px;">{{c.count|reporting_number}}</td></tr>
+            
+        
+        {% endfor %}
+    </table>
+    <hr>
+    <h6 class="mt-2">Individual Modules</h6>
+    {% for sm, content in results.items() %}
+        <small><span class="text-muted ms-2">{{source_to_name[sm]}}</span></small>
+        <table class="table table-striped ms-1 me-1small">
+            {% include "smart_contracts/smart_contracts_reporting_individual.html" %}    
+        </table>
+       
+        {% endfor %}
+
+    <!-- Module Contracts table-->
+
+<!-- </div> -->

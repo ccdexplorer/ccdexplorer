@@ -1,0 +1,17 @@
+
+
+{% include 'base/pagination.html' %}
+<table class="table table-borderless">
+    <tbody>
+      {% for row in rewards %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">{{row.account_id |account_link(net,user,tags,request.app)|safe}}</td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.transaction_fees | micro_ccd_display|safe}}</td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.finalization_reward | micro_ccd_display|safe}}</td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.baker_reward | micro_ccd_display|safe}}</td>
+            
+        </tr>
+      {% endfor %}
+        
+    </tbody>
+    </table>

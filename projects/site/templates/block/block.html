@@ -1,0 +1,198 @@
+{% extends "base/base.html" %}
+{% block ogp %}
+<meta property="og:title" content="Block {{block_info.height|round_x_decimal_with_comma(0)}} ({{block_info.hash}}) on Concordium {{net}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{env.SITE_URL}}/{{net}}/block/{{block_info.height}}" />
+{% endblock %}
+{% block content %}
+
+
+
+<script>
+    function getSpecialEvents() {
+        se = document.getElementById('special_events');
+        var block_height = document.getElementById('block_height').title;
+        url =  '/ajax_special_events_html_v2/{{net}}/' + block_height + '/' + api_key ;
+
+        fetch(url)
+            .then((response) => {
+                return response.text();
+            })
+            .then((data) => {
+                se.innerHTML = data;
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+
+    window.addEventListener('load', (event) => {
+        getSpecialEvents();
+
+    });
+</script>
+<script>
+    function getChainParameters() {
+        
+        cp = document.getElementById('chain_parameters');
+        var block_height = document.getElementById('block_height').title;
+        url =  '/ajax_chain_parameters_html_v2/{{net}}/' + block_height + '/' + api_key ;
+        console.log('url===', url);
+        fetch(url)
+            .then((response) => {
+                return response.text();
+            })
+            .then((data) => {
+                cp.innerHTML = data;
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+
+    window.addEventListener('load', (event) => {
+        getChainParameters();
+
+    });
+</script>
+<!-- Get Account Rewards -->
+<script>
+    function getAccountRewards(requested_page) {
+        account_rewards = document.getElementById('account_rewards');
+        block_height = document.getElementById('block_height').title;
+        total_rows = '{{payday_info.count_of_account_rewards}}';
+        url =  '/ajax_payday_account_rewards_html_v2/' + block_height + '/' + requested_page + '/' + total_rows + '/' + api_key;
+
+        fetch(url)
+            .then((response) => {
+                return response.text();
+            })
+            .then((data) => {
+                account_rewards.innerHTML = data;
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+
+    function prev_account_rewards(requested_page) {
+        console.log("___PREV:", requested_page)
+        getAccountRewards(requested_page)
+    };
+    function next_account_rewards(requested_page) {
+        console.log("___NEXT:", requested_page)
+        getAccountRewards(requested_page)
+    };
+
+    window.addEventListener('load', (event) => {
+        // getAccountRewards(0);
+    });
+</script>
+<!-- Get Pool Rewards -->
+<script>
+    function getPoolRewards(requested_page) {
+        pool_rewards = document.getElementById('pool_rewards');
+        block_height = document.getElementById('block_height').title;
+        total_rows = '{{payday_info.count_of_pool_rewards}}';
+        url =  '/ajax_payday_pool_rewards_html_v2/' + block_height + '/' + requested_page + '/' + total_rows + '/' + api_key;
+
+        fetch(url)
+            .then((response) => {
+                return response.text();
+            })
+            .then((data) => {
+                pool_rewards.innerHTML = data;
+            })
+            .catch(function (error) {
+                console.log(error);
+            });
+    }
+
+    function prev_pool_rewards(requested_page) {
+        console.log("___PREV:", requested_page)
+        getPoolRewards(requested_page)
+    };
+    function next_pool_rewards(requested_page) {
+        console.log("___NEXT:", requested_page)
+        getPoolRewards(requested_page)
+    };
+
+    window.addEventListener('load', (event) => {
+        // getPoolRewards(0);
+    });
+</script>
+
+
+    {% include 'base/search_bar_non_home_inclusion.html' %}
+    <div class="row  mt-4">
+        <div class="col">{% include 'block/block_header.html' %}</div>  
+    </div>
+    <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active explorer bg-secondary-subtle" id="pills-information-tab" data-bs-toggle="pill" data-bs-target="#pills-information" type="button" role="tab" aria-controls="pills-information" aria-selected="true">
+            <span class="tab-text-large">Information</span><span class="tab-text-small">Info</span>
+        </button>
+          
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link explorer  bg-secondary-subtle" id="pills-specials-tab" data-bs-toggle="pill" data-bs-target="#pills-specials" type="button" role="tab" aria-controls="pills-specials" aria-selected="false">
+            <span class="tab-text-large">Special Events</span><span class="tab-text-small">Events</span>
+        </button>
+          
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link explorer  bg-secondary-subtle" id="pills-contact-tab" data-bs-toggle="pill" data-bs-target="#pills-contact" type="button" role="tab" aria-controls="pills-contact" aria-selected="false">
+            <span class="tab-text-large">Chain Parameters</span><span class="tab-text-small">Chain</span>
+        </button>
+          
+        </li>
+        {% if payday_info["is_payday"] %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link explorer  bg-secondary-subtle" id="pills-payday-tab" data-bs-toggle="pill" data-bs-target="#pills-payday" type="button" role="tab" aria-controls="pills-contact" aria-selected="false">
+                    Payday
+                </button>
+                
+            </li>
+        {% endif %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link explorer  bg-secondary-subtle" id="pills-txs-tab" data-bs-toggle="pill" data-bs-target="#pills-txs" type="button" role="tab" aria-controls="pills-txs" aria-selected="false" >
+            <span class="tab-text-large">Transactions</span><span class="tab-text-small">Txs</span>
+        </button>
+          
+        </li>
+      </ul>
+
+
+      <div class="tab-content" id="pills-tabContent">
+        <div class="tab-pane fade show active col-lg-8  col-sm-12" id="pills-information" role="tabpanel" aria-labelledby="pills-information-tab" tabindex="0">
+            <div class="border curved-border">
+                {% set title= "Block Info" %}{% include 'base/box_title.html' %}
+                {% include "block/block_info.html" %}
+            </div>
+
+        </div>
+        <div class="tab-pane fade col-lg-8  col-sm-12" id="pills-specials" role="tabpanel" aria-labelledby="pills-specials-tab" tabindex="0"><div class="border curved-border" id="special_events"></div></div>
+        <div class="tab-pane fade col-lg-8  col-sm-12" id="pills-contact" role="tabpanel" aria-labelledby="pills-contact-tab" tabindex="0"><div class="border curved-border" id="chain_parameters"></div></div>
+        {% if payday_info["is_payday"] %}
+            <div class="tab-pane fade col-lg-12" id="pills-payday" role="tabpanel" aria-labelledby="pills-payday-tab" tabindex="0">{% include "block/block_payday.html" %}</div>
+        {% endif %}
+        <div class="tab-pane fade col-lg-12  col-sm-12" id="pills-txs" role="tabpanel" 
+        aria-labelledby="pills-txs-tab" tabindex="0"><div class="border curved-border" id="txs">
+            <div id="txs_table_block_wrapper">
+            {% set ccd_tabulator_table ='txs_table_block'%}
+                {% set tabulator_ajax_url = '/block_transactions/'+net+'/'+block_info.height|string+'/'+total_rows|string%}
+                {% set filename='block-transactions-'+account_id|string +'.csv' %}
+                {% include "base/tabulator/tabulator-txs.html" %}
+            </div>
+            <div id="txs_table_block_wrapper_no_rows">
+                No transactions found.
+            </div>
+
+        </div></div>
+      
+    </div>
+    
+       
+
+
+{% endblock content %}

@@ -1,0 +1,17 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+{% if user %}
+Already logged in. <br/>
+{{user}}
+{% else %}
+
+<h1>Register for API account</h1>
+
+<div id="register">
+{% include "/auth/register_component.html" %}
+</div>
+{% endif %}
+
+{% endblock content %}

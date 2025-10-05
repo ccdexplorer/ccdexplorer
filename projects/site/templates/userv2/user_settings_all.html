@@ -1,0 +1,95 @@
+{% extends "base/base.html" %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<p><i>Notifications are on a best effort basis. No guarantee they will arrive (on time, or at all). </i></p>
+{% if user %}
+<p>
+            
+    {% if user.username %}
+        You are logged in as <a href="https://telegram.me/{{user.username}}">@{{user.username}}</a> (<a href="/settings/user/logout">logout</a>).
+    {% elif user.first_name %}
+    You are logged in as {{user.first_name}} (<a href="/settings/user/logout">logout</a>).
+    {% else %}
+    You are logged in as {{user.chat_id}} (<a href="/settings/user/logout">logout</a>).
+    {% endif %}
+
+</p>
+<div class="row mt-4 row-flex">
+    <div class="col-md-6  col-sm-12 ">
+        <div class="border content curved-border " >
+          {% set title= "User Settings" %}{% include 'base/box_title.html' %}
+          
+    {% include "SiteUser/user_email_address_start.html" %}    
+        </div>
+    </div>
+    
+    <div class="col-md-6  col-sm-12">
+        <div id="" class=" content border curved-border  " >
+          {% set title= "General Notification Preferences" %}{% include 'base/box_title.html' %}
+          <!-- <h5>General Notification Preferences</h5> -->
+        
+          <p>
+              
+                  Edit notification preferences for events on-chain that are not directly related to an account (such as validators lowering its stake, (large) account transfers, protocol updates, etc.). 
+              
+          </p>
+          {% include "SiteUser/other_notification_preferences_start.html" %}        
+        </div>
+    </div>
+    
+</div>
+  
+ 
+  <div class="row  row-flex">
+    
+    <div class="col-md-6  col-sm-12">
+        <div id="" class=" content border curved-border  " >
+            {% set title= "Account Notification Preferences" %}{% include 'base/box_title.html' %}
+            
+            <p>Edit notification preferences for your accounts below. Note that for all accounts you can edit the 
+                <i>account notification preferences</i>, while you can only edit the <i>validator notification preferences</i> for validators.
+            </p>
+            <br/>
+            <b>Add a new account</b>
+            {% include "SiteUser/user_new_account_start.html" %}   
+            {% if user.accounts|length > 0 %}
+                {% for user_account_index, user_account in user.accounts.items() %}
+                    {% include "SiteUser/user_account_start.html" %}
+                {% endfor %}
+            {% else %} 
+                <div class="alert alert-info" role="alert">
+                    (You have no accounts listed. Please add a new account below.)
+                </div>
+                
+            {% endif %}        
+        </div>
+    </div>
+    <div class="col-md-6  col-sm-12">
+        <div id="" class=" content border curved-border  " >
+            {% set title= "Contract Notification Preferences" %}{% include 'base/box_title.html' %}
+        <p>Edit notification preferences for your contracts by selecting the methods you want to be notified for. 
+        </p>
+        <br/>
+        <h6>Add a new contract</h6>
+        {% include "SiteUser/user_new_contract_start.html" %}   
+        {% if user.contracts|length > 0 %}
+            {% for contract_index, contract in user.contracts.items() %}
+                {% include "SiteUser/user_contract_start.html" %}
+            {% endfor %}
+        {% else %} 
+            <div class="alert alert-info" role="alert">
+                (You have no contracts listed. Please add a new contract below.)
+            </div>
+            
+        {% endif %}        
+        </div>
+    </div>
+  </div>
+
+  {% else %} 
+  {% include "SiteUser/user_settings_logged_out.html" %}
+
+{% endif %}
+
+
+{% endblock content %}
