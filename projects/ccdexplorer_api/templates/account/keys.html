@@ -1,0 +1,16 @@
+
+
+    <h5>API Keys</h5>
+    <br/>
+    
+    {% if (user.plan=="free") or ((user.payments) and (user.payments|length > 0)) %}
+    
+      {% include "/account/current_keys.html"%}
+      {% if user_api_keys|length < 3 %}
+        <button hx-post="/account/new-key"   class="btn btn-primary btn-sm" >Request Key</button>
+      {% endif %}
+    {% else %}
+      <p>You can generate API keys when the first payment is made.</p>
+    {% endif %}
+
+          

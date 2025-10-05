@@ -1,0 +1,7 @@
+
+{% if module %}
+    {% set v = module.verification %}
+{% else %}
+    {% set v = contract.module_verification %}
+{% endif %}
+<pre id="source_code_container"><code class="vh-100 language-rust">{{v.source_code_at_verification_time}}</code></pre>

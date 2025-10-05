@@ -1,0 +1,56 @@
+<table class="table table-borderless">
+  <thead>
+    <tr class="sm-text">
+      <th class="small" scope="col"></th>
+{% if "d30" in account_apy_object %}<th class="text-secondary-emphasis text-end" scope="col">30d</th> {% endif %}
+{% if "d90" in account_apy_object %}<th class="text-secondary-emphasis text-end" scope="col">90d</th>{% endif %}
+{% if "d180" in account_apy_object %}<th class="text-secondary-emphasis text-end" scope="col">180d</th>{% endif %}
+
+    </tr>
+  </thead>
+  <tbody>
+{% if "d30" in account_apy_object %}
+    <tr class="sm-text">
+      <td class="text-secondary-emphasis text-start">{% if delegation%}Delegator{% else %}Validator{%endif%}<br/>rewards</td>
+      <td class="text-secondary-emphasis text-end"><small>{{ (account_apy_object.d30.sum_of_rewards*1000000)|micro_ccd_no_decimals|safe}}<br>
+        <i><small><span>{{ (account_apy_object.d30.apy * 100) | round_x_decimal_no_comma(2)}}%</span></small></i></small>
+      </td>
+
+{% endif %}
+{% if "d90" in account_apy_object %}
+
+      <td class="text-secondary-emphasis text-end"><small>
+        {{(account_apy_object.d90.sum_of_rewards*1000000)|micro_ccd_no_decimals|safe}}<br>
+          <i><small><span>{{ (account_apy_object.d90.apy * 100) | round_x_decimal_no_comma(2)}}%</span></small></i></small>
+      </td>
+{% endif %}
+
+{% if "d180" in account_apy_object %}
+      <td class="text-secondary-emphasis text-end"><small>
+        {% set sum_micro = account_apy_object.d180.sum_of_rewards * 1000000 %}
+        {% set apy_pct  = account_apy_object.d180.apy * 100 %}
+        <!-- {{sum_micro| micro_ccd_no_decimals | default('')}}
+        {{apy_pct| round_x_decimal_no_comma(2) | default('')}} -->
+        {{sum_micro| micro_ccd_no_decimals | default('')|safe}}<br>
+        <i><small><span>{{apy_pct| round_x_decimal_no_comma(2) | default('')}}%</span></small></i></small>
+      </td>
+        
+{% endif %}
+    </tr>
+
+  </tbody>
+</table>
+{% if not passive_delegation %}
+<div
+        class=" mb-1"
+        hx-indicator=".htmx-indicator-rewards"
+        hx-trigger="intersect, switched-theme from:body" 
+        hx-post="/{{net}}/account/rewards-bucketed/{{account_id}}/{{account_index}}"
+        hx-vals='js:{theme: document.querySelector("HTML").getAttribute("data-bs-theme")}'
+        
+    ><span class="htmx-indicator-rewards">
+      <img src="/static/misc/bars.svg"/> Loading data...
+     </span>
+    
+    </div>
+{%endif%}

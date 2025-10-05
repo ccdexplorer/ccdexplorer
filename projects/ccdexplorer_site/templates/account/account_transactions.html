@@ -1,0 +1,24 @@
+
+          <div class="input-box mt-1 d-flex justify-content-start">
+                <select 
+                  class="form-select form-select-sm search_selector_filter text-end" 
+                  id="tx_type_contents_selector"
+                  name="tx_type_contents_selector">
+                  <option value="all" selected>All</option>
+                  <option value="transfer">Transfers</option>
+                  <option value="smart_contract">Smart Contracts</option>
+                  <option value="identity">Identity</option>
+                  <option value="staking">Staking / Delegation</option>
+                  <option value="rejected">Rejected TXs</option>
+                  <option value="data_registered">Data</option>
+                  <option value="plt">PLT</option>
+                  {% if is_alias %}
+                  <option value="alias">Only Alias Transactions</option>
+                  {% endif %} 
+                </select>
+                    
+            </div>
+            <div id="txsfilter"></div>
+            {% set ccd_tabulator_table ='txsfilter'%}
+            {% set filename='transactions-filtered-'+account_id|string +'-'+range(1000,10000)|random|string+'.csv' %}
+            {% include 'base/tabulator/tabulator-table-download-link.html' %}

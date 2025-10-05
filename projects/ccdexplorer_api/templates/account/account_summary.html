@@ -1,0 +1,58 @@
+
+<h4  class="sm-text">Summary</h4>
+  <table class="table table-borderless" >
+    <thead></thead>
+    <tbody>
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">Username</td>
+            <td class=" text-secondary-emphasis">{{user.email}}</td>
+        </tr>
+        {% if not user.plan %}
+  <tr><td class=" text-secondary-emphasis" colspan="2">You first need to select a plan before you can request an API key. Go to <a href="/">plans</a> to learn more.</td></tr>
+{% else %}
+
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">Plan</td>
+            <td class=" text-secondary-emphasis">{{user.plan.capitalize()}}
+                {% if user.plan == "free" %} (<a href="/" hx-post="/plans/reset" >Upgrade</a>){% else %}{% if (user.payments|length == 0) %}  (<a href="/" hx-post="/plans/reset" >Change</a>){% endif %} {% endif %}
+            </td>
+        </tr>
+        {% if user.plan != "free" %}
+         {% if user.active%}
+            <tr class="sm-text">
+                <td class=" text-secondary-emphasis">Plan End Date</td>
+                <td class=" text-secondary-emphasis">{% if user.active%}{{user.plan_end_date|datetime_to_date_and_time_no_sec}}{% else %}-{%endif%}</td>
+            </tr>
+            {%endif%}
+            <tr class="sm-text">
+                <td class=" text-secondary-emphasis">Plan Active?</td>
+                <td class=" text-secondary-emphasis">{{user.active}}</td>
+            </tr>
+            
+        {%endif%}
+        {% if user.active%}
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Calls Remaining</td>
+            <td class=" text-secondary-emphasis">{{day_calls_remaining|seperator_no_decimals}} /  {{plan_daily_limit|seperator_no_decimals}} per day</td>
+        </tr>
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Call Limit Reset</td>
+            <td class=" text-secondary-emphasis">{% if ttl == -2 %}-{% else %}{{ttl_date|datetime_to_date_and_time_no_sec}}<br/><small>({{ttl_humanize|humanize_timedelta}})</small>{% endif %}</td>
+            
+        </tr>
+        {% if user.plan=="free"%}
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Calls Remaining</td>
+            <td class=" text-secondary-emphasis">{{min_calls_remaining|seperator_no_decimals}} /  {{plan_min_limit|seperator_no_decimals}} per min</td>
+        </tr>
+        <tr class="sm-text">
+            <td class=" text-secondary-emphasis">API Call Limit Reset</td>
+            <td class=" text-secondary-emphasis">{% if ttl_min == -2 %}-{% else %}{{ttl_date_min|datetime_to_date_and_time_no_sec}}<br/><small>({{ttl_humanize_min|humanize_timedelta}})</small>{% endif %}</td>
+            
+        </tr>
+        {%endif%}
+        {%endif%}
+        {% endif %}
+    </tbody>
+
+</table>

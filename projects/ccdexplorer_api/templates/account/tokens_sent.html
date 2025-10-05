@@ -1,0 +1,31 @@
+<div class="row">
+    <div class="col-sm-8 col-md-12">
+        <h4  class="sm-text">Payment Transactions</h4>
+        {% if user.plan == "free"%}
+        <p class="sm-text">No payment needed for Free plan.</p>
+        {% else %}
+            {% if not user.payments %}
+                <p  class="sm-text">No payment transactions found.</p>
+                {% else %}
+                <table class="table">
+                    <thead>
+                        <tr class="sm-text">
+                            <th class=" text-secondary-emphasis">Date</th>
+                            <th class="text-end text-secondary-emphasis">Hash</th>
+                            <th class="text-end text-secondary-emphasis">Paid</th>
+                            <th class="text-end text-secondary-emphasis">Days on plan</th>
+                        </tr>
+                    </thead>
+                    {% for hash, payment in user.payments.items() %}
+                    <tr class="sm-text">
+                    <td class=" text-secondary-emphasis">{{payment.tx_date}}</td>
+                    <td class="text-end text-secondary-emphasis"><a href="https://ccdexplorer.io/{{net}}/transaction/{{hash}}">{{hash[:4]}}</a></td>
+                    <td class="text-end text-secondary-emphasis"> {{payment.token_id}} {{payment.amount}}</td>
+                    <td class="text-end text-secondary-emphasis">{{payment.paid_days_for_plan}}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+        {%endif %}
+        {%endif %}
+    </div>
+</div>

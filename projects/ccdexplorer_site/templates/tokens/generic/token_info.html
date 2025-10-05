@@ -1,0 +1,88 @@
+
+
+
+<table class="table table-borderless">
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Token Name</td>
+            <td class="text-end text-secondary-emphasis text-break">
+                {% if "token_metadata" in stored_token_address %}
+                    {{ stored_token_address.token_metadata.name }}
+                {% else %}{{stored_token_address._id}}
+                {% endif%} </td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Token Contract</td>
+        <td class="text-end text-secondary-emphasis">
+            {% set copy_value = stored_token_address.contract %}
+            {% set value_type = "contract" %}
+            {% set display_value = stored_token_address.contract|safe %}
+            {% include "base/copy_to_clipboard.html"%}
+            </td>
+        </tr>
+        <!-- {% if "token_metadata" in stored_token_address %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Balance</td>
+            <td class="text-end text-secondary-emphasis">
+                {{(stored_token_address.token_amount|
+                    token_amount_using_decimals_rounded(stored_token_address.token_metadata.decimals, 0))}} {{stored_token_address.token_metadata.symbol}}
+                
+                </td>
+        </tr>
+        {% endif %} -->
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Deployed in block</td>
+        <td class="text-end text-secondary-emphasis">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
+            
+            </td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Deployed in tx</td>
+        <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
+            
+            </td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Age</td>
+        <td class="text-end text-secondary-emphasis">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
+    </tr>
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Creator</td>
+        <td class="text-end text-secondary-emphasis">{{ tx_deployed.account_transaction.sender|account_link(net,user,tags,request.app)|safe}}
+            
+            </td>
+    </tr>
+    
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Last Activity in block</td>
+        <td class="text-end text-secondary-emphasis">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}
+            
+            </td>
+    </tr>
+    {% if not md %}
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">Metadata URL</td>
+        <td class="text-end text-secondary-emphasis"><a href="{{stored_token_address.metadata_url}}">{{stored_token_address.metadata_url|shorten_address(true)|safe}}</a>
+            {% if stored_token_address.failed_attempt %}<a href="#" data-bs-toggle="popover" tabindex="0" id="failed_attempt" data-bs-trigger="focus" data-bs-title="Error fetching metadata" data-bs-content="
+            I've tried already <b>{{stored_token_address.failed_attempt.attempts}}</b> times to fetch this metadata.</br></br>The last error recorded is: </br></br><i>{{stored_token_address.failed_attempt.last_error}}.</i><br/><br/>
+            Will try again {{stored_token_address.failed_attempt.do_not_try_before|datetime_delta_format_between_dates}} from now. <br/><br/>Do you want me to retry now? Then send a POST request to <a href='{{env.API_URL}}/v2/{{net}}/token/{{stored_token_address._id|split_into_url_slug}}/refresh'>Token Refresh URL</a>
+                        "><i style="color:red;" class="bi bi-exclamation-square"></i></a>{% endif %}
+            
+            </td>
+    </tr>
+    {% endif %}
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis"># Current Holders</td>
+        <td class="text-end text-secondary-emphasis">{{stored_token_address.current_holders_count|round_x_decimal_with_comma(0)}}
+            
+            </td>
+    </tr>
+</tbody>
+</table>
+
+<script>
+    const failed_attempt = document.getElementById('failed_attempt')
+    const popover_failed_attempt = new bootstrap.Popover(failed_attempt, {trigger: 'focus', html:true})
+  </script>
+
+
+

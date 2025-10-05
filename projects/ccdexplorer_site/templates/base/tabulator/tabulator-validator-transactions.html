@@ -1,0 +1,78 @@
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+{% include 'base/tabulator/tabulator-common-options-get.html' %}
+<script>
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Hash", field: "hash", 
+        minWidth: 60,
+        maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        accessorDownload: (value, data) => data.hash_download,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Age", field: "transaction_block_info_slot_time", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 50,
+        formatter: isoDateTimeHumanDiff,
+        headerSort:false,
+        titleDownload:"Timestamp",
+        accessorDownload: (value, data) => data.transaction_block_info_slot_time_download,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        
+        title: "Event", field: "first_event", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 30,
+        minWidth: 250,
+        // maxWidth: 180, 
+        formatter: "html",
+        accessorDownload: (value, data) => StripHTMLFormatterOnString(data.first_event),
+        headerSort: false,
+        
+      }
+      
+    ];
+
+  
+  
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'block_height';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+</script>
+
+
+<div id="{{ccd_tabulator_table}}"></div>
+<div>
+  <button type="button" class="tabulator-download-button link-style" id="{{ccd_tabulator_table}}-download-csv">
+  Download visible rows as CSV
+</button>
+</div>
+
+<script>
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+      ...commonTabulatorOptionsGET,
+      columns: window["{{ccd_tabulator_table}}_columns"],
+      ajaxURL: "{{tabulator_ajax_url}}",
+      initialSort:[
+        {
+          column: window["{{ccd_tabulator_table}}_default_sort_field"], 
+          dir: window["{{ccd_tabulator_table}}_default_sort_field_direction"]
+        }
+      ],
+  });
+ 
+  window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+</script>
+{% include 'base/tabulator/tabulator-table-download-link.html' %}

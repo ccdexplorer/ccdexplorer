@@ -1,0 +1,212 @@
+{% if tx_type_translation_from_python is defined %}
+  <script>
+    var tx_type_translation = {};
+    tx_type_translation = {{ tx_type_translation_from_python | tojson }};
+  </script>
+{% endif %}
+
+<script>
+
+function txTypeFormatter(cell){
+  const key = cell.getValue();
+  const map = tx_type_translation[key];
+  if(!map) return ""; 
+
+  let icon;
+  switch(map.category){
+    case "smart_contract":
+      icon = `<i style="color:${map.color}" class="bi bi-card-checklist"></i>`;
+      break;
+    case "transfer":
+      icon = `<i style="color:${map.color}" class="bi bi-arrow-left-right"></i>`;
+      break;
+    case "data_registered":
+      icon = `<i style="color:${map.color}" class="bi bi-clipboard-pulse"></i>`;
+      break;
+    case "identity":
+      icon = `<i style="color:${map.color}" class="bi bi-bag-plus"></i>`;
+      break;
+    case "staking":
+      icon = `<i style="color:${map.color}" class="bi bi-bar-chart-line-fill"></i>`;
+      break;
+    case "plt":
+      icon = `<i style="color:${map.color}" class="bi bi-wrench-adjustable-circle"></i>`;
+      break;
+    case "rejected":
+      icon = `<i style="color:${map.color}" class="bi bi-ban"></i>`;
+      break;
+    case "chain":
+      icon = `<img class="tiny-logo"
+                     src="/static/logos/small-logo-grey.png"
+                     height="16" width="16">`;
+      break;
+  }
+
+  return `${icon} <span class="tx_type text-secondary-emphasis">${map.display_str}</span>`;
+}
+
+function StripHTMLFormatterOnString(raw) {
+  
+  if (typeof raw !== "string") {
+    return raw ?? "";
+  }
+
+  // Create a temporary DOM element to parse HTML
+  const div = document.createElement("div");
+  div.innerHTML = raw;
+
+  // Extract visible text content and remove "Ͼ" if present
+  const cleanText = (div.textContent || div.innerText || "").replace("Ͼ", "").trim();
+
+  return cleanText;
+}
+
+function LotteryPowerFormatter(cell) {
+  const raw = cell.getValue();
+
+  if (raw === undefined || raw === null) {
+    return ``;
+  }
+
+  const parsed = parseFloat(raw*100);
+  const value = isNaN(parsed) ? 0 : parsed;
+
+  // Round to 4 decimal places
+  const rounded = Math.round(value * 10_000) / 10_000;
+
+  // Format with commas and 4 fixed decimals
+  const formatted = rounded.toLocaleString("en-US", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4
+  });
+
+  return `<span class="ccd">${formatted}%</span>`;
+}
+
+function intFormatterRounded(cell) {
+  const raw = cell.getValue();
+
+  // If there’s no value, render empty
+  if (raw === undefined || raw === null) {
+    return ``;
+  }
+
+  // Try to parse as float
+  const parsed = parseFloat(raw);
+  const value = isNaN(parsed) ? 0 : parsed;
+
+  // Round to 0 decimals if > 5, otherwise leave as-is
+  const rounded = value > 5
+    ? Math.round(value)
+    : value;
+
+  // Format with commas
+  const formatted = rounded.toLocaleString("en-US");
+
+  return `<span class="ccd">${formatted}</span>`;
+}
+
+function microCCDFormatterRounded(cell) {
+  const raw = cell.getValue();
+
+  // If there’s no value, render empty
+  if (raw === undefined || raw === null) {
+    return ``;
+  }
+
+  // Try to parse; fall back to zero on NaN
+  const parsed = parseInt(raw, 10);
+  let amount = isNaN(parsed) ? 0 : parsed / 1_000_000;
+
+  // Round to nearest integer
+  const rounded = Math.round(amount);
+
+  // Format with commas
+  const formatted = rounded.toLocaleString("en-US");
+
+  return `<span class="ccd">Ͼ${formatted}</span>`;
+}
+
+
+function microCCDFormatter(cell) {
+  const raw = cell.getValue();
+
+// If there’s no value, render zero
+if (raw === undefined || raw === null) {
+  return ``;
+}
+
+// Try to parse; fall back to zero on NaN
+const parsed = parseInt(raw, 10);
+let amount = isNaN(parsed) ? 0 : parsed / 1_000_000;
+
+  
+    // Format to 6 decimal places with commas
+    const formatted = amount.toLocaleString("en-US", {
+      minimumFractionDigits: 6,
+      maximumFractionDigits: 6,
+    });
+  
+    const [intPart, decPart] = formatted.split(".");
+  
+    return `<span class="ccd">Ͼ${intPart}</span>.<span class="ccd_decimals">${decPart}</span>`;
+  }
+
+function isoDateTimeHumanDiff(cell) {
+  const { DateTime } = luxon;
+  const isoString = cell.getValue();
+  
+  var classlist = cell.getElement().classList;
+  classlist.add("ccd");
+  classlist.add("sm-text");
+  cell.getElement().classlist = classlist;
+
+  if (!isoString) return "-";
+
+  try {
+    const then = DateTime.fromISO(isoString, { zone: 'utc' });
+    const now = DateTime.utc();
+
+    const diff = now.diff(then, ['days', 'hours', 'minutes', 'seconds']).toObject();
+    if (diff.days >= 1) {
+      return `${Math.floor(diff.days)} day${diff.days >= 2 ? 's' : ''}`;
+    } else if (diff.hours >= 1) {
+      return `${Math.floor(diff.hours)} hour${diff.hours >= 2 ? 's' : ''}`;
+    } else if (diff.minutes >= 1) {
+      return `${Math.floor(diff.minutes)} min`;
+    } else if (diff.seconds >= 1) {
+  return `${Math.floor(diff.seconds)} sec`;
+} else {
+  return `just now`;}
+  } catch (err) {
+    return "-";
+  }
+}
+
+function isoDateTimeFormatter(cell) {
+  const { DateTime } = luxon;
+  const isoString = cell.getValue();
+  var classlist = cell.getElement().classList;
+  classlist.add("ccd");
+  cell.getElement().classlist = classlist;
+  if (!isoString) return "-";
+  try {
+    const dt = DateTime.fromISO(isoString, { zone: 'utc' });
+    return dt.toFormat("yyyy-MM-dd HH:mm:ss");
+  } catch (err) {
+    return "-";
+  }
+}
+function ccdClassFormatter(cell) {
+  const value = cell.getValue();
+  // Parse as number and format with thousands separators
+  const formatted = Number(value).toLocaleString("en-US");
+  return `<span class="ccd">${formatted}</span>`;
+
+}
+function ccdClassFormatterForString(cell) {
+  const value = cell.getValue();
+  return `<span class="ccd">${value}</span>`;
+}
+
+</script>  

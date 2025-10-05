@@ -1,0 +1,63 @@
+<div id="{{ccd_tabulator_table}}"></div>
+
+
+<script>
+  
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+    
+      columns: window["{{ccd_tabulator_table}}_columns"],
+      layout: "fitColumns",
+      maxHeight: "400px",           // fixed outer height
+      heightGrow: false, 
+      responsiveLayout: "hide",
+      paginationMode: "remote", 
+      filterMode:     "remote",
+      paginationSizeSelector: window["{{ccd_tabulator_table}}_size_selector"] || [10, 25, 50, 100, 500],
+      paginationSize: (window["{{ccd_tabulator_table}}_size_selector"] || [10, 25, 50, 100, 500])[1],
+      paginationButtonCount:3,
+      pagination:true,
+      paginationCounter: function(pageSize, currentRow, currentPage, totalRows, totalPages) {
+          // Humanize totals with Intl.NumberFormat compact notation
+          function humanize(num) {
+              if (num < 1000) {
+                  return num.toLocaleString();
+              }
+              return new Intl.NumberFormat('en', {
+                  notation: 'compact',
+                  compactDisplay: 'short',
+                  maximumFractionDigits: 1,
+              }).format(num);
+          }
+
+          // Compute the 1-based range of items on this page
+          const startIdx = (currentPage - 1) * pageSize + 1;
+          const endIdx = Math.min(currentPage * pageSize, totalRows);
+          const range = `${startIdx.toLocaleString()} – ${endIdx.toLocaleString()}`;
+
+          // Choose raw vs. humanized total
+          const totalFmt = totalRows < 5000
+              ? totalRows.toLocaleString()
+              : humanize(totalRows);
+
+          // Final display string
+          return `<span class="ccd">${range} of ${totalFmt}</span>`;
+      },
+      sortMode:"remote",
+      ajaxConfig: "POST",            // or { method: "POST" }
+      ajaxContentType: "json",
+      ajaxURL: "{{tabulator_ajax_url}}",
+      
+      rowFormatter: function(row){
+        row.getElement().classList.add("sm-text");
+      },
+      
+
+  });
+  
+window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+  document.querySelectorAll(".tabulator-col-title").forEach(el => {
+    el.classList.add("sm-text");
+  });
+});
+</script>
+

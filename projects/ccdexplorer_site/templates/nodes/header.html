@@ -1,0 +1,38 @@
+<h4>Nodes and Validators</h4>
+
+        <table class="table table-borderless ">
+            <thead>
+                <tr class="sm-text"><th></th><th class="text-end  text-secondary-emphasis">Validator</th><th class="text-end  text-secondary-emphasis">No Validator</th><th class="text-end  text-secondary-emphasis">Total</th></tr>
+            </thead>
+            <tbody>
+                <tr class="sm-text ">
+                    <td class=" text-secondary-emphasis">Node</td>
+                    <td class="text-end  text-secondary-emphasis">{{len_reporting_validators}}</td>
+                    <td class="text-end  text-secondary-emphasis">{{len_non_validator_nodes}}</td>
+                    <td class="text-end  text-secondary-emphasis">{{len_reporting_validators+len_non_validator_nodes}}</td>
+                </tr>
+                <tr class="sm-text">
+                    <td class=" text-secondary-emphasis">Not Reporting</td>
+                    <td class="text-end text-secondary-emphasis">{{(len_validators-len_reporting_validators)}}</td>
+                    <td class="text-end text-secondary-emphasis">-</td>
+                    <td class="text-end text-secondary-emphasis">{{(len_validators-len_reporting_validators)}}</td>
+                </tr>
+                <tr class="sm-text">
+                    <td class=" text-secondary-emphasis">Total</td>
+                    <td class="text-end text-secondary-emphasis">{{len_validators}}</td>
+                    <td class="text-end text-secondary-emphasis">{{len_non_validator_nodes}}</td>
+                    <td class="text-end text-secondary-emphasis">{{(len_validators+len_non_validator_nodes)}}</td>
+                </tr>
+            </tbody>
+        </table>
+
+
+        </table>
+        <p>Information for validators is taken from the <a href='/mainnet/block/{{last_payday_block._id}}'>first block</a> of the current payday. <br/>
+            Information for nodes is refreshed every minute from the <a href="https://dashboard.mainnet.concordium.software/">Mainnet Dashboard</a>.</p>
+        {% if show_bakers %}
+            <br><i>Showing only validators.</i>
+        {% endif %}
+        </p>
+
+    

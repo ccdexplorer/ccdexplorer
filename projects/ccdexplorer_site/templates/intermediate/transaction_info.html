@@ -1,0 +1,71 @@
+
+<table class="table table-borderless">
+    <tbody>
+        <tr class=" sm-text ">
+            <td class="text-start text-secondary-emphasis ">tx {{tx.hash|tx_hash_link(net)|safe}} at height {{ transaction.start_4| safe }} {{ transaction.start_2| safe }}</td>
+            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
+            
+        </tr>
+    
+    </tbody>
+    </table>
+
+
+
+{% if classified_tx.cns_domain.domain_name %}
+{% if classified_tx.cns_domain.action_message %}
+    <div class="clearfix">  
+        <div class=" card-footer text-white bg-success mt-2 ">{% if classified_tx.cns_domain.action_message %} {{ classified_tx.cns_domain.action_message | safe}}{% endif%}</div>  
+    </div>
+    <br>
+{% endif %}
+{% endif %}
+{% if events_list|length > 5 %}
+<span class="text-end"><a class="btn p-1 btn-outline-primary small btn-sm" data-bs-toggle="collapse" href="#tx-{{transaction.txHash}}" role="button" aria-expanded="false" aria-controls="tx-{{transaction.txHash}}">Events ↧</a></span>
+{% endif %}
+<table  id="tx-{{transaction.txHash}}" class=" collapse 
+{% if events_list|length < 6 %}
+    show
+    {% endif %}
+
+table table-borderless">
+    {% for event in events_list %}
+        
+            <tr class=" sm-text ">
+                
+                <td class="text-secondary-emphasis small text-end">
+                    {% if events_list|length > 1 %}
+                    {{loop.index}}
+                    {% endif %}
+                </td>
+                
+                <td class="text-secondary-emphasis small text-break text-start">{{event.event | safe}}
+                    {% if event.update %}
+                    <br><span class="text-secondary-emphasis  text-break">{{event.update | safe}}</span>
+                    {% endif %}
+                    {% if event.emit %}
+                    <br><span class="text-secondary-emphasis text-break">{{event.emit | safe}}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if event.logged_events %}
+            {% for logged_event in event.logged_events %}
+            <tr class="sm-text low">
+                <td class="text-secondary-emphasis text-end">
+                    
+                </td>
+                
+                <td class=" text-secondary-emphasis p2-4  text-start">&#8627; {{logged_event.event | safe}}
+                    {% if logged_event.update %}
+                    <br><span class="text-secondary-emphasis">{{logged_event.update | safe}}</span>
+                    {% endif %}
+                    {% if logged_event.emit %}
+                    <br><span class="text-secondary-emphasis">{{logged_event.emit | safe}}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% endif %}        
+    {% endfor %}
+</table>
+<hr>

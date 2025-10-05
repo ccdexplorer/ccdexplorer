@@ -1,0 +1,72 @@
+[build-system]
+requires      = [ "hatchling", "hatch-polylith-bricks" ]
+build-backend = "hatchling.build"
+
+[project]
+name    = "site"
+version = "0.1.0"
+
+
+requires-python = ">=3.12"
+
+dependencies = [
+    "python-dotenv",
+    "python-dateutil",
+    "base58",
+    "eth-hash",
+    "pycryptodome",
+    "pytest",
+    "grpcio",
+    "grpcio-tools",
+    "betterproto[compiler]==2.0.0b6",
+    "leb128",
+    "pydantic",
+    "pymongo",
+    "requests",
+    "apprise",
+    "py-graphql-client",
+    "chardet",
+    "pre-commit",
+    "cbor2",
+    "aiohttp",
+    "redis",
+    "rich",
+    "celery[redis,mongodb]",
+    "protobuf",
+    "googleapis-common-protos",
+    "httpx",
+    "scheduler>=0.8.8",
+    "python-telegram-bot[job-queue]>=22.5",
+    "fastapi[uvicorn]>=0.118.2",
+    "fastapi-restful>=0.6.0",
+    "uvicorn>=0.35.0",
+    "sentry-sdk[fastapi]>=2.41.0",
+    "asgi-ratelimit>=0.10.0",
+    "fastapi-login>=1.10.3",
+    "passlib>=1.7.4",
+    "bcrypt==4.0.1",
+    "prometheus-fastapi-instrumentator>=7.1.0",
+    "pandas>=2.3.3",
+    "humanize>=4.13.0",
+    "typing-inspect>=0.9.0",
+    "python-multipart>=0.0.20",
+    "plotly>=5.15.0",
+    "polars>=1.34.0",
+    "ccdexplorer_schema_parser",
+]
+
+[tool.hatch.build.hooks.polylith-bricks]
+
+[tool.polylith.bricks]
+"../../bases/ccdexplorer/ccdexplorer_site" = "ccdexplorer/ccdexplorer_site"
+"../../bases/ccdexplorer/ccdexplorer_api"  = "ccdexplorer/ccdexplorer_api"
+"../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
+"../../components/ccdexplorer/env"         = "ccdexplorer/env"
+"../../components/ccdexplorer/site_user"   = "ccdexplorer/site_user"
+"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
+"../../components/ccdexplorer/cns"         = "ccdexplorer/cns"
+"../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
+"../../components/ccdexplorer/mongodb"     = "ccdexplorer/mongodb"
+"../../components/ccdexplorer/tooter"      = "ccdexplorer/tooter"
+
+"../../components/ccdexplorer/schema_parser" = "ccdexplorer/schema_parser"

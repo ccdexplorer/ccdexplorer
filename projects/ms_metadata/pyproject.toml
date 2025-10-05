@@ -1,0 +1,50 @@
+[build-system]
+requires      = [ "hatchling", "hatch-polylith-bricks" ]
+build-backend = "hatchling.build"
+
+[project]
+name    = "ms_metadata"
+version = "0.1.0"
+
+
+requires-python = ">=3.12"
+
+dependencies = [
+    "python-dotenv",
+    "python-dateutil",
+    "base58",
+    "eth-hash",
+    "pycryptodome",
+    "pytest",
+    "grpcio",
+    "grpcio-tools",
+    "betterproto[compiler]==2.0.0b6",
+    "leb128",
+    "pydantic",
+    "pymongo",
+    "requests",
+    "apprise",
+    "py-graphql-client",
+    "chardet",
+    "pre-commit",
+    "cbor2",
+    "aiohttp",
+    "redis",
+    "rich",
+    "celery[redis,mongodb]",
+    "protobuf",
+    "googleapis-common-protos",
+    "httpx",
+]
+
+[tool.hatch.build.hooks.polylith-bricks]
+
+[tool.polylith.bricks]
+"../../bases/ccdexplorer/ms_metadata"      = "ccdexplorer/ms_metadata"
+"../../components/ccdexplorer/env"         = "ccdexplorer/env"
+"../../components/ccdexplorer/mongodb"     = "ccdexplorer/mongodb"
+"../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
+"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
+"../../components/ccdexplorer/tooter"      = "ccdexplorer/tooter"
+"../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
+"../../components/ccdexplorer/celery_app"  = "ccdexplorer/celery_app"

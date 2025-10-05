@@ -1,0 +1,23 @@
+
+
+{% include 'base/pagination.html' %}
+<table class="table table-borderless">
+    <tbody>
+      {% for row in rewards %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">
+            {% if row.pool_owner != 'passive_delegation' %}  
+              <a class="" href="/mainnet/account/{{row.pool_owner}}">{{row.pool_owner}}</a>
+            {%else %}
+              {{row.pool_owner}}
+            {% endif %}
+            </td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.transaction_fees | micro_ccd_display|safe}}</td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.finalization_reward | micro_ccd_display|safe}}</td>
+            <td class="text-end text-secondary-emphasis">{{row.reward.baker_reward | micro_ccd_display|safe}}</td>
+            
+        </tr>
+      {% endfor %}
+        
+    </tbody>
+    </table>

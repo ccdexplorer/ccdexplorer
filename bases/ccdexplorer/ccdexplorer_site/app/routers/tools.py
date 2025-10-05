@@ -1,0 +1,1092 @@
+# pyright: reportOptionalMemberAccess=false
+# pyright: reportOptionalSubscript=false
+# pyright: reportAttributeAccessIssue=false
+# pyright: reportAssignmentType=false
+# pyright: reportPossiblyUnboundVariable=false
+# pyright: reportArgumentType=false
+# pyright: reportOptionalOperand=false
+# pyright: reportOptionalIterable=false
+# pyright: reportCallIssue=false
+# pyright: reportReturnType=false
+# pyright: reportIndexIssue=false
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportInvalidTypeArguments=false
+import datetime as dt
+import math
+from typing import Any, Mapping, Optional, Sequence
+from collections import defaultdict
+import dateutil
+import httpx
+import pandas as pd
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_BlockItemSummary,
+    CCD_ReleaseSchedule,
+)
+from ccdexplorer.site_user import SiteUser
+from dateutil.relativedelta import relativedelta
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel
+
+from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
+    MakeUp,
+    MakeUpRequest,
+    RequestingRoute,
+)
+from ccdexplorer.env import environment
+
+from ccdexplorer.ccdexplorer_site.app.state import (
+    get_exchange_rates,
+    get_httpx_client,
+    get_labeled_accounts,
+    get_user_detailsv2,
+)
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    PaginationRequest,
+    calculate_skip,
+    create_dict_for_tabulator_display,
+    get_url_from_api,
+    pagination_calculator,
+    post_url_from_api,
+    tx_type_translation,
+    tx_type_translation_for_js,
+    account_link,
+    datetime_delta_format_until,
+)
+
+router = APIRouter()
+
+
+@router.get(
+    "/{net}/protocol-update-txs",
+    response_class=HTMLResponse,
+)
+async def get_account_transactions(
+    request: Request,
+    net: str,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
+):
+    """ """
+    user: SiteUser | None = await get_user_detailsv2(request)
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/protocol-updates",
+        httpx_client,
+    )
+    tx_result = api_result.return_value if api_result.ok else None
+    if not tx_result:
+        error = f"Request error getting protocol update transactions on {net}."
+        return request.app.templates.TemplateResponse(
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    tx_result_transactions = tx_result  # ["transactions"]
+    total_rows = 0
+
+    made_up_txs = []
+    if len(tx_result_transactions) > 0:
+        for transaction in tx_result_transactions:
+            transaction = CCD_BlockItemSummary(**transaction)
+            makeup_request = MakeUpRequest(
+                **{
+                    "net": net,
+                    "httpx_client": httpx_client,
+                    "tags": tags,
+                    "user": user,
+                    "app": request.app,
+                    "requesting_route": RequestingRoute.account,
+                }
+            )
+
+            classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+                transaction, "", False
+            )
+            made_up_txs.append(classified_tx)
+
+    html = request.app.templates.get_template("base/transactions_simple_list.html").render(
+        {
+            "transactions": made_up_txs,
+            "tags": tags,
+            "user": user,
+            "net": net,
+            "show_amounts": True,
+            "request": request,
+            "totals_in_pagination": True,
+            "total_rows": total_rows,
+        }
+    )
+
+    return html
+
+
+@router.get("/{net}/tools/projects", response_class=HTMLResponse)
+async def get_projects_overview(
+    request: Request,
+    net: str,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/mainnet/misc/projects/all-ids",
+        httpx_client,
+    )
+    projects = api_result.return_value if api_result.ok else []
+
+    return request.app.templates.TemplateResponse(
+        "projects/projects.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "projects": projects,
+            "net": "mainnet",
+        },
+    )
+
+
+@router.get("/{net}/tools/validators-failed-rounds", response_class=HTMLResponse)
+async def get_validators_failed_rounds(
+    request: Request,
+    net: str,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/mainnet/misc/validators-failed-rounds",
+        httpx_client,
+    )
+    validators_missed = api_result.return_value if api_result.ok else []
+
+    return request.app.templates.TemplateResponse(
+        "tools/validators-missed.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "tags": tags,
+            "validators_missed": validators_missed,
+            "net": "mainnet",
+        },
+    )
+
+
+@router.get("/{net}/tools/chain-information", response_class=HTMLResponse)
+async def chain_information(
+    request: Request,
+    net: str,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/identity-providers",
+        httpx_client,
+    )
+    ip = api_result.return_value if api_result.ok else []
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/anonymity-revokers",
+        httpx_client,
+    )
+    ar = api_result.return_value if api_result.ok else []
+
+    return request.app.templates.TemplateResponse(
+        "tools/chain-information.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "ar": ar,
+            "ip": ip,
+            "net": "mainnet",
+        },
+    )
+
+
+async def get_data_for_chain_transactions_for_dates(
+    app, start_date: str, end_date: str
+) -> list[str]:
+    api_result = await get_url_from_api(
+        f"{app.api_url}/v2/mainnet/misc/statistics-chain/{start_date}/{end_date}",
+        app.httpx_client,
+    )
+    result = api_result.return_value if api_result.ok else []
+    return result
+
+
+@router.get("/{net}/tools/labeled-accounts", response_class=HTMLResponse | RedirectResponse)
+async def labeled_accounts(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/projects/all-ids",
+        httpx_client,
+    )
+    projects = api_result.return_value if api_result.ok else []
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "/tools/labeled-accounts.html",
+            {
+                "env": environment,
+                "request": request,
+                "user": user,
+                "tags": tags,
+                "projects": projects,
+                "net": net,
+            },
+        )
+    else:
+        response = RedirectResponse(url="/mainnet/tools/labeled-accounts", status_code=302)
+        return response
+
+
+class TodayInRequest(BaseModel):
+    theme: str
+    date: str
+
+
+@router.post(
+    "/{net}/ajax_today_in/",
+    response_class=HTMLResponse,
+)
+async def ajax_today_in(
+    request: Request,
+    net: str,
+    post_data: TodayInRequest,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/today-in/{post_data.date}",
+        httpx_client,
+    )
+    today_in = api_result.return_value if api_result.ok else []
+
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "/tools/today_in_day.html",
+            {
+                "env": environment,
+                "request": request,
+                "user": user,
+                "tags": tags,
+                "today_in": today_in,
+                "date": post_data.date,
+                "net": net,
+            },
+        )
+
+
+@router.get("/{net}/today-in", response_class=HTMLResponse | RedirectResponse)
+async def today_in(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "/tools/today_in.html",
+            {
+                "env": environment,
+                "request": request,
+                "user": user,
+                "tags": tags,
+                "yesterday": yesterday,
+                "net": net,
+            },
+        )
+    else:
+        response = RedirectResponse(url="/mainnet/tools/labeled-accounts", status_code=302)
+        return response
+
+
+class SortItem(BaseModel):  # type: ignore
+    field: str
+    dir: str
+
+
+class PostDataTransfer(BaseModel):
+    theme: str
+    gte: str | int
+    lte: str | int
+    start_date: str
+    end_date: str
+    page: int
+    size: int
+    sort: Optional[list[SortItem]] = []
+    current_page: Optional[str] = None
+    memo: Optional[str] = None
+
+
+@router.post(
+    "/{net}/ajax_tools/transactions-search/transfer",
+    response_class=HTMLResponse,
+)
+async def ajax_tx_search_transfers(
+    request: Request,
+    net: str,
+    post_data: PostDataTransfer,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    """
+    Endpoint to search for transactions given parameters.
+    Parameter `all` refers to regular transfers.
+    Attributes:
+
+    Returns:
+
+    """
+    limit = 10
+    post_data.memo = post_data.memo.lower()
+    # skip = (post_data.requested_page - 1) * limit
+    skip = (post_data.page - 1) * post_data.size
+    if post_data.sort[0].field == "type_additional_info":
+        post_data.sort[0].field = "amount"
+    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
+
+    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
+    last_day = next_month - relativedelta(days=1)
+    post_data.end_date = last_day.strftime("%Y-%m-%d")
+    post_data.gte = int(post_data.gte.split(" ")[0].replace(".", "").replace(",", ""))  # type: ignore
+    post_data.lte = int(post_data.lte.split(" ")[0].replace(".", "").replace(",", ""))  # type: ignore
+
+    # skip = (post_data.requested_page - 1) * limit
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await post_url_from_api(
+        f"{request.app.api_url}/v2/{net}/transactions/search/transfers/{skip}/{post_data.size}",
+        httpx_client,
+        json_post_content=post_data.model_dump(exclude_none=True),
+    )
+    txs_result = api_result.return_value if api_result.ok else None
+    txs = txs_result["transactions"] if txs_result else []
+    made_up_txs = []
+    if len(txs) > 0:
+        for transaction in txs:
+            transaction = CCD_BlockItemSummary(**transaction)
+            makeup_request = MakeUpRequest(
+                **{
+                    "net": net,
+                    "httpx_client": httpx_client,
+                    "tags": tags,
+                    "user": user,
+                    "app": request.app,
+                    "requesting_route": RequestingRoute.other,
+                }
+            )
+
+            classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+                transaction, "", False
+            )
+
+            type_additional_info, sender = await classified_tx.transform_for_tabulator()
+
+            made_up_txs.append(
+                create_dict_for_tabulator_display(net, classified_tx, type_additional_info, sender)
+            )
+    last_page = math.ceil(txs_result["total_txs"] / post_data.size)
+    return JSONResponse(
+        {
+            "data": made_up_txs,
+            "last_page": max(1, last_page),
+            "last_row": txs_result["total_txs"],
+        }
+    )
+
+
+class PostDatHEX(BaseModel):
+    theme: str
+    search: str
+
+
+@router.post(
+    "/{net}/ajax_tools/transactions-search/data/{requested_page}",
+    response_class=HTMLResponse,
+)
+async def ajax_tx_search_data(
+    request: Request,
+    net: str,
+    requested_page: int,
+    post_data: PostDatHEX,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    limit = 10
+    # skip = (post_data.requested_page - 1) * limit
+    skip = calculate_skip(requested_page, 0, limit)
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await post_url_from_api(
+        f"{request.app.api_url}/v2/{net}/transactions/search/data/{skip}/{limit}",
+        httpx_client,
+        json_post_content={"hex": post_data.search},
+    )
+    txs = api_result.return_value if api_result.ok else None
+
+    made_up_txs = []
+    if len(txs) > 0:
+        for transaction in txs:
+            transaction = CCD_BlockItemSummary(**transaction)
+            makeup_request = MakeUpRequest(
+                **{
+                    "net": net,
+                    "httpx_client": httpx_client,
+                    "tags": tags,
+                    "user": user,
+                    "app": request.app,
+                    "requesting_route": RequestingRoute.other,
+                }
+            )
+
+            classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+                transaction, "", False
+            )
+            made_up_txs.append(classified_tx)
+
+    pagination_request = PaginationRequest(
+        total_txs=0,
+        requested_page=requested_page,
+        word="transaction",
+        action_string="tx",
+        limit=limit,
+        returned_rows=len(txs),
+    )
+    pagination = pagination_calculator(pagination_request)
+    html = request.app.templates.TemplateResponse(
+        "tools/last_txs_table_by_type.html",
+        {
+            "request": request,
+            "tx_type_translation": tx_type_translation,
+            "transactions": made_up_txs,
+            "net": net,
+            "totals_in_pagination": False,
+            "total_rows": 0,
+            "requested_page": requested_page,
+            "tags": tags,
+            "user": user,
+            "pagination": pagination,
+        },
+    )
+
+    return html
+
+
+@router.get("/{net}/tools/transactions-search", response_class=HTMLResponse | RedirectResponse)
+async def transactions_search(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
+    date_start = dt.date(2022, 1, 1).strftime("%Y-%m-%d")
+    return request.app.templates.TemplateResponse(
+        "/tools/transactions_search_home.html",
+        {
+            "env": environment,
+            "request": request,
+            "user": user,
+            "tags": tags,
+            "net": net,
+            "chain_start": chain_start,
+            "date_start": date_start,
+            "requested_page": 0,
+            "tx_type_translation_from_python": tx_type_translation_for_js(),
+        },
+    )
+
+
+@router.get("/mainnet/tools/exchange-rates", response_class=HTMLResponse)
+async def exchange_rates(
+    request: Request,
+    exchange_rates: dict = Depends(get_exchange_rates),
+):
+    user: SiteUser = await get_user_detailsv2(request)
+    return request.app.templates.TemplateResponse(
+        "tools/exchange_rates.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "exchange_rates": exchange_rates,
+            "net": "mainnet",
+        },
+    )
+
+
+@router.get("/{net}/transactions-by-type", response_class=HTMLResponse)
+async def transactions_by_type_page(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)  # type: ignore
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/transaction_types", httpx_client
+    )
+    tx_type_counts = api_result.return_value if api_result.ok else None
+    tx_type_counts = {x["_id"]: x["count"] for x in tx_type_counts}  # type: ignore
+    request.state.api_calls = {}
+    request.state.api_calls["Latest Txs"] = (
+        f"{request.app.api_url}/docs#/Transactions/get_last_transactions_v2__net__transactions_last__count__get"
+    )
+
+    return request.app.templates.TemplateResponse(
+        "tools/transactions_by_type2.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "requested_page": 1,
+            "tx_type_counts": tx_type_counts,
+            "tx_type_translation": {
+                k: v for k, v in tx_type_translation.items() if "token_update_effect-" not in k
+            },
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+            "tx_type_translation_from_python": tx_type_translation_for_js(),
+        },
+    )
+
+
+##########################
+class SortItem(BaseModel):
+    field: str
+    dir: str
+
+
+class FilterItem(BaseModel):
+    field: str
+    type: str
+    value: str
+
+
+class TabulatorRequest(BaseModel):
+    page: int
+    size: int
+    filter: Optional[list[FilterItem]] = []
+
+
+@router.post(
+    "/{net}/ajax_last_transactions_by_type/",
+)
+async def get_account_transactions_for_tabulator(
+    request: Request,
+    net: str,
+    body: TabulatorRequest,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    page = body.page
+    size = body.size
+    filters = body.filter
+    skip = (page - 1) * size
+
+    if len(filters) == 0:
+        filters.append(
+            FilterItem(
+                field="type",
+                type="like",
+                value="transfers",
+            )
+        )
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/transactions/{size}/{skip}/{filters[0].value}",
+        httpx_client,
+    )
+    latest_txs_result = api_result.return_value if api_result.ok else None
+    if not latest_txs_result:
+        error = f"Request error getting the most recent transactions on {net}."
+        return request.app.templates.TemplateResponse(
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+    tb_made_up_txs = []
+    tx_result_transactions = latest_txs_result["transactions"]
+    last_page = math.ceil(latest_txs_result["total_for_type"] / size)
+    if len(tx_result_transactions) > 0:
+        for transaction in tx_result_transactions:
+            transaction = CCD_BlockItemSummary(**transaction)
+            makeup_request = MakeUpRequest(
+                **{
+                    "net": net,
+                    "httpx_client": httpx_client,
+                    "tags": tags,
+                    "user": user,
+                    "app": request.app,
+                    "requesting_route": RequestingRoute.account,
+                }
+            )
+
+            classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+                transaction, "", False
+            )
+
+            type_additional_info, sender = await classified_tx.transform_for_tabulator()
+
+            tb_made_up_txs.append(
+                create_dict_for_tabulator_display(net, classified_tx, type_additional_info, sender)
+            )
+    return JSONResponse(
+        {
+            "data": tb_made_up_txs,
+            "last_page": max(1, last_page),
+            "last_row": latest_txs_result["total_for_type"],
+        }
+    )
+
+
+##########################
+
+# class PostData(BaseModel):
+#     theme: str
+#     filter: str
+#     requested_page: int
+
+
+# @router.post("/{net}/ajax_last_transactions_by_type", response_class=HTMLResponse)
+# async def ajax_last_txs_by_type(
+#     request: Request,
+#     net: str,
+#     post_data: PostData,
+#     tags: dict = Depends(get_labeled_accounts),
+#     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+# ):
+#     limit = 20
+#     skip = (post_data.requested_page - 1) * limit
+#     if net not in ["mainnet", "testnet"]:
+#         return RedirectResponse(url="/mainnet", status_code=302)
+
+#     user: SiteUser | None = await get_user_detailsv2(request)
+#     api_result = await get_url_from_api(
+#         f"{request.app.api_url}/v2/{net}/transactions/last/{limit}/{skip}/{post_data.filter}",
+#         httpx_client,
+#     )
+#     latest_txs = api_result.return_value if api_result.ok else None
+#     if not latest_txs:
+#         error = f"Request error getting the most recent transactions on {net}."
+#         return request.app.templates.TemplateResponse(
+#             "base/error-request.html",
+#             {
+#                 "request": request,
+#                 "error": error,
+#                 "env": environment,
+#                 "net": net,
+#             },
+#         )
+
+#     made_up_txs = []
+#     if len(latest_txs) > 0:
+#         for transaction in latest_txs:
+#             transaction = CCD_BlockItemSummary(**transaction)
+#             makeup_request = MakeUpRequest(
+#                 **{
+#                     "net": net,
+#                     "httpx_client": httpx_client,
+#                     "tags": tags,
+#                     "user": user,
+#                     "app": request.app,
+#                     "requesting_route": RequestingRoute.other,
+#                 }
+#             )
+
+#             classified_tx = await MakeUp(
+#                 makeup_request=makeup_request
+#             ).prepare_for_display(transaction, "", False)
+#             made_up_txs.append(classified_tx)
+
+#     html = templates.TemplateResponse(
+#         "tools/last_txs_table_by_type.html",
+#         {
+#             "request": request,
+#             "tx_type_translation": tx_type_translation,
+#             "transactions": made_up_txs,
+#             "net": net,
+#             "filter": post_data.filter,
+#             "pagination": None,
+#             "totals_in_pagination": False,
+#             "total_rows": 0,
+#             "requested_page": post_data.requested_page,
+#             "tags": tags,
+#             "user": user,
+#         },
+#     )
+
+#     return html
+
+
+@router.get("/{net}/accounts-scheduled-release", response_class=HTMLResponse)
+async def accounts_scheduled_release(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+
+    request.state.api_calls = {}
+    request.state.api_calls["Accounts Scheduled Release"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_scheduled_release_accounts_v2__net__accounts_scheduled_release_get"
+    )
+
+    return request.app.templates.TemplateResponse(
+        "tools/accounts-scheduled-release-content.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "requested_page": 1,
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+@router.get("/{net}/ajax_accounts_scheduled_release", response_class=HTMLResponse)
+async def ajax_accounts_scheduled_release(
+    request: Request,
+    net: str,
+    page: int = Query(),
+    size: int = Query(),
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    skip = (page - 1) * size
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/scheduled-release/{skip}/{size}",
+        httpx_client,
+    )
+    accounts = api_result.return_value if api_result.ok else {}
+    if not accounts:
+        error = f"Request error getting scheduled release accounts on {net}."
+        return request.app.templates.TemplateResponse(
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    data = accounts["accounts"]
+    made_up_accounts = []
+    for d in data:
+        dd = {}
+        dd["account_index_made_up"] = account_link(
+            d["account_index"],
+            net,
+            user=user,
+            tags=tags,
+            app=request.app,
+        )
+        release = CCD_ReleaseSchedule(**d["account_schedule"])
+
+        dd["scheduled_total"] = release.total
+        dd["count_of_installments"] = f"<span class='ccd'>{len(release.schedules)}</span>"
+        dd["first_release"] = datetime_delta_format_until(release.schedules[0].timestamp)
+        dd["last_release"] = datetime_delta_format_until(release.schedules[-1].timestamp)
+        dd["period"] = (
+            f'<span class="ccd">{dd["first_release"].replace(" days", "")} - {dd["last_release"]}</span>'
+        )
+        dd["unlocked"] = d["account_amount"] - release.total
+        made_up_accounts.append(dd)
+    total_rows = accounts["total_rows"]  # type: ignore
+    last_page = math.ceil(total_rows / size)
+
+    return JSONResponse(
+        {
+            "data": made_up_accounts,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
+    )
+
+
+@router.get("/{net}/accounts-cooldown", response_class=HTMLResponse)
+async def accounts_cooldown(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+
+    request.state.api_calls = {}
+    request.state.api_calls["Accounts Cooldown"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_cooldown_accounts_v2__net__accounts_cooldown_get"
+    )
+    request.state.api_calls["Accounts Pre Cooldown"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_pre_cooldown_accounts_v2__net__accounts_pre_cooldown_get"
+    )
+    request.state.api_calls["Accounts Pre Pre Cooldown"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_pre_pre_cooldown_accounts_v2__net__accounts_pre_pre_cooldown_get"
+    )
+    return request.app.templates.TemplateResponse(
+        "tools/accounts-cooldown.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "requested_page": 1,
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+@router.get(
+    "/{net}/ajax_accounts_cooldown",
+    response_class=HTMLResponse | RedirectResponse,
+)
+async def ajax_accounts_cooldown(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/cooldown",
+        httpx_client,
+    )
+    accounts = api_result.return_value if api_result.ok else []
+    aggregates = defaultdict(lambda: {"total_amount": 0, "count": 0})
+
+    for row in accounts:
+        for cooldown in row.get("account_cooldowns", []):
+            end_time = cooldown["end_time"]
+            amount = cooldown["amount"]
+            aggregates[end_time]["total_amount"] += amount
+            aggregates[end_time]["count"] += 1
+
+    # Convert to list of dicts
+    summary = sorted(
+        [
+            {"end_time": k, "total_amount": v["total_amount"], "count": v["count"]}
+            for k, v in aggregates.items()
+        ],
+        key=lambda x: dt.datetime.strptime(str(x["end_time"]), "%Y-%m-%dT%H:%M:%SZ"),
+    )
+    summary_totals = {
+        "total_amount": sum([x["total_amount"] for x in summary]),
+        "count": sum([x["count"] for x in summary]),
+    }
+    return request.app.templates.TemplateResponse(
+        "/tools/accounts-cooldown-content.html",
+        {
+            "env": environment,
+            "request": request,
+            "user": user,
+            "tags": tags,
+            "accounts": accounts,
+            "summary": summary,
+            "summary_totals": summary_totals,
+            "net": net,
+        },
+    )
+
+
+@router.get(
+    "/{net}/ajax_accounts_pre_cooldown",
+    response_class=HTMLResponse | RedirectResponse,
+)
+async def ajax_accounts_pre_cooldown(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/pre-cooldown",
+        httpx_client,
+    )
+    accounts = api_result.return_value if api_result.ok else []
+    # if accounts:
+    #     accounts = [CCD_AccountPending(**x) for x in accounts]
+    return request.app.templates.TemplateResponse(
+        "/tools/accounts-pre-cooldown-content.html",
+        {
+            "env": environment,
+            "request": request,
+            "user": user,
+            "tags": tags,
+            "accounts": accounts,
+            "net": net,
+        },
+    )
+
+
+@router.get(
+    "/{net}/ajax_accounts_pre_pre_cooldown",
+    response_class=HTMLResponse | RedirectResponse,
+)
+async def ajax_accounts_pre_pre_cooldown(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/pre-pre-cooldown",
+        httpx_client,
+    )
+    accounts = api_result.return_value if api_result.ok else []
+    # if accounts:
+    #     accounts = [CCD_AccountPending(**x) for x in accounts]
+    return request.app.templates.TemplateResponse(
+        "/tools/accounts-pre-pre-cooldown-content.html",
+        {
+            "env": environment,
+            "request": request,
+            "user": user,
+            "tags": tags,
+            "accounts": accounts,
+            "net": net,
+        },
+    )
+
+
+@router.get("/tools/api-direct", response_class=HTMLResponse, include_in_schema=False)
+async def api_direct(
+    request: Request,
+    tags: dict = Depends(get_labeled_accounts),
+):
+    return request.app.templates.TemplateResponse(
+        "/tools/api_direct.html",
+        {
+            "env": environment,
+            "request": request,
+            "tags": tags,
+        },
+    )
+
+
+API_KEY_HEADER_NAME = "x-ccdexplorer-key"
+
+
+def _flatten(obj: Any, prefix: str = "", out: dict[str, Any] | None = None) -> dict[str, Any]:
+    if out is None:
+        out = {}
+    if isinstance(obj, Mapping):
+        for k, v in obj.items():
+            _flatten(v, f"{prefix}.{k}" if prefix else str(k), out)
+    elif isinstance(obj, Sequence) and not isinstance(obj, (str, bytes, bytearray)):
+        for i, v in enumerate(obj):
+            _flatten(v, f"{prefix}[{i}]" if prefix else f"[{i}]", out)
+    else:
+        out[prefix] = obj
+    return out
+
+
+def _rows_from_json(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        if all(isinstance(x, Mapping) for x in data):
+            return [_flatten(x) for x in data]  # list of dicts
+        else:
+            return [{"value": data}]  # list of primitives
+    if isinstance(data, Mapping):
+        for key in ("results", "items", "data"):
+            v = data.get(key)
+            if isinstance(v, list) and all(isinstance(x, Mapping) for x in v):
+                return [_flatten(x) for x in v]
+        return [_flatten(data)]
+    return [{"value": data}]
+
+
+def _rows_to_df(rows) -> pd.DataFrame:
+    if not rows:
+        return pd.DataFrame([{"value": None}])
+    if isinstance(rows, list):
+        if all(isinstance(r, dict) for r in rows):
+            return pd.json_normalize(rows, sep=".")
+        else:
+            return pd.DataFrame({"value": rows})
+    if isinstance(rows, dict):
+        return pd.json_normalize([rows], sep=".")
+    return pd.DataFrame([{"value": rows}])
+
+
+@router.post("/fetch-submit", include_in_schema=False)
+async def fetch_submit(api_url: str = Form(...), header_key: str = Form(...)):
+    headers = {API_KEY_HEADER_NAME: header_key}
+
+    timeout = httpx.Timeout(30.0, connect=10.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+        resp = await client.get(api_url, headers=headers)
+    if resp.status_code >= 400:
+        raise HTTPException(
+            status_code=resp.status_code, detail=f"Upstream returned {resp.status_code}"
+        )
+
+    content_type = resp.headers.get("content-type", "")
+    if "application/json" in content_type or resp.text.strip().startswith(("{", "[")):
+        try:
+            data = resp.json()
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Response is not valid JSON: {e}")
+        rows = _rows_from_json(data)
+    elif "text/csv" in content_type:
+        # passthrough as-is
+        csv_bytes = resp.content
+        fname = f"api_export_{dt.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+        path = f"/tmp/{fname}"
+        with open(path, "wb") as f:
+            f.write(csv_bytes)
+        return FileResponse(path=path, filename=fname, media_type="text/csv")
+    else:
+        rows = [{"value": resp.text}]
+
+    df = _rows_to_df(rows)
+
+    fname = f"api_export_{dt.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}.csv"
+    path = f"/tmp/{fname}"
+    df.to_csv(path, index=False)
+
+    return FileResponse(path=path, filename=fname, media_type="text/csv")

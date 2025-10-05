@@ -1,0 +1,2068 @@
+# ruff: noqa: F403, F405, E402, E501, E722, F401
+# pyright: reportOptionalMemberAccess=false
+# pyright: reportOptionalSubscript=false
+# pyright: reportAttributeAccessIssue=false
+# pyright: reportAssignmentType=false
+# pyright: reportPossiblyUnboundVariable=false
+# pyright: reportArgumentType=false
+# pyright: reportOptionalOperand=false
+# pyright: reportOptionalIterable=false
+# pyright: reportCallIssue=false
+# pyright: reportReturnType=false
+# pyright: reportIndexIssue=false
+# pyright: reportGeneralTypeIssues=false
+# pyright: reportInvalidTypeArguments=false
+
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import TransactionClassifier
+from pydantic import BaseModel
+from enum import Enum
+import dateutil
+
+# from app.classes.Node_Baker import BakerStatus
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    get_url_from_api,
+    get_theme_from_request,
+    ccdexplorer_plotly_template,
+)
+
+# from app.ajax_helpers import mongo_pagination_html_header
+from ccdexplorer.env import *
+from ccdexplorer.ccdexplorer_site.app.state import *
+from ccdexplorer.ccdexplorer_site.app.routers.tools import get_data_for_chain_transactions_for_dates
+import requests
+from typing import Optional, Union
+import numpy as np
+from bisect import bisect_right
+from ccdexplorer.ccdexplorer_site.app.utils import user_string
+from pydantic import ConfigDict
+from ccdexplorer.site_user import SiteUser, NotificationPreferences
+
+# from app.Recurring.recurring import Recurring
+from ccdexplorer.domain.mongo import MongoTypeLoggedEvent
+from pymongo import ASCENDING, DESCENDING
+from datetime import timedelta
+from dateutil.relativedelta import relativedelta
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_PoolInfo,
+    CCD_CurrentPaydayStatus,
+    CCD_BlockItemSummary,
+)
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import pandas as pd
+import uuid
+
+
+router = APIRouter()
+
+
+def prepare_plotly_graph(data: list, title: str, d_date: str, layout_additions: dict):
+    return_object = {
+        "layout": {
+            "title": {
+                "text": f"<b>{title}</b><br><sup>{d_date}</sup>",
+                "font": {"size": 14},
+            },
+            # "plot_bgcolor": "#444",
+            "paper_bgcolor": "rgba(0,0,0,0)",
+            "xaxis": {"linecolor": "grey", "linewidth": 1, "mirror": True},
+            "yaxis": {"linecolor": "grey", "linewidth": 1, "mirror": True},
+            "legend": {"x": 0.01, "y": 0.99, "xanchor": "left", "yanchor": "top"},
+        },
+        "data": data,
+        "config": {"responsive": True, "displayModeBar": False},
+    }
+    return_object["layout"].update(layout_additions)
+    return return_object
+
+
+class ReportingActionType(str, Enum):
+    deposit = "Deposit"
+    swap = "Swap"
+    withdraw = "Withdraw"
+    mint = "Mint"
+    burn = "Burn"
+    none = "None"
+
+
+class ReportingSubject(str, Enum):
+    Concordex = "Concordex"
+    Arabella = "Arabella"
+    Tricorn = "Tricorn"
+
+
+class ClassifiedTransaction(BaseModel):
+    tx_hash: str
+    logged_events: list[MongoTypeLoggedEvent]
+    block_height: int
+    addresses: Optional[set] = None
+    date: Optional[str] = None
+    action_type: Optional[ReportingActionType] = None
+
+
+class ReportingUnit(BaseModel):
+    tx_hash: str
+    date: str
+    fungible_token: str
+    amount_in_local_currency: float
+    amount_in_usd: float
+    action_type: str
+
+
+class ReportingAddresses(BaseModel):
+    tx_hash: str
+    date: str
+    addresses: str
+
+
+class ReportingOutput(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    txs_by_action_type: dict  # [ReportingActionType: list[ClassifiedTransaction]]
+    # output: list
+    # df_accounts: dict
+    # df_raw: pd.DataFrame
+    # df_output_action_types: dict  # [str:pd.DataFrame]
+    # df_output_fungible_token: dict  # [str:pd.DataFrame]
+
+
+def address_exists_and_is_account(address: Union[None, str]):
+    if not address:
+        return False
+    else:
+        if len(address) > 20:
+            return True
+        else:
+            return False
+
+
+def classify_tx_as_swap_or_withdraw(classified_tx: ClassifiedTransaction):
+    log_0_to = classified_tx.logged_events[0].result.get("to_address")
+    log_0_from = classified_tx.logged_events[0].result.get("from_address")
+    log_1_to = classified_tx.logged_events[1].result.get("to_address")
+
+    if address_exists_and_is_account(log_0_to) and address_exists_and_is_account(log_1_to):
+        classified_tx.action_type = ReportingActionType.withdraw
+    else:
+        if (
+            classified_tx.logged_events[0].event_type == "mint_event"
+            and address_exists_and_is_account(log_1_to)
+            or address_exists_and_is_account(log_0_from)
+            and address_exists_and_is_account(log_1_to)
+            or address_exists_and_is_account(log_0_from)
+            and classified_tx.logged_events[1].event_type == "burn_event"
+        ):
+            classified_tx.action_type = ReportingActionType.swap
+    return classified_tx
+
+
+def find_date_for_height(heights, block_end_of_day_dict, height):
+    found_index = bisect_right(heights, height)
+    # meaning it's today...
+    if found_index == len(heights):
+        return f"{dt.datetime.now():%Y-%m-%d}"
+    else:
+        return block_end_of_day_dict[heights[found_index]]
+
+
+def find_date_and_date_str_for_height(heights, block_end_of_day_dict, height):
+    found_index = bisect_right(heights, height)
+    # meaning it's today...
+    if found_index == len(heights):
+        return f"{dt.datetime.utcnow():%Y-%m-%d}"
+    else:
+        return block_end_of_day_dict[heights[found_index]]
+
+
+def add_date_to_tx(tx: ClassifiedTransaction, heights, block_end_of_day_dict):
+    date = find_date_and_date_str_for_height(heights, block_end_of_day_dict, tx.block_height)
+    tx.date = date
+    return tx
+
+
+def add_tx_addresses(event: MongoTypeLoggedEvent, addresses: set):
+    _to = event.result.get("to_address")
+    if _to:
+        if len(_to) > 20:
+            addresses.add(_to)
+
+    _from = event.result.get("from_address")
+    if _from:
+        if len(_from) > 20:
+            addresses.add(_from)
+
+    return addresses
+
+
+@router.get("/{net}/statistics", response_class=HTMLResponse)
+async def statistics(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/accounts", response_class=HTMLResponse)
+async def statistics_accounts(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-accounts.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/chain", response_class=HTMLResponse)
+async def statistics_chain(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-chain.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/exchanges", response_class=HTMLResponse)
+async def statistics_exchanges(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-exchanges.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/staking", response_class=HTMLResponse)
+async def statistics_staking(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-staking.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/validators", response_class=HTMLResponse)
+async def statistics_validators(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-validators.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics/plt", response_class=HTMLResponse)
+async def statistics_plt(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        return request.app.templates.TemplateResponse(
+            "statistics/statistics-chain-plt.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+@router.get("/{net}/statistics-standalone", response_class=HTMLResponse)
+async def statistics_standalone(
+    request: Request,
+    net: str,
+):
+    if net == "mainnet":
+        chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
+        yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+        return request.app.templates.TemplateResponse(
+            "statistics/standalone/account_growth.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+                "chain_start": chain_start,
+                "yesterday": yesterday,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+
+#########################
+### TAKE 2
+
+
+def replace_short_strings(string):
+    if len(string) < 5:
+        return ""
+    else:
+        return string
+
+
+#########################
+
+
+def process_logged_events_to_HTML(rows, tab_string: str, active: bool):
+    active_str = "active" if active else ""
+
+    # header for the specific tab
+    html = f'<div class="tab-pane fade show {active_str} " style="padding-top: 10px;" id="{tab_string}" role="tabpanel" aria-labelledby="{tab_string}-tab">\n'
+
+    html += "<table class='table-sm table-striped'>"
+    # the transactions
+    for row in rows:
+        html += row
+
+    # closing the header
+    html += '</table><!-- class="tab-pane fade -->\n</div>\n'
+
+    return html
+
+
+@router.get("/{net}/statistics/{reporting_subject}", response_class=HTMLResponse)
+async def statistics_reporting_subject(
+    request: Request,
+    net: str,
+    reporting_subject: str,
+):
+    error = "Not implemented yet."
+    return request.app.templates.TemplateResponse(
+        "base/error.html",
+        {
+            "request": request,
+            "error": error,
+            "env": environment,
+            "net": net,
+        },
+    )
+
+
+class AnalysisType(Enum):
+    statistics_daily_holders = "statistics_daily_holders"
+    statistics_daily_limits = "statistics_daily_limits"
+    statistics_network_summary = "statistics_network_summary"
+    statistics_classified_pools = "statistics_classified_pools"
+
+
+async def get_all_data_for_analysis_limited(
+    analysis: str, app, start_date: str | dt.date, end_date: str
+) -> list[str]:
+    api_result = await get_url_from_api(
+        f"{app.api_url}/v2/mainnet/misc/statistics/{analysis}/{start_date}/{end_date}",
+        app.httpx_client,
+    )
+    result = api_result.return_value if api_result.ok else []
+    return result
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_daily_holders",
+    response_class=HTMLResponse,
+)
+async def statistics_daily_holders_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_daily_holders"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    title = "Count of Accounts holding > 1M CCD"
+    fig = px.bar(
+        df,
+        x="date",
+        y="count_above_1M",
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_traces(marker_color="#549FF2")
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text=title,
+        showgrid=False,
+        title_font=dict(color="#549FF2"),
+    )
+    fig.update_layout(
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    fig.update_xaxes(title=None)
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_daily_limits",
+    response_class=HTMLResponse,
+)
+async def statistics_daily_limits_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_daily_limits"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df.rename(
+        columns={
+            "amount_to_make_top_100": "Top 100",
+            "amount_to_make_top_250": "Top 250",
+        },
+        inplace=True,
+    )
+    melt = df.melt("date", var_name="limit_amount", value_name="value")
+    # print(melt)
+
+    rng = ["#AE7CF7", "#70B785"]
+
+    title = "Amounts of CCD needed to make top 100/250"
+    fig = px.line(
+        melt,
+        x="date",
+        y="value",
+        color="limit_amount",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text="Amount (CCD)",
+        showgrid=False,
+        autorange=False,
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        legend_y=-0.2,
+        yaxis_range=[0, round(max(df["Top 100"]), 0)],
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    fig.update_xaxes(title=None)
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_network_summary_validator_count",
+    response_class=Response,
+)
+async def statistics_network_summary_validator_count_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_network_summary"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df.fillna(0, inplace=True)
+    df["active_validator_count"] = df["validator_count"] - df["suspended_count"]
+
+    rng = ["#70B785"]
+    title = "Registered Active and Suspended Validators"
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.add_trace(
+        go.Scatter(
+            x=df["date"].to_list(),
+            y=df["active_validator_count"].to_list(),
+            name="Active Validators",
+            marker=dict(color="#70B785"),
+        ),
+        secondary_y=False,
+    )
+    # fig = px.line(
+    #     df,
+    #     x="date",
+    #     y="active_validator_count",
+    #     color_discrete_sequence=rng,
+    #     template=ccdexplorer_plotly_template(theme),
+    # )
+    fig.add_trace(
+        go.Bar(
+            x=df["date"].to_list(),
+            y=df["suspended_count"].to_list(),
+            name="Suspended Validators",
+            marker=dict(color="#AE7CF7"),
+        ),
+        secondary_y=False,
+    )
+
+    fig.update_yaxes(title_text="Validators")
+    fig.update_xaxes(title=None)
+    fig.update_layout(
+        template=ccdexplorer_plotly_template(theme),
+        legend_title_text=None,
+        legend_y=-0.25,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=500,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_network_summary_accounts_per_day",
+    response_class=Response,
+)
+async def statistics_network_summary_accounts_per_day_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_network_summary"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df_per_day = pd.DataFrame(all_data)
+    df_per_day["d_count_accounts"] = df_per_day["account_count"] - df_per_day[
+        "account_count"
+    ].shift(+1)
+
+    df_per_day = df_per_day.dropna(subset=["d_count_accounts"])
+
+    df_per_day.rename(
+        columns={"d_count_accounts": "growth", "account_count": "level"}, inplace=True
+    )
+    df_per_day = df_per_day[["date", "growth", "level"]]
+    title = "Accounts Active and Growth per day"
+
+    # Create figure with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    fig.add_trace(
+        go.Scatter(
+            x=df_per_day["date"].to_list(),
+            y=df_per_day["level"].to_list(),
+            name="Accounts On Chain",
+            marker=dict(color="#AE7CF7"),
+        ),
+        secondary_y=False,
+    )
+
+    fig.add_trace(
+        go.Bar(
+            x=df_per_day["date"].to_list(),
+            y=df_per_day["growth"].to_list(),
+            name="Account Growth",
+            marker=dict(color="#549FF2"),
+        ),
+        secondary_y=True,
+        # showgrid=False,
+    )
+
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text="Accounts On Chain",
+        showgrid=False,
+        title_font=dict(color="#AE7CF7"),
+    )
+    fig.update_yaxes(
+        secondary_y=True,
+        title_text="Account Growth",
+        showgrid=False,
+        title_font=dict(color="#549FF2"),
+    )
+    fig.update_xaxes(type="date")
+    fig.update_layout(
+        showlegend=True,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        template=ccdexplorer_plotly_template(theme),
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_open_pool_count",
+    response_class=Response,
+)
+async def statistics_classified_pools_open_pool_count_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    analysis = "statistics_classified_pools"
+    title = "# Open Pools"
+    plot_color = "#80B589"
+    data_field = "open_pool_count"
+    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_delegator_count",
+    response_class=Response,
+)
+async def statistics_classified_pools_delegator_count_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    analysis = "statistics_classified_pools"
+    title = "# Delegators"
+    plot_color = "#EE9B54"
+    data_field = "delegator_count"
+    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_avg_count_per_pool",
+    response_class=Response,
+)
+async def statistics_classified_pools_avg_count_per_pool_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    analysis = "statistics_classified_pools"
+    title = "Average # Delegators per Pool"
+    plot_color = "#6E97F7"
+    data_field = "delegator_avg_count_per_pool"
+    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_avg_stake",
+    response_class=Response,
+)
+async def statistics_classified_pools_avg_stake_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    analysis = "statistics_classified_pools"
+    title = "Delegator's Average Stake"
+    plot_color = "#AE7CF7"
+    data_field = "delegator_avg_stake"
+    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+
+
+async def staking_graphs_plotly(analysis, app, title, plot_color, data_field, theme: str):
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(analysis, app, chain_start, yesterday)
+    d_date = yesterday
+    df_pools = pd.DataFrame(all_data)
+    df_pools = df_pools[
+        [
+            "date",
+            "open_pool_count",
+            "delegator_count",
+            "delegator_avg_stake",
+            "delegator_avg_count_per_pool",
+        ]
+    ]
+    rng = [plot_color]
+    fig = px.area(
+        df_pools,
+        x="date",
+        y=[data_field],
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text=None,
+        showgrid=False,
+    )
+    fig.update_xaxes(title_text=None)
+
+    fig.update_layout(
+        showlegend=False,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=275,
+    )
+
+    fig.update_traces(
+        fillgradient=dict(
+            type="vertical",
+            colorscale=[(0.0, "white"), (1.0, plot_color)],
+        ),
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=df_pools["date"].to_list(),
+            y=df_pools[data_field].to_list(),
+            mode="lines",
+            line=dict(color=plot_color, width=2),
+            name=title,
+        )
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_rewards_explained",
+    response_class=Response,
+)
+async def statistics_rewards_explained(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    plot_color = "#AE7CF7"
+    data_field = "restaked_rewards_perc"
+    analysis = "statistics_daily_payday"
+    title = "Distribution of Daily Rewards"
+    staking_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, staking_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df = df[
+        [
+            "date",
+            "total_rewards_validators",
+            "total_rewards_pool_delegators",
+            "total_rewards_passive_delegators",
+        ]
+    ]
+    melt = df.melt("date", var_name="var", value_name="value")
+    melt["var"] = melt["var"].replace(
+        {
+            "total_rewards_validators": "Validators",
+            "total_rewards_pool_delegators": "Pool Delegators",
+            "total_rewards_passive_delegators": "Passive Delegators",
+        }
+    )
+    rng = ["#33C364", "#2485DF", "#7939BA", "#E87E90", "#F6DB9A", "#8BE7AA"]
+    columns = ["Validators", "Pool Delegators", "Passive Delegators"]
+    fig = px.area(
+        melt,
+        x="date",
+        y="value",
+        color="var",
+        color_discrete_sequence=rng,
+        category_orders={"var": columns},
+        template=ccdexplorer_plotly_template(theme),
+    )
+    for trace in fig.data:
+        trace.update(opacity=0.6)  # type: ignore
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text=None,
+        showgrid=False,
+        autorange=True,
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        # yaxis_range=[0, round(max(melt["CCD"]), 0)],
+        xaxis_title=None,
+        legend_title_text=None,
+        legend_y=-0.25,  # -0.45,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=370,
+    )
+    # fig.update_traces(
+    #     fillgradient=dict(
+    #         type="vertical",
+    #         colorscale=[(0.0, "white"), (1.0, plot_color)],
+    #     ),
+    # )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_restaked_rewards",
+    response_class=Response,
+)
+async def statistics_restaked_rewards(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+    plot_color = "#AE7CF7"
+    data_field = "restaked_rewards_perc"
+    analysis = "statistics_daily_payday"
+    title = "Percentage of Daily Rewards Restaked"
+    staking_start = dt.date(2022, 6, 24)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, staking_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df = df[["date", "restaked_rewards_perc"]]
+    rng = [plot_color]
+    fig = px.line(
+        df,
+        x="date",
+        y=[data_field],
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text=None,
+        showgrid=False,
+        tickformat=".0%",
+        range=[0, 1],
+    )
+    fig.update_xaxes(title_text=None)
+
+    fig.update_layout(
+        showlegend=False,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+
+    # fig.update_traces(
+    #     fillgradient=dict(
+    #         type="vertical",
+    #         colorscale=[(0.0, "white"), (1.0, plot_color)],
+    #     ),
+    # )
+
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_microccd",
+    response_class=Response,
+)
+async def statistics_microccd_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_microccd"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df_microCCD = pd.DataFrame(all_data)
+    df_microCCD["GTU_numerator"] = df_microCCD["GTU_numerator"].astype(float)
+    df_microCCD["GTU_denominator"] = df_microCCD["GTU_denominator"].astype(float)
+    df_microCCD["NRG_denominator"] = df_microCCD["NRG_denominator"].astype(float)
+    df_microCCD["NRG_numerator"] = df_microCCD["NRG_numerator"].astype(float)
+    df_microCCD["Price_of_regular_transfer"] = (
+        501
+        / 1_000_000
+        * df_microCCD["GTU_numerator"]
+        / df_microCCD["GTU_denominator"]
+        / (df_microCCD["NRG_denominator"] / df_microCCD["NRG_numerator"])
+    )
+
+    rng = ["#70B785"]
+    title = "Fee stabilization - (log scale)"
+    fig = px.line(
+        df_microCCD,
+        x="date",
+        y="Price_of_regular_transfer",
+        log_y=True,
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(title_text="Cost for regular transfer (in CCD)")
+    fig.update_xaxes(title=None)
+    fig.update_layout(
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_validator_staking",
+    response_class=Response,
+)
+async def statistics_validator_staking_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    d_date = yesterday
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/mainnet/accounts/current-payday/info",
+        request.app.httpx_client,
+    )
+    result = api_result.return_value if api_result.ok else []
+    active_validators = []
+    for pool in result:
+        pool_status = pool["pool_status"]
+        current_payday_info = CCD_CurrentPaydayStatus(**pool_status["current_payday_info"])
+        active_validators.append(
+            {
+                "Validator ID": pool["baker_id"],
+                "Effective Stake": (
+                    current_payday_info.baker_equity_capital + current_payday_info.delegated_capital
+                )
+                / 1_000_000,
+                "Validator Stake": current_payday_info.baker_equity_capital / 1_000_000,
+                "Delegated Stake": current_payday_info.delegated_capital / 1_000_000,
+            }
+        )
+
+    df_bakers = pd.DataFrame(active_validators)
+    df_bakers = df_bakers.sort_values(by="Effective Stake", ascending=False).head(50).reset_index()
+    # df.reset_index(level=0, inplace=True)
+    df_bakers = df_bakers.drop(["Effective Stake"], axis=1)
+    df_bakers["o"] = df_bakers.index
+    df_bakers["order"] = df_bakers["o"] + 1
+
+    rng = ["#33C364", "#7939BA"]
+    rng = ["#2485DF", "#E87E90"]
+    title = "Validator (top 50) - Staked amounts"
+    fig = px.bar(
+        df_bakers,
+        x=["Validator Stake", "Delegated Stake"],
+        y="Validator ID",
+        orientation="h",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        type="category",
+    )
+    fig.update_xaxes(title="Staked Amount")
+    fig.update_layout(
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=750,
+        legend_y=0.0,
+        legend_x=0.5,
+        yaxis_dtick=1,
+        uniformtext_minsize=8,
+        uniformtext_mode="show",
+        barmode="stack",
+        yaxis={
+            "categoryorder": "total ascending",
+            "categoryarray": df_bakers["Validator ID"].to_list(),
+        },
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/ccd_on_exchanges",
+    response_class=HTMLResponse,
+)
+async def statistics_ccd_on_exchanges_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_ccd_classified"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    source = pd.DataFrame(all_data)
+    columns_to_be_removed = ["total_supply", "staked", "unstaked", "delegated"]
+    columns_to_stay = list(set(source.columns) - set(columns_to_be_removed))
+    source = source[columns_to_stay]
+    islands = (source["bitfinex"] != 0).groupby(level=0).cumsum()
+    source = source[islands != 0]
+    source2 = source.copy()
+    source2["date"] = (
+        pd.to_datetime(source2["date"]) + dt.timedelta(days=1) - dt.timedelta(microseconds=1)
+    )
+
+    melt = source2.melt("date", var_name="ccd_type", value_name="CCD")
+    melt["ccd_type"] = melt["ccd_type"].replace(
+        {
+            "bitfinex": "1.BitFinex",
+            "bitglobal": "2.BitGlobal",
+            "mexc": "3.MEXC",
+            "ascendex": "4.AscendEX",
+            "kucoin": "5.KuCoin",
+            "coinex": "6.CoinEx",
+            "lcx": "7.LCX",
+            "gate.io": "8.Gate.IO",
+            "bitmart": "9.BitMart",
+        }
+    )
+
+    rng = ["#DC5050", "#33C364", "#2485DF", "#7939BA", "#E87E90", "#F6DB9A", "#8BE7AA"]
+    columns = [
+        "1.BitFinex",
+        "2.BitGlobal",
+        "3.MEXC",
+        "4.AscendEX",
+        "5.KuCoin",
+        "6.CoinEx",
+        "7.LCX",
+        "8.Gate.IO",
+        "9.BitMart",
+    ]
+
+    title = "CCD on Exchanges"
+    fig = px.area(
+        melt,
+        x="date",
+        y="CCD",
+        color="ccd_type",
+        color_discrete_sequence=rng,
+        category_orders={"ccd_type": columns},
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text="CCD on exchanges",
+        showgrid=False,
+        autorange=True,
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        # yaxis_range=[0, round(max(melt["CCD"]), 0)],
+        xaxis_title=None,
+        legend_title_text=None,
+        legend_y=-0.25,  # -0.45,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_ccd_classified",
+    response_class=Response,
+)
+async def statistics_ccd_classified_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_ccd_classified"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    all_data.reverse()
+    d_date = yesterday
+    df_ccd_classified = pd.DataFrame(all_data)
+
+    all_data = await get_all_data_for_analysis_limited(
+        "statistics_release_amounts", request.app, chain_start, yesterday
+    )
+    df_release = pd.DataFrame(all_data)
+
+    cols = list(df_ccd_classified.columns)
+    df_ccd_classified["gate.io"] = df_ccd_classified["gate.io"].fillna(0)
+    df_ccd_classified["tradable"] = 0
+    for col in [
+        x for x in cols if x not in ["date", "total_supply", "staked", "unstaked", "delegated"]
+    ]:
+        df_ccd_classified["tradable"] += df_ccd_classified[col]
+    # df_ccd_classified["bitfinex"]
+    # + df_ccd_classified["bitglobal"]
+    # + df_ccd_classified["mexc"]
+    # + df_ccd_classified["ascendex"]
+    # + df_ccd_classified["kucoin"]
+    # + df_ccd_classified["coinex"]
+    # + df_ccd_classified["lcx"]
+    # )
+
+    df_ccd_classified = df_ccd_classified[["date", "staked", "delegated", "unstaked", "tradable"]]
+    melt = df_ccd_classified.melt("date", var_name="ccd_type", value_name="CCD")
+    melt["order"] = melt["ccd_type"].replace(
+        {val: i for i, val in enumerate(["staked", "delegated", "unstaked", "tradable"])}
+    )
+    df_ccd_classified = (
+        df_ccd_classified.set_index("date")
+        .join(df_release.set_index("date"))
+        .reset_index()[["date", "total_amount_released", "total_amount"]]
+    )
+    df_ccd_classified["total_amount_released"] = df_ccd_classified["total_amount_released"].replace(
+        np.nan, 0
+    )
+    df_ccd_classified["locked"] = (
+        df_ccd_classified["total_amount"] - df_ccd_classified["total_amount_released"]
+    ) / 1_000_000
+
+    # rng = ["#AE7CF7", "#70B785", "#549FF2", "#EBBC90"]
+    rng = ["#E87E90", "#33C364", "#2485DF", "#7939BA"]
+    title = "CCD Classified"
+    fig = px.bar(
+        melt,
+        x="date",
+        y="CCD",
+        color="ccd_type",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_layout(
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+        legend_y=-0.1,
+        legend_orientation="h",
+    )
+    fig.update_xaxes(title=None)
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/percentage_staked",
+    response_class=Response,
+)
+async def statistics_percentage_staked_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_ccd_classified"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2022, 6, 24)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    all_data.reverse()
+    d_date = yesterday
+
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    df = pd.DataFrame(all_data)
+
+    df["percentage_staked"] = (df["staked"] / df["total_supply"]) * 100
+
+    rng = ["#E87E90", "#33C364", "#2485DF", "#7939BA"]
+    title = "Percentage of CCD Staked"
+    fig = px.bar(
+        df,
+        x="date",
+        y="percentage_staked",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_layout(
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+        yaxis=dict(type="linear", range=[0, 100], ticksuffix="%"),
+        legend_y=-0.1,
+        legend_orientation="h",
+        yaxis_title=None,
+    )
+    fig.update_xaxes(title=None)
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_network_activity_tps",
+    response_class=Response,
+)
+async def statistics_network_activity_tps_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_mongo_transactions"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df_transactions = pd.DataFrame(all_data)
+
+    all_data = await get_all_data_for_analysis_limited(
+        "statistics_network_activity", request.app, chain_start, yesterday
+    )
+    df_day_activity = pd.DataFrame(all_data)
+
+    merge = pd.merge(df_day_activity, df_transactions, on="date")
+    merge["avgTransactionSize"] = merge["network_activity"] / merge["account_transaction"]
+    # merge['transactionsPerBlock'] = merge['accountTransaction'] / merge['Mint']
+    merge["TPS"] = merge["account_transaction"] / 86_400
+
+    merge_tr = merge[merge["TPS"] > 0]
+    merge_ac = merge[merge["network_activity"] > 0.0]
+    title = "Network Activity"
+
+    # Create figure with secondary y-axis
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig.add_trace(
+        go.Scatter(
+            x=merge_ac["date"].to_list(),
+            y=merge_ac["network_activity"].to_list(),
+            name="Activity",
+            fill="tozeroy",
+            marker=dict(color="#70B785"),
+            fillgradient=dict(
+                type="horizontal",
+                colorscale=[(0.0, "white"), (1.0, "#70B785")],
+            ),
+        ),
+        secondary_y=False,
+        # showgrid=False,
+    )
+    fig.update_yaxes(secondary_y=False, type="log")
+    # fig.update_traces(
+
+    # )
+    fig.add_trace(
+        go.Scatter(
+            x=merge_tr["date"].to_list(),
+            y=merge_tr["TPS"].to_list(),
+            name="TPS",
+            marker=dict(color="#AE7CF7"),
+        ),
+        secondary_y=True,
+    )
+    fig.update_yaxes(
+        secondary_y=False,
+        title_text="Activity",
+        showgrid=False,
+        title_font=dict(color="#70B785"),
+    )
+    fig.update_yaxes(
+        secondary_y=True,
+        title_text="TPS",
+        showgrid=False,
+        title_font=dict(color="#AE7CF7"),
+    )
+    fig.update_xaxes(type="date")
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        xaxis_title=None,
+        showlegend=True,
+        legend_y=-0.2,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        template=ccdexplorer_plotly_template(theme),
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_transaction_details_histogram",
+    response_class=HTMLResponse,
+)
+async def statistics_transaction_details_histogram_python(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_mongo_transactions"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df = df.fillna(0)
+    df["account"] = df["initial"] + df["normal"] + df["credential_keys_updated"]
+    df["staking"] = (
+        df["baker_added"]
+        + df["baker_removed"]
+        + df["baker_keys_updated"]
+        + df["baker_stake_updated"]
+        # + df["baker_stake_earnings_updated"]
+        + df["baker_configured"]
+        + df["delegation_configured"]
+    )
+    df["smart ctr"] = (
+        df["contract_initialized"] + df["module_deployed"] + df["contract_update_issued"]
+    )
+    df["register data"] = df["data_registered"]
+
+    df["transfer"] = (
+        df["account_transfer"]
+        + df["transferred_to_encrypted"]
+        + df["transferred_to_public"]
+        + df["encrypted_amount_transferred"]
+        + df["transferred_with_schedule"]
+    )
+
+    melt = df[
+        [
+            "date",
+            "account",
+            # "identity",
+            "staking",
+            # "delegation",
+            "smart ctr",
+            "transfer",
+            "register data",
+            # "chain updates",
+        ]
+    ].melt("date", var_name="transaction_type", value_name="count")
+
+    rng = [
+        "#EE9B54",
+        "#F7D30A",
+        "#6E97F7",
+        "#F36F85",
+        "#AE7CF7",
+        "#508A86",
+        "#005B58",
+        # "#0E2625",
+    ]
+    # stacked hist
+    title = "Transaction Types"
+    fig = px.bar(
+        melt,
+        x="date",
+        y="count",
+        color="transaction_type",
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        xaxis_title=None,
+        legend_y=-0.2,
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_exchange_wallets",
+    response_class=Response,
+)
+async def statistics_exchange_wallets_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_exchange_wallets"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    melt = pd.DataFrame(df).melt(id_vars=["date"])
+
+    rng = [
+        "#EE9B54",
+        "#F7D30A",
+        "#6E97F7",
+        "#F36F85",
+        "#AE7CF7",
+        "#508A86",
+        "#005B58",
+        "#0E2625",
+    ]
+
+    title = "Known Exchange Wallets"
+    fig = px.line(
+        melt,
+        x="date",
+        y="value",
+        color="variable",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        title_text="Count",
+        showgrid=False,
+    )
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+        ),
+        yaxis_range=[0, round(max(melt["value"]), 0) * 1.1],
+        xaxis_title=None,
+        legend_title_text=None,
+        legend_y=-0.25,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_transaction_fees",
+    response_class=Response,
+)
+async def statistics_transaction_fees_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_transaction_fees"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df.fillna(0)
+    df["fee_for_day"] = df["fee_for_day"] / 1_000_000
+
+    rng = ["#EE9B54"]
+    title = "Transaction Fees per Day"
+    fig = px.line(
+        df,
+        x="date",
+        y="fee_for_day",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        # secondary_y=False,
+        title_text="Transaction Fees (CCD)",
+        # showgrid=False,
+        autorange=False,
+    )
+    fig.update_xaxes(title=None)
+    fig.update_layout(
+        yaxis_range=[0, round(max(df["fee_for_day"]), 0) * 1.1],
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_realized_prices",
+    response_class=Response,
+)
+async def statistics_realized_prices_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_realized_prices"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df.fillna(0)
+
+    rng = ["#EE9B54"]
+    title = "Realized Price (CCD)"
+    fig = px.line(
+        df,
+        x="date",
+        y="realised_price",
+        color_discrete_sequence=rng,
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_yaxes(
+        # secondary_y=False,
+        title_text="Realized Price (CCD)",
+        # showgrid=False,
+        autorange=True,
+    )
+    fig.update_xaxes(title=None)
+    fig.update_layout(
+        yaxis_range=[0, round(max(df["realised_price"]), 0) * 1.1],
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+def dates_to_blocks(
+    start_date: str, end_date: str, blocks_per_day: dict[str, MongoTypeBlockPerDay]
+):
+    amended_start_date = f"{(dateutil.parser.parse(start_date) - dt.timedelta(days=1)):%Y-%m-%d}"
+    start_block = blocks_per_day.get(amended_start_date)
+    if start_block:
+        start_block = start_block.height_for_first_block
+    else:
+        start_block = 0
+
+    end_block = blocks_per_day.get(end_date)
+    if end_block:
+        end_block = end_block.height_for_last_block
+    else:
+        end_block = 1_000_000_000
+
+    return start_block, end_block
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_unique_addresses",
+    response_class=Response,
+)
+async def statistics_unique_addresses_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_unique_addresses_weekly"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2021, 6, 9)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.DataFrame(all_data)
+    df.fillna(0)
+    df["date"] = pd.to_datetime(df["date"])
+    rng = ["#EE9B54"]
+    title = "Unique Active Addresses per Week"
+    fig = px.scatter(
+        df,
+        x="date",
+        y="unique_impacted_address_count",
+        color_discrete_sequence=rng,
+        # mode="lines",
+        template=ccdexplorer_plotly_template(theme),
+        # trendline="rolling",
+        # trendline_options=dict(window=12),
+    )
+    fig.update_yaxes(
+        # secondary_y=False,
+        title_text=None,
+        # showgrid=False,
+        # autorange=False,
+    )
+    fig.update_traces(mode="lines")
+    fig.update_xaxes(title=None, type="date")
+
+    fig.update_yaxes(secondary_y=False, type="log")
+    fig.update_layout(
+        # yaxis_range=[0, round(max(df["unique_impacted_address_count"]), 0) * 1.1],
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+########PLT
+
+
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/statistics_plt_stablecoin_dominance",
+    response_class=HTMLResponse,
+)
+async def statistics_plt_stablecoin_dominance_plotly(
+    request: Request,
+    net: str,
+):
+    theme = await get_theme_from_request(request)
+    analysis = "statistics_plt"
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            "testnet/not-available.html",
+            {
+                "env": request.app.env,
+                "net": net,
+                "request": request,
+            },
+        )
+
+    chain_start = dt.date(2025, 9, 22)
+    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
+    d_date = yesterday
+    df = pd.json_normalize(all_data)  # type: ignore
+    x = df["date"]
+    fig = go.Figure()
+    usd_cols = [x for x in df.columns if ".USD.total_supply" in x]
+    # rng = ["#33C364", "#2485DF", "#7939BA", "#E87E90", "#F6DB9A", "#8BE7AA"]
+    rng = [
+        "#33C364",  # green
+        "#2485DF",  # blue
+        "#7939BA",  # purple
+        "#E87E90",  # red/pink
+        "#F6DB9A",  # yellow
+        "#8BE7AA",  # mint
+        "#2EA856",  # green variant
+        "#1F73C4",  # blue variant
+        "#692F9F",  # purple variant
+        "#D16475",  # red/pink variant
+        "#EFCF7A",  # yellow variant
+        "#71D895",  # mint variant
+        "#52D98B",  # green
+        "#4AA1EC",  # blue
+        "#9559CC",  # purple
+        "#EC9AA9",  # red/pink
+        "#FAE4B5",  # yellow
+        "#A3F0BE",  # mint
+        "#1E7A3D",  # green
+        "#155A91",  # blue
+        "#4E1F75",  # purple
+        "#A84352",  # red/pink
+        "#D6B44F",  # yellow
+        "#4EB872",  # mint
+        "#6EE1A2",  # green
+        "#7FBFF3",  # blue
+        "#B27BD9",  # purple
+        "#F2B8C2",  # red/pink
+        "#FFF0CE",  # yellow
+        "#C5F7D8",  # mint
+    ]
+    for index, col in enumerate(usd_cols):
+        token = col.split(".")[1]
+
+        fig.add_trace(
+            go.Scatter(
+                name=token,
+                x=x,
+                y=df[f"tokens.{token}.USD.total_supply"],
+                mode="lines",
+                # line=dict(width=0.5),
+                stackgroup="one",
+                marker=dict(color=rng[index]),
+                groupnorm="percent",  # sets the normalization for the sum of the stackgroup
+                hovertemplate=(
+                    "date = %{x}"
+                    "<br>TVL% in USD = %{y:.1f}%"
+                    "<br>token = %{fullData.name}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+    title = "Stablecoin Dominance (TVL in USD)"
+
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+        ),
+        xaxis_type="category",
+        yaxis=dict(type="linear", range=[1, 100], ticksuffix="%"),
+    )
+
+    fig.update_layout(
+        template=ccdexplorer_plotly_template(theme),
+        legend_title_text=None,
+        title=f"<b>{title}</b><br><sup>{d_date}</sup>",
+        height=350,
+    )
+    fig.update_xaxes(title=None)
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+#####################standalone

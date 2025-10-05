@@ -1,0 +1,22 @@
+<div id="current_keys">
+{% if user_api_keys|length == 0 %}
+<p>No API keys found for this account.</p>
+{% else %}
+  <table class="table table-borderless" >
+      <tbody>
+          {% for key in user_api_keys %}
+          <tr class="sm-text">
+              
+              <td class="text-secondary-emphasis text-start"><code>{{key.id}}</code></td>
+              <td class="text-secondary-emphasis text-start">
+                <button class="btn btn-sm" hx-delete="/account/key/{{key.id}}" hx-confirm="Are you sure you wish to delete this key?">
+                <i style="color: red;" class="bi bi-x-circle"></i>
+              </button> </td>
+          </tr>
+          {% endfor %}  
+        
+    
+      </tbody>
+    </table>
+  {% endif %}
+</div>

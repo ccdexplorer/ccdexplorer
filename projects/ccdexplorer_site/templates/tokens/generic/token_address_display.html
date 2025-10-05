@@ -1,0 +1,262 @@
+{% extends "base/base.html" %}
+{% block ogp %}
+<meta property="og:title" content="{{ogp_title}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ogp_url}}" />
+{% endblock %}
+{% block content %}
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+{% set vi = stored_token_address.verified_information %}
+{% set md = stored_token_address.token_metadata %}
+
+<script>
+  // async function getHolders(requested_page, total_rows) {
+  //   try {
+  //     holders = document.getElementById('current_holders');
+  //     {% if stored_token_address.token_id == '' %}
+  //       {% set token_id = "_" %}
+  //     {% else %}
+  //     {% set token_id = stored_token_address.token_id %}
+  //     {% endif %}
+  //     url = '/{{net}}/token/{{contract.index}}/{{contract.subindex}}/{{token_id}}/' + requested_page + '/' + total_rows + '/' + api_key;
+  //     console.log(url);
+  //     holders.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'
+  //     await fetch(url)
+  //       .then((response) => {
+  //         return response.text();
+  //       })
+  //       .then((data) => {
+  //         holders.innerHTML = data;
+  //       })
+  //       .catch(function (error) {
+  //         console.log(error);
+  //       });
+  //   } catch (eroor) {}
+  // }
+
+  // function prev_holders(requested_page, total_rows) {
+  //   getHolders(requested_page, total_rows)
+  // };
+  // function next_holders(requested_page, total_rows) {
+  //   getHolders(requested_page, total_rows)
+  // };
+
+  
+</script>
+
+
+
+
+<div class="row  mt-4">
+  <div class="col">{% include 'tokens/generic/token_header.html' %}</div>  
+  
+</div>
+
+<!-- https://codepen.io/ondrejsvestka/pen/gWPpPo for equal height columns -->
+<div class="row mt-4 row-flex">
+  <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Token Info" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_info.html" %}</div>
+  </div>
+  {% if vi %}
+  <div class="col-md-6  col-sm-12 ">
+    <div class="border content curved-border " >
+        {% set title= "Verified Information" %}{% include 'base/box_title.html' %}
+        {% include "tokens/generic/token_verified_information.html" %}</div>
+  </div>
+  {% endif %}
+  </div>  
+
+  <div class="row row-flex">
+    {% if md %}
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Token Metadata" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_metadata.html" %}</div>
+    </div>
+    {% endif %}
+    
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Current Holders" %}{% include 'base/box_title.html' %}
+          <div id="cis2_holders_table"></div>
+          {% set ccd_tabulator_table ='cis2_holders_table'%}
+          {% set tabulator_ajax_url = '/ajax_cis2_tokens/'+net+'/'+ contract.index|string +'/'+contract.subindex|string+'/'+token_id%}
+        {% set filename='cis2-tokens-for-'+ token_id+'-'+range(1000,10000)|random|string+'.csv' %}
+            {% include "base/tabulator/tabulator-cis2-holders.html" %}
+    </div>
+  </div>
+    <script>
+      async function load_media(mediaUrl) {
+        console.log(mediaUrl);
+        const containerElement = document.getElementById('media-container');
+        containerElement.innerHTML = '{% include "base/spinner.html" %}'; // Clear previous content
+    
+        try {
+            const response = await fetch(mediaUrl);
+            const contentType = response.headers.get('Content-Type');
+            console.log(contentType);
+            if (!contentType || contentType.startsWith('text')) {
+                // Handle as text response, assuming it contains the actual media URL
+                const data = await response.text();
+                if (data.trim().startsWith('http')) {
+                    // Assume it's a URL
+                    load_media(data.trim());
+                } else {
+                    console.error('Invalid media URL:', data);
+                }
+            } else if (contentType.startsWith('image') || contentType === 'application/octet-stream') {
+                const blob = await response.blob();
+                const imageUrl = URL.createObjectURL(blob);
+                const imageElement = new Image();
+                imageElement.src = imageUrl;
+                {% if md %}imageElement.alt = "{{md.name}}";{% endif %}
+    
+                // Set the maximum width and height for the image
+                const maxWidth = 250; // Adjust this value as needed
+                const maxHeight = 250; // Adjust this value as needed
+    
+                // Ensure the image is loaded before calculating dimensions
+                // console.log(imageElement.width, imageElement.height);
+                imageElement.onload = function () {
+                  // console.log(imageElement.width, imageElement.height);
+                  const aspectRatio = imageElement.width / imageElement.height;
+                    // console.log(aspectRatio);
+                    // Resize the image while maintaining aspect ratio
+                    if (imageElement.width > maxWidth) {
+                        imageElement.width = maxWidth;
+                        imageElement.height = maxWidth / aspectRatio;
+                    }
+    
+                    if (imageElement.height > maxHeight) {
+                        imageElement.height = maxHeight;
+                        imageElement.width = maxHeight * aspectRatio;
+                    }
+                    
+                    // Append the resized image to the container
+                    containerElement.innerHTML = '';
+                    containerElement.appendChild(imageElement);  
+                  
+                    // console.log(imageElement.width, imageElement.height);
+                };
+            } else if (contentType.startsWith('video')) {
+                const blob = await response.blob();
+                const videoUrl = URL.createObjectURL(blob);
+                const videoElement = document.createElement('video');
+                videoElement.src = videoUrl;
+                videoElement.controls = true; // Enable default video controls
+                videoElement.autoplay = true; // Autoplay the video
+                videoElement.style.maxWidth = '350px'; // Limit width to 350px
+    
+                // Append the video element to the container
+                containerElement.innerHTML = '';
+                containerElement.appendChild(videoElement);
+            } else {
+                console.error('Unsupported media type:', contentType);
+            }
+        } catch (error) {
+            console.error('Error loading media:', error);
+        }
+    }
+    
+      window.addEventListener('load', (event) => {
+        
+        
+        {% if md %}
+          {% if md.display %}
+            {% set url = md.display.url %}
+            {% if md.display.url[:4] == "ipfs" %}
+                {% set url = "https://ipfs.io/ipfs/"+metadata.display.url[7:] %}
+            {% endif %}
+              load_media("{{url}}");
+            
+          {% endif %}
+        {% endif %}
+
+        
+
+      });
+
+      </script>
+
+
+
+<!-- CIS2 holders-->
+ <!-- {% set ccd_tabulator_table ='cis2_holders_table'%}
+{% set tabulator_ajax_url = '/ajax_cis2_tokens/'+net+'/'+ contract.index|string +'/'+contract.subindex|string+'/'+token_id%}
+{% set filename='cis2-tokens-for-'+ token_id+'-'+range(1000,10000)|random|string+'.csv' %}
+
+{% include 'base/tabulator/tabulator-common-options-get.html' %} -->
+
+<script>
+
+  // const cis2_holders_table_columns = [
+
+  //     {
+  //       title: "Account", field: "account_address", 
+  //       minWidth: 120,
+  //       // maxWidth: 120,
+  //       responsive: 0,
+  //       accessorDownload: (value, data) => data.account_download,
+  //       formatter: "html",
+  //       headerSort: false,
+  //       hozAlign: "left", headerHozAlign: "left",
+        
+  //     },
+  //     {
+  //       title: "Balance", field: "token_balance", 
+  //       formatter: "html",
+  //       headerSort: false,
+  //       hozAlign: "right", headerHozAlign: "right",
+  //       accessorDownload: (value, data) => data.token_balance_download,
+        
+  //     }
+      
+  //   ];
+  // window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+
+  // window["cis2_holders_table"] = new Tabulator("#cis2_holders_table", {
+  //   ...commonTabulatorOptionsGET,
+  //   columns: cis2_holders_table_columns,
+  //   ajaxURL: "{{tabulator_ajax_url}}",
+  //   maxHeight: "400px",           // fixed outer height
+  //   heightGrow: false,
+  //   ajaxRequesting: function(url, params){
+  //   return true; // must return true to allow the request
+  // },
+  // ajaxResponse: function (url, params, resp) {
+  //     const rows = Array.isArray(resp?.data) ? resp.data : [];
+  //     const last_page = Math.max(1, Number(resp?.last_page ?? 1));
+  //     const last_row  = Math.max(0, Number(resp?.last_row  ?? rows.length));
+  //     const sel = `#${CSS.escape("{{ccd_tabulator_table}}")} .tabulator-paginator`;
+  //     const pagination = document.querySelector(sel);
+  //     if (pagination) pagination.style.display = (last_page > 1) ? "" : "none";
+      
+  //     return { data: rows, last_page, last_row };
+  //   },
+  // });
+
+  // window["cis2_holders_table"].on("renderComplete", function () {
+  //   document.querySelectorAll(".tabulator-col-title").forEach(el => {
+  //     el.classList.add("sm-text");
+  //   });
+  // });
+  // const btn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+  //   if (btn) {
+  //   btn.addEventListener("click", () => {
+  //       window["{{ccd_tabulator_table}}_table"]?.download(
+  //       "csv",
+  //       window["{{ccd_tabulator_table}}_filename"],
+  //       { bom: true, downloadDataFormatter: (d) => d }
+  //       );
+  //   });
+  //   }
+
+</script>
+
+
+<!-- CIS2 holders-->
+{% endblock %}
+

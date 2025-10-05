@@ -1,0 +1,7 @@
+{% if user.plan == "free"%}
+ 
+{% else %}
+  To pay for (more) days on your API plan,
+  send any PLT that track EUR to this address. <br/>{% if plan_daily_fee%}The day rate for your plan is EUR {{plan_daily_fee|seperator_no_decimals}} / day:{%endif%} <br/><br/><code>{{user.alias_account_id}}</code><br/><br/>
+  <p><a href="/" hx-post="/account/refresh" >Refresh</a> the page to see the transaction reflected in your account. </p>
+{% endif %}

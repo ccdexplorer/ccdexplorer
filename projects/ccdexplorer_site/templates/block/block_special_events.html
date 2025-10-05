@@ -1,0 +1,219 @@
+{% set title= "Special Events" %}{% include 'base/box_title.html' %}
+{% if se|length==0 %}
+<p class="small">No special events in block.</p>
+{% else %}
+
+{% if primed %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Validator(s) Primed for Suspension</th>
+        </tr>
+    </thead> 
+    <tbody>
+        {% for prime in primed %}
+            <tr class="table-row-line-height sm-text">
+                <td class="text-start text-secondary-emphasis">Validator Primed for Suspension</td>
+                <td class="text-end text-secondary-emphasis ccd" >{{prime.validator_primed_for_suspension.account|account_link(net, user,
+                    tags, app=request.app)|safe}}</td>
+            </tr>
+        {% endfor %}
+        
+    </tbody>
+</table>
+{% endif %}
+
+{% if suspended %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Validator(s) Suspended</th>
+        </tr>
+    </thead> 
+    <tbody>
+        {% for sus in suspended %}
+            <tr class="table-row-line-height sm-text">
+                <td class="text-start text-secondary-emphasis">Validator Suspended</td>
+                <td class="text-end text-secondary-emphasis ccd" >{{sus.validator_suspended.account|account_link(net, user,
+                    tags, app=request.app)|safe}}</td>
+            </tr>
+        {% endfor %}
+        
+    </tbody>
+</table>
+{% endif %}
+{% for node in se|reverse %}
+<!-- PrimedForSuspsension -->
+
+<!--MINT-->
+{% if node.mint %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Mint</th>
+        </tr>
+    </thead>    
+    <tbody>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Validation Reward</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.mint.mint_baking_reward | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Finalization Reward</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.mint.mint_finalization_reward | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Platform Development Charge</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.mint.mint_platform_development_charge | micro_ccd_display|safe}}</td>
+        </tr>
+    </tbody>
+</table>
+
+
+{% endif %}
+
+<!--BlockReward-->
+{% if node.block_reward %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Block Accrue</th>
+        </tr>
+    </thead>    
+    <tbody>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Old Gas Account</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_reward.old_gas_account | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">New Gas Account</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_reward.new_gas_account | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Transaction Fees</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_reward.transaction_fees |micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Foundation Charge</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_reward.foundation_charge | micro_ccd_display|safe}}</td>
+        </tr>
+        
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Validator Reward<br/>
+                {% if node.block_reward.old_gas_account > node.block_reward.new_gas_account %}
+                (= {{node.block_reward.transaction_fees |micro_ccd_display|safe}} - {{node.block_reward.foundation_charge | micro_ccd_display|safe}} + {{(node.block_reward.old_gas_account - node.block_reward.new_gas_account) | micro_ccd_display|safe}})
+            {% else %}
+                (= {{node.block_reward.transaction_fees |micro_ccd_display|safe}} - {{node.block_reward.foundation_charge | micro_ccd_display|safe}} - {{(node.block_reward.new_gas_account - node.block_reward.old_gas_account) | micro_ccd_display|safe}})
+            {% endif %}
+        </td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_reward.baker_reward | micro_ccd_display|safe}}</td>
+        </tr>
+        
+    </tbody>
+</table>  
+{% endif %}
+
+<!--BlockAccrue-->
+{% if node.block_accrue_reward %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Block Accrue</th>
+        </tr>
+    </thead>    
+    <tbody>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Old Gas Account</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.old_gas_account | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">New Gas Account</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.new_gas_account | micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Transaction Fees</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.transaction_fees |micro_ccd_display|safe}}</td>
+        </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Foundation Charge</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.foundation_charge | micro_ccd_display|safe}}</td>
+        </tr>
+        {% if node.block_accrue_reward.passive_reward %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Passive Reward</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.passive_reward | micro_ccd_display|safe}}</td>
+        </tr>
+        {% endif %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Validator Reward<br/>
+                {% if node.block_accrue_reward.old_gas_account > node.block_accrue_reward.new_gas_account %}
+                (= {{node.block_accrue_reward.transaction_fees |micro_ccd_display|safe}} - {{node.block_accrue_reward.passive_reward| micro_ccd_display|safe}} - {{node.block_accrue_reward.foundation_charge | micro_ccd_display|safe}} + {{(node.block_accrue_reward.old_gas_account - node.block_accrue_reward.new_gas_account) | micro_ccd_display|safe}})
+            {% else %}
+                (= {{node.block_accrue_reward.transaction_fees |micro_ccd_display|safe}} - {{node.block_accrue_reward.passive_reward| micro_ccd_display|safe}} - {{node.block_accrue_reward.foundation_charge | micro_ccd_display|safe}} - {{(node.block_accrue_reward.new_gas_account - node.block_accrue_reward.old_gas_account) | micro_ccd_display|safe}})
+            {% endif %}
+        </td>
+            <td class="text-end text-secondary-emphasis ccd" >{{node.block_accrue_reward.baker_reward | micro_ccd_display|safe}}</td>
+        </tr>
+        
+    </tbody>
+</table>   
+        
+{% endif %}
+
+<!--finalizationRewards-->
+{% if node.__typename == 'BakingRewardsSpecialEvent' %}
+<div class="card mb-2 ms-2 me-2">
+    <div class="card-body p-2">
+        <div class="clearfix">
+            <div class="card-text small float-start small text-muted">Baking Rewards</div>
+        </div>
+        <table class="table table-striped table-hover table-sm">
+            <thead>
+                <tr>
+                    <th class="small" scope="col">Baker ID</th>
+                    <th class="small" scope="col">Node Name</th>
+                    <th class="small" scope="col">Reward</th>
+
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in node.bakingRewards.nodes|sort_finalizers %}
+                <tr>
+                    {{row.accountAddress.asString}}
+                    
+                    <td><small>{{row.amount |micro_ccd_display | safe}}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <!--class="card-body p-2"-->
+    </div>
+    <!--class="card mb-2 ms-2 me-2"-->
+</div>
+{% endif %}
+
+
+<!--finalizationRewards-->
+{% if node.finalization_rewards %}
+<table class="table table-borderless">
+    <thead>
+        <tr class="table-title-line-height sm-text">
+            <th class="text-secondary-emphasis" colspan="2">Finalization Rewards</th>
+        </tr>
+    </thead>    
+    <tbody>
+        {% for row in node.finalization_rewards.finalization_rewards.entries %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">{{row.account|account_link(net, user,
+                tags, app=request.app)|safe}}</td>
+            <td class="text-end text-secondary-emphasis ccd" >{{row.amount | micro_ccd_display | safe}}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+
+{% endif %}
+{% endfor %}
+<!--class="tab-pane fade show "-->
+{%endif%}

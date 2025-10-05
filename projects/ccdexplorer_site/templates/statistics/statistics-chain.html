@@ -1,0 +1,34 @@
+{% extends "base/base.html" %}
+
+{% block js %}
+<script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
+{% endblock %}
+
+{% block content %}
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<div class="container my-4">
+  {% set title= "Statistics / Charts" %}{% include 'base/box_title.html' %}
+  <div class="row">
+    {% for name in ['Chain', 'Accounts', 'Exchanges', 'Staking', 'Validators', "PLT", "Miscellaneous"] %}
+    <div class="col-md-4 col-sm-6">
+      <div class="card text-center  border-dark" >
+              <div class="card-body text-center">
+                  <span class="card-title text-center"><br/>{{name}}<br/></span>
+                  {% if name == "Miscellaneous" %}
+                    <a class="stretched-link" href="/mainnet/charts"></a>
+                  {% elif name == "PLT" %}
+                  <a class="stretched-link" href="/mainnet/charts-plt"></a>
+                    
+                  {% else %}
+                    <a class="stretched-link" href="/mainnet/statistics/{{name|lower}}"></a>  
+                  {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}
+

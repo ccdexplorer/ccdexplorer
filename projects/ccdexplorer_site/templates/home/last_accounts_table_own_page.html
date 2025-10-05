@@ -1,0 +1,116 @@
+
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+{% set ccd_tabulator_table ='latest_accounts'%}
+{% set REFRESH = 20_000%}
+<div class="row">
+  <div class="col">
+  <span class="text-uppercase sm-text text-secondary-emphasis">Latest Accounts</span>
+  </div>
+{% include 'base/tabulator/timer-display.html' %}
+</div>
+<div id="{{ccd_tabulator_table}}" ></div>
+<script>
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Address", field: "address", 
+        minWidth: 80,
+        responsive: 0,
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      
+      {
+        title: "Available Balance", field: "available_balance", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 0,
+        minWidth: 140,
+        maxWidth: 140, 
+        formatter: "html",
+        headerSort: false,
+        
+      },
+      {
+        title: "Age", field: "deployment_tx_slot_time", 
+        minWidth: 120,
+        maxWidth: 120,
+        responsive: 0,
+        formatter: "html",
+        headerSort:false,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Staking", field: "staking", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 100,
+        minWidth: 150,
+        maxWidth: 150, 
+        formatter: "html",
+        headerSort: false,
+        
+      },
+      {
+        title: "ID Provider", field: "identity", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 100,
+        minWidth: 250,
+        maxWidth: 250, 
+        formatter: "html",
+        headerSort: false,
+        
+      },
+      {
+        title: "Nonce", field: "sequence_number", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 100,
+        minWidth: 100,
+        maxWidth: 100, 
+        formatter: "html",
+        headerSort: false,
+        
+      },
+     
+
+    ];
+
+  
+  
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+  layout: "fitColumns",
+  height: "600px",
+  responsiveLayout: "hide",
+  ajaxURL: "/{{net}}/ajax_last_accounts_own_page",              // your paged endpoint
+  paginationSize: 25,                // rows per “page”
+  progressiveLoad: "scroll",         // infinite scroll mode
+  progressiveLoadScrollMargin: 300,  // trigger next load 300px from bottom
+  columns: window["{{ccd_tabulator_table}}_columns"],
+});
+window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+  document.querySelectorAll(".tabulator-col-title").forEach(el => {
+    el.classList.add("sm-text");
+  });
+});
+async function pollNewAccounts(){
+    const data = window["{{ccd_tabulator_table}}_table"].getData();
+    const since = data.length ? data[0].account_index : 0;
+    nextRefresh = Date.now() + REFRESH_INTERVAL;
+    try {
+      const resp = await fetch(`/{{net}}/ajax_accounts/new?since_index=${since}`);
+      if (!resp.ok) throw new Error(resp.statusText);
+      const newBlocks = await resp.json();
+
+      if (newBlocks.length){
+        await window["{{ccd_tabulator_table}}_table"].addData(newBlocks, true);
+      }
+    } catch (e) {
+      
+    }
+  }
+
+ 
+</script>
+{% include 'base/tabulator/timer-js.html' %}
+<script>
+  setInterval(pollNewAccounts, {{REFRESH}});
+</script>
+

@@ -1,0 +1,35 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+<h2 class="sm-text">API Account</h2>
+<div class="row mt-6 row-flex">
+  <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border" >{% include "/account/account_summary.html"%}</div>
+  </div>
+  <div class="col-md-6  col-sm-12">
+      <div class=" content border curved-border" >
+        
+        {% include "/account/tokens_sent.html"%}
+        <div id="token_tx_hash">
+          {% include "/account/send_tokens.html"%}
+        </div>
+      </div>
+  </div>
+</div>
+<div class="row mt-6 row-flex">
+  <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+        {% include "/account/keys.html"%}
+      </div>
+  </div>
+  <div class="col-md-6  col-sm-12">
+      <div class=" content border curved-border  " >{% include "/account/header_explanation.html"%}</div>
+  </div>
+</div>
+
+
+  
+  
+  
+
+{% endblock content %}

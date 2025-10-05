@@ -1,0 +1,23 @@
+{% extends "base/base.html" %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<h4>Projects</h4>
+<div class="container">
+  <div class="row">
+    
+    {% for project_id, project in projects.items() %}
+    <div class="col">
+    <div class="card" style="width: 18rem;">
+        <!-- <img src="..." class="card-img-top" alt="..."> -->
+        <div class="card-body">
+          <h5 class="card-title">{{project.display_name}}</h5>
+          <!-- <p class="card-text">Some quick example text to build on the card title and make up the bulk of the card's content.</p> -->
+          <!-- <a href="#" class="btn btn-primary">Go somewhere</a> -->
+          <a class="stretched-link" href="/project/{{project_id}}"></a>
+        </div>
+      </div>
+      </div>  
+    {% endfor %}
+</div>  
+</div> 
+{% endblock content %}

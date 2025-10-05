@@ -1,0 +1,104 @@
+<div id="{{ccd_tabulator_table}}"></div>
+<!-- <div>
+  <button type="button" class="tabulator-download-button link-style" id="{{ccd_tabulator_table}}-download-csv">
+  Download visible rows as CSV
+</button>
+</div> -->
+
+<script>
+  
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+    
+      columns: window["{{ccd_tabulator_table}}_columns"],
+      layout: "fitColumns",
+      maxHeight: "400px",           // fixed outer height
+      heightGrow: false, 
+      responsiveLayout: "hide",
+      paginationMode: "remote", 
+      filterMode:"remote",
+      paginationSizeSelector: window["{{ccd_tabulator_table}}_size_selector"] || [10, 25, 50, 100, 500],
+      paginationSize: (window["{{ccd_tabulator_table}}_size_selector"] || [10, 25, 50, 100, 500])[1],
+      paginationButtonCount:3,
+      pagination:true,
+      paginationCounter: function(pageSize, currentRow, currentPage, totalRows, totalPages) {
+          // Humanize totals with Intl.NumberFormat compact notation
+          function humanize(num) {
+              if (num < 1000) {
+                  return num.toLocaleString();
+              }
+              return new Intl.NumberFormat('en', {
+                  notation: 'compact',
+                  compactDisplay: 'short',
+                  maximumFractionDigits: 1,
+              }).format(num);
+          }
+
+          // Compute the 1-based range of items on this page
+          const startIdx = (currentPage - 1) * pageSize + 1;
+          const endIdx = Math.min(currentPage * pageSize, totalRows);
+          const range = `${startIdx.toLocaleString()} – ${endIdx.toLocaleString()}`;
+
+          // Choose raw vs. humanized total
+          const totalFmt = totalRows < 5000
+              ? totalRows.toLocaleString()
+              : humanize(totalRows);
+
+          // Final display string
+          return `<span class="ccd">${range} of ${totalFmt}</span>`;
+      },
+      sortMode:"remote",
+      ajaxURL: "{{tabulator_ajax_url}}",
+      initialSort:[
+        {
+          column: window["{{ccd_tabulator_table}}_default_sort_field"], 
+          dir: window["{{ccd_tabulator_table}}_default_sort_field_direction"]
+        }
+        
+    ],
+    rowFormatter: function(row){
+  row.getElement().classList.add("sm-text");
+},
+      ajaxURLGenerator: function (url, config, params) {
+        const page = params.page || 1;
+        const size = params.size || 10;
+        const skip = (page - 1) * size;
+
+        const sorter = params.sort?.[0] || {};
+        const sort_key = sorter.field || window["{{ccd_tabulator_table}}_default_sort_field"];
+        const direction = sorter.dir || window["{{ccd_tabulator_table}}_default_sort_field_direction"];
+        const queryParams = {
+          page,
+          size,
+        };
+        if (window["{{ccd_tabulator_table}}_default_sort_field"] !== undefined) {
+          queryParams.sort_key = sort_key;
+          queryParams.direction = direction;
+        }
+        const query = new URLSearchParams(queryParams);
+        
+        return `{{tabulator_ajax_url}}?${query.toString()}`;
+      },
+      ajaxResponse: function (url, params, resp) {
+      const rows = Array.isArray(resp?.data) ? resp.data : [];
+      const last_page = Math.max(1, Number(resp?.last_page ?? 1));
+      const last_row  = Math.max(0, Number(resp?.last_row  ?? rows.length));
+      const wrap = document.getElementById("{{ccd_tabulator_table}}_wrapper");
+      const wrap_no_rows = document.getElementById("{{ccd_tabulator_table}}_wrapper_no_rows");
+      console.log(rows.length , params.size)
+      const sel = `#${CSS.escape("{{ccd_tabulator_table}}")} .tabulator-paginator`;
+      const pagination = document.querySelector(sel);
+      if (pagination) pagination.style.display = (last_page > 1)? "" : "none";
+      if (wrap) wrap.style.display = rows.length ? "" : "none";
+      if (wrap_no_rows) wrap_no_rows.style.display = rows.length ? "none" : "";
+
+      return { data: rows, last_page, last_row };
+    },
+  });
+
+  window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+</script>
+

@@ -1,0 +1,28 @@
+{% set passive_delegation_info = passive_info.passive_delegation_info %}
+{% set passive_delegation_rewards = passive_info.passive_delegation_rewards %}
+Commission Rates
+<table class="table table-borderless">
+
+    <tbody>
+      <tr>
+            <td class="text-secondary-emphasis text-end">Validation</td>
+            <td class="text-secondary-emphasis text-end align-middle ccd">{{ passive_delegation_info.commission_rates.baking* 100 }}%</td>
+        </tr>
+        
+        <tr>
+            <td class="text-secondary-emphasis text-end">Transaction</td>
+            <td class="text-secondary-emphasis text-end align-middle ccd">{{ passive_delegation_info.commission_rates.transaction* 100 }}%</td>
+        </tr>
+        <tr>
+            <td class="text-secondary-emphasis text-end">Transaction Fees Earned 
+              <a href="#" data-bs-toggle="popover" data-bs-html="true" tabindex="0" id="tx_fees" data-bs-trigger="focus" data-bs-title="Passive Delegation Tx Fees" data-bs-content="
+                        The transaction fees accruing to the passive delegators in the current reward period. 
+                        ">(i)</a>
+
+            </td>
+            <td class="text-secondary-emphasis text-end align-middle ccd">{{ passive_delegation_info.current_payday_transaction_fees_earned|
+                micro_ccd_no_decimals|safe}}</td>
+        </tr>
+    </tbody>
+</table>
+

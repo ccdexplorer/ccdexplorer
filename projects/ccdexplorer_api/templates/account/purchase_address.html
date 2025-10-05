@@ -1,0 +1,13 @@
+<h4>Register Paying Account <i class="bi bi-check" style="color: green"></i></h4>
+<br/>
+You have registered the following account as <i>paying account</i>:<br/>
+<code>{{user.paying_account_address}}</code>
+
+...from the following tx:<br/>
+<code>{{user.tx_with_user_token}}</code>
+<button class="btn btn-sm" 
+    hx-delete="/account/delete-paying-account" 
+    hx-confirm="Are you sure you wish to unregister your paying account?">
+    <i style="color: red;" class="bi bi-x-circle"></i>
+  </button>
+  <br/>
