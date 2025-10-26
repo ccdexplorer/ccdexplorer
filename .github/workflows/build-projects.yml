@@ -38,6 +38,11 @@ jobs:
           echo "all=$(cat all-projects.json)" >> $GITHUB_OUTPUT
           cat all-projects.json
 
+      - name: Install Python dependencies
+        run: |
+          pip install --quiet pyyaml
+          python scripts/generate_path_filters.py > filters.yml
+
       - name: Generate dynamic filters
         run: |
           uv run python scripts/generate_path_filters.py > filters.yml
