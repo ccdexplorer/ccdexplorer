@@ -356,6 +356,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 f"{app.api_url}/v2/{net}/misc/identity-providers",
                 app.httpx_client,
             )
+            if api_result.return_value is None:
+                continue
             for id in api_result.return_value:  # type: ignore
                 id = CCD_IpInfo(**id)
                 identity_providers[str(id.identity)] = {

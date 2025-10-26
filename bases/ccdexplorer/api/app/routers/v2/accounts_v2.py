@@ -7,6 +7,7 @@
 
 import json
 import re
+import asyncio
 
 from ccdexplorer.api.app.utils import await_await
 import httpx
@@ -505,6 +506,7 @@ async def get_validator_primed_suspended_information(
     suspended_validators = []
     for v in suspended_validators_source:
         ai = grpcclient.get_account_info("last_final", account_index=v["baker_id"], net=NET(net))
+        await asyncio.sleep(0.01)
         if ai.stake:
             if ai.stake.baker:
                 if ai.stake.baker.is_suspended:

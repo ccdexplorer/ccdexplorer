@@ -29,7 +29,7 @@ from ccdexplorer.grpc_client.CCD_Types import *
 from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 
 from ccdexplorer_schema_parser.Schema import Schema
-from fastapi import APIRouter, Depends, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from ccdexplorer.site.app.classes.dressingroom import (
@@ -767,6 +767,11 @@ async def smart_contract_page(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
     request.state.api_calls = {}
     user: SiteUser | None = await get_user_detailsv2(request)
     instance_address = f"<{instance_index},{subindex}>"
