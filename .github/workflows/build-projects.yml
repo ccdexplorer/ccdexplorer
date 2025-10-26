@@ -38,15 +38,18 @@ jobs:
           echo "all=$(cat all-projects.json)" >> $GITHUB_OUTPUT
           cat all-projects.json
 
-      - name: Install Python dependencies
-        run: |
-          pip install --quiet pyyaml
-          python scripts/generate_path_filters.py > filters.yml
+      # --- NEW: install uv properly and run the generator ---
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: 3.12
+
+      - name: Install PyYAML dependency
+        run: uv add pyyaml --no-sync --dev
 
       - name: Generate dynamic filters
-        run: |
-          uv run python scripts/generate_path_filters.py > filters.yml
+        run: uv run python scripts/generate_path_filters.py > filters.yml
 
+      # Run paths-filter with dynamically generated filters
       - uses: dorny/paths-filter@v3
         id: changes
         with:
