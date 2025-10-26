@@ -72,9 +72,7 @@ jobs:
           set -euo pipefail
 
           write_matrix() {
-            # usage: write_matrix "${array[@]}"
             jq -Rn '[inputs | select(length>0)] | {project: .}' > matrix.json <<< "$(printf '%s\n' "$@")"
-            # Write multiline output correctly
             {
               echo 'matrix<<JSON'
               cat matrix.json
@@ -84,7 +82,7 @@ jobs:
             cat matrix.json
           }
 
-          # If shared changed, rebuild ALL projects.
+          # 1️⃣ Shared code changed → rebuild all
           if [ "${{ steps.changes.outputs.shared }}" = "true" ]; then
             echo "::notice::Shared code changed; rebuilding all projects."
             mapfile -t all_projects < <(find projects -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
@@ -92,34 +90,31 @@ jobs:
             exit 0
           fi
 
-          # Else: only projects whose own subtree changed.
+          # 2️⃣ Get changed project files
           changed_files='${{ steps.changes.outputs.projects_files }}'
+
           if [ -z "$changed_files" ] || [ "$changed_files" = "null" ]; then
-            echo "::notice::No project-local changes detected. Building ALL projects."
-            mapfile -t all_projects < <(find projects -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
-            write_matrix "${all_projects[@]}"
+            echo "::notice::No relevant project changes detected. Skipping build."
+            echo 'matrix={"project":[]}' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Extract project names from changed paths: projects/<name>/...
+          # 3️⃣ Derive affected projects
           mapfile -t candidates < <(jq -r '.[]?' <<< "$changed_files" | awk -F/ '$1=="projects"{print $2}' | sort -u)
-
-          # Keep only real project directories (filters out things like projects/.keep)
           projects=()
           for p in "${candidates[@]}"; do
             [ -n "$p" ] && [ -d "projects/$p" ] && projects+=("$p")
           done
 
           if [ ${#projects[@]} -eq 0 ]; then
-            echo "::notice::No project-local changes matched patterns. Building ALL projects."
-            mapfile -t all_projects < <(find projects -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
-            write_matrix "${all_projects[@]}"
+            echo "::notice::No project-local changes matched patterns. Skipping build."
+            echo 'matrix={"project":[]}' >> "$GITHUB_OUTPUT"
           else
             write_matrix "${projects[@]}"
           fi
 
   build-and-push:
-    name: Build & push ${{ matrix.project }}
+    if: ${{ needs.detect-projects.outputs.matrix != '{"project":[]}' && needs.detect-projects.outputs.matrix != '' }}
     needs: detect-projects
     runs-on: ubuntu-latest
     strategy:
