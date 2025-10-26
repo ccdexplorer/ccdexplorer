@@ -38,20 +38,16 @@ jobs:
           echo "all=$(cat all-projects.json)" >> $GITHUB_OUTPUT
           cat all-projects.json
 
-      # Coarse filters: shared vs any project files (single definition, no per-project boilerplate)
+      - name: Generate dynamic filters
+        run: |
+          uv run python scripts/generate_path_filters.py > filters.yml
+
       - uses: dorny/paths-filter@v3
         id: changes
         with:
           list-files: json
-          filters: |
-            shared:
-              - 'components/**'
-              - 'bases/**'
-              - 'pyproject.toml'
-              - 'uv.lock'
-            projects:
-              - 'projects/**'
-
+          filters: filters.yml
+      
       - name: Debug changed files
         shell: bash
         run: |
