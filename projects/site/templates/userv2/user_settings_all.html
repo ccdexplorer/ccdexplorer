@@ -19,7 +19,7 @@
         <div class="border content curved-border " >
           {% set title= "User Settings" %}{% include 'base/box_title.html' %}
           
-    {% include "SiteUser/user_email_address_start.html" %}    
+    {% include "userv2/user_email_address_start.html" %}    
         </div>
     </div>
     
@@ -33,7 +33,7 @@
                   Edit notification preferences for events on-chain that are not directly related to an account (such as validators lowering its stake, (large) account transfers, protocol updates, etc.). 
               
           </p>
-          {% include "SiteUser/other_notification_preferences_start.html" %}        
+          {% include "userv2/other_notification_preferences_start.html" %}        
         </div>
     </div>
     
@@ -51,10 +51,10 @@
             </p>
             <br/>
             <b>Add a new account</b>
-            {% include "SiteUser/user_new_account_start.html" %}   
+            {% include "userv2/user_new_account_start.html" %}   
             {% if user.accounts|length > 0 %}
                 {% for user_account_index, user_account in user.accounts.items() %}
-                    {% include "SiteUser/user_account_start.html" %}
+                    {% include "userv2/user_account_start.html" %}
                 {% endfor %}
             {% else %} 
                 <div class="alert alert-info" role="alert">
@@ -71,10 +71,10 @@
         </p>
         <br/>
         <h6>Add a new contract</h6>
-        {% include "SiteUser/user_new_contract_start.html" %}   
+        {% include "userv2/user_new_contract_start.html" %}   
         {% if user.contracts|length > 0 %}
             {% for contract_index, contract in user.contracts.items() %}
-                {% include "SiteUser/user_contract_start.html" %}
+                {% include "userv2/user_contract_start.html" %}
             {% endfor %}
         {% else %} 
             <div class="alert alert-info" role="alert">
@@ -87,7 +87,7 @@
   </div>
 
   {% else %} 
-  {% include "SiteUser/user_settings_logged_out.html" %}
+  {% include "userv2/user_settings_logged_out.html" %}
 
 {% endif %}
 

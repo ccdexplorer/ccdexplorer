@@ -132,7 +132,7 @@ from .queries._GetWinningBakersEpoch import (
 # )
 
 
-class GRPCClient(
+class GRPCClient(  # type: ignore
     _GetPoolInfo,
     _GetAccountList,
     _GetBakerList,

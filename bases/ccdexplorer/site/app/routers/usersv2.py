@@ -101,7 +101,7 @@ async def user_settings_all(
     else:
         html = None
     return request.app.templates.TemplateResponse(
-        "SiteUser/user_settings_all.html",
+        "userv2/user_settings_all.html",
         {
             "env": request.app.env,
             "request": request,
@@ -112,7 +112,7 @@ async def user_settings_all(
     )
 
 
-@router.get("/settings/SiteUser/cancel/email-address")
+@router.get("/settings/userv2/cancel/email-address")
 async def cancel_edit_email_address_response(
     request: Request,
 ):
@@ -120,7 +120,7 @@ async def cancel_edit_email_address_response(
     if not isinstance(user, SiteUser):
         user = SiteUser(**user)
     return request.app.templates.TemplateResponse(
-        "SiteUser/user_email_address_start.html",
+        "userv2/user_email_address_start.html",
         {
             "env": request.app.env,
             "request": request,
@@ -130,7 +130,7 @@ async def cancel_edit_email_address_response(
     )
 
 
-@router.get("/settings/SiteUser/cancel/other-notification-preferences")
+@router.get("/settings/userv2/cancel/other-notification-preferences")
 async def cancel_edit_other_notification_preferences_response(
     request: Request,
 ):
@@ -138,7 +138,7 @@ async def cancel_edit_other_notification_preferences_response(
     if not isinstance(user, SiteUser):
         user = SiteUser(**user)
     return request.app.templates.TemplateResponse(
-        "SiteUser/other_notification_preferences_start.html",
+        "userv2/other_notification_preferences_start.html",
         {
             "env": request.app.env,
             "request": request,
@@ -148,7 +148,7 @@ async def cancel_edit_other_notification_preferences_response(
     )
 
 
-@router.get("/settings/SiteUser/cancel/contract/{contract_index}")
+@router.get("/settings/userv2/cancel/contract/{contract_index}")
 async def cancel_edit_contract_response(
     request: Request,
     contract_index: int,
@@ -162,7 +162,7 @@ async def cancel_edit_contract_response(
         contract = user.contracts[str(contract_index)]
 
     return request.app.templates.TemplateResponse(
-        "SiteUser/user_contract_start.html",
+        "userv2/user_contract_start.html",
         {
             "env": request.app.env,
             "request": request,
@@ -174,7 +174,7 @@ async def cancel_edit_contract_response(
     )
 
 
-@router.get("/settings/SiteUser/cancel/{account_index}")
+@router.get("/settings/userv2/cancel/{account_index}")
 async def cancel_edit_user_account_response(
     request: Request,
     account_index: CCD_AccountIndex,
@@ -188,7 +188,7 @@ async def cancel_edit_user_account_response(
         user_account = user.accounts[str(account_index)]
 
     return request.app.templates.TemplateResponse(
-        "SiteUser/user_account_start.html",
+        "userv2/user_account_start.html",
         {
             "env": request.app.env,
             "request": request,
@@ -200,7 +200,7 @@ async def cancel_edit_user_account_response(
     )
 
 
-@router.put("/settings/SiteUser/save/email-address", response_class=RedirectResponse)
+@router.put("/settings/userv2/save/email-address", response_class=RedirectResponse)
 async def save_email_address_response(
     request: Request,
     response_form: dict,
@@ -223,7 +223,7 @@ async def save_email_address_response(
 
 
 @router.put(
-    "/settings/SiteUser/save/new-account",
+    "/settings/userv2/save/new-account",
     response_class=Union[RedirectResponse, HTMLResponse],
 )
 async def save_new_account_response(
@@ -247,7 +247,7 @@ async def save_new_account_response(
 
     if not account_info:
         return request.app.templates.TemplateResponse(
-            "SiteUser/user_new_account_start.html",
+            "userv2/user_new_account_start.html",
             {
                 "env": request.app.env,
                 "request": request,
@@ -277,7 +277,7 @@ class SearchTerm(BaseModel):
 
 
 @router.post(
-    "/settings/SiteUser/search-instance",
+    "/settings/userv2/search-instance",
     response_class=HTMLResponse,
 )
 async def search_instance_response(
@@ -331,7 +331,7 @@ async def search_instance_response(
 
 
 @router.put(
-    "/settings/SiteUser/save/new-contract",
+    "/settings/userv2/save/new-contract",
     response_class=Union[RedirectResponse, HTMLResponse],
 )
 async def save_new_contract_response(
@@ -373,7 +373,7 @@ async def save_new_contract_response(
 
     if lookup_failed:
         return request.app.templates.TemplateResponse(
-            "SiteUser/user_new_contract_start.html",
+            "userv2/user_new_contract_start.html",
             {
                 "env": request.app.env,
                 "request": request,
@@ -400,7 +400,7 @@ async def save_new_contract_response(
         return response
 
 
-@router.put("/settings/SiteUser/save/other-notification-preferences", response_class=HTMLResponse)
+@router.put("/settings/userv2/save/other-notification-preferences", response_class=HTMLResponse)
 async def save_other_notification_preferences_response(
     request: Request,
     response_form: dict,
@@ -472,7 +472,7 @@ async def save_other_notification_preferences_response(
     return response
 
 
-@router.delete("/settings/SiteUser/delete/{account_index}", response_class=RedirectResponse)
+@router.delete("/settings/userv2/delete/{account_index}", response_class=RedirectResponse)
 async def delete_user_account_response(
     request: Request,
     account_index: CCD_AccountIndex,
@@ -492,9 +492,7 @@ async def delete_user_account_response(
     return response
 
 
-@router.delete(
-    "/settings/SiteUser/delete/contract/{contract_index}", response_class=RedirectResponse
-)
+@router.delete("/settings/userv2/delete/contract/{contract_index}", response_class=RedirectResponse)
 async def delete_contract_response(
     request: Request,
     contract_index: int,
@@ -514,7 +512,7 @@ async def delete_contract_response(
     return response
 
 
-@router.put("/settings/SiteUser/save/contract/{contract_index}", response_class=RedirectResponse)
+@router.put("/settings/userv2/save/contract/{contract_index}", response_class=RedirectResponse)
 async def save_contract_response(
     request: Request,
     contract_index: int,
@@ -592,7 +590,7 @@ async def save_contract_response(
     # return generate_edit_html_for_user_account(account_index, user, user_account)
 
 
-@router.put("/settings/SiteUser/save/{account_index}", response_class=RedirectResponse)
+@router.put("/settings/userv2/save/{account_index}", response_class=RedirectResponse)
 async def save_user_account_response(
     request: Request,
     account_index: CCD_AccountIndex,
@@ -719,7 +717,7 @@ async def save_user_account_response(
     # return generate_edit_html_for_user_account(account_index, user, user_account)
 
 
-@router.get("/settings/SiteUser/edit/email-address", response_class=HTMLResponse)
+@router.get("/settings/userv2/edit/email-address", response_class=HTMLResponse)
 async def edit_email_address(
     request: Request,
 ):
@@ -730,7 +728,7 @@ async def edit_email_address(
     return await generate_edit_html_for_email_address(user, request.app.templates)
 
 
-@router.get("/settings/SiteUser/edit/other-notification-preferences", response_class=HTMLResponse)
+@router.get("/settings/userv2/edit/other-notification-preferences", response_class=HTMLResponse)
 async def edit_other_notification_preferences_response(
     request: Request,
 ):
@@ -744,7 +742,7 @@ async def edit_other_notification_preferences_response(
 
 # note this needs to be below the other-notification-preferences route,
 # as the order matters! 422 otherwise..
-@router.get("/settings/SiteUser/edit/{account_index}", response_class=HTMLResponse)
+@router.get("/settings/userv2/edit/{account_index}", response_class=HTMLResponse)
 async def edit_user_account_response(
     request: Request,
     account_index: CCD_AccountIndex,
@@ -759,7 +757,7 @@ async def edit_user_account_response(
     return await generate_edit_html_for_user_account(account_index, user, user_account, request.app)
 
 
-@router.get("/settings/SiteUser/edit/contract/{contract_index}", response_class=HTMLResponse)
+@router.get("/settings/userv2/edit/contract/{contract_index}", response_class=HTMLResponse)
 async def edit_contract_response(
     request: Request,
     contract_index: int,
@@ -801,7 +799,7 @@ async def generate_edit_html_for_contract(
     )
     explanations = api_result.return_value if api_result.ok else {}
     html = f"""
-<form hx-put="/settings/SiteUser/save/contract/{contract_index}" hx-ext='json-enc' hx-target="this" >
+<form hx-put="/settings/userv2/save/contract/{contract_index}" hx-ext='json-enc' hx-target="this" >
   """
 
     contract_all_fields = methods
@@ -845,7 +843,7 @@ async def generate_edit_html_for_contract(
                 "email_limit": None,
             }
 
-    html += app.templates.get_template("/SiteUser/contract.html").render(
+    html += app.templates.get_template("/userv2/contract.html").render(
         {
             "contract_all_fields": contract_all_fields,
             "contract_all_fields_dict": contract_all_fields_dict,
@@ -862,10 +860,10 @@ async def generate_edit_html_for_contract(
     <button class="btn  ms-1 mt-0 btn-link">Save</button>
   </div>
   <div class="col">
-    <button class="btn ms-1 mt-0 btn-link" hx-get="/settings/SiteUser/cancel/contract/{contract_index}" x-ext='json-enc' >Cancel</button>
+    <button class="btn ms-1 mt-0 btn-link" hx-get="/settings/userv2/cancel/contract/{contract_index}" x-ext='json-enc' >Cancel</button>
   </div>
   <div class="col">
-    <button class="btn  ms-1 mt-0 btn-link btn-danger" hx-confirm="Are you sure you wish to delete this contract?" hx-delete="/settings/SiteUser/delete/contract/{contract_index}" x-ext='json-enc' >Delete</button>
+    <button class="btn  ms-1 mt-0 btn-link btn-danger" hx-confirm="Are you sure you wish to delete this contract?" hx-delete="/settings/userv2/delete/contract/{contract_index}" x-ext='json-enc' >Delete</button>
   </div>
 </div>
     </form>
@@ -882,7 +880,7 @@ async def generate_edit_html_for_user_account(
     )
     explanations = api_result.return_value if api_result.ok else {}
     html = f"""
-<form hx-put="/settings/SiteUser/save/{account_index}" hx-ext='json-enc' hx-target="this" >
+<form hx-put="/settings/userv2/save/{account_index}" hx-ext='json-enc' hx-target="this" >
   """
     account_all_fields = AccountNotificationPreferences.model_fields
     account_all_fields_dict = {}
@@ -971,7 +969,7 @@ async def generate_edit_html_for_user_account(
                     "email_limit": None,
                 }
 
-    html += app.templates.get_template("/SiteUser/user_account.html").render(
+    html += app.templates.get_template("/userv2/user_account.html").render(
         {
             "account_all_fields": account_all_fields,
             "account_all_fields_dict": account_all_fields_dict,
@@ -991,10 +989,10 @@ async def generate_edit_html_for_user_account(
     <button class="btn  ms-1 mt-0 btn-link">Save</button>
   </div>
   <div class="col">
-    <button class="btn ms-1 mt-0  btn-link" hx-get="/settings/SiteUser/cancel/{account_index}" x-ext='json-enc' >Cancel</button>
+    <button class="btn ms-1 mt-0  btn-link" hx-get="/settings/userv2/cancel/{account_index}" x-ext='json-enc' >Cancel</button>
   </div>
   <div class="col">
-    <button class="btn  ms-1 mt-0 btn-link btn-danger" hx-confirm="Are you sure you wish to delete this account?" hx-delete="/settings/SiteUser/delete/{account_index}" x-ext='json-enc' >Delete</button>
+    <button class="btn  ms-1 mt-0 btn-link btn-danger" hx-confirm="Are you sure you wish to delete this account?" hx-delete="/settings/userv2/delete/{account_index}" x-ext='json-enc' >Delete</button>
   </div>
 </div>
     </form>
@@ -1009,7 +1007,7 @@ async def generate_edit_html_for_other_notification_preferences(user: SiteUser, 
     )
     explanations = api_result.return_value if api_result.ok else {}
     html = """
-<form hx-put="/settings/SiteUser/save/other-notification-preferences" hx-ext='json-enc' hx-target="this" hx-swap="outerHTML">
+<form hx-put="/settings/userv2/save/other-notification-preferences" hx-ext='json-enc' hx-target="this" hx-swap="outerHTML">
   """
     all_fields = OtherNotificationPreferences.model_fields
     all_fields_dict = {}
@@ -1052,7 +1050,7 @@ async def generate_edit_html_for_other_notification_preferences(user: SiteUser, 
             }
 
     html += request.app.templates.get_template(
-        "/SiteUser/other_notification_preferences.html"
+        "/userv2/other_notification_preferences.html"
     ).render(
         {
             "all_fields": all_fields,
@@ -1067,7 +1065,7 @@ async def generate_edit_html_for_other_notification_preferences(user: SiteUser, 
     <div class="row">
   <div class="col">
     <button class="btn  ms-1 mt-0 btn-link">Save</button>
-    <button class="btn  ms-1 mt-0  btn-link" hx-get="/settings/SiteUser/cancel/other-notification-preferences" x-ext='json-enc' >Cancel</button>
+    <button class="btn  ms-1 mt-0  btn-link" hx-get="/settings/userv2/cancel/other-notification-preferences" x-ext='json-enc' >Cancel</button>
   </div>
 </div>
     </form>
@@ -1077,10 +1075,10 @@ async def generate_edit_html_for_other_notification_preferences(user: SiteUser, 
 
 async def generate_edit_html_for_email_address(user: SiteUser, templates):
     html = """
-<form hx-put="/settings/SiteUser/save/email-address" hx-ext='json-enc' hx-target="this" hx-swap="outerHTML">
+<form hx-put="/settings/userv2/save/email-address" hx-ext='json-enc' hx-target="this" hx-swap="outerHTML">
   """
 
-    html += templates.get_template("/SiteUser/user_email_address.html").render(
+    html += templates.get_template("/userv2/user_email_address.html").render(
         {
             "user": user,
         }
@@ -1090,7 +1088,7 @@ async def generate_edit_html_for_email_address(user: SiteUser, templates):
     <div class="row">
   <div class="col">
     <button class="btn  ms-1 mt-0 btn-link">Save</button>
-    <button class="btn  ms-1 mt-0  btn-link" hx-get="/settings/SiteUser/cancel/email-address" x-ext='json-enc' >Cancel</button>
+    <button class="btn  ms-1 mt-0  btn-link" hx-get="/settings/userv2/cancel/email-address" x-ext='json-enc' >Cancel</button>
   </div>
 </div>
     </form>

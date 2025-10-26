@@ -18,7 +18,7 @@
     }
     </script>
 <form 
-hx-put="/settings/SiteUser/save/new-contract" 
+hx-put="/settings/userv2/save/new-contract" 
 hx-ext='json-enc' 
 hx-target="this" 
 hx-swap="outerHTML"
@@ -34,7 +34,7 @@ hx-swap="outerHTML"
                 <input   
                 class="form-control form-control-sm  input-sm mb-1 text-end " type="search" 
                 name="search" 
-                hx-post="/settings/SiteUser/search-instance" 
+                hx-post="/settings/userv2/search-instance" 
                 hx-ext='json-enc' 
                 hx-trigger="input changed delay:250ms, search" 
                 hx-target="#search-results" 
