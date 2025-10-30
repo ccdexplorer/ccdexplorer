@@ -17,4 +17,4 @@ Modules are stored in the collection `modules` in the db and have the following 
 
 
 ## How is a module stored in the system?
-This is performed in the [New Module Service](../services/messages/new_module.md), that works on receiving the appropriate MQTT message. When this service runs, it stores the module data in the corresponding collection, and also starts the module `verification process`. 
+This is performed in the [New Module Service](../projects/every_block/new_module.md), that works on receiving the appropriate MQTT message. When this service runs, it stores the module data in the corresponding collection, and also starts the module `verification process`. 

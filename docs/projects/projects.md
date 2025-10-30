@@ -88,7 +88,7 @@ Data for labels is stored in the `projects` collection. This has documents for `
 This information is sourced from `projects.json` and saved in this collection using the "Update Projects" service. This service takes all entries in `projects.json` and saves, for each project, the account addresses and modules with the corresponding `project_id`. From the modules, this service also finds all contracts from these modules (at runtime) and labels these contract accordingly. 
 
 !!! Note 1
-    Finding contracts from modules is performed in this service only when the service runs, i.e. when `projects.json` is updated. Any new contracts initialized from existing modules are captured in the [Transactions By Projects](../services/end_of_day/transactions_by_projects.md) service.
+    Finding contracts from modules is performed in this service only when the service runs, i.e. when `projects.json` is updated. Any new contracts initialized from existing modules are captured in the [Transactions By Projects](../projects/timed_services/transactions_by_projects.md) service.
 
 ## Specialized labeling
 For projects that need specialized labeling conventions (such as 5Tars), we have the possbility to add bespoke `display_name` properties to the entries in the `projects` collection. Entries containing a `display_name` property, will not be overwritten.

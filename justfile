@@ -4,11 +4,7 @@
 
 # default recipe
 default := "info"
-# read a single variable VAR from a given env FILE
-set dotenv-filename := ".env.redis"
 
-flower:
-    uv run python -m flower --broker $REDIS_URL flower
 # --- Polylith commands ---
 
 info:
@@ -46,7 +42,7 @@ lock:
 
 # mkdocs documentation
 docs:
-    uv run mkdocs serve -a 0.0.0.0:8001 
+    uv run mkdocs serve -a 0.0.0.0:8001 --livereload
     
 # --- Formatting / linting / testing ---
 

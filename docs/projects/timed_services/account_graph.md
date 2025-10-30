@@ -27,4 +27,4 @@ The graph shows data points only when the balance has changed on that day. In or
 !!! Note
     We need to make a decision between pre-calculating and storing data vs computing data on rerequest. Doing the latter will lead to unacceptable wait times for the user, as we need to request 1300+ balances from the node for an account to view.
 
-    On the other hand, pre-computing all balances for all accounts for every day is also wasteful, as we have many accounts that have aqcuired a CCD balance early on, but that balance has never changed. Pre-computing for every day would store the same balance on all these days. 
+    On the other hand, pre-computing all balances for all accounts for every day is also wasteful, as we have many accounts that have acquired a CCD balance early on, but that balance has never changed. Pre-computing for every day would store the same balance on all these days. 
