@@ -1,5 +1,5 @@
 
-The micro service [ms-new-modules](https://github.com/ccdexplorer/ms-new-modules) has a subscription to the MQTT channel `heartbeat/module/new` and starts processing when a new message arrives. The message contains the `module_ref`.
+The micro service MS Modules listens to the Celery topic `module_deployed` and starts processing when a new message arrives. The message contains the `block_height`.
 
 
 ## Steps

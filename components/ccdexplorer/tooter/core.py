@@ -43,6 +43,7 @@ class Tooter:
         # self.email_part_2_api = f"""&user={MAILTO_USER}&pass={FASTMAIL_TOKEN}&from=CCDExplorer API Bot<bot@ccdexplorer.io>"""
 
     def email(self, title: str, body: str, email_address: str, value=None, error=None):
+        """Send email"""
         body_signature = """
 Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>account</a> to adjust notification settings.
 

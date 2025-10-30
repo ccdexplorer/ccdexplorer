@@ -22,8 +22,11 @@ nav:
     - Every Block:
       - Heartbeat: projects/every_block/heartbeat.md
       - Block Analyzer: projects/every_block/block_analyzer.md
-      - Events and Impacted Addresses: projects/every_block/events_impacted_addresses.md
+      - Indexers: projects/every_block/indexers.md
+      - Events and Impacted Addresses: projects/every_block/events_and_impacted.md
       - Token Accounting: projects/every_block/token_accounting.md
+      - Metadata: projects/every_block/metadata.md
+      - PLT: projects/every_block/plt.md
       - New Account Address: projects/every_block/new_address.md
       - New/Upgraded Contract: projects/every_block/new_contract.md
       - New/Upgraded Module: projects/every_block/new_module.md
