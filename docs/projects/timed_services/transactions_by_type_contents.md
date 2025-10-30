@@ -1,6 +1,6 @@
 
 ## Goal
-The goal of this script is to calculate, on a daily basis, which transaction types have been used for all transactions. We calculate counts per day for all [Account Transaction Effects](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), in addition to [Update Transaction Payloads](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_UpdatePayload) and [Account Creation Details](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountCreationDetails).
+The goal of this script is to calculate, on a daily basis, which transaction types have been used for all transactions. We calculate counts per day for all [Account Transaction Effects](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), in addition to [Update Transaction Payloads](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_UpdatePayload) and [Account Creation Details](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountCreationDetails).
 
 ## Data used
 Data is calculated through pipelines, executed on the `transactions` collection. 
@@ -20,7 +20,7 @@ pipeline = [
         ]
 
 ```
-The `type.type` field is filled with either `update`, `account_creation` or `account_transaction`. See [CCD_BlockItemSummary](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_BlockItemSummary).
+The `type.type` field is filled with either `update`, `account_creation` or `account_transaction`. See [CCD_BlockItemSummary](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_BlockItemSummary).
 
 *Pipeline for contents*:
 ```
@@ -39,7 +39,7 @@ pipeline = [
 ```
 
 
-The `type.contents` field is filled with all possible values from [Account Transaction Effects](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), in addition to [Update Transaction Payloads](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_UpdatePayload), [Account Creation Details](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountCreationDetails) and [Reject Reasons](../../reference/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_RejectReason).
+The `type.contents` field is filled with all possible values from [Account Transaction Effects](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), in addition to [Update Transaction Payloads](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_UpdatePayload), [Account Creation Details](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_AccountCreationDetails) and [Reject Reasons](../../components/grpc.md#ccdexplorer.grpc_client.CCD_Types.CCD_RejectReason).
 
 ## Examples
 This is an example for 2025-02-21:

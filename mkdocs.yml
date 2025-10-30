@@ -5,42 +5,52 @@ site_url: https://docs.ccdexplorer.io
 
 nav:
   - Home: index.md
+  - Projects: 
+    - Overview: projects/index.md
+    - API: projects/api.md
+    - Notification Bot: projects/bot.md
+    - Site: projects/site.md
+    - Timed services: 
+      - Accounts: projects/timed_services/accounts.md
+      - Transactions by Type/Contents: projects/timed_services/transactions_by_type_contents.md
+      - Statistics Daily Holders: projects/timed_services/statistics_daily_holders.md
+      - Statistics Daily Limits: projects/timed_services/statistics_daily_limits.md
+      - Account Graphs: projects/timed_services/account_graph.md
+      - Transactions by projects: projects/timed_services/transactions_by_projects.md
+      - Unique Active Addresses: projects/timed_services/statistics_unique_addresses.md
+      - Statistics Transaction Fees: projects/timed_services/statistics_fees.md
+    - Every Block:
+      - Heartbeat: projects/every_block/heartbeat.md
+      - Block Analyzer: projects/every_block/block_analyzer.md
+      - Indexers: projects/every_block/indexers.md
+      - Events and Impacted Addresses: projects/every_block/events_and_impacted.md
+      - Token Accounting: projects/every_block/token_accounting.md
+      - Metadata: projects/every_block/metadata.md
+      - PLT: projects/every_block/plt.md
+      - New Account Address: projects/every_block/new_address.md
+      - New/Upgraded Contract: projects/every_block/new_contract.md
+      - New/Upgraded Module: projects/every_block/new_module.md
+    - Misc:
+      - Concordium Recognized Projects: projects/projects.md
   - Entities:
+    - Overview: entities/index.md
     - Block: entities/block.md
     - Transaction: entities/transaction.md
     - Account: entities/account.md
     - Module: entities/module.md
     - Token: entities/token.md
     - Community Labels: entities/community_labels.md
-  - Services:
-    - Projects: services/projects.md
-    - Every Block:
-      - Heartbeat: services/every_block/heartbeat.md
-      - Events and Impacted Addresses: services/every_block/events_impacted_addresses.md
-      - Token Accounting: services/every_block/token_accounting.md
-    - End of Day:
-      - Accounts: services/end_of_day/accounts.md
-      - Transactions by Type/Contents: services/end_of_day/transactions_by_type_contents.md
-      - Statistics Daily Holders: services/end_of_day/statistics_daily_holders.md
-      - Statistics Daily Limits: services/end_of_day/statistics_daily_limits.md
-      - Account Graphs: services/end_of_day/account_graph.md
-      - Transactions by projects: services/end_of_day/transactions_by_projects.md
-      - Unique Active Addresses: services/end_of_day/statistics_unique_addresses.md
-      - Statistics Transaction Fees: services/end_of_day/statistics_fees.md
-    - Messages:
-      - New Account Address: services/messages/new_address.md
-      - New/Upgraded Contract: services/messages/new_contract.md
-      - New/Upgraded Module: services/messages/new_module.md
-  - Reference:
-    - Celery: reference/celery.md
-    - CIS: reference/cis.md
-    - CNS: reference/cns.md
-    - Domain: reference/domain.md
-    - GRPC: reference/grpc.md
-    - MongoDB: reference/mongodb.md
-    - SchemaParser: reference/schema-parser.md
-    - Tooter: reference/tooter.md
-    - WasmDecoder: reference/wasmdecoder.md
+      
+  - Components:
+    - Celery: components/celery.md
+    - CIS: components/cis.md
+    - CNS: components/cns.md
+    - Domain: components/domain.md
+    - GRPC: components/grpc.md
+    - MongoDB: components/mongodb.md
+    - SchemaParser: components/schema-parser.md
+    - Tooter: components/tooter.md
+    - WasmDecoder: components/wasmdecoder.md
 docs_dir: docs
 
 markdown_extensions:
@@ -84,4 +94,4 @@ theme:
       scheme: slate
       primary: deep purple
       accent: lime
-      toggle: { icon: material/brightness-4, name: Switch to system preference }
+      toggle: { icon: material/brightness-4, name: Switch to system pcomponents }

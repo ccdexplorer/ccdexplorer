@@ -45,7 +45,7 @@ pipeline = [
 ```
 
 
-The `contents` field is filled with all properties of [CCD_AccountTransactionEffects](../../reference/grpc.md/#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), combined with [CCD_RejectReason](../../reference/grpc.md/#ccdexplorer.grpc_client.CCD_Types.CCD_RejectReason).
+The `contents` field is filled with all properties of [CCD_AccountTransactionEffects](../../components/grpc.md/#ccdexplorer.grpc_client.CCD_Types.CCD_AccountTransactionEffects), combined with [CCD_RejectReason](../../components/grpc.md/#ccdexplorer.grpc_client.CCD_Types.CCD_RejectReason).
 
 
 ## Examples

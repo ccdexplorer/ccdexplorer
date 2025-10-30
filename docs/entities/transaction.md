@@ -40,4 +40,4 @@ Update transactions are performed by the chain itself. The following payloads ar
 
 
 ## How is a transaction stored in the system?
-In the [heartbeat](../services/every_block/heartbeat.md) service, all new transactions are parsed and stored in the db.
+In the [heartbeat](../projects/every_block/heartbeat.md) service, all new transactions are parsed and stored in the db.

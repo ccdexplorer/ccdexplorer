@@ -12,6 +12,6 @@ The following categories currently exist.
 | General          | General interest accounts.                                                    |
 | First-day        | These accounts have been created on the first day of mainnet.                 |
 | Foundation       | These accounts are named in the Mar 2024 Transparency Report.                 |
-| Projects         | These accounts are linked to recognized projects on Concordium (see [Projects](../services/projects.md)). |
+| Projects         | These accounts are linked to recognized projects on Concordium (see [Projects](../projects/projects.md)). |
 
 These labels can be found at [Community Labels](https://ccdexplorer.io/mainnet/tools/labeled-accounts).

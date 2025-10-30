@@ -1,5 +1,5 @@
 
-The micro service [ms-new-accounts](https://github.com/ccdexplorer/ms-new-accounts) has a subscription to the MQTT channel `heartbeat/address/new` and starts processing when a new message arrives. The message contains the `account address`.
+The micro service MS Accounts listens to the Celery topic `account_creation` and starts processing when a new message arrives. The message contains the `account address`.
 
 ## Steps
 

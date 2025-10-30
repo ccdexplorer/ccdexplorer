@@ -4,6 +4,7 @@ htmlcov/*
 *.pyc
 build/*
 dist/*
+development/__marimo__/*
 ccdexplorer.egg-info/dependency_links.txt
 ccdexplorer.egg-info/PKG-INFO
 ccdexplorer.egg-info/requires.txt
@@ -129,3 +130,4 @@ test/bases/tmp/*.out
 /projects/site/node_modules/highlight.js/languages/*
 !/projects/site/node_modules/highlight.js/languages/rust.min.js
 !/projects/site/node_modules/highlight.js/languages/json.min.js
+

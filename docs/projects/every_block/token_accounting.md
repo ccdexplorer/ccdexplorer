@@ -1,5 +1,5 @@
 ## Goal
-The goal of this service is to keep the CIS tokens administration up to date. It does this by looking for new logged events (as created in [Events and Impacted Addresses](events_impacted_addresses.md)) and parses the events. 
+The goal of this service is to keep the CIS tokens administration up to date. It does this by looking for new logged events (as created in [Events and Impacted Addresses](events_and_impacted.md)) and parses the events. 
 
 ## Data used
 At every block (as an indicator, it's not actually looking at the block), this service reads the value of the helper `token_accounting_last_processed_block_v3`, which contains the last block we have processed that had events that led to a change for token accounting. 
