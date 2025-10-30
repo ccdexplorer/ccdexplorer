@@ -1,5 +1,10 @@
 from pydantic import BaseModel
-from ccdexplorer.grpc_client.CCD_Types import microCCD, CCD_BlockItemSummary
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_AccountAddress,
+    CCD_ContractAddress,
+    microCCD,
+    CCD_BlockItemSummary,
+)
 from ccdexplorer.domain.generic import StandardIdentifiers
 from typing import Optional, Any
 
@@ -451,3 +456,48 @@ class fiveStarsRegisterAccessEvent(BaseModel):
     tag: int
     public_key: Optional[str] = None
     timestamp: Optional[int] = None
+
+
+### SpaceSeven
+class s7_InventoryGetTokenCallbackParams(BaseModel):
+    """A parameter for the SpaceSeven protocol.
+
+    Attributes:
+        tag (int): The event tag (0 for SpaceSeven parameters).
+        custom_token_id (Optional[int]): The custom token ID.
+        royalty_percent (Optional[int]): The royalty percentage.
+        account_address (Optional[str]): The account address.
+        url (Optional[str]): The URL associated with the parameter.
+    """
+
+    custom_token_id: int
+    creator: CCD_AccountAddress
+    owner: CCD_AccountAddress
+    royalty_percent: int
+    sender: CCD_AccountAddress | CCD_ContractAddress
+    amount: microCCD
+
+
+class s7_InventoryCreateParams_ERC721_V1(BaseModel):
+    """A parameter for the SpaceSeven protocol."""
+
+    custom_token_id: int
+    creator: Optional[CCD_AccountAddress] = None
+    royalty_percent: int
+
+
+class s7_InventoryCreateParams_ERC721_V2(BaseModel):
+    """A parameter for the SpaceSeven protocol."""
+
+    custom_token_id: int
+    creator: Optional[CCD_AccountAddress] = None
+    royalty_percent: int
+    url: str
+
+
+### s7 events
+class s7_InventoryTransferEvent(BaseModel):
+    """A parameter for the SpaceSeven protocol."""
+
+    custom_token_id: int
+    to_: CCD_AccountAddress

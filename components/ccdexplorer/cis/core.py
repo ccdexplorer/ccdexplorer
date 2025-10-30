@@ -24,6 +24,10 @@ from ccdexplorer.domain.cis import (
     registerCredentialEvent,
     revocationKeyEvent,
     revokeCredentialEvent,
+    s7_InventoryCreateParams_ERC721_V1,
+    s7_InventoryCreateParams_ERC721_V2,
+    s7_InventoryGetTokenCallbackParams,
+    s7_InventoryTransferEvent,
     tokenMetadataEvent,
     transferCCDEvent,
     transferCIS2TokensEvent,
@@ -2547,3 +2551,131 @@ class CIS:
                     return tag_, None, None, None
             else:
                 return tag_, None, None, None
+
+    # SpaceSeven
+    def s7_parameter(self, hexParameter: str):
+        """
+        Parses a metadata URL from a given BytesIO stream.
+
+        This method reads a URL from the provided BytesIO stream, calculates its checksum,
+        and returns a MetadataUrl object containing the URL and its checksum.
+
+        Args:
+            bs (io.BytesIO): A BytesIO stream containing the metadata URL.
+
+        Returns:
+            (MetadataUrl): An object containing the parsed URL and its checksum.
+
+        References:
+            [CIS-2 Metadata URL](http://proposals.concordium.software/CIS/cis-2.html#metadataurl)
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        account_address = self.account_address(bs)
+        royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
+
+        return s7_Parameter(
+            **{
+                "custom_token_id": custom_token_id,
+                "royalty_percent": royalty_percent,
+                "account_address": account_address,
+            }
+        )
+
+    # def s7_inventory_get_token(self, hexParameter: str):
+    #     """
+    #     Parses a hexadecimal string representing an inventory get token event and returns a s7_InventoryGetToken object.
+
+    #     This method reads a URL from the provided BytesIO stream, calculates its checksum,
+    #     and returns a MetadataUrl object containing the URL and its checksum.
+
+    #     Args:
+    #         bs (io.BytesIO): A BytesIO stream containing the metadata URL.
+
+    #     Returns:
+    #         (MetadataUrl): An object containing the parsed URL and its checksum.
+
+    #     References:
+    #         [CIS-2 Metadata URL](http://proposals.concordium.software/CIS/cis-2.html#metadataurl)
+    #     """
+    #     bs = io.BytesIO(bytes.fromhex(hexParameter))
+    #     # event_type = int.from_bytes(bs.read(8), byteorder="little")
+    #     custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+    #     address = self.address(bs)
+    #     amount = self.ccd_amount(bs)
+    #     quantity = self.token_amount(bs)
+    #     lot_id = int.from_bytes(bs.read(8), byteorder="little")
+
+    #     return s7_Parameter(
+    #         **{
+    #             "custom_token_id": custom_token_id,
+    #             "royalty_percent": royalty_percent,
+    #             "account_address": account_address,
+    #         }
+    #     )
+
+    def s7_trader_buy_callback(self, hexParameter: str):
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        creator = self.account_address(bs)
+        owner = self.account_address(bs)
+        royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
+        sender = self.address(bs)
+        amount = self.ccd_amount(bs)
+        # quantity = self.token_amount(bs)
+        # lot_id = int.from_bytes(bs.read(8), byteorder="little")
+
+        return s7_InventoryGetTokenCallbackParams(
+            **{
+                "custom_token_id": custom_token_id,
+                "creator": creator,
+                "owner": owner,
+                "royalty_percent": royalty_percent,
+                "sender": sender,
+                "amount": amount,
+            }
+        )
+
+    def s7_inventory_create_erc721_v1(self, hexParameter: str):
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        # creator = self.account_address(bs)
+        royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
+
+        return s7_InventoryCreateParams_ERC721_V1(
+            **{
+                "custom_token_id": custom_token_id,
+                "creator": None,
+                "royalty_percent": royalty_percent,
+            }
+        )
+
+    def s7_inventory_transfer_event_erc721_v1(self, hexParameter: str) -> s7_InventoryTransferEvent:
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        event_type = int.from_bytes(bs.read(1), byteorder="little")
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        opt_ = int.from_bytes(bs.read(1), byteorder="little")
+        to_ = self.account_address(bs)
+        return s7_InventoryTransferEvent(
+            **{
+                "custom_token_id": custom_token_id,
+                "to_": to_,
+            }
+        )
+
+    def s7_inventory_create_erc721_v2(self, hexParameter: str):
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        # creator = self.account_address(bs)
+        royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
+        length = int.from_bytes(bs.read(4), "little")
+        url = bs.read(length).decode("utf-8")
+        return s7_InventoryCreateParams_ERC721_V2(
+            **{
+                "custom_token_id": custom_token_id,
+                "creator": None,
+                "royalty_percent": royalty_percent,
+                "url": url,
+            }
+        )
