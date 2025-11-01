@@ -19,14 +19,21 @@ jobs:
         id: enumerate
         shell: bash
         run: |
+          set -euo pipefail
           mapfile -t projects < <(find projects -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)
           if [ ${#projects[@]} -eq 0 ]; then
             echo "::error::No projects found under ./projects/"
             exit 1
           fi
+
           printf 'Found projects: %s\n' "${projects[*]}"
-          printf '{"project":["%s"]}\n' "$(IFS='","'; echo "${projects[*]}")" > matrix.json
-          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+          # Build proper JSON for matrix
+          json=$(jq -n --argjson arr "$(printf '%s\n' "${projects[@]}" | jq -R . | jq -s .)" '{project: $arr}')
+
+          echo "matrix=$json" >> $GITHUB_OUTPUT
+          echo "Matrix JSON:"
+          echo "$json"
 
     outputs:
       matrix: ${{ steps.enumerate.outputs.matrix }}
