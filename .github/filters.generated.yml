@@ -5,70 +5,87 @@ filters:
   - pyproject.toml
   - uv.lock
   accounts_retrieval:
+  - "bases/**/accounts_retrieval/**"
   - projects/accounts_retrieval/**
   - pyproject.toml
   - uv.lock
   api:
+  - "bases/**/api/**"
   - projects/api/**
   - pyproject.toml
   - uv.lock
   bot:
+  - "bases/**/bot/**"
   - projects/bot/**
   - pyproject.toml
   - uv.lock
   dagster_nightrunner:
+  - "bases/**/dagster_nightrunner/**"
   - projects/dagster_nightrunner/**
   - pyproject.toml
   - uv.lock
   dagster_paydays:
+  - "bases/**/dagster_paydays/**"
   - projects/dagster_paydays/**
   - pyproject.toml
   - uv.lock
   dagster_recurring:
+  - "bases/**/dagster_recurring/**"
   - projects/dagster_recurring/**
   - pyproject.toml
   - uv.lock
   heartbeat:
+  - "bases/**/heartbeat/**"
   - projects/heartbeat/**
   - pyproject.toml
   - uv.lock
   ms_accounts:
+  
   - projects/ms_accounts/**
   - pyproject.toml
   - uv.lock
   ms_block_analyser:
+  
   - projects/ms_block_analyser/**
   - pyproject.toml
   - uv.lock
   ms_events_and_impacts:
+  - "bases/**/ms_events_and_impacts/**"
   - projects/ms_events_and_impacts/**
   - pyproject.toml
   - uv.lock
   ms_indexers:
+  - "bases/**/ms_indexers/**"
   - projects/ms_indexers/**
   - pyproject.toml
   - uv.lock
   ms_instances:
+  - "bases/**/ms_instances/**"
   - projects/ms_instances/**
   - pyproject.toml
   - uv.lock
   ms_metadata:
+  - "bases/**/ms_metadata/**"
   - projects/ms_metadata/**
   - pyproject.toml
   - uv.lock
   ms_modules:
+  - "bases/**/ms_modules/**"
   - projects/ms_modules/**
   - pyproject.toml
   - uv.lock
   ms_plt:
+  - "bases/**/ms_plt/**"
   - projects/ms_plt/**
   - pyproject.toml
   - uv.lock
   ms_token_accounting:
+  - "bases/**/ms_token_accounting/**"
   - projects/ms_token_accounting/**
   - pyproject.toml
   - uv.lock
   site:
+  - "bases/**/site/**"
   - projects/site/**
   - pyproject.toml
   - uv.lock
