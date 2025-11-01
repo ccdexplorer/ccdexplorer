@@ -97,6 +97,12 @@ def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heigh
         holder_to_ids.setdefault(account["token_holder"], []).append(account["token_id"])
 
     for account in holder_to_ids.keys():
+        canonical_account_address_entry = db[Collections.all_account_addresses].find_one(
+            {"_id": account}
+        )
+        if not canonical_account_address_entry:
+            continue
+        canonical_account = canonical_account_address_entry["account_address_canonical"]
         account_info = grpc_client.get_account_info(
             block_hash="last_final", hex_address=account, net=NET(net)
         )
@@ -106,7 +112,7 @@ def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heigh
                     token_id = token_info.token_id
                     token_account_state = token_info.token_account_state
                     balance = token_account_state.balance
-                    _id = f"{token_id}-{account}"
+                    _id = f"{token_id}-{canonical_account}"
 
                     # If a account_plt pair is present in the collection
                     # it means that the account has a PLT balance > 0
@@ -117,8 +123,8 @@ def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heigh
                     else:
                         d = {
                             "_id": _id,
-                            "account_address": account,
-                            "account_address_canonical": account[:29],
+                            "account_address": canonical_account,
+                            "account_address_canonical": canonical_account[:29],
                             "token_id": token_id,
                             "balance": str(balance.value),
                         }

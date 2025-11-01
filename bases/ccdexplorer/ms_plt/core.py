@@ -55,10 +55,8 @@ def process_block(self, processor: str, payload: Dict[str, Any]) -> dict | None:
     print(f"Handling payload: {payload}")
     block_height = payload.get("height")
     try:
-        # your work
         update_plts(mongodb, grpcclient, RUN_ON_NET, block_height)  # type: ignore
 
-        # success
         task_doc = TaskResult(
             _id=self.request.id,
             queue=processor,
