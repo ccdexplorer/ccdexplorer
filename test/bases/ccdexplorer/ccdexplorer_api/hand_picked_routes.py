@@ -34,6 +34,9 @@ SAMPLE_PATH_VALUES = {
     "node_id": "8175412dde32cfab",
     "analysis": "statistics_plt",
     "date": "2025-10-01",
+    "year": 2025,
+    "month": 10,
+    "day": 5,
     "cis_standard": "CIS-2",
     # add more as needed
 }
