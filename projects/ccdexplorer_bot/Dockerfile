@@ -29,5 +29,5 @@ RUN addgroup --system app && adduser --system --ingroup app app
 
 USER app
 
-CMD ["python", "-m", "ccdexplorer.bot"]
+CMD ["python", "-m", "ccdexplorer.ccdexplorer_bot"]
 #bump
