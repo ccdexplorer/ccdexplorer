@@ -113,7 +113,7 @@ async def get_all_plt_tokens_at_block(
 
 @router.get("/{net}/plt/statistics-overview/{year}/{month}/{day}", response_class=JSONResponse)
 @router.get("/{net}/plt/statistics-overview/{year}/{month}", response_class=JSONResponse)
-async def get_all_plt_statistics_per_month(
+async def get_all_plt_statistics_per_day_or_month(
     request: Request,
     net: str,
     year: int,
