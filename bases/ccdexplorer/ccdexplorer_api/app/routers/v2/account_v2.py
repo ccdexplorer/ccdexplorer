@@ -1099,11 +1099,11 @@ async def get_validator_current_payday_stats(
     mongo_result = await await_await(mongomotor.mainnet, Collections.paydays_v2, pipeline)
     if mongo_result:
         mongo_result = MongoTypePaydayV2(**mongo_result[0])
-        assert mongo_result.height_for_last_block is not None
+        # assert mongo_result.height_for_last_block is not None
         assert mongo_result.height_for_first_block is not None
         if mongo_result:
             paydays_last_blocks_validated = (
-                mongo_result.height_for_last_block - mongo_result.height_for_first_block + 1
+                mongo_result.height_for_last_block - mongo_result.height_for_first_block + 1  # type: ignore
             )
 
         try:

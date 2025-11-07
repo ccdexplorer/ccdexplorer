@@ -33,7 +33,7 @@ async def get_user_api_keys(user, mongomotor):
         {"$match": {"scope": API_URL}},
         {"$match": {"api_account_id": user.api_account_id}},
     ]
-    result = await await_await(mongomotor.utilities_db, CollectionsUtilities.api_api_keys, pipeline)
+    result = await await_await(mongomotor.utilities, CollectionsUtilities.api_api_keys, pipeline)
     user_api_keys = [APIKey(**x) for x in result]
     return user_api_keys
 
@@ -250,7 +250,7 @@ async def account_new_key(
     key_to_add = key_to_add.model_dump()
     if "id" in key_to_add:
         del key_to_add["id"]
-    request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
+    await request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
         [ReplaceOne({"_id": key_id}, key_to_add, upsert=True)]
     )
     request.app.api_keys = await get_api_keys(
@@ -267,7 +267,7 @@ async def account_delete_key(
     key: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ):
-    request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
+    await request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
         [
             DeleteOne(
                 {"_id": key},
@@ -322,7 +322,7 @@ async def set_end_date_for_plan(request: Request, user: User):
     # user.plan_end_date = dt.datetime.combine(end_date, dt.time.max).astimezone(dt.UTC)
     user.plan_end_date = end_date
     # write back to user
-    _ = await request.app.mongomotor.utilities[CollectionsUtilities.api_users].bulk_write(
+    _ = await request.app.motormongo.utilities[CollectionsUtilities.api_users].bulk_write(
         [
             ReplaceOne(
                 {"_id": user.api_account_id},

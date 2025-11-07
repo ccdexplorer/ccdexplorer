@@ -36,7 +36,7 @@ async def plans_set_plan(
         else:
             user.plan_end_date = dt.datetime.now().astimezone(dt.UTC)
 
-        request.app.motormongo.utilities[CollectionsUtilities.api_users].bulk_write(
+        rr = await request.app.motormongo.utilities[CollectionsUtilities.api_users].bulk_write(
             [
                 ReplaceOne(
                     {"_id": user.api_account_id},
@@ -65,7 +65,7 @@ async def plans_reset_plan(
     user.plan = None
     user.plan_end_date = dt.datetime.now().astimezone(dt.UTC)
 
-    request.app.motormongo.utilities[CollectionsUtilities.api_users].bulk_write(
+    rr = await request.app.motormongo.utilities[CollectionsUtilities.api_users].bulk_write(
         [
             ReplaceOne(
                 {"_id": user.api_account_id},
@@ -86,7 +86,7 @@ async def plans_reset_plan(
 
     if len(result) > 0:
         for x in result:
-            request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
+            await request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
                 [DeleteOne({"_id": x["_id"]})]
             )
 

@@ -298,14 +298,16 @@ async def get_info_for_token_address(
                 ]
             }
         )
-        if not mint_event_logged_event:
-            raise HTTPException(
-                status_code=500,
-                detail=f"mint_event for requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+        if mint_event_logged_event:
+            # raise HTTPException(
+            #     status_code=500,
+            #     detail=f"mint_event for requested token_id {token_id} from contract <{contract_index},{contract_subindex}> is not found on {net}.",
+            # )
+            token_from_collection.update(
+                {"mint_tx_hash": mint_event_logged_event["tx_info"]["tx_hash"]}
             )
-        token_from_collection.update(
-            {"mint_tx_hash": mint_event_logged_event["tx_info"]["tx_hash"]}
-        )
+        else:
+            token_from_collection.update({"mint_tx_hash": token_from_collection["mint_tx_hash"]})
 
         pipeline = [
             {"$match": {"token_holding.token_address": token_address}},

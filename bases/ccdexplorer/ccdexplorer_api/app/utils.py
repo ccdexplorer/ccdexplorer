@@ -64,6 +64,10 @@ async def await_await(
     length: int | None = None,
     **kwargs,
 ) -> list:
+    if isinstance(collection, CollectionsUtilities):
+        collection = CollectionsUtilities(collection.value)
+    else:
+        collection = Collections(collection.value)
     return await (await db[collection].aggregate(pipeline, **kwargs)).to_list(length=length)
 
 
