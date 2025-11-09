@@ -13,11 +13,13 @@ from functools import lru_cache
 from typing import Any, Optional
 
 import cbor2
+from ccdexplorer.cis.core import CIS
 import dateutil
 import dateutil.parser
 import httpx
 
 #
+from ccdexplorer.domain.generic import NET
 import plotly.graph_objects as go
 from ccdexplorer.domain.mongo import (
     MongoTypeLoggedEventV2,
@@ -423,6 +425,7 @@ class ProcessEventRequest(BaseModel):
     contract_address: CCD_ContractAddress
     token_metadata: Optional[TokenMetaData] = None
     event: str
+    entrypoint: Optional[str] = None
     net: str
     user: Optional[SiteUser] = None
     tags: Optional[dict] = None
@@ -1247,7 +1250,6 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 ),
                 None,
             )
-
         elif standard == "CIS-4":
             return EventType(
                 f"{event_type}",
@@ -1262,7 +1264,6 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 ),
                 None,
             )
-
         elif standard == "CIS-5":
             if isinstance(
                 result,
@@ -1304,13 +1305,41 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 None,
             )
     else:
-        return EventType(
-            "Non CIS event",
-            req.app.templates.get_template("tx/logged_events/unrecognized_event.html").render(
-                {"logged_event": req.logged_event_from_collection}
-            ),
-            None,
-        )
+        if 1 == 1:
+            token_address_as_class = await get_token_info_from_collection(req, req.contract_address)
+            try:
+                s7_parameter = CIS(
+                    None,
+                    req.contract_address.index,
+                    req.contract_address.subindex,
+                    req.entrypoint,
+                    NET(req.net),
+                ).s7_inventory_create_erc721_v2_created_event(req.event)
+            except Exception:  # noqa: E722
+                s7_parameter = None
+
+            return EventType(
+                f"{'SpaceSeven Inventory Created Event' if s7_parameter else 'Non CIS event'}",
+                req.app.templates.get_template("tx/logged_events/s7.html").render(
+                    {
+                        "result": result,
+                        "token_address_as_class": token_address_as_class,
+                        "request": req,
+                        "net": req.net,
+                        "tags": req.tags,
+                        "user": req.user,
+                    },
+                ),
+                None,
+            )
+        else:
+            return EventType(
+                "Non CIS event",
+                req.app.templates.get_template("tx/logged_events/unrecognized_event.html").render(
+                    {"logged_event": req.logged_event_from_collection}
+                ),
+                None,
+            )
 
 
 async def get_token_info_from_collection(

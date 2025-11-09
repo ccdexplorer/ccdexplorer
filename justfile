@@ -69,6 +69,10 @@ run:
 
 api:
     uvicorn projects.ccdexplorer_api.asgi:app --loop asyncio --port 7000
+
+site:
+    uvicorn projects.ccdexplorer_site.asgi:app --reload --loop asyncio --port 8000
+    
 # --- Help message ---
 
 help:

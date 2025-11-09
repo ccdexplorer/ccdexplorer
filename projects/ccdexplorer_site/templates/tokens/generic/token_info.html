@@ -31,7 +31,7 @@
         {% endif %} -->
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Deployed in block</td>
-        <td class="text-end text-secondary-emphasis">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
+        <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
             
             </td>
     </tr>
@@ -43,7 +43,7 @@
     </tr>
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Age</td>
-        <td class="text-end text-secondary-emphasis">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
+        <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
     </tr>
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Creator</td>
@@ -54,7 +54,7 @@
     
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Last Activity in block</td>
-        <td class="text-end text-secondary-emphasis">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}
+        <td class="text-end text-secondary-emphasis ccd">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}
             
             </td>
     </tr>
@@ -72,10 +72,16 @@
     {% endif %}
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis"># Current Holders</td>
-        <td class="text-end text-secondary-emphasis">{{stored_token_address.current_holders_count|round_x_decimal_with_comma(0)}}
+        <td class="text-end text-secondary-emphasis ccd">{{stored_token_address.current_holders_count|round_x_decimal_with_comma(0)}}
             
             </td>
     </tr>
+    {% if stored_token_address.special_type %}
+    <tr class="table-row-line-height sm-text">
+        <td class="text-start  text-warning" colspan="2">This is a non CIS-2 SpaceSeven NFT that we have imported. Note that for now only the NFT metadata is preserved. More work is needed to display the current owner.</td>
+        
+    </tr>
+    {% endif %}
 </tbody>
 </table>
 

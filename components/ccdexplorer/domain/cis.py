@@ -7,7 +7,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 )
 from ccdexplorer.domain.generic import StandardIdentifiers
 from typing import Optional, Any
-
+import datetime as dt
 # CIS-2 Logged Event Types
 
 
@@ -478,26 +478,56 @@ class s7_InventoryGetTokenCallbackParams(BaseModel):
     amount: microCCD
 
 
-class s7_InventoryCreateParams_ERC721_V1(BaseModel):
-    """A parameter for the SpaceSeven protocol."""
-
+class s7_TraderCreateAndSellParams_ERC721_V2(BaseModel):
     custom_token_id: int
-    creator: Optional[CCD_AccountAddress] = None
+    royalty_percent: int
+    url: str
+    price: microCCD
+    to_time: int
+    bid_additional_time: int
+
+
+class s7_TraderCreateAndSellParams_ERC1155_V1(BaseModel):
+    custom_token_id: int
+    value: int
+    lot_id: int
+    royalty_percent: int
+    url: str
+    price: microCCD
+    to_time: int
+    bid_additional_time: int
+
+
+class s7_InventoryCreateParams_ERC721_V1(BaseModel):
+    custom_token_id: int
     royalty_percent: int
 
 
 class s7_InventoryCreateParams_ERC721_V2(BaseModel):
-    """A parameter for the SpaceSeven protocol."""
-
     custom_token_id: int
-    creator: Optional[CCD_AccountAddress] = None
+    royalty_percent: int
+    url: str
+
+
+class s7_InventoryCreateParams_ERC1155_V1(BaseModel):
+    custom_token_id: int
+    value: int
     royalty_percent: int
     url: str
 
 
 ### s7 events
-class s7_InventoryTransferEvent(BaseModel):
+class s7_InventoryCreateCreatedEvent(BaseModel):
+    """A parameter for the SpaceSeven protocol."""
+
+    type: str
+    custom_token_id: int
+    creator: CCD_AccountAddress
+    trader: CCD_ContractAddress
+
+
+class s7_InventoryCreateTransferEvent(BaseModel):
     """A parameter for the SpaceSeven protocol."""
 
     custom_token_id: int
-    to_: CCD_AccountAddress
+    to_: Optional[CCD_AccountAddress] = None

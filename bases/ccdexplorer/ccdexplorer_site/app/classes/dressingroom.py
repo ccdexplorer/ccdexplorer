@@ -26,7 +26,7 @@ from ccdexplorer.grpc_client.CCD_Types import *
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer_schema_parser.Schema import Schema
 from pydantic import BaseModel
-
+from ccdexplorer.cis import CIS
 from ccdexplorer.ccdexplorer_site.app.classes.Enums import *
 from ccdexplorer.env import *
 from ccdexplorer.ccdexplorer_site.app.utils import *
@@ -543,6 +543,7 @@ class MakeUp:
                                     logged_events_source.get(f"0,{event_index}"),
                                     logged_events,
                                     event,
+                                    None,
                                     effects.contract_initialized.address,
                                 )
                             if not success:
@@ -621,12 +622,25 @@ class MakeUp:
                                     schema, source_module_name = await self.get_schema_from_source(
                                         effect.updated.address
                                     )
-                                    parameter_json, _ = self.try_schema_parsing_for_parameter(
+                                    parameter_json, success = self.try_schema_parsing_for_parameter(
                                         schema,
                                         source_module_name,
                                         effect.updated.receive_name.split(".")[1],
                                         effect.updated.parameter,
                                     )
+                                    s7_parameter = None
+                                    if not success:
+                                        if effect.updated.receive_name == "inventory.create":
+                                            s7_parameter = CIS(
+                                                None,
+                                                effect.updated.address.index,
+                                                effect.updated.address.subindex,
+                                                effect.updated.receive_name,
+                                                self.net,
+                                            ).s7_inventory_create_erc721_v2(
+                                                effect.updated.parameter
+                                            )
+
                                 except ValueError:
                                     schema = None
                                     source_module_name = None
@@ -645,6 +659,7 @@ class MakeUp:
                                                 ),
                                                 logged_events,
                                                 event,
+                                                effect.updated.receive_name,
                                                 effect.updated.address,
                                             )
                                         if not success:
@@ -669,10 +684,17 @@ class MakeUp:
                                     if effect.updated.amount > 0
                                     else ""
                                 )
+
+                                if s7_parameter:
+                                    parameter_or_token = f'Token: <a href="/{self.net}/token/{effect.updated.address.index}/{effect.updated.address.subindex}/{s7_parameter.custom_token_id}"><span class="ccd">{s7_parameter.custom_token_id}</span></a> '
+
+                                else:
+                                    parameter_or_token = f"Parameter: {shorten_address(effect.updated.parameter) if not parameter_json else print_schema_dict(parameter_json, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
+
                                 new_event = EventType(
                                     f"Updated contract with address {instance_link_v2(effect.updated.address, self.user, self.tags, self.net)}",
                                     f"Contract: {effect.updated.receive_name.split('.')[0]}<br>Function: {effect.updated.receive_name.split('.')[1]}{amount_str}",
-                                    f"Parameter: {shorten_address(effect.updated.parameter) if not parameter_json else print_schema_dict(parameter_json, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                                    parameter_or_token,
                                     logged_events,
                                 )
                                 self.smart_contracts_updated.append(effect.updated.address)
@@ -700,6 +722,7 @@ class MakeUp:
                                                 ),
                                                 logged_events,
                                                 event,
+                                                None,
                                                 effect.interrupted.address,
                                             )
                                         if not success:
@@ -1378,6 +1401,7 @@ class MakeUp:
         logged_event_from_collection: MongoTypeLoggedEventV2,
         logged_events: list,
         event,
+        entrypoint: str,
         contract_address: CCD_ContractAddress,
     ):
         success = False
@@ -1412,6 +1436,7 @@ class MakeUp:
             **{
                 "contract_address": contract_address,
                 "event": event,
+                "entrypoint": entrypoint,
                 "net": self.net,
                 "user": self.user,
                 "tags": self.tags,
@@ -1489,7 +1514,7 @@ class MakeUp:
                 function_name,
                 bytes.fromhex(parameter),
             )
-            success = True
+            success = parameter_json is not None
         except ValueError:
             parameter_json = None
             success = False

@@ -781,7 +781,7 @@ async def get_cis2_token_holders_paginated(
     )
     current_holders_with_ids = api_result.return_value["current_holders"] if api_result.ok else None
     total_rows = api_result.return_value["total_count"] if api_result.ok else 0
-    if not current_holders_with_ids:
+    if current_holders_with_ids is None and not api_result.ok:
         error = f"Request error getting holders for token at {token_id} on {net}."
         return request.app.templates.TemplateResponse(
             "base/error-request.html",

@@ -69,7 +69,7 @@ async def get_module_name_from_contract_address(db_to_use, contract_address: CCD
     if "v1" in instance_result:
         module_name = instance_result["v1"]["name"].replace("init_", "")
     elif "v0" in instance_result:
-        module_name = instance_result["v1"]["name"].replace("init_", "")
+        module_name = instance_result["v0"]["name"].replace("init_", "")
     return module_name
 
 
