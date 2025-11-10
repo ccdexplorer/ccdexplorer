@@ -25,10 +25,8 @@ from pydantic import BaseModel
 
 urllib3.disable_warnings()
 
-import datetime as dt
 import pickle
 
-import httpx
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from ccdexplorer.env import environment
@@ -65,7 +63,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, ge
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
-import sentry_sdk
+
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
@@ -130,6 +128,7 @@ async def log_response(response):
 def read_addresses_if_available(app):
     print("Start getting addresses to indexes.")
     app.addresses_to_indexes = {"mainnet": {}, "testnet": {}}
+    app.addresses_to_indexes_complete = {"mainnet": {}, "testnet": {}}
     app.max_index_known = {"mainnet": 0, "testnet": 0}
     try:
         for net in ["mainnet", "testnet"]:
@@ -139,6 +138,11 @@ def read_addresses_if_available(app):
             ) as fp:  # Unpickling
                 app.addresses_to_indexes[net] = pickle.load(fp)
                 app.max_index_known[net] = max(app.addresses_to_indexes[net].values())
+
+            with open(
+                f"{app.app_settings.addresses_dir}/{net}_addresses_to_indexes_complete.pickle", "rb"
+            ) as fp:  # Unpickling
+                app.addresses_to_indexes_complete[net] = pickle.load(fp)
     except Exception as error:
         print(f"ERROR getting addresses: {error}")
 
@@ -177,14 +181,13 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.env = environment
         app.credential_issuers = None
         app.env["API_KEY"] = str(uuid.uuid1())
-        now = dt.datetime.now().astimezone(dt.timezone.utc)
-        app.labeled_accounts_last_requested = now - dt.timedelta(seconds=10)
-        app.users_last_requested = now - dt.timedelta(seconds=10)
-        app.nodes_last_requested = now - dt.timedelta(seconds=10)
-        app.credential_issuers_last_requested = now - dt.timedelta(seconds=10)
-        app.consensus_last_requested = now - dt.timedelta(seconds=10)
-        app.staking_pools_last_requested = now - dt.timedelta(seconds=10)
-        app.exchange_rates_last_requested = now - dt.timedelta(seconds=10)
+        app.labeled_accounts_last_requested = init_time
+        app.users_last_requested = init_time
+        app.nodes_last_requested = init_time
+        app.credential_issuers_last_requested = init_time
+        app.consensus_last_requested = init_time
+        app.staking_pools_last_requested = init_time
+        app.exchange_rates_last_requested = init_time
         app.tags = None
         app.nodes = None
         read_addresses_if_available(app)

@@ -28,10 +28,13 @@ from ccdexplorer.domain.cis import (
     s7_InventoryGetTokenCallbackParams,
     s7_InventoryCreateTransferEvent,
     s7_InventoryCreateCreatedEvent,
+    s7_InventoryTransferTransferEvent,
+    s7_InventoryCloseParams_ERC721_V2,
     s7_TraderCreateAndSellParams_ERC721_V2,
     s7_TraderCreateAndSellParams_ERC1155_V1,
     s7_InventoryCreateParams_ERC1155_V1,
     s7_InventoryCreateParams_ERC721_V1,
+    s7_InventoryTransferParams_ERC721_V2,
     s7_InventoryCreateParams_ERC721_V2,
     tokenMetadataEvent,
     transferCCDEvent,
@@ -2579,19 +2582,6 @@ class CIS:
             }
         )
 
-    # def s7_inventory_transfer_event_erc721_v1(self, hexParameter: str) -> s7_InventoryTransferEvent:
-    #     bs = io.BytesIO(bytes.fromhex(hexParameter))
-    #     event_type = int.from_bytes(bs.read(1), byteorder="little")
-    #     custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
-    #     opt_ = int.from_bytes(bs.read(1), byteorder="little")
-    #     to_ = self.account_address(bs)
-    #     return s7_InventoryTransferEvent(
-    #         **{
-    #             "custom_token_id": custom_token_id,
-    #             "to_": to_,
-    #         }
-    #     )
-
     def s7_trader_create_and_sell_erc721_v2(self, hexParameter: str):
         bs = io.BytesIO(bytes.fromhex(hexParameter))
         custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
@@ -2649,10 +2639,13 @@ class CIS:
             }
         )
 
-    def s7_inventory_create_erc721_v2(self, hexParameter: str):
+    def s7_inventory_create_erc721_v2_create_parameter(
+        self, hexParameter: str
+    ) -> s7_InventoryCreateParams_ERC721_V2:
         bs = io.BytesIO(bytes.fromhex(hexParameter))
         custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
         optional = int.from_bytes(bs.read(1), "little")
+        creator = None
         if optional:
             creator = self.account_address(bs)
         royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
@@ -2661,12 +2654,46 @@ class CIS:
         return s7_InventoryCreateParams_ERC721_V2(
             **{
                 "custom_token_id": custom_token_id,
+                "creator": creator,
                 "royalty_percent": royalty_percent,
                 "url": url,
             }
         )
 
-    def s7_inventory_create_erc721_v2_created_event(self, hexParameter: str):
+    def s7_inventory_close_erc721_v2_close_parameter(
+        self, hexParameter: str
+    ) -> s7_InventoryCloseParams_ERC721_V2:
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        sender = self.address(bs)
+        return s7_InventoryCloseParams_ERC721_V2(
+            **{
+                "custom_token_id": custom_token_id,
+                "sender": sender,
+            }
+        )
+
+    # def s7_inventory_transfer_erc721_v2(self, hexParameter: str):
+    #     bs = io.BytesIO(bytes.fromhex(hexParameter))
+    #     custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+    #     optional = int.from_bytes(bs.read(1), "little")
+    #     if optional:
+    #         creator = self.account_address(bs)
+    #     royalty_percent = int.from_bytes(bs.read(8), byteorder="little")
+    #     length = int.from_bytes(bs.read(4), "little")
+    #     url = bs.read(length).decode()
+    #     return s7_InventoryTransferParams_ERC721_V2(
+    #         **{
+    #             "custom_token_id": custom_token_id,
+    #             "royalty_percent": royalty_percent,
+    #             "url": url,
+    #             "to_": creator,
+    #         }
+    #     )
+
+    def s7_inventory_create_erc721_v2_created_event(
+        self, hexParameter: str
+    ) -> s7_InventoryCreateCreatedEvent:
         bs = io.BytesIO(bytes.fromhex(hexParameter))
         type_ = int.from_bytes(bs.read(1), byteorder="little")
         custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
@@ -2678,6 +2705,20 @@ class CIS:
                 "custom_token_id": custom_token_id,
                 "creator": creator,
                 "trader": trader,
+            }
+        )
+
+    def s7_inventory_transfer_erc721_v2_transfer_parameter(self, hexParameter: str):
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        custom_token_id = int.from_bytes(bs.read(8), byteorder="little")
+        optional = int.from_bytes(bs.read(1), "little")
+        to_ = None
+        if optional:
+            to_ = self.account_address(bs)
+        return s7_InventoryTransferParams_ERC721_V2(
+            **{
+                "custom_token_id": custom_token_id,
+                "to_": to_,
             }
         )
 

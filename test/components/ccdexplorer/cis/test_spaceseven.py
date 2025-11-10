@@ -76,7 +76,7 @@ def test_s7_inventory_create_21(cis: CIS):
     cis.entrypoint = entrypoint
     cis.net = NET.MAINNET
     hex = "0d00003622484c0001b6e60b502a3697903dee496a91696ef3d5a5bd143031f8af2111ec25a48e5c8d000000000000000042000000697066733a2f2f6261666b726569667079766d716b6c6f61726c7732636f7270687a706b376c7a65797a35366d6c7562706d6d68356477746e676136346274346d75"
-    parsed_result = cis.s7_inventory_create_erc721_v2(hex)
+    parsed_result = cis.s7_inventory_create_erc721_v2_create_parameter(hex)
     assert parsed_result.creator == "4LJ5QS8RW26jAgbeaAZp9zBXNRexr6wpnvbgsp5Czib6FLkP3D"
     assert parsed_result.custom_token_id == 21471410002067469
     assert parsed_result.url == "ipfs://bafkreifpyvmqkloarlw2corphzpk7lzeyz56mlubpmmh5dwtnga64bt4mu"
@@ -155,7 +155,7 @@ def test_s7_inventory_create_3(cis: CIS):
     cis.entrypoint = entrypoint
     cis.net = NET.MAINNET
     hex = "0800009ed89c8d03014feb8e5998fa692316d315a8f3c50b673b5ccb57f52180dc1abb512a117fb132000000000000000042000000697066733a2f2f6261666b726569656673696a74686e6c376d356d74796c36776163676836326f7a67377369357179737435716b7568786234716c37703773633734"
-    parsed_result = cis.s7_inventory_create_erc721_v2(hex)
+    parsed_result = cis.s7_inventory_create_erc721_v2_create_parameter(hex)
     # assert parsed_result.creator == "4LJ5QS8RW26jAgbeaAZp9zBXNRexr6wpnvbgsp5Czib6FLkP3D"
     # assert parsed_result.custom_token_id == 21471410002067469
     # assert parsed_result.url == "ipfs://bafkreifpyvmqkloarlw2corphzpk7lzeyz56mlubpmmh5dwtnga64bt4mu"

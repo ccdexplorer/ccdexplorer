@@ -743,7 +743,7 @@ async def get_account_non_fungible_tokens_verified(
             motor=mongomotor,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state.get(account_address, 0)
+        token.token_amount = token_amount_from_state.get(account_address, token.token_amount)
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
         )

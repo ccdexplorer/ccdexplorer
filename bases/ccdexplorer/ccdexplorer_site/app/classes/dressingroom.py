@@ -20,6 +20,10 @@ from enum import Enum
 
 import httpx
 from ccdexplorer.cis import *
+from ccdexplorer.domain.cis import (
+    s7_InventoryCreateParams_ERC721_V2,
+    s7_InventoryTransferParams_ERC721_V2,
+)
 from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.cns import CNSActions, CNSDomain, CNSEvent
 from ccdexplorer.grpc_client.CCD_Types import *
@@ -469,9 +473,7 @@ class MakeUp:
                 "start_4": block_height_link(t.block_info.height, self.net),
                 "end_4": cost_html(t.account_transaction.cost, energy=False),
                 "start_5": account_link(
-                    from_address_to_index(
-                        t.account_transaction.sender, self.net, self.makeup_request.app
-                    ),
+                    t.account_transaction.sender,
                     self.net,
                     user=self.user,
                     tags=self.tags,
@@ -630,16 +632,9 @@ class MakeUp:
                                     )
                                     s7_parameter = None
                                     if not success:
-                                        if effect.updated.receive_name == "inventory.create":
-                                            s7_parameter = CIS(
-                                                None,
-                                                effect.updated.address.index,
-                                                effect.updated.address.subindex,
-                                                effect.updated.receive_name,
-                                                self.net,
-                                            ).s7_inventory_create_erc721_v2(
-                                                effect.updated.parameter
-                                            )
+                                        s7_parameter = self.derive_s7__information_from_paramets(
+                                            effect
+                                        )
 
                                 except ValueError:
                                     schema = None
@@ -686,8 +681,13 @@ class MakeUp:
                                 )
 
                                 if s7_parameter:
-                                    parameter_or_token = f'Token: <a href="/{self.net}/token/{effect.updated.address.index}/{effect.updated.address.subindex}/{s7_parameter.custom_token_id}"><span class="ccd">{s7_parameter.custom_token_id}</span></a> '
-
+                                    parameter_or_token = f"""Token: <a href="/{self.net}/token/{effect.updated.address.index}/{effect.updated.address.subindex}/{s7_parameter.custom_token_id}"><span class="ccd">{s7_parameter.custom_token_id}</span></a> <br/>"""
+                                    if isinstance(
+                                        s7_parameter, s7_InventoryTransferParams_ERC721_V2
+                                    ):
+                                        parameter_or_token += f"To: {account_link(s7_parameter.to_, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
+                                    if isinstance(s7_parameter, s7_InventoryCreateParams_ERC721_V2):
+                                        parameter_or_token += f"Creator: {account_link(s7_parameter.creator, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
                                 else:
                                     parameter_or_token = f"Parameter: {shorten_address(effect.updated.parameter) if not parameter_json else print_schema_dict(parameter_json, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
 
@@ -751,7 +751,7 @@ class MakeUp:
 
                             if effect.transferred:
                                 new_event = EventType(
-                                    f"Transferred {(micro_ccd_display(effect.transferred.amount))} from {instance_link_v2(effect.transferred.sender, self.net)} to {account_link(from_address_to_index(effect.transferred.receiver, self.net, app=self.makeup_request.app), self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                                    f"Transferred {(micro_ccd_display(effect.transferred.amount))} from {instance_link_v2(effect.transferred.sender, self.net)} to {account_link(effect.transferred.receiver, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
                                     None,
                                     None,
                                 )
@@ -792,11 +792,7 @@ class MakeUp:
                     self.from_account = t.account_transaction.sender
 
                     self.to_link = account_link(
-                        from_address_to_index(
-                            effects.account_transfer.receiver,
-                            self.net,
-                            app=self.makeup_request.app,
-                        ),
+                        effects.account_transfer.receiver,
                         self.net,
                         user=self.user,
                         tags=self.tags,
@@ -804,11 +800,7 @@ class MakeUp:
                     )
 
                     self.from_link = account_link(
-                        from_address_to_index(
-                            t.account_transaction.sender,
-                            self.net,
-                            app=self.makeup_request.app,
-                        ),
+                        t.account_transaction.sender,
                         self.net,
                         user=self.user,
                         tags=self.tags,
@@ -818,11 +810,7 @@ class MakeUp:
                     dct.update(
                         {
                             "end_5": account_link(
-                                from_address_to_index(
-                                    effects.account_transfer.receiver,
-                                    self.net,
-                                    app=self.makeup_request.app,
-                                ),
+                                effects.account_transfer.receiver,
                                 self.net,
                                 user=self.user,
                                 tags=self.tags,
@@ -925,11 +913,7 @@ class MakeUp:
                             "schedule": effects.transferred_with_schedule.amount,
                             # 'start_1': event['totalAmount'],
                             "end_5": account_link(
-                                from_address_to_index(
-                                    effects.transferred_with_schedule.receiver,
-                                    self.net,
-                                    app=self.makeup_request.app,
-                                ),
+                                effects.transferred_with_schedule.receiver,
                                 self.net,
                                 user=self.user,
                                 tags=self.tags,
@@ -1207,11 +1191,7 @@ class MakeUp:
             new_event = EventType(
                 f"Account created: {
                     account_link(
-                        from_address_to_index(
-                            t.account_creation.address,
-                            self.net,
-                            app=self.makeup_request.app,
-                        ),
+                        t.account_creation.address,
                         self.net,
                         user=self.user,
                         tags=self.tags,
@@ -1301,11 +1281,7 @@ class MakeUp:
             elif t.update.payload.foundation_account_update:
                 new_account = (
                     account_link(
-                        from_address_to_index(
-                            t.update.payload.foundation_account_update,
-                            self.net,
-                            app=self.makeup_request.app,
-                        ),
+                        t.update.payload.foundation_account_update,
                         self.net,
                         user=self.user,
                         tags=self.tags,
@@ -1392,6 +1368,26 @@ class MakeUp:
             self.classifier = TransactionClassifier.Chain
 
             self.dct = dct
+
+    def derive_s7__information_from_paramets(self, effect: CCD_ContractTraceElement):
+        s7_parameter = None
+        if effect.updated.receive_name == "inventory.create":
+            s7_parameter = CIS(
+                None,
+                effect.updated.address.index,
+                effect.updated.address.subindex,
+                effect.updated.receive_name,
+                self.net,
+            ).s7_inventory_create_erc721_v2_create_parameter(effect.updated.parameter)
+        elif effect.updated.receive_name == "inventory.transfer":
+            s7_parameter = CIS(
+                None,
+                effect.updated.address.index,
+                effect.updated.address.subindex,
+                effect.updated.receive_name,
+                self.net,
+            ).s7_inventory_transfer_erc721_v2_transfer_parameter(effect.updated.parameter)
+        return s7_parameter
 
     def determine_if_we_show_events(self):
         return self.makeup_request.requesting_route == RequestingRoute.transaction
@@ -1583,7 +1579,7 @@ class MakeUp:
                 )
                 self.additional_info["amount"] = int(event.transfer_event.amount.value)
                 new_event = EventType(
-                    f"Transferred {token_amount_using_decimals_rounded(int(event.transfer_event.amount.value), decimals)} from {account_link(from_address_to_index(event.transfer_event.from_.account, self.net, app=self.makeup_request.app), self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(from_address_to_index(event.transfer_event.to.account, self.net, app=self.makeup_request.app), self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    f"Transferred {token_amount_using_decimals_rounded(int(event.transfer_event.amount.value), decimals)} from {account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
                     plt_string,
                     memo if memo else None,
                 )
@@ -1591,7 +1587,7 @@ class MakeUp:
             elif event.mint_event is not None:
                 self.additional_info["amount"] = int(event.mint_event.amount.value)
                 new_event = EventType(
-                    f"Minted {token_amount_using_decimals_rounded(int(event.mint_event.amount.value), decimals)} to {account_link(from_address_to_index(event.mint_event.target.account, self.net, app=self.makeup_request.app), self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    f"Minted {token_amount_using_decimals_rounded(int(event.mint_event.amount.value), decimals)} to {account_link(event.mint_event.target.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
                     plt_string,
                     None,
                 )
@@ -1599,7 +1595,7 @@ class MakeUp:
             elif event.burn_event is not None:
                 self.additional_info["amount"] = int(event.burn_event.amount.value)
                 new_event = EventType(
-                    f"Burned {token_amount_using_decimals_rounded(int(event.burn_event.amount.value), decimals)} from {account_link(from_address_to_index(event.burn_event.target.account, self.net, app=self.makeup_request.app), self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    f"Burned {token_amount_using_decimals_rounded(int(event.burn_event.amount.value), decimals)} from {account_link(event.burn_event.target.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
                     plt_string,
                     None,
                 )

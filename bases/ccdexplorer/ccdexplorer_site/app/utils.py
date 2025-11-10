@@ -946,17 +946,17 @@ def account_link(
     if isinstance(user, dict):
         user = SiteUser(**user)
     url_portion = value
-
+    is_alias = False
     if isinstance(value, str):
         if "<" in value:
             return instance_link_from_str(value, net, user, tags)
 
-        # # try to figure out if this is an alias
-        # account_address_entry = app.addresses_to_indexes[net].get(value[:29], None)
-        # if account_address_entry:
-        #     is_alias = account_address_entry["account_address"] != value
-        #     if is_alias:
-        #         url_portion = f"{account_address_entry['account_index']}/{value[29:]}"
+        # try to figure out if this is an alias
+        account_address_entry = app.addresses_to_indexes_complete[net].get(value[:29], None)  # type: ignore
+        if account_address_entry:
+            is_alias = account_address_entry["account_address"] != value
+            if is_alias:
+                url_portion = f"{account_address_entry['account_index']}/alias/{value[29:]}"
         value = from_address_to_index(value, net, app)
 
     if net == "testnet":
@@ -979,7 +979,7 @@ def account_link(
             tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value}</span>'
 
     return (
-        f'<a class="" href="/{net}/account/{url_portion}">{tag_label}</a>'
+        f'<a class="" href="/{net}/account/{url_portion}">{tag_label}{" (<i style='color:#A6AB9A;' class='bi bi-stack pe-1'></i>)" if is_alias else ""}</a>'
         if not wallet_contract_address
         else f'<a class="" href="/{net}/smart-wallet/{wallet_contract_address.index}/{wallet_contract_address.subindex}/{value}">{tag_label}</a>'
     )
@@ -1305,21 +1305,42 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 None,
             )
     else:
-        if 1 == 1:
-            token_address_as_class = await get_token_info_from_collection(req, req.contract_address)
-            try:
-                s7_parameter = CIS(
-                    None,
-                    req.contract_address.index,
-                    req.contract_address.subindex,
-                    req.entrypoint,
-                    NET(req.net),
-                ).s7_inventory_create_erc721_v2_created_event(req.event)
-            except Exception:  # noqa: E722
-                s7_parameter = None
+        token_address_as_class = await get_token_info_from_collection(req, req.contract_address)
+        try:
+            s7_parameter = CIS(
+                None,
+                req.contract_address.index,
+                req.contract_address.subindex,
+                req.entrypoint,
+                NET(req.net),
+            ).s7_inventory_create_erc721_v2_created_event(req.event)
+        except Exception:  # noqa: E722
+            s7_parameter = None
+        try:
+            s7_parameter = CIS(
+                None,
+                req.contract_address.index,
+                req.contract_address.subindex,
+                req.entrypoint,
+                NET(req.net),
+            ).s7_inventory_transfer_erc721_v2_transfer_parameter(req.event)
+        except Exception:  # noqa: E722
+            s7_parameter = None
 
+        try:
+            s7_parameter = CIS(
+                None,
+                req.contract_address.index,
+                req.contract_address.subindex,
+                req.entrypoint,
+                NET(req.net),
+            ).s7_inventory_close_erc721_v2_close_parameter(req.event)
+        except Exception:  # noqa: E722
+            s7_parameter = None
+        if s7_parameter:
+            event_name = f"SpaceSeven Inventory {req.entrypoint.split('.')[1].capitalize()} Event"  # type: ignore
             return EventType(
-                f"{'SpaceSeven Inventory Created Event' if s7_parameter else 'Non CIS event'}",
+                f"{event_name}",
                 req.app.templates.get_template("tx/logged_events/s7.html").render(
                     {
                         "result": result,
@@ -1664,6 +1685,7 @@ def split_contract_into_url_slug_and_token_id(contract_str: str, token_id: str):
 
 def add_account_info_to_cache(account_info: CCD_AccountInfo, app: FastAPI, net: str):
     app.addresses_to_indexes[net][account_info.address[:29]] = account_info.index  # type: ignore
+    app.addresses_to_indexes_complete[net][account_info.address[:29]] = account_info  # type: ignore
     app.max_index_known[net] = max(app.addresses_to_indexes[net].values())  # type: ignore
 
 
@@ -1835,14 +1857,20 @@ def create_dict_for_tabulator_display_for_fungible_token(net, row: dict):
 def create_dict_for_tabulator_display_for_non_fungible_token(net, row: dict):
     ai = row["address_information"]
     vi = row["verified_information"]
-
-    return {
-        "issuer": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><span class="ccd text-secondary-emphasis">{vi["display_name"]}</span>',
-        "token": (
+    if ai.get("special_type"):
+        contract_index = CCD_ContractAddress.from_str(row["contract"]).index
+        contract_subindex = CCD_ContractAddress.from_str(row["contract"]).subindex
+        token_link = f'<a href="/{net}/token/{contract_index}/{contract_subindex}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
+    else:
+        token_link = (
             f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
             if ai.get("token_metadata")
             else f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{row["token_id"]}</a>'
-        ),
+        )
+
+    return {
+        "issuer": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><span class="ccd text-secondary-emphasis">{vi["display_name"]}{" (non-CIS)" if ai.get("special_type") else ""}</span>',
+        "token": token_link,
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
         "issuer_download": f"{vi['display_name']}",
         "token_download": (

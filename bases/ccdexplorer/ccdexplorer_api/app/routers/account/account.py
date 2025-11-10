@@ -51,7 +51,7 @@ async def get_payment_tx_and_update_payments(request: Request, user: User, db_to
         for tx in txs:
             if tx["impacted_address"] != user.alias_account_id:
                 continue
-            token_id = tx["balance_movement"]["plt_transfer_in"][0]["event"]["token_id"]
+            token_id = tx["balance_movement"]["plt_transfer_in"][0]["token_id"]
             if token_id not in eur_plts:
                 continue
 
@@ -294,7 +294,7 @@ async def set_end_date_for_plan(request: Request, user: User):
     else:
         sorted_txs = sorted(user.payments.items(), key=lambda x: x[1].tx_date)  # type: ignore
         # set initial value
-        start_date = dateutil.parser.parse(sorted_txs[0][1].tx_date)
+        start_date = dateutil.parser.parse(sorted_txs[0][1].tx_date).astimezone(dt.UTC)  # type: ignore
         end_date = start_date
 
         for _, tx in sorted_txs:

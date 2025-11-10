@@ -21,7 +21,19 @@ async def main():
         }
 
         with open(
-            f"projects/site/addresses/{net}_addresses_to_indexes.pickle", "wb"
+            f"projects/ccdexplorer_site/addresses/{net}_addresses_to_indexes.pickle", "wb"
+        ) as fp:  # Pickling
+            pickle.dump(get_all_addresses, fp)
+
+        get_all_addresses = {
+            x["_id"]: x
+            for x in await db_to_use[Collections.all_account_addresses]
+            .find({})
+            .to_list(length=None)
+        }
+
+        with open(
+            f"projects/ccdexplorer_site/addresses/{net}_addresses_to_indexes_complete.pickle", "wb"
         ) as fp:  # Pickling
             pickle.dump(get_all_addresses, fp)
         print(f"{net}: {len(get_all_addresses)} done.")

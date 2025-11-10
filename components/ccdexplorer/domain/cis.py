@@ -505,8 +505,19 @@ class s7_InventoryCreateParams_ERC721_V1(BaseModel):
 
 class s7_InventoryCreateParams_ERC721_V2(BaseModel):
     custom_token_id: int
+    creator: Optional[CCD_AccountAddress] = None
     royalty_percent: int
     url: str
+
+
+class s7_InventoryCloseParams_ERC721_V2(BaseModel):
+    custom_token_id: int
+    sender: CCD_AccountAddress | CCD_ContractAddress
+
+
+class s7_InventoryTransferParams_ERC721_V2(BaseModel):
+    custom_token_id: int
+    to_: Optional[CCD_AccountAddress] = None
 
 
 class s7_InventoryCreateParams_ERC1155_V1(BaseModel):
@@ -530,4 +541,13 @@ class s7_InventoryCreateTransferEvent(BaseModel):
     """A parameter for the SpaceSeven protocol."""
 
     custom_token_id: int
+    to_: Optional[CCD_AccountAddress] = None
+
+
+class s7_InventoryTransferTransferEvent(BaseModel):
+    """A parameter for the SpaceSeven protocol."""
+
+    type: str
+    custom_token_id: int
+    from_: Optional[CCD_AccountAddress] = None
     to_: Optional[CCD_AccountAddress] = None

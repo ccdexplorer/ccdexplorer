@@ -460,7 +460,9 @@ async def get_token_current_holders(
         for holder in current_holders:
             token_holding = TokenHolding(**holder["token_holding"])
 
-            token_holding.token_amount = token_amounts_from_state.get(holder["account_address"], 0)
+            token_holding.token_amount = token_amounts_from_state.get(
+                holder["account_address"], token_holding.token_amount
+            )
             holder["token_holding"] = token_holding
 
         consolidated = {}
