@@ -954,9 +954,17 @@ def account_link(
         # try to figure out if this is an alias
         account_address_entry = app.addresses_to_indexes_complete[net].get(value[:29], None)  # type: ignore
         if account_address_entry:
-            is_alias = account_address_entry["account_address"] != value
-            if is_alias:
-                url_portion = f"{account_address_entry['account_index']}/alias/{value[29:]}"
+            if len(value) == 29:
+                pass
+            else:
+                if isinstance(account_address_entry, CCD_AccountInfo):
+                    is_alias = account_address_entry.address != value
+                    account_index = account_address_entry.index
+                else:
+                    is_alias = account_address_entry["account_address"] != value
+                    account_index = account_address_entry["account_index"]
+                if is_alias:
+                    url_portion = f"{account_index}/alias/{value[29:]}"
         value = from_address_to_index(value, net, app)
 
     if net == "testnet":
