@@ -7,6 +7,7 @@ import ccdexplorer.dagster_recurring.src.validators_missed as validators_missed
 import ccdexplorer.dagster_recurring.src.tx_types_count as tx_types_count
 import ccdexplorer.dagster_recurring.src.metadata as metadata
 import ccdexplorer.dagster_recurring.src.spot_retrieval as spot_retrieval
+import ccdexplorer.dagster_recurring.src.redis_failures as redis_failures
 
 defs = dg.Definitions.merge(
     market_position.defs,
@@ -17,4 +18,5 @@ defs = dg.Definitions.merge(
     tx_types_count.defs,
     metadata.defs,
     spot_retrieval.defs,
+    redis_failures.defs,
 )

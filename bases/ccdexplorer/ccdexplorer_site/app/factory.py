@@ -470,5 +470,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             datetime_delta_format_schedule_node  # noqa: F405
         )
         app.templates.env.filters["datetime_delta_format_uptime"] = datetime_delta_format_uptime  # noqa: F405
+        app.templates.env.filters["is_account_address"] = is_account_address  # noqa: F405
 
     return app

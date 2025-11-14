@@ -42,6 +42,7 @@ dependencies = [
 
 [tool.polylith.bricks]
 "../../bases/ccdexplorer/ms_plt"           = "ccdexplorer/ms_plt"
+"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
 "../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
 "../../components/ccdexplorer/celery_app"  = "ccdexplorer/celery_app"

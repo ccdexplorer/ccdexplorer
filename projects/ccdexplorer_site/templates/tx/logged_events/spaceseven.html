@@ -1,0 +1,79 @@
+{% set ai = token_address_as_class %}
+{% set vi = token_address_as_class.verified_information %}
+{% set token_decimals = 0 %}
+{% set token_string = "" %}
+{% if vi %}
+    {% if vi.token_type == "fungible" %}
+        {% set token_string = vi._id %}
+        {% endif %}
+    {% if vi.decimals %}
+        {% set token_decimals = vi.decimals %}
+    {% endif %}
+{% else %}
+    {% if ai %}
+        {% if ai.decimals %}
+            {% set token_decimals = ai.decimals %}
+        {% endif %}
+    {% endif %}
+{% endif %}
+
+
+
+<table class="table table-borderless">
+    {% if 'custom_token_id' in result.model_fields_set %}
+    <tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Token</td>
+        <td><span class='text-secondary-emphasis '>    <a class="ccd text-break" href="/{{net}}/token/{{ai.contract|split_contract_into_url_slug_and_token_id(result.custom_token_id)}}">
+           {% if ai.token_metadata %} 
+                {{ai.token_metadata.name}}
+            {% else %}
+                {{result.custom_token_id}}
+            {% endif %}
+        </a></span></td>
+    {% endif %}
+    {% if 'price' in result.model_fields_set %}<tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Price</td>
+        <td><span class='text-secondary-emphasis ccd'>{{result.price|micro_ccd_no_decimals|safe}}</span></td>
+    </tr>{% endif %}
+    {% if 'token_amount' in result.model_fields_set %}<tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Amount</td>
+        <td><span class='text-secondary-emphasis ccd'>{{display_name|safe}}{{result.token_amount|token_amount_using_decimals(token_decimals)|safe}} {{token_string|safe}}</span></td>
+    </tr>{% endif %}
+    {% if result.from_ %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>From</td>
+        <td><span class='text-secondary-emphasis'>{{result.from_|account_link(net, user, tags, app=request.app)|safe}}</span></td>
+    </tr>{% endif %}
+    {% if result.to_ %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>To</td>
+        <td><span class='text-secondary-emphasis'>{{result.to_|account_link(net, user, tags, app=request.app)|safe}}</span></td>
+    </tr>{% endif %}
+    {% if result.sender %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>Sender</td>
+        <td><span class='text-secondary-emphasis'>{{result.sender|account_link(net, user, tags, app=request.app)|safe}}</span></td>
+    </tr>{% endif %}
+    {% if result.trader %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>Trader</td>
+        <td><span class='text-secondary-emphasis'>{{result.trader.to_str()|instance_link_from_str(net, user, tags)|safe}}</span></td>
+    </tr>{% endif %}
+    {% if result.operator %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>Operator</td>
+        <td><span class='text-secondary-emphasis'>
+        {% if result.operator|is_account_address %}
+            {{result.operator|account_link(net, user, tags, app=request.app)|safe}}
+        {% else %}
+            {{result.operator.to_str()|instance_link_from_str(net, user, tags)|safe}}
+        {% endif %}
+        
+        </span></td>
+        </tr>{% endif %}
+    {% if 'value' in result.model_fields_set %}<tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Value</td>
+        <td><span class='text-secondary-emphasis ccd'>{{result.value}}</span></td>
+    </tr>{% endif %}
+    {% if 'lot_id' in result.model_fields_set %}<tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Lot ID</td>
+        <td><span class='text-secondary-emphasis ccd'>{{result.lot_id}}</span></td>
+    </tr>{% endif %}
+
+    
+</table>

@@ -20,9 +20,11 @@ from enum import Enum
 
 import httpx
 from ccdexplorer.cis import *
-from ccdexplorer.domain.cis import (
+from ccdexplorer.domain.s7 import s7_contract_to_erc_version
+from ccdexplorer.domain.s7 import (
     s7_InventoryCreateParams_ERC721_V2,
     s7_InventoryTransferParams_ERC721_V2,
+    s7_InventoryTransferParams_ERC721_V1,
 )
 from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.cns import CNSActions, CNSDomain, CNSEvent
@@ -34,6 +36,8 @@ from ccdexplorer.cis import CIS
 from ccdexplorer.ccdexplorer_site.app.classes.Enums import *
 from ccdexplorer.env import *
 from ccdexplorer.ccdexplorer_site.app.utils import *
+
+s7 = SpaceSevenEvents()
 
 
 class Outcome(Enum):
@@ -631,10 +635,10 @@ class MakeUp:
                                         effect.updated.parameter,
                                     )
                                     s7_parameter = None
-                                    if not success:
-                                        s7_parameter = self.derive_s7__information_from_paramets(
-                                            effect
-                                        )
+                                    # if not success:
+                                    #     s7_parameter = self.derive_s7__information_from_parameter(
+                                    #         effect
+                                    #     )
 
                                 except ValueError:
                                     schema = None
@@ -683,11 +687,16 @@ class MakeUp:
                                 if s7_parameter:
                                     parameter_or_token = f"""Token: <a href="/{self.net}/token/{effect.updated.address.index}/{effect.updated.address.subindex}/{s7_parameter.custom_token_id}"><span class="ccd">{s7_parameter.custom_token_id}</span></a> <br/>"""
                                     if isinstance(
-                                        s7_parameter, s7_InventoryTransferParams_ERC721_V2
+                                        s7_parameter,
+                                        (
+                                            s7_InventoryTransferParams_ERC721_V2
+                                            | s7_InventoryTransferParams_ERC721_V1
+                                        ),
                                     ):
                                         parameter_or_token += f"To: {account_link(s7_parameter.to_, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
                                     if isinstance(s7_parameter, s7_InventoryCreateParams_ERC721_V2):
-                                        parameter_or_token += f"Creator: {account_link(s7_parameter.creator, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
+                                        if s7_parameter.creator:
+                                            parameter_or_token += f"Creator: {account_link(s7_parameter.creator, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
                                 else:
                                     parameter_or_token = f"Parameter: {shorten_address(effect.updated.parameter) if not parameter_json else print_schema_dict(parameter_json, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
 
@@ -1369,24 +1378,34 @@ class MakeUp:
 
             self.dct = dct
 
-    def derive_s7__information_from_paramets(self, effect: CCD_ContractTraceElement):
+    def derive_s7__information_from_parameter(self, effect: CCD_ContractTraceElement):
         s7_parameter = None
+        erc_version = s7_contract_to_erc_version.get(effect.updated.address.index)
+        if not erc_version:
+            return None
+        cis_instance = CIS(
+            None,
+            effect.updated.address.index,
+            effect.updated.address.subindex,
+            effect.updated.receive_name,
+            self.net,
+        )
         if effect.updated.receive_name == "inventory.create":
-            s7_parameter = CIS(
-                None,
-                effect.updated.address.index,
-                effect.updated.address.subindex,
-                effect.updated.receive_name,
-                self.net,
-            ).s7_inventory_create_erc721_v2_create_parameter(effect.updated.parameter)
+            s7_parameter = s7.s7_inventory_create_erc721_v2_create_parameter(
+                cis_instance, effect.updated.parameter
+            )
         elif effect.updated.receive_name == "inventory.transfer":
-            s7_parameter = CIS(
-                None,
-                effect.updated.address.index,
-                effect.updated.address.subindex,
-                effect.updated.receive_name,
-                self.net,
-            ).s7_inventory_transfer_erc721_v2_transfer_parameter(effect.updated.parameter)
+            if erc_version == "erc721_v1":
+                s7_parameter = s7.s7_inventory_transfer_erc721_v1_transfer_parameter(
+                    cis_instance, effect.updated.parameter
+                )
+            if erc_version == "erc721_v2":
+                s7_parameter = s7.s7_inventory_transfer_erc721_v2_transfer_parameter(
+                    cis_instance, effect.updated.parameter
+                )
+            # elif erc_version == "erc1155_v2":
+            #     s7_parameter.s7_inventory_transfer_erc1155_v2_transfer_parameter(effect.updated.parameter)
+
         return s7_parameter
 
     def determine_if_we_show_events(self):

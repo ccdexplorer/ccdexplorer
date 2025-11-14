@@ -902,6 +902,7 @@ async def smart_contract_page(
                 "net": net,
                 "request": request,
                 "error": error,
+                "instance_address": instance_address,
             },
         )
 

@@ -30,7 +30,15 @@ class RedisResource(dg.ConfigurableResource):
         return Redis.from_url(REDIS_URL, decode_responses=False)  # type: ignore
 
 
+class TooterResource(dg.ConfigurableResource):
+    """Resource to access the shared Tooter instance"""
+
+    def get_client(self) -> Tooter:
+        return Tooter()
+
+
 # Create single instances
 mongodb_resource_instance = MongoDBResource()
 grpc_resource_instance = GRPCResource()
 redis_resource_instance = RedisResource()
+tooter_resource_instance = TooterResource()

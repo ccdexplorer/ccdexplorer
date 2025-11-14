@@ -5,7 +5,7 @@ import base64
 import datetime as dt
 import json
 import math
-import re
+import io
 import typing
 from datetime import timedelta
 from enum import Enum
@@ -19,6 +19,12 @@ import dateutil.parser
 import httpx
 
 #
+from ccdexplorer.domain.s7 import (
+    SpaceSevenEvents,
+    s7_erc1155_v1_AddTraderEvent,
+    s7_erc721_v1_AddTraderEvent,
+    s7_erc721_v2_AddTraderEvent,
+)
 from ccdexplorer.domain.generic import NET
 import plotly.graph_objects as go
 from ccdexplorer.domain.mongo import (
@@ -30,6 +36,7 @@ from ccdexplorer.domain.mongo import (
     withdrawCIS2TokensEvent,
 )
 from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_AccountAddress,
     CCD_AccountInfo,
     CCD_BlockInfo,
     CCD_ContractAddress,
@@ -43,8 +50,10 @@ from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from rich import print
-
+from ccdexplorer.domain.s7 import s7_contract_to_erc_version
 # from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import MakeUp
+
+s7 = SpaceSevenEvents()
 
 
 class TypeContentsCategories(Enum):
@@ -1196,6 +1205,10 @@ def datetime_format_normal_from_ms_timestamp(value):
     return f"{ddt:%Y-%m-%d %H:%M:%S}"
 
 
+def is_account_address(value: CCD_AccountAddress | CCD_ContractAddress):
+    return isinstance(value, CCD_AccountAddress)
+
+
 def token_amount_using_decimals(value: int, decimals: int | None = None):
     if not decimals:
         return f"{value}"
@@ -1313,45 +1326,96 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 None,
             )
     else:
-        token_address_as_class = await get_token_info_from_collection(req, req.contract_address)
-        try:
-            s7_parameter = CIS(
+        s7_event = None
+        cis_instance = CIS(
+            None,
+            req.contract_address.index,
+            req.contract_address.subindex,
+            req.entrypoint,
+            NET(req.net),
+        )
+        contract_version = s7_contract_to_erc_version.get(req.contract_address.index)
+        if contract_version is None:
+            return EventType(
+                "Non CIS event",
+                req.app.templates.get_template("tx/logged_events/unrecognized_event.html").render(
+                    {"logged_event": req.logged_event_from_collection}
+                ),
                 None,
-                req.contract_address.index,
-                req.contract_address.subindex,
-                req.entrypoint,
-                NET(req.net),
-            ).s7_inventory_create_erc721_v2_created_event(req.event)
-        except Exception:  # noqa: E722
-            s7_parameter = None
-        try:
-            s7_parameter = CIS(
-                None,
-                req.contract_address.index,
-                req.contract_address.subindex,
-                req.entrypoint,
-                NET(req.net),
-            ).s7_inventory_transfer_erc721_v2_transfer_parameter(req.event)
-        except Exception:  # noqa: E722
-            s7_parameter = None
+            )
+        bs = io.BytesIO(bytes.fromhex(event_info.logged_event))
+        tag_ = int.from_bytes(bs.read(1), byteorder="little")
 
-        try:
-            s7_parameter = CIS(
-                None,
-                req.contract_address.index,
-                req.contract_address.subindex,
-                req.entrypoint,
-                NET(req.net),
-            ).s7_inventory_close_erc721_v2_close_parameter(req.event)
-        except Exception:  # noqa: E722
-            s7_parameter = None
-        if s7_parameter:
-            event_name = f"SpaceSeven Inventory {req.entrypoint.split('.')[1].capitalize()} Event"  # type: ignore
+        if contract_version == "erc721_v1":
+            if tag_ == 0:
+                event_type = "Add Trader"
+                s7_event = s7.s7_erc721_v1_inventory_add_trader_event(cis_instance, req.event)
+            if tag_ == 1:
+                event_type = "Transfer"
+                s7_event = s7.s7_erc721_v1_inventory_transfer_event(cis_instance, req.event)
+            if tag_ == 4:
+                event_type = "OnSale"
+                s7_event = s7.s7_erc721_v1_inventory_on_sale_event(cis_instance, req.event)
+            if tag_ == 5:
+                event_type = "Buying"
+                s7_event = s7.s7_erc721_v1_inventory_buying_event(cis_instance, req.event)
+
+        if contract_version == "erc721_v2":
+            if tag_ == 0:
+                event_type = "Add Trader"
+                s7_event = s7.s7_erc721_v2_inventory_add_trader_event(cis_instance, req.event)
+            if tag_ == 1:
+                event_type = "Transfer"
+                s7_event = s7.s7_erc721_v2_inventory_transfer_event(cis_instance, req.event)
+            if tag_ == 4:
+                event_type = "OnSale"
+                s7_event = s7.s7_erc721_v2_inventory_on_sale_event(cis_instance, req.event)
+            if tag_ == 5:
+                event_type = "Buying"
+                s7_event = s7.s7_erc721_v2_inventory_buying_event(cis_instance, req.event)
+            if tag_ == 6:
+                event_type = "Pause"
+                s7_event = s7.s7_erc721_v2_inventory_pause_event(cis_instance, req.event)
+            if tag_ == 7:
+                event_type = "Closed"
+                s7_event = s7.s7_erc721_v2_inventory_closed_event(cis_instance, req.event)
+            if tag_ == 8:
+                event_type = "Created"
+                s7_event = s7.s7_erc721_v2_inventory_created_event(cis_instance, req.event)
+        if contract_version == "erc1155_v1":
+            if tag_ == 0:
+                event_type = "Add Trader"
+                s7_event = s7.s7_erc1155_v1_inventory_add_trader_event(cis_instance, req.event)
+            if tag_ == 1:
+                event_type = "Transfer"
+                s7_event = s7.s7_erc1155_v1_inventory_transfer_event(cis_instance, req.event)
+            if tag_ == 4:
+                event_type = "OnSale"
+                s7_event = s7.s7_erc1155_v1_inventory_on_sale_event(cis_instance, req.event)
+            if tag_ == 5:
+                event_type = "Buying"
+                s7_event = s7.s7_erc1155_v1_inventory_buying_event(cis_instance, req.event)
+            if tag_ == 6:
+                event_type = "Pause"
+                s7_event = s7.s7_erc1155_v1_inventory_pause_event(cis_instance, req.event)
+
+        if s7_event:
+            if (
+                not isinstance(s7_event, s7_erc1155_v1_AddTraderEvent)
+                and not isinstance(s7_event, s7_erc721_v1_AddTraderEvent)
+                and not isinstance(s7_event, s7_erc721_v2_AddTraderEvent)
+            ):
+                token_address_as_class = await get_s7_token_info_from_collection(
+                    req, req.contract_address, str(s7_event.custom_token_id)
+                )
+            else:
+                token_address_as_class = None
+            event_name = f"SpaceSeven {event_type} Event"  # type: ignore
             return EventType(
                 f"{event_name}",
-                req.app.templates.get_template("tx/logged_events/s7.html").render(
+                req.app.templates.get_template("tx/logged_events/spaceseven.html").render(
                     {
-                        "result": result,
+                        "result": s7_event,
                         "token_address_as_class": token_address_as_class,
                         "request": req,
                         "net": req.net,
@@ -1384,6 +1448,18 @@ async def get_token_info_from_collection(
         if req.logged_event_from_collection.recognized_event.token_id == ""  # type: ignore
         else req.logged_event_from_collection.recognized_event.token_id  # type: ignore
     )
+    api_result = await get_url_from_api(
+        f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
+        req.httpx_client,
+    )
+    token_address_as_class = api_result.return_value if api_result.ok else None
+
+    return token_address_as_class
+
+
+async def get_s7_token_info_from_collection(
+    req: ProcessEventRequest, contract_address: CCD_ContractAddress, token_id: str
+):
     api_result = await get_url_from_api(
         f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
         req.httpx_client,
