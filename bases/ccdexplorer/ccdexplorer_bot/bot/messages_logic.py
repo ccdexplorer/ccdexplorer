@@ -9,9 +9,11 @@
 # pyright: reportOptionalIterable=false
 
 
+import asyncio
 import math
 import sys
 
+from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.env import *  # type: ignore
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
 from ccdexplorer.mongodb import CollectionsUtilities
@@ -349,6 +351,27 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
         # services...
         return message_response, notification_services_to_send
 
+    async def publish_to_celery(
+        self, service: NotificationServices, user: SiteUser, message_response: MessageResponse
+    ) -> None:
+        """
+        Publish a message to the specified service.
+        """
+        task_name = "bot_message"
+        payload = {
+            "service": service.value,
+            "telegram_chat_id": user.telegram_chat_id,
+            "email_address": user.email_address,
+            "message_response": message_response.model_dump(exclude_none=True),
+        }
+        await asyncio.to_thread(
+            celery_app.send_task,
+            task_name,
+            args=[],
+            kwargs={"payload": payload},
+            queue="bot_sender",
+        )
+
     async def send_to_services(
         self,
         user: SiteUser,
@@ -356,16 +379,26 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
         message_response: MessageResponse,
     ):
         if notification_services_to_send[NotificationServices.telegram] and user.telegram_chat_id:
-            await self.connections.tooter.async_relay(
-                channel=TooterChannel.BOT,
-                title=message_response.title_telegram,
-                chat_id=user.telegram_chat_id,
-                body=message_response.message_telegram,
-                notifier_type=TooterType.INFO,
+            await self.publish_to_celery(
+                service=NotificationServices.telegram,
+                user=user,
+                message_response=message_response,
             )
+            # await self.connections.tooter.async_relay(
+            #     channel=TooterChannel.BOT,
+            #     title=message_response.title_telegram,
+            #     chat_id=user.telegram_chat_id,
+            #     body=message_response.message_telegram,
+            #     notifier_type=TooterType.INFO,
+            # )
         if notification_services_to_send[NotificationServices.email] and user.email_address:
-            self.connections.tooter.email(
-                title=message_response.title_email,
-                body=message_response.message_email,
-                email_address=user.email_address,
+            await self.publish_to_celery(
+                service=NotificationServices.email,
+                user=user,
+                message_response=message_response,
             )
+            # self.connections.tooter.email(
+            #     title=message_response.title_email,
+            #     body=message_response.message_email,
+            #     email_address=user.email_address,
+            # )

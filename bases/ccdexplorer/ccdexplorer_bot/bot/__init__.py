@@ -27,6 +27,7 @@ from ccdexplorer.domain.mongo import (
     MongoLabeledAccount,
     MongoTypePayday,
 )
+from redis.asyncio import Redis
 
 console = Console()
 

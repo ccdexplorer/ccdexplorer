@@ -3,7 +3,7 @@ requires      = [ "hatchling", "hatch-polylith-bricks" ]
 build-backend = "hatchling.build"
 
 [project]
-name    = "bot"
+name    = "ccdexplorer_bot"
 version = "0.1.0"
 
 
@@ -50,3 +50,4 @@ dependencies = [
 "../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
 "../../components/ccdexplorer/site_user"   = "ccdexplorer/site_user"
+"../../components/ccdexplorer/celery_app"  = "ccdexplorer/celery_app"

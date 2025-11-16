@@ -3,7 +3,7 @@ requires      = [ "hatchling", "hatch-polylith-bricks" ]
 build-backend = "hatchling.build"
 
 [project]
-name    = "site"
+name    = "ccdexplorer_site"
 version = "0.1.0"
 
 
