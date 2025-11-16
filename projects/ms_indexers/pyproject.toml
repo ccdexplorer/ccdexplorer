@@ -43,6 +43,7 @@ dependencies = [
 "../../bases/ccdexplorer/ms_indexers" = "ccdexplorer/ms_indexers"
 
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
+"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
 "../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
 "../../components/ccdexplorer/celery_app"  = "ccdexplorer/celery_app"
 "../../components/ccdexplorer/domain"      = "ccdexplorer/domain"

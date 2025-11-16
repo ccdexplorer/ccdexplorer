@@ -19,7 +19,7 @@ import typing
 from enum import Enum
 
 import httpx
-from ccdexplorer.cis import *
+from ccdexplorer.cis import *  # type: ignore
 from ccdexplorer.domain.s7 import s7_contract_to_erc_version
 from ccdexplorer.domain.s7 import (
     s7_InventoryCreateParams_ERC721_V2,
@@ -28,14 +28,14 @@ from ccdexplorer.domain.s7 import (
 )
 from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.cns import CNSActions, CNSDomain, CNSEvent
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer_schema_parser.Schema import Schema
 from pydantic import BaseModel
 from ccdexplorer.cis import CIS
-from ccdexplorer.ccdexplorer_site.app.classes.Enums import *
-from ccdexplorer.env import *
-from ccdexplorer.ccdexplorer_site.app.utils import *
+from ccdexplorer.ccdexplorer_site.app.classes.Enums import *  # type: ignore
+from ccdexplorer.env import *  # type: ignore
+from ccdexplorer.ccdexplorer_site.app.utils import *  # type: ignore
 
 s7 = SpaceSevenEvents()
 

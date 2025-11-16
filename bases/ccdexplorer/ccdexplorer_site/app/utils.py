@@ -43,7 +43,6 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_RejectReason,
     CCD_UpdatePayload,
 )
-from ccdexplorer.mongodb import Collections, MongoMotor
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer_schema_parser.Schema import Schema
 from dateutil.relativedelta import relativedelta
@@ -1398,7 +1397,12 @@ async def process_event_for_makeup(req: ProcessEventRequest):
             if tag_ == 6:
                 event_type = "Pause"
                 s7_event = s7.s7_erc1155_v1_inventory_pause_event(cis_instance, req.event)
-
+            if tag_ == 7:
+                event_type = "Closed"
+                s7_event = s7.s7_erc1155_v1_inventory_closed_event(cis_instance, req.event)
+            if tag_ == 8:
+                event_type = "Created"
+                s7_event = s7.s7_erc1155_v1_inventory_create_event(cis_instance, req.event)
         if s7_event:
             if (
                 not isinstance(s7_event, s7_erc1155_v1_AddTraderEvent)

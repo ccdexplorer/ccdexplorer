@@ -50,6 +50,7 @@ dependencies = [
 "../../bases/ccdexplorer/dagster_nightrunner" = "ccdexplorer/dagster_nightrunner"
 "../../components/ccdexplorer/mongodb"        = "ccdexplorer/mongodb"
 "../../components/ccdexplorer/grpc_client"    = "ccdexplorer/grpc_client"
+"../../components/ccdexplorer/cis"            = "ccdexplorer/cis"
 "../../components/ccdexplorer/tooter"         = "ccdexplorer/tooter"
 "../../components/ccdexplorer/domain"         = "ccdexplorer/domain"
 "../../components/ccdexplorer/ccdscan"        = "ccdexplorer/ccdscan"

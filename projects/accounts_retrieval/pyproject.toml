@@ -46,6 +46,7 @@ dependencies = [
 "../../bases/ccdexplorer/accounts_retrieval" = "ccdexplorer/accounts_retrieval"
 "../../components/ccdexplorer/env"           = "ccdexplorer/env"
 "../../components/ccdexplorer/domain"        = "ccdexplorer/domain"
+"../../components/ccdexplorer/cis"           = "ccdexplorer/cis"
 "../../components/ccdexplorer/tooter"        = "ccdexplorer/tooter"
 "../../components/ccdexplorer/mongodb"       = "ccdexplorer/mongodb"
 "../../components/ccdexplorer/grpc_client"   = "ccdexplorer/grpc_client"

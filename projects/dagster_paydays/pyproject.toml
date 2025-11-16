@@ -47,6 +47,7 @@ dependencies = [
 "../../bases/ccdexplorer/dagster_paydays"  = "ccdexplorer/dagster_paydays"
 "../../components/ccdexplorer/tooter"      = "ccdexplorer/tooter"
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
+"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
 "../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
 "../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
 "../../components/ccdexplorer/mongodb"     = "ccdexplorer/mongodb"
