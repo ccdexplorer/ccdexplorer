@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import math
 import io
+import re
 import typing
 from datetime import timedelta
 from enum import Enum
@@ -941,6 +942,44 @@ def from_address_to_index(account_address: str, net: str, app):
             return int(account_index)
 
 
+def account_address_is_alias(account_address: str, net: str, app) -> bool:
+    account_address_entry = app.addresses_to_indexes_complete[net].get(account_address[:29], None)  # type: ignore
+    if isinstance(account_address_entry, CCD_AccountInfo):
+        is_alias = account_address_entry.address != account_address
+
+    else:
+        if not account_address_entry:
+            return False
+        is_alias = account_address_entry["account_address"] != account_address
+
+    return is_alias
+
+
+def account_alias_link(
+    value: str | int,
+    net: str,
+    user=None,
+    tags=None,
+    app=None,
+):
+    alias_portion = ""
+    is_alias = False
+    if isinstance(value, str):
+        is_alias = account_address_is_alias(value, net, app)
+        index_if_found = from_address_to_index(value, net, app)
+        if is_alias and isinstance(index_if_found, int):
+            alias_portion = f"{index_if_found}/alias/{value[29:]}"
+    if isinstance(value, str):
+        value = from_address_to_index(value, net, app)
+    if not is_alias:
+        return ""
+    return (
+        f' <a href="/{net}/account/{alias_portion}">'
+        f'(<i style="color:#A6AB9A;" class="bi bi-stack pe-1"></i>)'
+        f"</a>"
+    )
+
+
 def account_link(
     value: str | int,
     net: str,
@@ -953,26 +992,33 @@ def account_link(
     tag_found = False
     if isinstance(user, dict):
         user = SiteUser(**user)
-    url_portion = value
+    alias_portion = ""
     is_alias = False
+    # account_address = value if isinstance(value, str) else None
+    if isinstance(value, str):
+        is_alias = account_address_is_alias(value, net, app)
+        index_if_found = from_address_to_index(value, net, app)
+        if is_alias and isinstance(index_if_found, int):
+            alias_portion = f"{index_if_found}/alias/{value[29:]}"
+    # check if this is a contract address
     if isinstance(value, str):
         if "<" in value:
             return instance_link_from_str(value, net, user, tags)
 
         # try to figure out if this is an alias
-        account_address_entry = app.addresses_to_indexes_complete[net].get(value[:29], None)  # type: ignore
-        if account_address_entry:
-            if len(value) == 29:
-                pass
-            else:
-                if isinstance(account_address_entry, CCD_AccountInfo):
-                    is_alias = account_address_entry.address != value
-                    account_index = account_address_entry.index
-                else:
-                    is_alias = account_address_entry["account_address"] != value
-                    account_index = account_address_entry["account_index"]
-                if is_alias:
-                    url_portion = f"{account_index}/alias/{value[29:]}"
+        # account_address_entry = app.addresses_to_indexes_complete[net].get(value[:29], None)  # type: ignore
+        # if account_address_entry:
+        #     if len(value) == 29:
+        #         pass
+        #     else:
+        #         if isinstance(account_address_entry, CCD_AccountInfo):
+        #             is_alias = account_address_entry.address != value
+        #             account_index = account_address_entry.index
+        #         else:
+        #             is_alias = account_address_entry["account_address"] != value
+        #             account_index = account_address_entry["account_index"]
+        #         if is_alias:
+        #             alias_portion = f"{account_index}/alias/{value[29:]}"
         value = from_address_to_index(value, net, app)
 
     if net == "testnet":
@@ -994,11 +1040,20 @@ def account_link(
         else:
             tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value}</span>'
 
-    return (
-        f'<a class="" href="/{net}/account/{url_portion}">{tag_label}{" (<i style='color:#A6AB9A;' class='bi bi-stack pe-1'></i>)" if is_alias else ""}</a>'
-        if not wallet_contract_address
-        else f'<a class="" href="/{net}/smart-wallet/{wallet_contract_address.index}/{wallet_contract_address.subindex}/{value}">{tag_label}</a>'
-    )
+    if wallet_contract_address:
+        return_string = f'<a class="" href="/{net}/smart-wallet/{wallet_contract_address.index}/{wallet_contract_address.subindex}/{value}">{tag_label}</a>'
+    else:
+        if is_alias:
+            return_string = (
+                f'<a href="/{net}/account/{value}">{tag_label}</a>'
+                f' <a href="/{net}/account/{alias_portion}">'
+                f'(<i style="color:#A6AB9A;" class="bi bi-stack pe-1"></i>)'
+                f"</a>"
+            )
+        else:
+            return_string = f'<a href="/{net}/account/{value}">{tag_label}</a>'
+
+    return return_string
 
 
 def round_x_decimal_with_comma(value, dec: int):
@@ -1892,7 +1947,7 @@ def create_dict_for_tabulator_display_for_cis2_token_holders(
 
     return {
         "token_balance": f'<span class="text-secondary-emphasis">{token_amount_using_decimals_rounded(int(row["token_holding"]["token_amount"]), decimals)}</span> <span class="ccd">{token_label}</span>',
-        "account_address": account_address,
+        "sender": account_address,
         "token_balance_download": f"{row['token_holding']['token_amount']}",
         "account_download": row["account_index"],
     }
@@ -1942,9 +1997,12 @@ def create_dict_for_tabulator_display_for_fungible_token(net, row: dict):
     }
 
 
-def create_dict_for_tabulator_display_for_non_fungible_token(net, row: dict):
+def create_dict_for_tabulator_display_for_non_fungible_token(
+    net, row: dict, sender: str, holder_link: str
+):
     ai = row["address_information"]
     vi = row["verified_information"]
+
     if ai.get("special_type"):
         contract_index = CCD_ContractAddress.from_str(row["contract"]).index
         contract_subindex = CCD_ContractAddress.from_str(row["contract"]).subindex
@@ -1959,8 +2017,9 @@ def create_dict_for_tabulator_display_for_non_fungible_token(net, row: dict):
     return {
         "issuer": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><span class="ccd text-secondary-emphasis">{vi["display_name"]}{" (non-CIS)" if ai.get("special_type") else ""}</span>',
         "token": token_link,
-        "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
+        "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>{holder_link}',
         "issuer_download": f"{vi['display_name']}",
+        "sender": sender,
         "token_download": (
             f"{row['token_id']}"
             if not ai.get("token_metadata")

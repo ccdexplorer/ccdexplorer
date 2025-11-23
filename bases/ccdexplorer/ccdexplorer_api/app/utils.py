@@ -37,6 +37,7 @@ class TokenHolding(BaseModel):
     token_value_USD: Optional[float] = None
     verified_information: Optional[dict] = None
     address_information: Optional[dict] = None
+    account_address_for_token: Optional[str] = None
 
 
 class APIResponseResult(BaseModel):

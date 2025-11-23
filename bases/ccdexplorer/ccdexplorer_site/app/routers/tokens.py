@@ -818,7 +818,7 @@ async def get_cis2_token_holders_paginated(
 
     for row in current_holders:
         sender = account_link(
-            row["account_index"],
+            row["account_address"],
             net,
             user=user,
             tags=tags,

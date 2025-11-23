@@ -384,21 +384,10 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
                 user=user,
                 message_response=message_response,
             )
-            # await self.connections.tooter.async_relay(
-            #     channel=TooterChannel.BOT,
-            #     title=message_response.title_telegram,
-            #     chat_id=user.telegram_chat_id,
-            #     body=message_response.message_telegram,
-            #     notifier_type=TooterType.INFO,
-            # )
+
         if notification_services_to_send[NotificationServices.email] and user.email_address:
             await self.publish_to_celery(
                 service=NotificationServices.email,
                 user=user,
                 message_response=message_response,
             )
-            # self.connections.tooter.email(
-            #     title=message_response.title_email,
-            #     body=message_response.message_email,
-            #     email_address=user.email_address,
-            # )

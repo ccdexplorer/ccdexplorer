@@ -543,7 +543,7 @@ async def get_account(
         rewards_filename = None
 
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/tokens-available",
+        f"{request.app.api_url}/v2/{net}/account/{account_id}/tokens-available{'/alias' if alias_portion else ''}",
         httpx_client,
     )
     tokens_available = api_result.return_value if api_result.ok else None
@@ -699,46 +699,88 @@ async def get_account(
     )
     # TODO
     exchange_rates = {"CCD": {"rate": 1}}
-    return request.app.templates.TemplateResponse(
-        "account/account_account.html",
-        {
-            "env": request.app.env,
-            "rewards_no_stake": (account_info.stake.baker is None)  # type: ignore
-            and (account_info.stake.delegator is None)  # type: ignore
-            and rewards_for_account_available,
-            "rewards_for_account_available": rewards_for_account_available,
-            "account_id": account_id,
-            "account_index": account_index,
-            "token_ids_for_flow": token_ids,
-            "tx_deployed": tx_deployed,
-            "deployed_in_genesis_block": deployed_in_genesis_block,
-            "genesis_block_slot_time": genesis_block_slot_time,
-            "request": request,
-            "exchange_rates": exchange_rates,
-            "tokens_value_USD": tokens_value_USD,
-            "ccd_balance_USD": ccd_balance_USD,
-            "pool_apy_object": pool_apy_object,
-            "account_apy_object": account_apy_object,
-            "account": account_info,
-            "pool": pool,
-            "account_is_validator": account_is_validator,
-            "cns_domains_list": cns_domains_list,
-            "identity": identity,
-            "identity_providers": request.app.identity_providers_cache[net],
-            "delegation": delegation,
-            "delegation_target_address": delegation_target_address,
-            "net": net,
-            "user": user,
-            "tags": tags,
-            "account_link_found": account_link_found,
-            "tokens_available": tokens_available,
-            "year_month": dt.datetime.now().strftime("%Y-%m"),
-            "rewards_filename": rewards_filename,
-            "tx_type_translation_from_python": tx_type_translation_for_js(),
-            "tx_types": tx_types,
-            "alias_portion": alias_portion,
-        },
-    )
+    if not alias_portion:
+        return request.app.templates.TemplateResponse(
+            "account/account_account.html",
+            {
+                "env": request.app.env,
+                "rewards_no_stake": (account_info.stake.baker is None)  # type: ignore
+                and (account_info.stake.delegator is None)  # type: ignore
+                and rewards_for_account_available,
+                "rewards_for_account_available": rewards_for_account_available,
+                "account_id": account_id,
+                "account_index": account_index,
+                "token_ids_for_flow": token_ids,
+                "tx_deployed": tx_deployed,
+                "deployed_in_genesis_block": deployed_in_genesis_block,
+                "genesis_block_slot_time": genesis_block_slot_time,
+                "request": request,
+                "exchange_rates": exchange_rates,
+                "tokens_value_USD": tokens_value_USD,
+                "ccd_balance_USD": ccd_balance_USD,
+                "pool_apy_object": pool_apy_object,
+                "account_apy_object": account_apy_object,
+                "account": account_info,
+                "pool": pool,
+                "account_is_validator": account_is_validator,
+                "cns_domains_list": cns_domains_list,
+                "identity": identity,
+                "identity_providers": request.app.identity_providers_cache[net],
+                "delegation": delegation,
+                "delegation_target_address": delegation_target_address,
+                "net": net,
+                "user": user,
+                "tags": tags,
+                "account_link_found": account_link_found,
+                "tokens_available": tokens_available,
+                "year_month": dt.datetime.now().strftime("%Y-%m"),
+                "rewards_filename": rewards_filename,
+                "tx_type_translation_from_python": tx_type_translation_for_js(),
+                "tx_types": tx_types,
+                "alias_portion": alias_portion,
+            },
+        )
+    else:
+        return request.app.templates.TemplateResponse(
+            "account/account_account_alias.html",
+            {
+                "env": request.app.env,
+                "rewards_no_stake": (account_info.stake.baker is None)  # type: ignore
+                and (account_info.stake.delegator is None)  # type: ignore
+                and rewards_for_account_available,
+                "rewards_for_account_available": rewards_for_account_available,
+                "account_id": account_id,
+                "account_index": account_index,
+                "token_ids_for_flow": token_ids,
+                "tx_deployed": tx_deployed,
+                "deployed_in_genesis_block": deployed_in_genesis_block,
+                "genesis_block_slot_time": genesis_block_slot_time,
+                "request": request,
+                "exchange_rates": exchange_rates,
+                "tokens_value_USD": tokens_value_USD,
+                "ccd_balance_USD": ccd_balance_USD,
+                "pool_apy_object": pool_apy_object,
+                "account_apy_object": account_apy_object,
+                "account": account_info,
+                "pool": pool,
+                "account_is_validator": account_is_validator,
+                "cns_domains_list": cns_domains_list,
+                "identity": identity,
+                "identity_providers": request.app.identity_providers_cache[net],
+                "delegation": delegation,
+                "delegation_target_address": delegation_target_address,
+                "net": net,
+                "user": user,
+                "tags": tags,
+                "account_link_found": account_link_found,
+                "tokens_available": tokens_available,
+                "year_month": dt.datetime.now().strftime("%Y-%m"),
+                "rewards_filename": rewards_filename,
+                "tx_type_translation_from_python": tx_type_translation_for_js(),
+                "tx_types": tx_types,
+                "alias_portion": alias_portion,
+            },
+        )
 
 
 class SanKeyParams(BaseModel):

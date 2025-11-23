@@ -4,6 +4,10 @@
                   class="form-select form-select-sm search_selector_filter text-end" 
                   id="tx_type_contents_selector"
                   name="tx_type_contents_selector">
+                  
+                  {% if is_alias %}
+                  <option value="alias" selected>Only Alias Transactions</option>
+                  {% else %}
                   <option value="all" selected>All</option>
                   <option value="transfer">Transfers</option>
                   <option value="smart_contract">Smart Contracts</option>
@@ -12,8 +16,6 @@
                   <option value="rejected">Rejected TXs</option>
                   <option value="data_registered">Data</option>
                   <option value="plt">PLT</option>
-                  {% if is_alias %}
-                  <option value="alias">Only Alias Transactions</option>
                   {% endif %} 
                 </select>
                     

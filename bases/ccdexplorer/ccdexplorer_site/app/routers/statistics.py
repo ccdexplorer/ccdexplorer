@@ -1273,6 +1273,7 @@ async def statistics_ccd_on_exchanges_plotly(
             "lcx": "7.LCX",
             "gate.io": "8.Gate.IO",
             "bitmart": "9.BitMart",
+            "kraken": "10.Kraken",
         }
     )
 
@@ -1287,6 +1288,7 @@ async def statistics_ccd_on_exchanges_plotly(
         "7.LCX",
         "8.Gate.IO",
         "9.BitMart",
+        "10.Kraken",
     ]
 
     title = "CCD on Exchanges"

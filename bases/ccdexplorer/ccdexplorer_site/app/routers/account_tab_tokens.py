@@ -16,6 +16,9 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_user_detailsv2,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    account_address_is_alias,
+    account_link,
+    account_alias_link,
     create_dict_for_tabulator_display_for_fungible_token,
     create_dict_for_tabulator_display_for_non_fungible_token,
     create_dict_for_tabulator_display_for_unverified_token,
@@ -81,9 +84,9 @@ async def get_ajax_plt_tokens_(
     Protocol-level tokens for an account.
     """
     skip = (page - 1) * size
-
+    is_alias = account_address_is_alias(account_id, net, request.app)
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/plt/{skip}/{size}",
+        f"{request.app.api_url}/v2/{net}/account/{account_id}/plt/{skip}/{size}{'/alias' if is_alias else ''}",
         httpx_client,
     )
     api_return_result = api_result.return_value if api_result.ok else None
@@ -136,9 +139,9 @@ async def get_ajax_tokens_fungible_verified(
     skip = (page - 1) * size
     # also used for smart contracts
     account_id = account_id.replace("&lt;", "<").replace("&gt;", ">")
-
+    is_alias = account_address_is_alias(account_id, net, request.app)
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/fungible-tokens/{skip}/{size}/verified",
+        f"{request.app.api_url}/v2/{net}/account/{account_id}/fungible-tokens/{skip}/{size}/verified{'/alias' if is_alias else ''}",
         httpx_client,
     )
     api_return_result = api_result.return_value if api_result.ok else None
@@ -190,11 +193,13 @@ async def get_ajax_tokens_non_fungible_verified(
     """
     Fungible verified tokens for an account.
     """
+    user: SiteUser | None = await get_user_detailsv2(request)
     skip = (page - 1) * size
     # also used for smart contracts
     account_id = account_id.replace("&lt;", "<").replace("&gt;", ">")
+    is_alias = account_address_is_alias(account_id, net, request.app)
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/non-fungible-tokens/{skip}/{size}/verified",
+        f"{request.app.api_url}/v2/{net}/account/{account_id}/non-fungible-tokens/{skip}/{size}/verified{'/alias' if is_alias else ''}",
         httpx_client,
     )
     api_return_result = api_result.return_value if api_result.ok else None
@@ -210,13 +215,30 @@ async def get_ajax_tokens_non_fungible_verified(
             },
         )
     else:
+        sender = account_link(
+            account_id,
+            net,
+            user=user,
+            tags=tags,
+            app=request.app,
+        )
         tb_made_up_rows = []
         result_rows = api_return_result["tokens"]
 
         if len(result_rows) > 0:
             for row in result_rows:
+                holder = row["account_address_for_token"]
+                holder_link = account_alias_link(
+                    holder,
+                    net,
+                    user=user,
+                    tags=tags,
+                    app=request.app,
+                )
                 tb_made_up_rows.append(
-                    create_dict_for_tabulator_display_for_non_fungible_token(net, row)
+                    create_dict_for_tabulator_display_for_non_fungible_token(
+                        net, row, sender, holder_link
+                    )
                 )
         total_rows = api_return_result["total_token_count"]
         last_page = math.ceil(total_rows / size)
@@ -249,9 +271,9 @@ async def get_ajax_tokens_unverified(
     skip = (page - 1) * size
     # also used for smart contracts
     account_id = account_id.replace("&lt;", "<").replace("&gt;", ">")
-
+    is_alias = account_address_is_alias(account_id, net, request.app)
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/tokens/{skip}/{size}/unverified",
+        f"{request.app.api_url}/v2/{net}/account/{account_id}/tokens/{skip}/{size}/unverified{'/alias' if is_alias else ''}",
         httpx_client,
     )
     api_return_result = api_result.return_value if api_result.ok else None

@@ -1,0 +1,336 @@
+{% extends "base/base.html" %}
+
+{% block js %}
+<script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tabs = [
+    {
+      btn: '#pills-txsfilter-tab',
+      containerId: 'transactions-tab-content',
+      url:   `/account/transactions-tab-content/{{net}}/{{account_id}}`,
+      init:  () => init_txs_table?.(),
+    },
+    {
+      btn: '#tokens-pills-tab',
+      containerId: 'tokens-tab-content',
+      url:   `/account/tokens-tab-content/{{net}}/{{account_id}}`,
+      init:  () => {
+        init_plt_tokens_table?.();
+        init_tokens_fungible_verified_table?.();
+        init_tokens_non_fungible_verified_table?.();
+        init_tokens_unverified_table?.();
+
+      },
+    },
+    {
+      btn: '#pills-validator-tab',
+      containerId: 'validator-tab-content',
+      url:   `/account/validator-tab-content/{{net}}/{{account_id}}`,
+      init:  () => {
+        init_validator_tally_table?.();
+        init_validator_transactions_table?.();
+        init_validator_rewards_table?.();
+      },
+    },
+  ];
+
+  tabs.forEach(({ btn, containerId, url, init }) => {
+    const tabButton = document.querySelector(btn);
+    if (!tabButton) return;
+
+    let loaded = false;
+    const loadTabContent = () => {
+      if (loaded) return;
+      fetch(url)
+        .then(r => r.text())
+        .then(html => {
+          const container = document.getElementById(containerId);
+          container.innerHTML = html;
+          window.htmx && htmx.process(container);
+          init();
+        })
+        .catch(console.error);
+      loaded = true;
+    };
+
+    // Run when the tab becomes active
+    tabButton.addEventListener('shown.bs.tab', loadTabContent);
+
+    // Also run right away if it’s already active on page load
+    if (tabButton.classList.contains('active')) {
+      loadTabContent();
+    }
+  });
+});
+</script>
+{% endblock %}
+
+{% block ogp %}
+<meta property="og:title" content="Account {{account_index}} with alias {{alias_portion}} on Concordium {{net}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{env.SITE_URL}}/{{net}}/account/{{account_index}}" />
+{% endblock %}
+
+{% block content %}
+
+{% if error %}
+<p>An error occured: <b>{{error.errorMessage}}</b></p>
+{% else %}
+{% if show_tab %}
+{% set show_tab_list = show_tab.split('-') %}
+{% else %}
+{% set show_tab_list = [] %}
+
+{% endif %}
+
+
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+    <div class="row row-flex">
+      <div class=" col-md-12  col-sm-12">
+        <div class="border content curved-border ">
+          {% set title= "Alias Info" %}{% include 'base/box_title.html' %}
+          <p class="text-start ">You are viewing the alias portion 
+            {% set copy_value = account.address[:29]+alias_portion %}
+                {% set value_type = "account_id" %}
+                {% set display_value = alias_portion|safe %}
+                {% include "base/copy_to_clipboard.html"%}
+
+             for account index {{account_index}}. <br/>Go to <a href="https://docs.concordium.com/en/mainnet/docs/protocol/account-aliases.html">Concordium Docs on Aliases</a> to learn more.</p>
+          
+          {% include "account/account_info_alias.html" %}
+        
+        
+      </div>  
+      
+    </div>
+    </div>
+    <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+        
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active explorer bg-secondary-subtle" id="pills-txsfilter-tab" data-bs-toggle="pill" data-bs-target="#pills-txsfilter" type="button" role="tab" aria-controls="pills-txsfilter" aria-selected="true">
+            <span class="tab-text-large">Transactions</span><span class="tab-text-small">Txs</span>
+        </button>
+        </li>
+        
+        {% if tokens_available %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link  explorer bg-secondary-subtle" id="tokens-pills-tab" data-bs-toggle="pill" data-bs-target="#pills-tokens" type="button" role="tab" aria-controls="pills-tokens" aria-selected="true">
+            <span class="tab-text-large">Tokens (PLT & CIS-2)</span><span class="tab-text-small">Tokens</span>
+        </button>
+        </li>
+      {% endif %}  
+      
+</ul>
+
+<div class="tab-content" id="pills-tabContent">
+  
+  <div class="tab-pane fade show active" id="pills-txsfilter" role="tabpanel" aria-labelledby="pills-txsfilter-tab" tabindex="0">
+    <div class="row mt-4">
+      <div class=" col-md-12  col-sm-12">
+        <div class="border curved-border" >
+          <div id="transactions-tab-content">Loading...</div> 
+    </div>  
+      
+    </div>
+      
+    </div>
+  </div>
+  
+  {% if tokens_available %}
+  <div class="tab-pane fade show " id="pills-tokens" role="tabpanel" aria-labelledby="pills-tokens-tab" tabindex="0">
+        <div id="tokens-tab-content">Loading...</div> 
+      
+      
+  </div>
+  {% endif %}
+  
+</div>
+
+{% endif %}
+
+<!-- Tabulator Tables -->
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+
+<!-- transactions -->
+{% set ccd_tabulator_table ='txsfilter'%}
+{% set tabulator_ajax_filtering_url = '/account_transactions_with_filter/'+net+'/'+account_id%}
+{% set filename='transactions-filtered-'+account_id|string +'-'+range(1000,10000)|random|string+'.csv' %}
+ {% include 'base/tabulator/tabulator-custom-formatters.html' %}
+<script>
+  function init_txs_table() {
+    const columns = [
+  {
+        title: "Hash", field: "hash", 
+        minWidth: 60,
+        maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        accessorDownload: (value, data) => data.hash_download,
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Age", field: "transaction_block_info_slot_time", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 50,
+        formatter: isoDateTimeHumanDiff,
+        headerSort:false,
+        titleDownload:"Timestamp",
+        accessorDownload: (value, data) => data.transaction_block_info_slot_time_download,
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      {
+        title: "Cost", field: "transaction_account_transaction_cost", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 100,
+        minWidth: 100,
+        maxWidth: 100, 
+        sorter: "number",
+        headerSort: false,
+        accessorDownload: (value, data) => data.transaction_account_transaction_cost/1000000,
+        formatter: microCCDFormatter,
+      },
+      {
+        title: "Primary Type", field: "transaction_type_contents", hozAlign: "left", headerHozAlign: "left", 
+        responsive: 0,
+        minWidth: 170,
+        // maxWidth: 170, 
+        formatter:txTypeFormatter,
+        headerSort: false,
+        
+      },
+      {
+        title: "", field: "type_additional_info", hozAlign: "right", 
+        responsive: 70,
+        minWidth: 200,
+        maxWidth: 200, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.type_additional_info_download,
+        headerSort: false,
+        
+      },
+      {
+        title: "Block", field: "block_height", hozAlign: "right", headerHozAlign: "right", 
+        responsive: 90,
+        minWidth: 120,
+        maxWidth: 130, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.block_height_download,
+        headerSort: true,
+        
+      },
+      {
+        
+        title: "Sender", field: "sender", headerHozAlign:"right", hozAlign: "right", 
+        responsive: 30,
+        minWidth: 120,
+        // maxWidth: 180, 
+        formatter: "html",
+        accessorDownload: (value, data) => data.sender_download,
+        headerSort: false,
+        
+      }
+
+    ];
+  
+  window["{{ccd_tabulator_table}}_columns"] = columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'block_height';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+
+  
+  function initialLoad() {
+    const table  = window["{{ccd_tabulator_table}}_table"];
+    const select = document.getElementById("tx_type_contents_selector");
+    table.setData("{{tabulator_ajax_filtering_url}}");
+    
+    console.log("Data reloaded once at:", "{{tabulator_ajax_filtering_url}}");
+  }
+
+  // 2) Wait for the DOM so your <div> and <select> exist, then build Tabulator:
+  const table = new Tabulator("#{{ccd_tabulator_table}}", {
+    ajaxURL: "{{tabulator_ajax_filtering_url}}",
+    columns:  columns,
+    layout: "fitColumns",
+    maxHeight: "400px",           // fixed outer height
+    heightGrow: false,
+    responsiveLayout: "hide",
+    paginationMode: "remote",
+    filterMode: "remote",
+    sortMode: "remote",
+    ajaxConfig: "POST",
+    ajaxContentType: "json",
+    paginationSizeSelector: window["{{ccd_tabulator_table}}_size_selector"] || [10,25,50,100,500],
+    paginationSize: (window["{{ccd_tabulator_table}}_size_selector"] || [10,25,50,100,500])[1],
+    paginationButtonCount: 3,
+    pagination: true,
+    paginationDataReceived: { data: "data", total_rows: "total", last_page: (raw, p) => Math.ceil(raw.total/p.size) },
+    paginationCounter: function(ps, cr, cp, tr, tp) {
+        if (tr == null) return `<span class="ccd">${cr.toLocaleString()}</span>`;
+        const humanize = n =>
+          n < 1000
+            ? n.toLocaleString()
+            : new Intl.NumberFormat("en", {
+                notation: "compact",
+                compactDisplay: "short",
+                maximumFractionDigits: 1,
+              }).format(n);
+        const start = ((cp - 1)*ps + 1).toLocaleString();
+        const end   = Math.min(cp*ps, tr).toLocaleString();
+        const total = tr < 5000 ? tr.toLocaleString() : humanize(tr);
+        return `<span class="ccd">${start} – ${end} of ${total}</span>`;
+      },
+    initialSort: [
+      { column: window["{{ccd_tabulator_table}}_default_sort_field"],
+        dir: window["{{ccd_tabulator_table}}_default_sort_field_direction"] }
+    ],
+    initialFilter:[
+        {field:"type", type:"=", value:"alias"}
+    ],
+    rowFormatter(row){ row.getElement().classList.add("sm-text"); },
+
+    // 4) tableBuilt fires once the table DOM is in place
+    tableBuilt(){
+      console.log("Tabulator table built, applying initial filter and data load.");
+      initialLoad();
+    },
+  });
+
+  // 5) Expose and wire up your filter-change listener
+  window["{{ccd_tabulator_table}}_table"] = table;
+  
+  document
+    .getElementById("tx_type_contents_selector");
+
+
+  
+const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (downloadBtn) {
+      document.getElementById("transactions-tab-content").addEventListener("click", e => {
+  if (e.target.matches("#{{ccd_tabulator_table}}-download-csv")) {
+    table.download(
+      "csv",
+      "{{filename}}",
+      { bom: true, downloadDataFormatter: data => data }
+    );
+  }
+});
+  }
+};
+
+</script>
+
+
+
+<!-- Tokens-->
+{% include "base/tabulator/tabulator-plt-tokens.html" %}
+{% include "base/tabulator/tabulator-cis-2-tokens.html" %}
+
+{% endblock content %}

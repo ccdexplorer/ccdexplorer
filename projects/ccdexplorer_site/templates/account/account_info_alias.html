@@ -1,0 +1,35 @@
+<style>
+    .smooth {
+      transition: all 1s ease-in;
+    }
+    </style>
+<table class="table table-borderless">
+    <tbody>
+        {% if  account.index|account_label_on_index_for_label(user,tags,net, request.app) %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Label</td>
+            <td class="text-end text-secondary-emphasis">{{account.index|account_link(net, user, tags, app=request.app)|safe}}</td>
+            
+        </tr>
+        {% endif %}
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Canonical Address</td>
+            <td  class=" text-end align-middle text-secondary-emphasis">
+                {% set copy_value = account.address %}
+                {% set value_type = "account_id" %}
+                {% set display_value = account.address | shorten_address(address=True)|safe %}
+                {% include "base/copy_to_clipboard.html"%}
+            </td>
+        </tr>
+        
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Index</td>
+            <td title="{{account.index}}" id="account_index" class=" text-end text-secondary-emphasis ccd">{{account.index|round_x_decimal_with_comma(0) }}</td>
+        </tr>
+        
+        
+    </tbody>
+    </table>
+
+
+    

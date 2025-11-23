@@ -125,11 +125,15 @@ async def convert_account_fungible_tokens_value_to_USD(
     return tokens_value_USD
 
 
+@router.get(
+    "/{net}/account/{account_address}/tokens-available/{alias}", response_class=JSONResponse
+)
 @router.get("/{net}/account/{account_address}/tokens-available", response_class=JSONResponse)
 async def get_account_tokens_available(
     request: Request,
     net: str,
     account_address: str,
+    alias: str | None = None,
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
@@ -144,19 +148,22 @@ async def get_account_tokens_available(
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
+    if alias:
+        account_address_to_use = account_address
+        compare = "account_address"
+    else:
+        account_address_to_use = account_address[:29]
+        compare = "account_address_canonical"
+
     db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
     result_list = list(
-        db_to_use[Collections.tokens_links_v3]
-        .find({"account_address_canonical": account_address[:29]})
-        .limit(1)
+        db_to_use[Collections.tokens_links_v3].find({compare: account_address_to_use}).limit(1)
     )
     tokens = [TokenHolding(**x["token_holding"]) for x in result_list]
 
     # PLT
     result_list = list(
-        db_to_use[Collections.plts_links]
-        .find({"account_address_canonical": account_address[:29]})
-        .limit(1)
+        db_to_use[Collections.plts_links].find({compare: account_address_to_use}).limit(1)
     )
 
     return len(tokens) > 0 or len(result_list) > 0
@@ -432,6 +439,10 @@ async def get_account_plt_symbols_for_flow(
 
 
 @router.get(
+    "/{net}/account/{account_address}/plt/{skip}/{limit}/{alias}",
+    response_class=JSONResponse,
+)
+@router.get(
     "/{net}/account/{account_address}/plt/{skip}/{limit}",
     response_class=JSONResponse,
 )
@@ -441,6 +452,7 @@ async def get_paginated_account_plt_tokens(
     account_address: str,
     skip: int,
     limit: int,
+    alias: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
@@ -470,8 +482,11 @@ async def get_paginated_account_plt_tokens(
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
-    pipeline = [
-        {"$match": {"account_address_canonical": account_address[:29]}},
+    if not alias:
+        pipeline = [{"$match": {"account_address_canonical": account_address[:29]}}]
+    else:
+        pipeline = [{"$match": {"account_address": account_address}}]
+    pipeline += [
         {
             "$facet": {
                 "metadata": [{"$count": "total"}],
@@ -519,6 +534,10 @@ async def get_paginated_account_plt_tokens(
 
 
 @router.get(
+    "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified/{alias}",
+    response_class=JSONResponse,
+)
+@router.get(
     "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified",
     response_class=JSONResponse,
 )
@@ -528,6 +547,7 @@ async def get_account_fungible_tokens_verified(
     account_address: str,
     skip: int,
     limit: int,
+    alias: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
@@ -572,8 +592,11 @@ async def get_account_fungible_tokens_verified(
         x["related_token_address"] for x in fungible_token_result if "related_token_address" in x
     ]
 
-    pipeline = [
-        {"$match": {"account_address_canonical": account_address[:29]}},
+    if not alias:
+        pipeline = [{"$match": {"account_address_canonical": account_address[:29]}}]
+    else:
+        pipeline = [{"$match": {"account_address": account_address}}]
+    pipeline += [
         {"$match": {"token_holding.token_address": {"$in": fungible_token_addresses}}},
         {
             "$facet": {
@@ -594,10 +617,16 @@ async def get_account_fungible_tokens_verified(
         total_token_count = result[0]["total"]
     else:
         total_token_count = 0
-    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
+    tokens = [
+        {"account_address": x["account_address"], "token": TokenHolding(**x["token_holding"])}
+        for x in all_tokens
+    ]
 
     # add verified information and metadata and USD value
-    for index, token in enumerate(tokens):
+    # for index, token in enumerate(tokens):
+    for d in tokens:
+        account_address_for_token = d["account_address"]
+        token = d["token"]
         result = await db_to_use[Collections.tokens_tags].find_one(
             {"related_token_address": token.token_address}
         )
@@ -620,12 +649,12 @@ async def get_account_fungible_tokens_verified(
                 else result["related_token_address"].replace(f"{contract}-", "")
             ),
             module_name=module_name,
-            addresses=[all_tokens[index]["account_address"]],
+            addresses=[account_address_for_token],
             grpcclient=grpcclient,
             motor=mongomotor,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state.get(all_tokens[index]["account_address"], 0)
+        token.token_amount = token_amount_from_state.get(account_address_for_token, 0)
 
         token.token_symbol = token.verified_information.get("get_price_from")
         token.decimals = token.verified_information.get("decimals", 0)
@@ -648,9 +677,13 @@ async def get_account_fungible_tokens_verified(
         if token.token_symbol in exchange_rates:
             token.address_information["exchange_rate"] = exchange_rates[token.token_symbol]["rate"]
 
-    return {"tokens": tokens, "total_token_count": total_token_count}
+    return {"tokens": [x["token"] for x in tokens], "total_token_count": total_token_count}
 
 
+@router.get(
+    "/{net}/account/{account_address}/non-fungible-tokens/{skip}/{limit}/verified/{alias}",
+    response_class=JSONResponse,
+)
 @router.get(
     "/{net}/account/{account_address}/non-fungible-tokens/{skip}/{limit}/verified",
     response_class=JSONResponse,
@@ -661,6 +694,7 @@ async def get_account_non_fungible_tokens_verified(
     account_address: str,
     skip: int,
     limit: int,
+    alias: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
@@ -695,8 +729,11 @@ async def get_account_non_fungible_tokens_verified(
         .to_list(length=None)
     ]
     non_fungible_token_contracts = [item for row in non_fungible_token_contracts for item in row]
-    pipeline = [
-        {"$match": {"account_address_canonical": account_address[:29]}},
+    if not alias:
+        pipeline = [{"$match": {"account_address_canonical": account_address[:29]}}]
+    else:
+        pipeline = [{"$match": {"account_address": account_address}}]
+    pipeline += [
         {"$match": {"token_holding.contract": {"$in": non_fungible_token_contracts}}},
         {
             "$facet": {
@@ -717,10 +754,16 @@ async def get_account_non_fungible_tokens_verified(
         total_token_count = result[0]["total"]
     else:
         total_token_count = 0
-    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens]
+    tokens = [
+        {"account_address": x["account_address"], "token": TokenHolding(**x["token_holding"])}
+        for x in all_tokens
+    ]
 
     # add verified information and metadata
-    for token in tokens:
+    for d in tokens:
+        account_address_for_token = d["account_address"]
+        token = d["token"]
+        token.account_address_for_token = account_address_for_token
         result = await db_to_use[Collections.tokens_tags].find_one(
             {"contracts": {"$in": [token.contract]}}
         )
@@ -738,20 +781,26 @@ async def get_account_non_fungible_tokens_verified(
             contract_address=CCD_ContractAddress.from_str(token.contract),
             token_id=token.token_id,
             module_name=module_name,
-            addresses=[account_address],
+            addresses=[account_address_for_token],
             grpcclient=grpcclient,
             motor=mongomotor,
         )
         token_amount_from_state = await get_balance_of(request)
-        token.token_amount = token_amount_from_state.get(account_address, token.token_amount)
+        token.token_amount = token_amount_from_state.get(
+            account_address_for_token, token.token_amount
+        )
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
         )
         token.address_information = result
 
-    return {"tokens": tokens, "total_token_count": total_token_count}
+    return {"tokens": [x["token"] for x in tokens], "total_token_count": total_token_count}
 
 
+@router.get(
+    "/{net}/account/{account_address}/tokens/{skip}/{limit}/unverified/{alias}",
+    response_class=JSONResponse,
+)
 @router.get(
     "/{net}/account/{account_address}/tokens/{skip}/{limit}/unverified",
     response_class=JSONResponse,
@@ -762,6 +811,7 @@ async def get_account_tokens_unverified(
     account_address: str,
     skip: int,
     limit: int,
+    alias: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     exchange_rates: dict = Depends(get_exchange_rates),
@@ -796,8 +846,11 @@ async def get_account_tokens_unverified(
         .to_list(length=None)
     ]
     verified_token_contracts = [item for row in verified_token_contracts for item in row]
-    pipeline = [
-        {"$match": {"account_address_canonical": account_address[:29]}},
+    if not alias:
+        pipeline = [{"$match": {"account_address_canonical": account_address[:29]}}]
+    else:
+        pipeline = [{"$match": {"account_address": account_address}}]
+    pipeline += [
         {"$match": {"token_holding.contract": {"$nin": verified_token_contracts}}},
         {
             "$facet": {
@@ -818,10 +871,15 @@ async def get_account_tokens_unverified(
         total_token_count = result[0]["total"]
     else:
         total_token_count = 0
-    tokens = [TokenHolding(**x["token_holding"]) for x in all_tokens if "token_holding" in x]
+    tokens = [
+        {"account_address": x["account_address"], "token": TokenHolding(**x["token_holding"])}
+        for x in all_tokens
+    ]
 
     # add metadata
-    for token in tokens:
+    for d in tokens:
+        account_address_for_token = d["account_address"]
+        token = d["token"]
         result = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
             {"_id": token.token_address}
         )
@@ -836,14 +894,14 @@ async def get_account_tokens_unverified(
             contract_address=CCD_ContractAddress.from_str(token.contract),
             token_id=token.token_id,
             module_name=module_name,
-            addresses=[account_address],
+            addresses=[account_address_for_token],
             grpcclient=grpcclient,
             motor=mongomotor,
         )
         token_amount_from_state = await get_balance_of(request)
         if token_amount_from_state != []:
-            token.token_amount = token_amount_from_state.get(account_address, 0)
-    return {"tokens": tokens, "total_token_count": total_token_count}
+            token.token_amount = token_amount_from_state.get(account_address_for_token, 0)
+    return {"tokens": [x["token"] for x in tokens], "total_token_count": total_token_count}
 
 
 @router.get(
@@ -1904,7 +1962,7 @@ async def get_account_txs_with_filter(
             base_filter["effect_type"] = {"$in": filter_list}
 
     # count unique hashes
-    if not top_list_member:  # or filter_list:
+    if not top_list_member or (filter_list == ["alias"]):
         count_pipeline = [
             {"$match": base_filter},
             {"$group": {"_id": "$tx_hash"}},
