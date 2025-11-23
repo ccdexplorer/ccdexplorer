@@ -83,6 +83,18 @@ function LotteryPowerFormatter(cell) {
   return `<span class="ccd">${formatted}%</span>`;
 }
 
+function ContractFormatter(cell) {
+  const raw = cell.getValue();
+
+  if (raw === undefined || raw === null) {
+    return ``;
+  }
+
+  const row = cell.getRow().getData();
+  const net = row.net;
+  return `<a href="/${net}/instance/${raw}/0"><span class="ccd"><${raw},0></span></a>`;
+}
+
 function intFormatterRounded(cell) {
   const raw = cell.getValue();
 

@@ -183,6 +183,8 @@ async def get_paginated_cis2_nft_tokens(
     tag: str,
     page: int = Query(),
     size: int = Query(),
+    sort_key: Optional[str] = Query("last_height_processed"),
+    direction: Optional[str] = Query("desc"),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
     # recurring: Recurring = Depends(get_recurring),
@@ -190,7 +192,7 @@ async def get_paginated_cis2_nft_tokens(
     user: SiteUser | None = await get_user_detailsv2(request)
     skip = (page - 1) * size
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/token/tag/{tag}/{skip}/{size}",
+        f"{request.app.api_url}/v2/{net}/token/tag/{tag}/{skip}/{size}/{sort_key}/{direction}",
         httpx_client,
     )
     nft_tokens_result = api_result.return_value if api_result.ok else None
@@ -228,95 +230,6 @@ async def get_paginated_cis2_nft_tokens(
             "last_row": total_rows,
         }
     )
-
-
-# @router.get(
-#     "/{net}/ajax_nft_tokens_for/{tag}/{requested_page}/{total_rows}/{api_key}",
-#     response_class=HTMLResponse,
-# )
-# async def ajax_nft_tokens_for_tag(
-#     request: Request,
-#     net: str,
-#     tag: str,
-#     requested_page: int,
-#     total_rows: int,
-#     api_key: str,
-#     tags: dict = Depends(get_labeled_accounts),
-#     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
-# ):
-#     limit = 10
-#     skip = calculate_skip(requested_page, total_rows, limit)
-#     user: SiteUser | None = await get_user_detailsv2(request)
-#     api_result = await get_url_from_api(
-#         f"{request.app.api_url}/v2/{net}/token/tag/{tag}/{skip}/{limit}",
-#         httpx_client,
-#     )
-#     nft_tokens = api_result.return_value if api_result.ok else None
-
-#     pagination_request = PaginationRequest(
-#         total_txs=total_rows,
-#         requested_page=requested_page,
-#         word="token",
-#         action_string="nft_token",
-#         limit=limit,
-#         returned_rows=len(nft_tokens),
-#     )
-#     pagination = pagination_calculator(pagination_request)
-#     request.state.api_calls = {}
-#     request.state.api_calls["NFT Tokens"] = (
-#         f"{request.app.api_url}/docs#/Token/get_nft_tag_tokens_v2__net__token_tag__tag___skip___limit__get"
-#     )
-#     html = templates.get_template("tokens/nft_tag/nft_tag_tokens.html").render(
-#         {
-#             "nft_tokens": nft_tokens,
-#             "tags": tags,
-#             "tag": tag,
-#             "net": net,
-#             "request": request,
-#             "pagination": pagination,
-#             "total_rows": total_rows,
-#         }
-#     )
-
-#     return html
-
-
-# @router.get(
-#     "/ajax_statistics_tvl/{token_address}",
-#     response_class=Response,
-# )
-# async def statistics_token_TVL_plotly(
-#     request: Request,
-#     token_address: str,
-# ):
-#     analysis = "statistics_tvl_for_tokens"
-
-#     token_address = token_address.replace("&lt;", "<").replace("&gt;", ">")
-#     all_data = get_all_data_for_analysis_for_token(analysis, token_address, mongodb)
-#     d_date = get_statistics_date(mongodb)
-#     df = pd.DataFrame(all_data)
-#     df["tvl"] = df["tvl_contribution_for_day_in_usd"].cumsum()
-#     rng = ["#70B785"]
-#     title = "EUROe"
-#     fig = px.line(
-#         df,
-#         x="date",
-#         y="tvl",
-#         color_discrete_sequence=rng,
-#         template=ccdexplorer_plotly_template(),
-#     )
-#     fig.update_yaxes(title_text="TVL")
-#     fig.update_xaxes(title=None)
-#     fig.update_layout(
-#         legend_title_text=title,
-#         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
-#         height=550,
-#     )
-#     return fig.to_html(
-#         config={"responsive": True, "displayModeBar": False},
-#         full_html=False,
-#         include_plotlyjs=False,
-#     )
 
 
 @router.get("/{net}/token/{contract_index}/{contract_subindex}")
@@ -633,12 +546,20 @@ async def show_nft_tag(request: Request, net: str, tag_result: dict):
     """Only for non-fungible tags"""
     user: SiteUser | None = await get_user_detailsv2(request)
 
+    contracts = sorted(
+        [
+            {"contract_index": CCD_ContractAddress.from_str(c).index, "net": net}
+            for c in tag_result["contracts"]
+        ],
+        key=lambda x: x["contract_index"],
+    )
     template_dict = {
         "env": request.app.env,
         "request": request,
         "net": net,
         "user": user,
         "vi": tag_result,
+        "contracts": contracts,
     }
 
     return request.app.templates.TemplateResponse(

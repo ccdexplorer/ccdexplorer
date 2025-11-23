@@ -690,7 +690,7 @@ async def get_instance_tag_information(
 
 
 @router.get(
-    "/{net}/token/tag/{tag}/{skip}/{limit}",
+    "/{net}/token/tag/{tag}/{skip}/{limit}/{sort_key}/{direction}",
     response_class=JSONResponse,
 )
 async def get_nft_tag_tokens(
@@ -699,6 +699,8 @@ async def get_nft_tag_tokens(
     tag: str,
     skip: int,
     limit: int,
+    sort_key: str,
+    direction: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -732,7 +734,7 @@ async def get_nft_tag_tokens(
         )
 
     filter = {"contract": {"$in": tag_result["contracts"]}}
-    sort = list({"last_height_processed": -1}.items())
+    sort = list({sort_key: -1 if direction == "desc" else 1}.items())
     nft_tokens = (
         await db_to_use[Collections.tokens_token_addresses_v2]
         .find(filter=filter, sort=sort, skip=skip, limit=limit)

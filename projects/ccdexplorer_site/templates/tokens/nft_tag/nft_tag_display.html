@@ -48,7 +48,12 @@
   <div class="col-md-4  col-sm-12 ">
     <div class="border content curved-border " >
         {% set title= "Contracts" %}{% include 'base/box_title.html' %}
-        {% include "tokens/nft_tag/nft_tag_contracts.html" %}</div>
+        <div id="nft_tag_contracts_table"></div>
+        {% set ccd_tabulator_table ='nft_tag_contracts_table'%}
+          {% include 'tokens/nft_tag/nft_tag_contracts_tabulator.html' %}
+        
+      </div>
+        
   </div>
   </div>  
 

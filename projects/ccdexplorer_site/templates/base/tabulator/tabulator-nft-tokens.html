@@ -24,7 +24,7 @@
       {
         title: "Last Activity in Block", field: "last_height_processed", 
         formatter: "html",
-        headerSort: false,
+        headerSort: true,
         hozAlign: "right", headerHozAlign: "right",
         accessorDownload: (value, data) => data.last_height_processed_download,
         
@@ -36,6 +36,8 @@
   
   window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
   window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'last_height_processed';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
 </script>
 {% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
 {% include 'base/tabulator/tabulator-table-download-link.html' %}

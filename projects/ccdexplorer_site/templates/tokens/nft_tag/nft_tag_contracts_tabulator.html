@@ -1,0 +1,46 @@
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+<script>
+
+const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Contract", field: "contract_index", 
+        minWidth: 100,
+        // maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: ContractFormatter,
+        accessorDownload: (value, data) => data.contract_index,
+        headerSort: true,
+        hozAlign: "left", headerHozAlign: "left",
+        visible:true, download:true
+        
+      },
+    ];
+
+  
+  
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'validator_id';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+
+window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+    window["{{ccd_tabulator_table}}_table"] = new Tabulator("#nft_tag_contracts_table", {
+    layout: "fitColumns",
+    data:{{contracts|tojson}},
+    columns:               window["{{ccd_tabulator_table}}_columns"],
+     
+    maxHeight: "400px",           // fixed outer height
+    heightGrow: false,
+    responsiveLayout: "hide",
+    // pagination: "local",
+    pagination: false,
+    // rowHeight:20,
+    // paginationSize: 25,
+    // paginationSizeSelector: [10, 25, 50, 100, 500],
+    // paginationCounter: "rows",
+    });
+    window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+    
+</script>
