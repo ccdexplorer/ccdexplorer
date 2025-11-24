@@ -187,6 +187,7 @@ async def watch_loop(stop: Shutdown):
                             "documentKey._id": 1,
                             "fullDocument.height": 1,
                             "fullDocument.transaction_count": 1,
+                            "fullDocument.slot_time": 1,
                         }
                     },
                 ],
