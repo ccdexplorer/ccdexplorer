@@ -7,27 +7,33 @@ import os
 import signal
 import sys
 from contextlib import asynccontextmanager
+import traceback
 from typing import Any, Dict, Optional
+from uuid import uuid4
+
+from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.domain.generic import NET
+from ccdexplorer.env import REDIS_URL, RUN_ON_NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb.core import MongoDB
 from ccdexplorer.tooter import Tooter
-from pymongo.asynchronous.collection import AsyncCollection
 from pydantic import BaseModel
+from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.errors import PyMongoError
 from redis.asyncio import Redis
-
-from ccdexplorer.env import REDIS_URL, RUN_ON_NET
 
 grpcclient = GRPCClient()
 tooter = Tooter()
 motormongo = MongoMotor(tooter, nearest=True)
+mongodb = MongoDB(tooter, nearest=True)
 
 
 class Settings(BaseModel):
     grpcclient: GRPCClient = grpcclient
     motormongo: MongoMotor = motormongo
+    mongodb: MongoDB = mongodb
     redis_url: str | None = REDIS_URL
 
     resume_token_key: str = os.getenv(
@@ -220,6 +226,8 @@ async def watch_loop(stop: Shutdown):
                             print(f"{height:,.0f} - skip")
                             continue
 
+                        slot_time = change.get("fullDocument", {}).get("slot_time")
+
                         payload["height"] = height
                         payload["block_hash"] = block_hash
 
@@ -228,9 +236,30 @@ async def watch_loop(stop: Shutdown):
                         print(f"{payload['height']:,.0f} - {processors}")
                         for proc in processors:
                             await publish_to_celery(proc, payload)
-
+                        task_doc = TaskResult(
+                            _id=uuid4().hex,
+                            queue="block_analyser",
+                            block_height=height,  # type: ignore
+                            slot_time=slot_time,
+                            net=RUN_ON_NET,  # type: ignore
+                            status="SUCCESS",
+                            error=None,
+                            traceback=None,
+                        )
+                        store_result_in_mongo(settings.mongodb, task_doc)
                     except Exception as e:
+                        tb = traceback.format_exc()
                         print(f"[producer][event-error] {e!r}", file=sys.stderr)
+                        task_doc = TaskResult(
+                            _id=uuid4().hex,
+                            queue="block_analyser",
+                            block_height=height,  # type: ignore
+                            net=RUN_ON_NET,  # type: ignore
+                            status="FAILURE",
+                            error=str(e),
+                            traceback=tb,
+                        )
+                        store_result_in_mongo(settings.mongodb, task_doc)
 
             await r.aclose()
             await motormongo.connection.close()

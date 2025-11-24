@@ -25,6 +25,7 @@ class TaskResult(BaseModel):
         ..., description="Task execution status."
     )
     date_done: dt.datetime = Field(default_factory=lambda: dt.datetime.now(dt.timezone.utc))
+    slot_time: Optional[dt.datetime] = None
 
     error: Optional[str] = Field(None, description="Error message if status=FAILURE.")
     traceback: Optional[str] = Field(None, description="Traceback if status=FAILURE.")
@@ -68,6 +69,8 @@ def store_result_in_mongo(mongodb: MongoDB, task: TaskResult) -> None:
         "status": task.status,
         "date_done": dt.datetime.now(dt.timezone.utc),
     }
+    if task.slot_time:
+        native["slot_time"] = task.slot_time
     if task.error:
         native["error"] = task.error
     if task.traceback:
