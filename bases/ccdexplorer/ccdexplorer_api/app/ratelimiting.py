@@ -57,9 +57,9 @@ async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
             assert recognized_api_key_document is not None
             api_account_id = recognized_api_key_document["api_account_id"]
             group_name = recognized_api_key_document["api_group"]
+            scope["api_auth"] = (api_account_id, group_name)
         else:
             raise EmptyInformation(scope)
     else:
         raise EmptyInformation(scope)
-
     return api_account_id, group_name

@@ -169,6 +169,7 @@ class CollectionsUtilities(Enum):
     api_api_keys = "api_api_keys"
     # api
     api_users = "api_users"
+    api_usage_daily = "api_usage_daily"
 
 
 class MongoDB:

@@ -6,30 +6,29 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
+from ccdexplorer.mongodb.core import CollectionsUtilities
 import httpx
-from httpx import ASGITransport
 import humanize
-from pydantic import BaseModel
-from pymongo import AsyncMongoClient
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from httpx import ASGITransport
 
 # from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
+from pymongo import AsyncMongoClient
 from redis.asyncio import Redis
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from .state_getters import get_api_keys as _get_api_keys
 
 urllib3.disable_warnings()
 
-from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.tooter import Tooter
-
-from ccdexplorer.env import environment, REDIS_URL
-from .models import rate_limit_rules
 from ccdexplorer.ccdexplorer_api.app.routers.account import account
 from ccdexplorer.ccdexplorer_api.app.routers.auth import auth
 from ccdexplorer.ccdexplorer_api.app.routers.home import home
@@ -47,6 +46,8 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2 import (
     misc_v2,
     module_v2,
     modules_v2,
+    plt_v2,
+    plts_v2,
     site_user_v2,
     smart_wallet_v2,
     smart_wallets_v2,
@@ -54,10 +55,12 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2 import (
     tokens_v2,
     transaction_v2,
     transactions_v2,
-    plt_v2,
-    plts_v2,
 )
+from ccdexplorer.env import REDIS_URL, environment
+from ccdexplorer.grpc_client import GRPCClient
+from ccdexplorer.tooter import Tooter
 
+from .models import rate_limit_rules
 
 r = Redis.from_url(REDIS_URL, decode_responses=False)  # type: ignore
 # ratelimit
@@ -76,6 +79,67 @@ if environment["SITE_URL"] != "http://127.0.0.1:8000":
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )
+
+
+def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, str]:
+    """
+    Returns (net, resource) based on the URL structure.
+    Example:
+        /v2/mainnet/account/...  → ("mainnet", "account")
+        /v2/testnet/module/...   → ("testnet", "module")
+    """
+    parts = request.url.path.strip("/").split("/")
+
+    # parts[0] = "v2"
+    # parts[1] = net
+    # parts[2] = resource
+    if len(parts) < 3:
+        return None, "other"
+
+    net = parts[1]
+    resource = parts[2]
+
+    return net, resource
+
+
+class UsageMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, mongomotor: MongoMotor):
+        super().__init__(app)
+        self.mongomotor = mongomotor
+
+    async def dispatch(self, request: Request, call_next):
+        # user = request.state.user  # however you attach your user
+        # if not user:
+        #     return await call_next(request)
+        net, resource = classify_endpoint(request)
+        today = dt.date.today().isoformat()
+        # Extract values placed by AUTH_FUNCTION
+        api_account_id, group_name = None, None
+        authenticated = request.scope.get("api_auth")
+        if authenticated:
+            api_account_id, group_name = authenticated
+        host = request.url.hostname
+        # Call the API endpoint first
+        response: Response = await call_next(request)
+
+        # Increment counters only if successful or depending on your choice
+        if response.status_code < 500:
+            doc_id = f"{host}:{api_account_id}:{net}:{today}"
+            await self.mongomotor.utilities[CollectionsUtilities.api_usage_daily].update_one(
+                {"_id": doc_id},
+                {
+                    "$setOnInsert": {
+                        "host": host,
+                        "api_account_id": api_account_id,
+                        "net": net,
+                        "date": today,
+                    },
+                    "$inc": {"total_calls": 1, f"endpoints.{resource}": 1},
+                },
+                upsert=True,
+            )
+
+        return response
 
 
 async def _aclose(resource) -> None:
@@ -253,6 +317,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    if app_settings.motor_factory is not None:
+        app.add_middleware(UsageMiddleware, mongomotor=app_settings.motor_factory())
 
     app.add_middleware(
         RateLimitMiddleware,
@@ -264,7 +330,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         on_blocked=handle_429,
         config={r"^/v2": rate_limit_rules},
     )
-
     instrumentator = Instrumentator().instrument(app)
     instrumentator.expose(app)
 
@@ -304,4 +369,5 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.state.templates.env.filters["seperator_no_decimals"] = seperator_no_decimals
 
     app.state.templates.env.filters["humanize_timedelta"] = humanize_timedelta
+
     return app
