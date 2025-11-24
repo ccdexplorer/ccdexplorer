@@ -71,6 +71,7 @@ def store_result_in_mongo(mongodb: MongoDB, task: TaskResult) -> None:
     }
     if task.slot_time:
         native["slot_time"] = task.slot_time
+        print(f"Storing slot_time {task.slot_time} for block_height {task.block_height}")
     if task.error:
         native["error"] = task.error
     if task.traceback:

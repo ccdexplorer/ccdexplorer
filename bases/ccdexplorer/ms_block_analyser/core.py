@@ -9,7 +9,7 @@ import sys
 from contextlib import asynccontextmanager
 import traceback
 from typing import Any, Dict, Optional
-from uuid import uuid4
+import uuid
 
 from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
@@ -227,7 +227,11 @@ async def watch_loop(stop: Shutdown):
                             continue
 
                         slot_time = change.get("fullDocument", {}).get("slot_time")
-
+                        if not slot_time:
+                            print(
+                                f"[producer][warning] missing slot_time for block {height}",
+                                file=sys.stderr,
+                            )
                         payload["height"] = height
                         payload["block_hash"] = block_hash
 
@@ -237,7 +241,7 @@ async def watch_loop(stop: Shutdown):
                         for proc in processors:
                             await publish_to_celery(proc, payload)
                         task_doc = TaskResult(
-                            _id=uuid4().hex,
+                            _id=str(uuid.uuid4()),
                             queue="block_analyser",
                             block_height=height,  # type: ignore
                             slot_time=slot_time,
@@ -251,7 +255,7 @@ async def watch_loop(stop: Shutdown):
                         tb = traceback.format_exc()
                         print(f"[producer][event-error] {e!r}", file=sys.stderr)
                         task_doc = TaskResult(
-                            _id=uuid4().hex,
+                            _id=str(uuid.uuid4()),
                             queue="block_analyser",
                             block_height=height,  # type: ignore
                             net=RUN_ON_NET,  # type: ignore
