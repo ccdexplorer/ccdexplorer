@@ -81,7 +81,7 @@ if environment["SITE_URL"] != "http://127.0.0.1:8000":
     )
 
 
-def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, str]:
+def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, None]:
     """
     Returns (net, resource) based on the URL structure.
     Example:
@@ -94,7 +94,7 @@ def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, str]:
     # parts[1] = net
     # parts[2] = resource
     if len(parts) < 3:
-        return None, "other"
+        return None, None
 
     net = parts[1]
     resource = parts[2]
@@ -123,7 +123,7 @@ class UsageMiddleware(BaseHTTPMiddleware):
         response: Response = await call_next(request)
 
         # Increment counters only if successful or depending on your choice
-        if response.status_code < 500:
+        if (response.status_code < 500) and resource is not None and api_account_id is not None:
             doc_id = f"{host}:{api_account_id}:{net}:{today}"
             await self.mongomotor.utilities[CollectionsUtilities.api_usage_daily].update_one(
                 {"_id": doc_id},
