@@ -38,7 +38,7 @@ from fastapi.responses import (
 )
 from pydantic import BaseModel
 
-from ccdexplorer.env import environment
+from ccdexplorer.env import environment, LIVE_PORT
 
 from ccdexplorer.ccdexplorer_site.app.state import (
     get_httpx_client,
@@ -90,6 +90,11 @@ async def get_marketcap_info(
     api_result = await get_url_from_api(url, httpx_client)
     response = api_result.return_value if api_result.ok else None
     return response
+
+
+@router.get("/live_port")
+async def live_port(request: Request):
+    return LIVE_PORT
 
 
 @router.get("/", response_class=RedirectResponse)

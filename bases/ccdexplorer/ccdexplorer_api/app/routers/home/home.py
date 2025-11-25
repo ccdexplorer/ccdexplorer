@@ -1,4 +1,4 @@
-from ccdexplorer.env.settings import API_NET
+from ccdexplorer.env.settings import API_NET, LIVE_PORT
 from ccdexplorer.mongodb import (
     MongoMotor,
 )
@@ -33,3 +33,8 @@ async def home_route(
         "eur_plts": eur_plts,
     }
     return request.app.state.templates.TemplateResponse("plans/home.html", context)
+
+
+@router.get("/live_port")
+async def live_port(request: Request):
+    return LIVE_PORT

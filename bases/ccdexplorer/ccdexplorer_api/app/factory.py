@@ -112,7 +112,7 @@ class UsageMiddleware(BaseHTTPMiddleware):
         # if not user:
         #     return await call_next(request)
         net, resource = classify_endpoint(request)
-        today = dt.date.today().isoformat()
+        today = dt.datetime.now().astimezone(dt.UTC).strftime("%Y-%m-%d")
         # Extract values placed by AUTH_FUNCTION
         api_account_id, group_name = None, None
         authenticated = request.scope.get("api_auth")
@@ -122,8 +122,15 @@ class UsageMiddleware(BaseHTTPMiddleware):
         # Call the API endpoint first
         response: Response = await call_next(request)
 
+        if request.method not in ["GET", "POST"]:
+            return response
         # Increment counters only if successful or depending on your choice
-        if (response.status_code < 500) and resource is not None and api_account_id is not None:
+        if (
+            (response.status_code < 500)
+            and (response.status_code != 429)
+            and resource is not None
+            and api_account_id is not None
+        ):
             doc_id = f"{host}:{api_account_id}:{net}:{today}"
             await self.mongomotor.utilities[CollectionsUtilities.api_usage_daily].update_one(
                 {"_id": doc_id},

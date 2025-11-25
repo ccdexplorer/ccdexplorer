@@ -30,4 +30,4 @@ RUN addgroup --system app && adduser --system --ingroup app app
 USER app
 
 WORKDIR /app/projects/ccdexplorer_api
-CMD ["uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "80", "--no-access-log"]
+CMD ["uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "80", "--no-access-log", "--workers", "2"]

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
+LIVE_PORT = os.environ.get("LIVE_PORT", "")
 BRANCH = os.environ.get("BRANCH", "dev")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "prod")
 NOTIFIER_API_TOKEN = os.environ.get("NOTIFIER_API_TOKEN")
