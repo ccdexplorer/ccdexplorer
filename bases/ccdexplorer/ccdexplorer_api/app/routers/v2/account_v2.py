@@ -1,3 +1,5 @@
+"""Endpoints serving Concordium account facts, balances, rewards, and token data."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -71,6 +73,7 @@ API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
 async def convert_account_plt_value_to_USD(
     tokens: list[CCD_Token], db_to_use: dict[Collections, AsyncCollection], exchange_rates
 ):
+    """Convert PLT token holdings to USD using cached exchange rates."""
     tokens_value_USD = 0
     for token in tokens:
         token_value = int(token.token_account_state.balance.value) * (
@@ -92,6 +95,7 @@ async def convert_account_plt_value_to_USD(
 async def convert_account_fungible_tokens_value_to_USD(
     tokens_dict: dict[str, TokenHolding], db_to_use: AsyncDatabase, exchange_rates
 ):
+    """Convert fungible CIS-2 token holdings to USD, enriching with metadata."""
     tokens_tags = {
         x["contracts"][0]: x
         for x in await db_to_use[Collections.tokens_tags]
@@ -137,10 +141,21 @@ async def get_account_tokens_available(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to determine if a given account holds tokens, as stored in MongoDB collection `tokens_links_v3`.
+    """Return whether an account currently has CIS-2 or PLT tokens recorded.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        alias: When provided, indicates the supplied address is a full alias.
+        mongodb: Mongo client dependency pointing to the main/test databases.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        ``True`` if the account has a token record or PLT link, ``False`` otherwise.
+
+    Raises:
+        HTTPException: If the network parameter is invalid.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -177,10 +192,20 @@ async def get_account_rewards_available(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to determine if a given account has ever received Account Rewards.
+    """Return whether an account has ever received an account reward entry.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        mongodb: Mongo client dependency pointing to the main/test databases.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        ``True`` if at least one reward entry exists for the account.
+
+    Raises:
+        HTTPException: If the network parameter is invalid.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -213,10 +238,22 @@ async def get_account_plt_tokens_value_in_USD(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> float:
-    """
-    Endpoint to get sum of all PLT tokens in USD for a given account, as stored in account_info on the node`.
+    """Return the USD value of PLT tokens held by an account.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        mongomotor: Mongo client dependency for currency metadata.
+        grpcclient: gRPC client dependency used to fetch account tokens.
+        exchange_rates: Cached exchange rates keyed by token symbol.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        Total USD value of PLT holdings according to current exchange rates.
+
+    Raises:
+        HTTPException: If the network is invalid or no tokens exist.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -252,10 +289,22 @@ async def get_account_fungible_tokens_value_in_USD(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> float:
-    """
-    Endpoint to get sum of all fungible tokens in USD for a given account, as stored in MongoDB collection `tokens_links_v3`.
+    """Return the USD value of all verified fungible CIS-2 tokens for an account.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        mongomotor: Mongo client dependency for token metadata lookup.
+        grpcclient: gRPC client dependency used to refresh token balances.
+        exchange_rates: Cached exchange rates keyed by token symbol.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        The total USD value of fungible tokens held by the account.
+
+    Raises:
+        HTTPException: If the network is invalid or no fungible tokens exist.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -336,10 +385,20 @@ async def get_account_token_symbols_for_flow(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
-    """
-    Endpoint to get all fungible CIS-2 tokens for a given account, even if the current balance is zero.
+    """Return all fungible CIS-2 token symbols relevant for the flow graph.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        mongomotor: Mongo client dependency used to query MongoDB data.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        Sorted list of token symbols even if the balance is zero.
+
+    Raises:
+        HTTPException: If the network is invalid or no symbols exist.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
@@ -409,10 +468,20 @@ async def get_account_plt_symbols_for_flow(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
-    """
-    Endpoint to get all Protocol-Level tokens for a given account, even if the current balance is zero.
+    """Return PLT identifiers seen for the account regardless of current balance.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        mongomotor: Mongo client dependency used to query MongoDB data.
+        api_key: API key extracted via FastAPI security dependency.
 
+    Returns:
+        Sorted list of PLT token identifiers.
+
+    Raises:
+        HTTPException: If the network is invalid.
     """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
@@ -458,8 +527,25 @@ async def get_paginated_account_plt_tokens(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get PLT tokens for a given account, as stored in MongoDB collection `plts_links`.
+    """Return a paginated PLT token listing for the given account.
+
+    Args:
+        request: FastAPI request context exposing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_address: Canonical or alias-format account address.
+        skip: Number of tokens to skip.
+        limit: Maximum number of tokens to return.
+        alias: When provided, indicates the supplied address is a full alias.
+        mongomotor: Mongo client dependency used to query ``plts_links``.
+        grpcclient: gRPC client dependency used for metadata lookups.
+        exchange_rates: Cached exchange rates keyed by token symbol.
+        api_key: API key extracted via FastAPI security dependency.
+
+    Returns:
+        Dictionary containing token details and the total count.
+
+    Raises:
+        HTTPException: If the network is invalid or pagination arguments are out of bounds.
     """
 
     if net not in ["mainnet", "testnet"]:
@@ -1017,6 +1103,7 @@ async def account_is_alias(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
+    """Return whether the supplied index hash represents an alias entry."""
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     result = await db_to_use[Collections.all_account_addresses].find_one({"_id": index_hash[:29]})
     if not result:

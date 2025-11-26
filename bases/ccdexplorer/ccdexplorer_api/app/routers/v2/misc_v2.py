@@ -1,3 +1,5 @@
+"""Miscellaneous v2 endpoints for statistics, search, and insight dashboards."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -670,6 +672,7 @@ async def get_all_project_ids(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
+    """Return all Project Catalyst metadata keyed by project id."""
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -695,6 +698,7 @@ async def get_project_id(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> Any | None:
+    """Return metadata for a single curated project entry."""
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -717,6 +721,7 @@ async def get_project_addresses(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
+    """Return all tracked addresses associated with a given project id."""
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -740,6 +745,7 @@ async def get_release_notes(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
+    """Return the list of release notes stored for the public site."""
     db_to_use = mongomotor.utilities
     release_notes = list(
         reversed(await db_to_use[CollectionsUtilities.release_notes].find({}).to_list(length=None))
@@ -781,6 +787,7 @@ async def get_consensus_detailed_status(
 async def get_exchange_txs_as_receiver(
     exchanges_canonical, start_block, end_block, mongomotor: MongoMotor
 ):
+    """Return transfers where exchanges acted as receivers within block bounds."""
     pipeline = [
         {"$match": {"receiver_canonical": {"$in": exchanges_canonical}}},
         {"$match": {"block_height": {"$gt": start_block, "$lte": end_block}}},
@@ -794,6 +801,7 @@ async def get_exchange_txs_as_receiver(
 async def get_exchange_txs_as_sender(
     exchanges_canonical, start_block, end_block, mongomotor: MongoMotor
 ):
+    """Return transfers where exchanges acted as senders within block bounds."""
     pipeline = [
         {"$match": {"sender_canonical": {"$in": exchanges_canonical}}},
         {"$match": {"block_height": {"$gt": start_block, "$lte": end_block}}},
@@ -986,6 +994,7 @@ async def get_validators_failed_rounds(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
+    """Aggregate validator round-miss stats for the latest payday on mainnet."""
     if net not in ["mainnet"]:
         raise HTTPException(
             status_code=404,
