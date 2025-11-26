@@ -1,3 +1,5 @@
+"""Routes that expose single-token metadata, holdings, and stats for v2."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -64,6 +66,7 @@ def get_owner_history_for_provenance(
     contract_address: CCD_ContractAddress,
     net: NET,
 ):
+    """Call the provenance tag contract to fetch historical owners."""
     entrypoint = "provenance_tag_nft.view_owner_history"
     ci = CIS(
         grpcclient,
@@ -100,8 +103,21 @@ async def get_token_based_on_token_id(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get a token based on tag and token_id.
+    """Return token metadata by combining a tag and an optional token id.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tag: Token tag (usually the verified identifier).
+        token_id: Optional token identifier for multi-token contracts.
+        mongomotor: Mongo client dependency used to query token metadata collections.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A JSON document describing the token together with verified metadata, mint info, and holder count.
+
+    Raises:
+        HTTPException: If the network is unsupported or the token/tag combination cannot be found.
     """
 
     if net not in ["mainnet", "testnet"]:
@@ -201,8 +217,23 @@ async def get_info_for_token_address_for_public_keys(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get information for a given token address for public keys.
+    """Return token metadata formatted for public-key exposure.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        token_id: Token identifier or ``_`` for fungible tokens.
+        mongomotor: Mongo client dependency used to access token metadata.
+        grpcclient: gRPC client dependency used for module resolution.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document containing verified and address information for the token.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -264,9 +295,23 @@ async def get_info_for_token_address(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get information for a given token address. For Provenance Tags specifically, the `owner_history`
-    property is added if available.
+    """Return token metadata, including provenance information when available.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        token_id: Token identifier or ``_`` for fungible tokens.
+        mongomotor: Mongo client dependency used to access token metadata.
+        grpcclient: gRPC client dependency used to resolve module details.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document containing token metadata, mint transaction hash, and holder count.
+
+    Raises:
+        HTTPException: If the network is unsupported or the token cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -389,8 +434,25 @@ async def get_token_current_holders(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get current token holders for token.
+    """List the current holders of a CIS-2 token along with balances.
+
+    Args:
+        request: FastAPI request context containing limit configuration.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the token's contract.
+        contract_subindex: Subindex component of the token's contract.
+        token_id: Token identifier or ``_`` for fungible tokens.
+        skip: Number of holder records to skip (currently unused but validated).
+        limit: Maximum number of holders to inspect (bounded by app limits).
+        mongomotor: Mongo client dependency used to query holdings.
+        grpcclient: gRPC dependency used to read live balances.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary containing the deduplicated holder list and the total number of holders.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination arguments are invalid.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -513,8 +575,22 @@ async def get_token_cis_2_compliance(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to get determination if all holder have zero of positive balance.
+    """Determine whether a token has any negative balances recorded.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the token's contract.
+        contract_subindex: Subindex component of the token's contract.
+        token_id: Token identifier or ``_`` for fungible tokens.
+        mongomotor: Mongo client dependency used to query holdings.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` if no holders with negative balances are found, ``False`` otherwise.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -553,8 +629,21 @@ async def get_info_for_token_tag(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> MongoTypeTokensTag:
-    """
-    Endpoint to get information for a given token tag.
+    """Return the metadata entry associated with a token tag.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tag: Identifier of the tag to fetch.
+        mongodb: Mongo client dependency used to read ``tokens_tags``.
+        grpcclient: gRPC client dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The ``MongoTypeTokensTag`` document describing the tag.
+
+    Raises:
+        HTTPException: If the network is unsupported or the tag is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -587,8 +676,21 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> RedirectResponse:
-    """
-    Endpoint to queue a token for a refresh of the metadata from the token metadataUrl where the token_id is None.
+    """Queue a fungible token for metadata refresh by redirecting to the explicit token endpoint.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract.
+        contract_subindex: Subindex component of the contract.
+        mongodb: Mongo client dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Redirect response pointing at the endpoint that handles concrete token ids.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -602,6 +704,7 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
 
 
 async def send_metadata_to_redis(r: Redis, repl_dict: dict, net: str):
+    """Push a token metadata refresh request onto the Redis stream."""
     if r is not None and len(repl_dict) > 0:
         token_address = f"{repl_dict['contract']}-{repl_dict['token_id']}"
         await r.xadd(
@@ -629,8 +732,22 @@ async def add_token_address_to_metadata_refresh_queue(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to queue a token for a refresh of the metadata from the token metadataUrl.
+    """Queue a specific token for metadata refresh via Redis.
+
+    Args:
+        request: FastAPI request context providing access to the Redis client.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract.
+        contract_subindex: Subindex component of the contract.
+        token_id: Token identifier or ``_`` for fungible tokens.
+        mongodb: Mongo client dependency used to locate the token address.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON response acknowledging the enqueue action.
+
+    Raises:
+        HTTPException: If the network is unsupported or the token is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -669,8 +786,20 @@ async def get_instance_tag_information(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get the recognized tag information from a tag id.
+    """Return the verified metadata entry for a given tag id.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tag: Tag identifier to query.
+        mongomotor: Mongo client dependency used to read ``tokens_tags``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document describing the tag.
+
+    Raises:
+        HTTPException: If the network is unsupported or the tag cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -704,8 +833,24 @@ async def get_nft_tag_tokens(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get individual tokens for recognized nft tag.
+    """Paginate through the NFTs belonging to a verified tag.
+
+    Args:
+        request: FastAPI request context used for pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tag: Tag identifier that groups the NFT contracts.
+        skip: Number of token records to skip.
+        limit: Maximum number of tokens to return.
+        sort_key: Field used for sorting (e.g., ``mint_time``).
+        direction: Sort order, ``asc`` or ``desc``.
+        mongomotor: Mongo client dependency used to query token metadata.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary containing the NFT slice and the total number of tokens for the tag.
+
+    Raises:
+        HTTPException: If the network is unsupported, pagination is invalid, or the tag is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

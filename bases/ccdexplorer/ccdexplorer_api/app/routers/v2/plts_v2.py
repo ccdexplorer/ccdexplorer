@@ -1,3 +1,5 @@
+"""Routes for listing and aggregating Protocol-Level Tokens (PLTs)."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -36,6 +38,37 @@ async def get_all_plt_tokens_from_node(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_TokenId]:
+    """Return the list of PLT token ids that existed at a given block hash.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        block_hash: Block hash to query.
+        grpcclient: gRPC client dependency used to call the node.
+        mongomotor: Mongo client dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Token ids reported by the node for that block.
+
+    Raises:
+        HTTPException: If the network is unsupported or the node call fails.
+    """
+    """Return the list of PLT token IDs directly from the node.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        grpcclient: gRPC client dependency used to call the node.
+        mongomotor: Mongo client dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of ``CCD_TokenId`` entries.
+
+    Raises:
+        HTTPException: If the network is unsupported or the node call fails.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -64,6 +97,21 @@ async def get_all_plt_tokens(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
+    """Return the cached metadata for all PLT tokens.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        grpcclient: gRPC client dependency (unused but kept for parity).
+        mongomotor: Mongo client dependency used to read ``plts_tags``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary keyed by token id containing the stored metadata.
+
+    Raises:
+        HTTPException: If the network is unsupported or no data is available.
+    """
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -123,6 +171,24 @@ async def get_all_plt_statistics_per_day_or_month(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     api_key: str = Security(API_KEY_HEADER),
 ):
+    """Aggregate PLT statistics for a given day or month.
+
+    Args:
+        request: FastAPI request context providing the internal API URL.
+        net: Network identifier (only ``mainnet`` supported).
+        year: Year component of the range.
+        month: Month component of the range.
+        day: Optional day; if omitted, the full month is summarized.
+        grpcclient: gRPC client dependency (unused but kept for parity).
+        httpx_client: Shared HTTP client used to query the misc statistics endpoint.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A summary dictionary containing aggregate transaction counts and USD volumes.
+
+    Raises:
+        HTTPException: If the network is unsupported, the date is invalid, or no data exists.
+    """
     if net != "mainnet":
         raise HTTPException(
             status_code=404,

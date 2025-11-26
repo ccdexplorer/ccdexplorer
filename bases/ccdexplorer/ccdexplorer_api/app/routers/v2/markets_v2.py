@@ -1,3 +1,5 @@
+"""Routes exposing cached market data sourced from third parties."""
+
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
@@ -21,8 +23,18 @@ async def get_markets_info(
     api_key: str = Security(API_KEY_HEADER),
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ) -> dict:
-    """
-    Endpoint to get market information ffor CCD from CoinMarketCap.
+    """Return cached Concordium market metrics obtained from CoinMarketCap.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        api_key: API key extracted from the request headers.
+        mongomotor: Mongo client dependency used to read helper documents.
+
+    Returns:
+        The ``coinmarketcap_data`` helper record.
+
+    Raises:
+        HTTPException: If the market data cannot be found or retrieved.
     """
     db_to_use = mongomotor.mainnet
     try:

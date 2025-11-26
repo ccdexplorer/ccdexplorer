@@ -1,3 +1,5 @@
+"""FastAPI routes serving historical block data for the v2 API."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -29,9 +31,20 @@ async def get_last_blocks(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockInfo]:
-    """
-    Endpoint to get the last X blocks as stored in MongoDB collection `blocks`. Maxes out at 50.
+    """Return the most recent blocks stored in MongoDB.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        limit: Maximum number of blocks to return (capped at 50).
+        mongomotor: Mongo client dependency used to access the ``blocks`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of ``CCD_BlockInfo`` records ordered from newest to oldest.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -70,8 +83,21 @@ async def get_paginated_blocks(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to page through the `blocks` collection using skip/limit.
+    """Page through stored blocks using skip/limit pagination.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of documents to skip before returning blocks.
+        limit: Maximum number of blocks to return.
+        mongomotor: Mongo client dependency used to access the ``blocks`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary containing the estimated total row count and the requested slice of blocks.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
     if net not in ["mainnet", "testnet"]:
@@ -111,9 +137,20 @@ async def get_last_blocks_newer_than(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockInfo]:
-    """
-    Endpoint to get the last X blocks that are newer than `since` as stored in MongoDB collection `blocks`.
+    """Fetch blocks mined after a given height.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        since: Minimum block height (exclusive).
+        mongomotor: Mongo client dependency used to access the ``blocks`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Blocks newer than the given height ordered by height descending.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

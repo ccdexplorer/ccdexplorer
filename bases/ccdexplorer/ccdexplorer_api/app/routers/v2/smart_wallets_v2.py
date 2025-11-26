@@ -1,3 +1,5 @@
+"""Routes summarizing CIS-5 smart-wallet contracts and their activity."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -31,9 +33,20 @@ async def get_last_smart_wallet_transactions_newer_than(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get the last X smart wallet transactions that are newer than block `since`.
+    """Return the latest smart-wallet transactions mined after the given block height.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        since: Minimum block height (exclusive).
+        mongomotor: Mongo client dependency used to query collections.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Paginated transaction data identical to the generic smart-wallet listing endpoint.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -57,17 +70,19 @@ async def get_all_smart_wallet_contracts_info(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Fetches all unique smart wallet contract addresses from the specified MongoDB collection.
+    """Return detailed metadata for every smart-wallet contract.
 
     Args:
-        request (Request): The request object.
-        net (str): The network type, either "testnet" or "mainnet".
-        mongodb (MongoDB, optional): The MongoDB dependency, defaults to the result of get_mongo_db.
-        api_key (str, optional): The API key for security, defaults to the result of API_KEY_HEADER.
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongodb: Mongo client dependency used to query CIS-5 data.
+        api_key: API key extracted from the request headers.
 
     Returns:
-        list[str]: A list of unique smart wallet contract addresses.
+        Dictionary keyed by contract address containing name, module, address counts, and activity.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -156,17 +171,19 @@ async def get_all_smart_wallet_contracts(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Fetches all unique smart wallet contract addresses from the specified MongoDB collection.
+    """Return the set of smart-wallet contracts and their module names only.
 
     Args:
-        request (Request): The request object.
-        net (str): The network type, either "testnet" or "mainnet".
-        mongodb (MongoDB, optional): The MongoDB dependency, defaults to the result of get_mongo_db.
-        api_key (str, optional): The API key for security, defaults to the result of API_KEY_HEADER.
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongodb: Mongo client dependency used to query CIS-5 contract references.
+        api_key: API key extracted from the request headers.
 
     Returns:
-        list[str]: A list of unique smart wallet contract addresses.
+        Dictionary keyed by contract address with name and module metadata.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -195,6 +212,7 @@ async def get_all_smart_wallet_contracts(
 def get_block_ranges_from_start_and_end_dates(
     start_date: str, end_date: str, db_to_use: dict[Collections, Collection]
 ) -> str:
+    """Resolve calendar dates into the corresponding block height range."""
     start_date_result = db_to_use[Collections.blocks_per_day].find_one({"date": start_date})
     if start_date_result:
         height_for_first_block_start_date = start_date_result["height_for_first_block"]
@@ -222,7 +240,22 @@ async def get_smart_wallet_public_key_creations_per_day(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """ """
+    """Return counts of new smart-wallet public keys bucketed by day.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        start_date: Inclusive YYYY-MM-DD string.
+        end_date: Inclusive YYYY-MM-DD string.
+        mongodb: Mongo client dependency used to access utilities collections.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Aggregation result containing the number of creations per day.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -346,8 +379,21 @@ async def get_paginated_smart_wallets_txs(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get paginated smart wallets transactions.
+    """Return paginated smart-wallet transactions with per-wallet context.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of transactions to skip.
+        limit: Maximum number of transactions to return.
+        mongomotor: Mongo client dependency used to query MongoDB.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary keyed by transaction hash that includes the wallet contract and transaction summary.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

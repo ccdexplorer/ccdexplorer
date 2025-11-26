@@ -1,3 +1,5 @@
+"""Internal routes for managing site-user preferences and metadata."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -30,9 +32,15 @@ async def get_site_user_explanations(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get explanations for options for site users.
+    """Return the explanatory metadata displayed next to preference toggles.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        mongomotor: Mongo client dependency pointing at the utilities database.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary keyed by explanation id.
     """
     db_to_use = mongomotor.utilities
     try:
@@ -54,9 +62,19 @@ async def get_site_user_from_token(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> SiteUser | None:
-    """
-    Endpoint to get site user from token.
+    """Fetch the stored site-user profile using the opaque token.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        token: Site-user token string.
+        mongomotor: Mongo client dependency used to query the utilities database.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``SiteUser`` instance if found.
+
+    Raises:
+        HTTPException: If the token cannot be resolved.
     """
     db_to_use = mongomotor.utilities
     try:
@@ -74,6 +92,7 @@ async def get_site_user_from_token(
 
 
 async def get_user(request: Request, token: str):
+    """Internal helper that fetches the site user via the public endpoint."""
     response = await request.app.httpx_client.get(f"{request.app.api_url}/v2/site_user/{token}")
     if response.status_code == 200:
         return SiteUser(**response.json())
@@ -89,9 +108,20 @@ async def post_user_email_address(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to update and save user email address.
+    """Persist an updated email address for the site user identified by the token.
 
+    Args:
+        request: FastAPI request context used to call helper endpoints.
+        user_token: Token that identifies the user.
+        response_form: JSON payload sent by the UI containing ``email_address``.
+        mongomotor: Mongo client dependency used to persist the user document.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` once the document has been upserted.
+
+    Raises:
+        HTTPException: If the user token cannot be resolved.
     """
     user: SiteUser | None = await get_user(request, user_token)
     response_as_dict = jsonable_encoder(response_form)
@@ -118,9 +148,17 @@ async def post_user(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to update and save user.
+    """Persist the full site-user payload provided by the UI.
 
+    Args:
+        request: FastAPI request context used to call helper endpoints.
+        user_token: Token that identifies the user.
+        response_form: JSON payload containing a ``user`` object.
+        mongomotor: Mongo client dependency used to persist the document.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` when the user document is stored, ``False`` if no user exists for the token.
     """
     user: SiteUser | None = await get_user(request, user_token)
     if user:

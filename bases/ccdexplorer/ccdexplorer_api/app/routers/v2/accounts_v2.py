@@ -1,3 +1,5 @@
+"""Routes for paginating, searching, and summarizing account-level data."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -49,9 +51,20 @@ async def get_last_accounts_newer_than(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get the last X accounts that are newer than `since` as stored in MongoDB collection `all_account_addresses`.
+    """Return accounts created after the given index threshold.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        since_index: Minimum account index to include (exclusive).
+        mongomotor: Mongo client dependency used to read ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Up to 1000 account records ordered by index descending.
+
+    Raises:
+        HTTPException: If the network is unsupported or MongoDB query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -85,9 +98,19 @@ async def get_accounts_count_estimate(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> int:
-    """
-    Endpoint to get the accounts estimated count.
+    """Return the approximate number of accounts maintained on the network.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to read ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Estimated document count derived from the highest account index plus one.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -126,9 +149,19 @@ async def get_account_indexes(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get the the account_indexes for a list of canonical account_ids.
+    """Resolve canonical account ids to their on-chain account indexes.
 
+    Args:
+        request: FastAPI request containing a JSON array of ids.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to read ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Mapping from canonical account id to index.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -171,6 +204,35 @@ async def search_accounts(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
+    """Return account documents for a provided list of canonical ids.
+
+    Args:
+        request: FastAPI request containing a JSON array of ids.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to query ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Matching account documents.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
+    """
+    """Perform a case-insensitive search of accounts by hash, alias, or index.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        value: Partial string to match.
+        mongomotor: Mongo client dependency used to read ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Account records that satisfy the regex search.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     search_str = str(value)
     regex = re.compile(search_str, re.IGNORECASE)
     search_str_canonical = str(value)[:29]
@@ -200,9 +262,19 @@ async def get_account_addresses(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get the the account_addresses for a list of account_indexes.
+    """Resolve account indexes to canonical account addresses.
 
+    Args:
+        request: FastAPI request containing a JSON array of indexes.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to read ``all_account_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Mapping from account index to canonical id.
+
+    Raises:
+        HTTPException: If the network is unsupported or the lookup fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -244,9 +316,19 @@ async def get_current_payday_info(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
-    """
-    Endpoint to get the current payday info.
+    """Return summary information for the current payday window.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to query payday collections.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        List of payday info dictionaries ordered by date descending.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

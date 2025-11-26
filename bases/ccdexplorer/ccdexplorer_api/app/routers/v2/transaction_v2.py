@@ -1,3 +1,5 @@
+"""FastAPI routes for transaction-level queries in the v2 API."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -30,20 +32,20 @@ async def get_transaction_logged_events(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Get logged events for a transaction from the MongoDB `tokens_logged_events_v2` collection.
+    """Fetch the logged events emitted by a specific transaction.
 
-    Parameters:
-    - net (str): Network type, either "testnet" or "mainnet".
-    - tx_hash (str): The transaction hash to look up.
-    - mongodb (MongoDB, optional): MongoDB dependency, defaults to `get_mongo_db`.
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tx_hash: Hash of the transaction to inspect.
+        mongodb: Mongo client dependency used to query ``tokens_logged_events_v2``.
+        api_key: API key extracted from the request headers.
 
     Returns:
-    - list[MongoTypeLoggedEventV2]: A list of logged events for the specified transaction.
+        A dictionary keyed by ``(effect_index, event_index)`` mapping to logged event models.
 
     Raises:
-    - HTTPException: If the transaction hash is not found in the specified network.
-
+        HTTPException: If the network is unsupported or the transaction hash is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -82,19 +84,20 @@ async def get_transaction(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
-    """
-    Retrieve a transaction from the MongoDB `transactions` collection.
+    """Return the raw transaction summary from MongoDB.
 
-    Parameters:
-    - net (str): Network type, either "testnet" or "mainnet".
-    - tx_hash (str): The transaction hash to look up.
-    - mongodb (MongoDB, optional): MongoDB dependency, defaults to `get_mongo_db`.
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        tx_hash: Hash of the transaction to fetch.
+        mongodb: Mongo client dependency used to query the ``transactions`` collection.
+        api_key: API key extracted from the request headers.
 
     Returns:
-    - CCD_BlockItemSummary: The transaction summary from the MongoDB collection.
+        The transaction serialized as ``CCD_BlockItemSummary``.
 
     Raises:
-    - HTTPException: If the transaction hash is not found in the specified network.
+        HTTPException: If the network is unsupported or the transaction hash is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
