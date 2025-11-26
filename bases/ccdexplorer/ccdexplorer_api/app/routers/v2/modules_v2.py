@@ -1,3 +1,5 @@
+"""Routes exposing module summaries and search utilities."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -25,9 +27,19 @@ async def get_overview_of_all_modules(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Fetches all modules from the specified MongoDB collection.
+    """Return the latest monthly overview statistics for every module.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongodb: Mongo client dependency used to read the ``statistics`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary keyed by ``year_month`` containing module overview rows.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -55,6 +67,21 @@ async def search_modules(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
+    """Perform a case-insensitive search across module ids and names.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        value: Search pattern to match.
+        mongomotor: Mongo client dependency used to query ``modules``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Up to ten modules matching the search string.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     search_str = str(value)
     regex = re.compile(search_str, re.IGNORECASE)
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet

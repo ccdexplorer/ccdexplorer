@@ -1,3 +1,5 @@
+"""Routes exposing module metadata, schemas, and usage statistics."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -38,8 +40,20 @@ async def get_module_deployment_tx(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
-    """
-    Endpoint to get tx in which the module was deployed.
+    """Return the transaction that deployed the specified module reference.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        module_ref: Module reference (hash).
+        mongodb: Mongo client dependency used to query the ``transactions`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``CCD_BlockItemSummary`` describing the deployment transaction.
+
+    Raises:
+        HTTPException: If the network is unsupported or the module is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -68,8 +82,20 @@ async def get_module_schema(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get schema from module source.
+    """Return the raw module source in base64 encoding along with its version.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        module_ref: Module reference (hash).
+        grpcclient: gRPC client dependency used to fetch module sources.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document with the encoded schema and the version tag.
+
+    Raises:
+        HTTPException: If the network is unsupported or the source cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -103,8 +129,22 @@ async def get_module_instances(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get instances from module ref.
+    """Page through contract instances derived from a specific module reference.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        module_ref: Module reference (hash).
+        skip: Number of instances to skip.
+        limit: Maximum number of instances to return.
+        mongodb: Mongo client dependency used to query ``instances``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with the list of instance addresses and the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -161,8 +201,20 @@ async def get_module_usage(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get usage over time for instances from module ref.
+    """Return daily activity counts for all instances referencing the module.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        module_ref: Module reference (hash).
+        mongodb: Mongo client dependency used to query impacts and instances.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of day/count pairs describing usage.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -198,8 +250,20 @@ async def get_module(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get schema from module source.
+    """Return the stored module metadata document.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        module_ref: Module reference (hash).
+        mongodb: Mongo client dependency used to read the ``modules`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document for the module reference.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

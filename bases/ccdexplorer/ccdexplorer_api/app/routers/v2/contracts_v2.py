@@ -1,3 +1,5 @@
+"""Routes that expose contract catalog data and pagination utilities."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -31,6 +33,21 @@ async def search_contracts(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
+    """Perform a case-insensitive search over stored contracts by name.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        value: Substring to match against contract names.
+        mongomotor: Mongo client dependency used to query the ``instances`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Contracts whose names (v0 or v1) match the provided pattern.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     search_str = str(value)
     regex = re.compile(search_str, re.IGNORECASE)
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
@@ -62,8 +79,22 @@ async def get_paginated_contracts(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to page through the `instances` collection using skip/limit.
+    """Page through stored contracts while enriching each entry with deployment info.
+
+    Args:
+        request: FastAPI request context providing the API base URL.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of entries to skip.
+        limit: Maximum number of contracts to return.
+        mongomotor: Mongo client dependency used to query the ``instances`` collection.
+        httpx_client: Shared HTTP client used to fetch contract deployment data.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary containing the total number of contracts and the requested slice.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
     if net not in ["mainnet", "testnet"]:

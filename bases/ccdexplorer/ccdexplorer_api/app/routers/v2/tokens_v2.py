@@ -1,3 +1,5 @@
+"""Routes exposing aggregated token metadata across the Concordium networks."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -44,9 +46,19 @@ async def get_tokens_count_estimate(
     mongomotor: MongoDB = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> int:
-    """
-    Endpoint to get the tokens estimated count.
+    """Return the approximate number of known token addresses.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to access token collections.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Estimated document count for ``tokens_token_addresses_v2``.
+
+    Raises:
+        HTTPException: If the network is unsupported or the estimate cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -82,8 +94,20 @@ async def get_fungible_tokens_verified(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get verified fungible tokens on 'net'.
+    """List verified fungible CIS-2 tokens together with USD estimates.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to access token metadata.
+        exchange_rates: Injected exchange-rate cache keyed by ticker.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of ``FungibleToken`` models enriched with metadata and fiat valuations.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -144,8 +168,20 @@ async def get_non_fungible_tokens_verified(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get verified non-fungible tokens on 'net'.
+    """List verified NFT collections for the requested network.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to access token metadata.
+        exchange_rates: Injected exchange-rate cache (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of ``NonFungibleToken`` models containing the verified metadata.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -182,6 +218,21 @@ async def search_tokens(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
+    """Perform a case-insensitive search over verified token display names.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        value: Partial display name to match.
+        mongomotor: Mongo client dependency used to access token metadata.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Tokens whose display name matches the pattern.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     search_str = str(value).lower()
     regex = re.compile(search_str)
 

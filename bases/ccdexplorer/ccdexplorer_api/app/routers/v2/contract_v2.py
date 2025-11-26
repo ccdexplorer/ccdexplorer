@@ -1,3 +1,5 @@
+"""Routes covering contract metadata, holdings, schemas, and logs for v2."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -57,12 +59,14 @@ class GetCIS5BalanceOfRequest(BaseModel):
 
 
 def batch(iterable, n=1):
+    """Yield fixed-size batches from an iterable list."""
     iterable_length = len(iterable)
     for ndx in range(0, iterable_length, n):
         yield iterable[ndx : min(ndx + n, iterable_length)]
 
 
 async def get_module_name_from_contract_address(db_to_use, contract_address: CCD_ContractAddress):
+    """Return the module name associated with a contract instance."""
     instance_result = await db_to_use[Collections.instances].find_one(
         {"_id": contract_address.to_str()}
     )
@@ -185,8 +189,22 @@ async def get_schema_from_source(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get the schema as extracted from the source of a smart contract.
+    """Return the compiled schema embedded inside the contract source.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to retrieve instance metadata.
+        grpcclient: gRPC client dependency used to read module sources.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON payload containing the versioned module schema.
+
+    Raises:
+        HTTPException: If the network is unsupported or the schema cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -244,8 +262,21 @@ async def get_token_information(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get the token information a smart contract.
+    """Return token metadata stored for a smart contract instance.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to read token tags.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The first matching document from ``tokens_tags`` describing the contract.
+
+    Raises:
+        HTTPException: If the network is unsupported or no metadata exists.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -288,8 +319,22 @@ async def get_contract_information(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get the information for a smart contract.
+    """Return full contract metadata enriched with verification status.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to read module verification data.
+        grpcclient: gRPC client dependency used to fetch instance info.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The instance info as reported by the node plus additional metadata.
+
+    Raises:
+        HTTPException: If the network is unsupported or the instance is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -341,8 +386,23 @@ async def get_instance_CIS_support(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get CIS support for instance.
+    """Check whether an instance reports support for a specific CIS standard.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        cis_standard: Name of the CIS standard to test (e.g., ``CIS-2``).
+        mongomotor: Mongo client dependency used to look up module names.
+        grpcclient: gRPC client dependency used to call the ``supports`` entrypoint.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` when the contract reports supporting the standard, ``False`` otherwise.
+
+    Raises:
+        HTTPException: If the network is unsupported or the instance is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -393,8 +453,22 @@ async def get_instance_CIS_support_multiple(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
-    """
-    Endpoint to get which CIS standard the instance reportedly supports.
+    """List every CIS standard an instance reports supporting.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to read module names.
+        grpcclient: gRPC client dependency used to call the ``supports`` entrypoint.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of supported CIS standard identifiers.
+
+    Raises:
+        HTTPException: If the network is unsupported or the instance is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -444,8 +518,21 @@ async def get_instance_tnt_ids(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get all CIS-6 ids for instance.
+    """Return the list of TNT (CIS-6) identifiers emitted by a contract.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Distinct CIS-6 item identifiers observed in logged events.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -492,8 +579,21 @@ async def get_instance_tnt_logged_events(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get all CIS-6 logged events for instance.
+    """Return all CIS-6 events emitted by the contract regardless of item id.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The logged events stripped down to relevant fields.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -538,8 +638,22 @@ async def get_instance_tnt_logged_events_for_item_id(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get all CIS-6 logged events for instance.
+    """Return CIS-6 events for a specific TNT item id ordered by block height.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        item_id: TNT identifier whose history should be returned.
+        mongomotor: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Logged events pertaining to the requested item id.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -572,9 +686,21 @@ async def get_contract_tokens_available(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """
-    Endpoint to determine if a given contract instance holds tokens,
-    as stored in MongoDB collection `tokens_links_v3`.
+    """Return whether the contract address currently holds any CIS-2 tokens.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to query ``tokens_links_v3``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` if at least one token holding record exists, ``False`` otherwise.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -606,8 +732,21 @@ async def get_instance_tag_information(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
-    """
-    Endpoint to get the recognized tag information for a smart contract.
+    """Return the verified tag metadata attached to a contract instance.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to query ``tokens_tags``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        JSON document describing the instance tag.
+
+    Raises:
+        HTTPException: If the network is unsupported or the tag is unknown.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -641,8 +780,21 @@ async def get_contract_deployment_tx(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
-    """
-    Endpoint to get tx in which the instance was deployed.
+    """Return the transaction that created the specified contract instance.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongodb: Mongo client dependency used to query the ``transactions`` collection.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The deployment transaction serialized as ``CCD_BlockItemSummary``.
+
+    Raises:
+        HTTPException: If the network is unsupported or the transaction is missing.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -678,8 +830,21 @@ async def get_contract_txs_count(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> int:
-    """
-    Endpoint to get a count of all contract transactions. Note: can be slow for large contracts.
+    """Return the number of transactions that impacted the contract.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        contract_index: Index component of the contract address.
+        contract_subindex: Subindex component of the contract address.
+        mongomotor: Mongo client dependency used to query ``impacted_addresses``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Count of matching transactions (may be slow for frequently used contracts).
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

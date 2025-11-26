@@ -1,3 +1,5 @@
+"""Routes for inspecting CIS-5 smart-wallet contracts, public keys, and balances."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -71,7 +73,22 @@ async def get_all_public_keys_for_smart_wallet_contract(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
-    """ """
+    """List every public key registered against a smart-wallet contract.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        mongodb: Mongo client dependency used to query CIS-5 records.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        All distinct public keys stored for the contract.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -109,7 +126,22 @@ async def get_smart_wallet_details_from_public_key(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Find the smart-wallet contract that owns a given public key.
+
+    Args:
+        request: FastAPI request context used to fetch contract data.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        public_key: Hex-encoded CIS-5 public key.
+        mongodb: Mongo client dependency used to query CIS-5 records.
+        httpx_client: Shared HTTP client used to confirm CIS-5 support via API calls.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary containing the wallet contract address and the public key.
+
+    Raises:
+        HTTPException: If the network is unsupported or the key cannot be located.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -157,7 +189,23 @@ async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockItemSummary:
-    """ """
+    """Return the transaction that first introduced a public key to the wallet.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key of interest.
+        mongodb: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``CCD_BlockItemSummary`` describing the deployment transaction.
+
+    Raises:
+        HTTPException: If the network is unsupported or the key cannot be found.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -216,7 +264,23 @@ async def get_tx_count_for_public_key_from_smart_wallet_contract(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Return how many transactions involve the specified public key.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key of interest.
+        mongodb: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary containing the contract, public key, and transaction count.
+
+    Raises:
+        HTTPException: If the network is unsupported or the key has no history.
+    """
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
@@ -265,7 +329,25 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Return paginated CIS-5 logged events touching the provided public key.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key of interest.
+        skip: Number of events to skip.
+        limit: Maximum number of events to return.
+        mongodb: Mongo client dependency used to query logged events.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Selected logged events and a placeholder for the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -335,7 +417,25 @@ async def get_ccd_balances_for_public_key_from_smart_wallet_contract(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Query the CCD balance held by a public key inside a smart-wallet contract.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key to inspect.
+        mongodb: Mongo client dependency used to resolve contract metadata.
+        grpcclient: gRPC client dependency used to invoke CCD balance entrypoints.
+        exchange_rates: Exchange rates used to compute USD equivalents.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionary with CCD balance information including USD conversion.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -394,7 +494,25 @@ async def get_tokens_available_for_public_key_from_smart_wallet_contract(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
-    """ """
+    """Return whether the public key has any CIS-2 token links recorded.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key to inspect.
+        mongodb: Mongo client dependency used to query CIS-5 link records.
+        grpcclient: gRPC client dependency (unused but kept for parity).
+        exchange_rates: Exchange rates dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        ``True`` if at least one token link exists, ``False`` otherwise.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -436,7 +554,27 @@ async def get_cis2_tokens_list_for_public_key_from_smart_wallet_contract(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Return metadata about CIS-2 tokens linked to the public key.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key to inspect.
+        skip: Number of link records to skip.
+        limit: Maximum number of link records to return.
+        mongodb: Mongo client dependency used to query token link data.
+        grpcclient: gRPC client dependency (unused but kept for parity).
+        exchange_rates: Exchange rates dependency (unused but kept for parity).
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionaries grouping fungible, non-fungible, and unverified tokens.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -552,7 +690,27 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     exchange_rates: dict = Depends(get_exchange_rates),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """ """
+    """Return live CIS-2 token balances for a public key managed by a wallet.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key to inspect.
+        skip: Number of token link records to skip.
+        limit: Maximum number of token link records to consider.
+        mongodb: Mongo client dependency used to query token link data.
+        grpcclient: gRPC client dependency used to invoke wallet entrypoints.
+        exchange_rates: Exchange-rate cache used for USD conversions.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Dictionaries grouping balances into fungible, non-fungible, and unverified sets.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -675,6 +833,7 @@ def update_fungible_token_with_price_info(
     token_amount,
     token_vi,
 ):
+    """Enrich a fungible token entry with pricing data using exchange rates."""
     this_token_.update({"token_symbol": token_vi["get_price_from"]})
     this_token_.update({"decimals": token_vi["decimals"]})
     this_token_.update({"token_value": int(token_amount) * (math.pow(10, -token_vi["decimals"]))})
@@ -705,7 +864,23 @@ async def get_all_cis2_contracts_for_public_key_from_smart_wallet_contract(
     mongodb: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
-    """ """
+    """List distinct CIS-2 contract addresses linked to a wallet public key.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        wallet_contract_address_index: Index component of the contract address.
+        wallet_contract_address_subindex: Subindex component of the contract address.
+        public_key: Public key to inspect.
+        mongodb: Mongo client dependency used to query token link data.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Unique contract addresses as strings.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,

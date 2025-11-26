@@ -1,3 +1,5 @@
+"""FastAPI routes serving transaction-oriented data for version 2 of the API."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -32,6 +34,7 @@ API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
 
 
 def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
+    """Look up the canonical transaction type name for a given contents label."""
     result: TypeContents | None = tx_type_translation.get(tx_type_contents)
     if result:
         result.category.value
@@ -40,6 +43,7 @@ def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
 
 
 def reverse_tx_type_translation(tx_type_translation: dict) -> dict:
+    """Group transaction type names by their category to simplify filtering."""
     category_to_types = defaultdict(list)
 
     for tx_type, contents in tx_type_translation.items():
@@ -58,9 +62,19 @@ async def get_transaction_types(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    """
-    Endpoint to get the transaction types as stored in MongoDB collection `tx_types_count`.
+    """Return the list of tracked transaction types and counts.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to query the ``tx_types_count`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        All transaction type records stored in MongoDB.
+
+    Raises:
+        HTTPException: If the network is unsupported or the types cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -89,9 +103,22 @@ async def get_last_transactions(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
-    """
-    Endpoint to get the last X transactions as stored in MongoDB collection `transactions`. Maxes out at 50.
+    """List the latest transactions, optionally filtered by type category.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        count: Maximum number of transactions to return (clamped to 50).
+        skip: Number of items to skip from the newest set.
+        filter: Optional category key from ``tx_type_translation`` to restrict the result.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        A list of serialized ``CCD_BlockItemSummary`` records ordered from newest to oldest.
+
+    Raises:
+        HTTPException: If the network is unsupported, the filter is invalid, or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -147,9 +174,20 @@ async def get_last_blocks_newer_than(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockItemSummary]:
-    """
-    Endpoint to get the last X transactions that are newer than `since` as stored in MongoDB collection `transactions`.
+    """Fetch transactions created after a particular block height.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        since: Minimum block height (exclusive) for the query.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        Transaction summaries newer than the provided block height.
+
+    Raises:
+        HTTPException: If the network is unsupported or the database query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -183,9 +221,22 @@ async def get_transactions_with_filter(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get the last X transactions as stored in MongoDB collection `transactions`. Maxes out at 50.
+    """Provide paginated transactions plus the total for an optional filter.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        count: Maximum number of transactions to return (capped at 500).
+        skip: Starting offset inside the sorted list.
+        filter: Optional category key from ``tx_type_translation`` to restrict the query.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        A dictionary containing the serialized transactions plus the total count for the filter.
+
+    Raises:
+        HTTPException: If the network is unsupported or the database query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -237,9 +288,18 @@ async def get_transactions_tps(
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ) -> dict:
-    """
-    Endpoint to get the transactions TPS as stored in MongoDB collection `pre_render`.
+    """Return the latest transactions-per-second statistics for mainnet.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, only ``mainnet`` is supported for this endpoint.
+        mongomotor: Mongo client dependency used to reach the ``pre_render`` collection.
+
+    Returns:
+        A dictionary containing the TPS table as pre-rendered for dashboards.
+
+    Raises:
+        HTTPException: If the network is unsupported, not mainnet, or the data cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -276,9 +336,18 @@ async def get_transactions_count_estimate(
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ) -> int:
-    """
-    Endpoint to get the transactions estimated count.
+    """Return the estimated number of transactions stored in MongoDB.
 
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+
+    Returns:
+        The estimated document count of the ``transactions`` collection.
+
+    Raises:
+        HTTPException: If the network is unsupported or the estimate cannot be computed.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -315,9 +384,21 @@ async def get_transactions_from_data_registered(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[dict]:
-    """
-    Endpoint to get the search transactions from data registered as stored in MongoDB collection `transactions`.
+    """Search transactions by the exact ``data_registered`` payload.
 
+    Args:
+        request: FastAPI request used to read the JSON body containing ``hex``.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of records to skip from the newest matching result.
+        limit: Maximum number of matches to return (capped at 50).
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        Matching transactions serialized as ``CCD_BlockItemSummary`` dictionaries.
+
+    Raises:
+        HTTPException: If the network is unsupported, the request body is missing, or the query fails.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -357,6 +438,7 @@ async def get_transactions_from_data_registered(
 
 
 async def get_tx_ids_for_memo(memo_to_search: str, memos: dict):
+    """Return transaction hashes whose memo contains the provided substring."""
     keys_with_sub_string = []
     for x in memos.keys():
         memo = x
@@ -386,9 +468,23 @@ async def get_transactions_from_transfers(
     blocks_per_day: dict[str, MongoTypeBlockPerDay] = Depends(get_blocks_per_day),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get the search transactions from transfers as stored in MongoDB collection `transactions`.
+    """Search large account transfers with optional memo and date filters.
 
+    Args:
+        request: FastAPI request used to read search criteria such as ranges and memo.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of transfer records to skip after sorting.
+        limit: Maximum number of events to return (capped at 500).
+        mongomotor: Mongo client dependency used to reach transfer collections.
+        memos: In-memory memo index injected via dependency.
+        blocks_per_day: Mapping of YYYY-MM-DD strings to the block range for that day.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        A dictionary containing the filtered transactions plus the total number of matches.
+
+    Raises:
+        HTTPException: If validation fails, the network is unsupported, or the query errors.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -524,8 +620,21 @@ async def get_paginated_transactions(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to page through the `transactions` collection using skip/limit.
+    """Page through the entire ``transactions`` collection using skip/limit pagination.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of documents to skip before returning data.
+        limit: Maximum number of documents to retrieve.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        A dictionary containing the estimated total row count and the requested slice of transactions.
+
+    Raises:
+        HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
     if net not in ["mainnet", "testnet"]:
