@@ -1,3 +1,5 @@
+"""FastAPI endpoints that expose block and payday data for version 2 of the API."""
+
 # pyright: reportOptionalMemberAccess=false
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
@@ -38,8 +40,20 @@ async def get_block_at_height_from_grpc(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_BlockInfo:
-    """
-    Endpoint to get blockInfo from the node.
+    """Retrieve a block directly from the node via gRPC.
+
+    Args:
+        request: FastAPI request used to read app limits (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height_or_hash: Either a block height or a block hash.
+        grpcclient: Shared gRPC client dependency.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The block info as returned by the node.
+
+    Raises:
+        HTTPException: If the network is unsupported or the block cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -82,8 +96,25 @@ async def get_block_txs(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get transactions for the given block from mongodb.
+    """List transactions belonging to a particular block.
+
+    Args:
+        request: FastAPI request used to access per-request configuration limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height: Height of the block whose transactions are requested.
+        skip: Number of transactions to skip for pagination.
+        limit: Maximum number of transactions to return.
+        sort_key: Field inside a transaction summary used for sorting.
+        direction: Either ``asc`` or ``desc`` to influence the sort order.
+        mongomotor: Mongo client dependency injected by FastAPI.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary containing the transactions plus metadata such as total count.
+
+    Raises:
+        HTTPException: If parameters are invalid, the block does not exist, or the
+            transactions cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -158,8 +189,22 @@ async def get_block_payday_true_false(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """
-    Endpoint to get determine if a block is a payday block.
+    """Determine whether a block distributes payday rewards.
+
+    Args:
+        request: FastAPI request used to read app limits (unused but kept for parity).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height_or_hash: Either a block height or hash used to look up payday metadata.
+        mongomotor: Mongo client dependency injected by FastAPI.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary indicating whether the block is a payday and, if so, how many
+        account and pool rewards exist.
+
+    Raises:
+        HTTPException: If the network is unsupported or an error occurs while
+            querying MongoDB.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -232,8 +277,25 @@ async def get_block_payday_pool_rewards(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypePoolReward]:
-    """
-    Endpoint to get pool rewards for the given block from mongodb.
+    """Return the pool rewards distributed for a payday block.
+
+    Args:
+        request: FastAPI request used to access per-request configuration limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height: Height of the block that closes the payday sequence.
+        skip: Number of pool rewards to skip for pagination.
+        limit: Maximum number of rewards to return.
+        sort_key: Field used to sort the results.
+        direction: Either ``asc`` or ``desc`` to select the sort direction.
+        mongomotor: Mongo client dependency injected by FastAPI.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of pool reward models constrained by the pagination arguments.
+
+    Raises:
+        HTTPException: If parameters are invalid, the network is unsupported, or
+            rewards cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -310,8 +372,25 @@ async def get_block_payday_account_rewards(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[MongoTypeAccountReward]:
-    """
-    Endpoint to get account rewards for the given block from mongodb.
+    """Return the account rewards distributed for a payday block.
+
+    Args:
+        request: FastAPI request used to access per-request configuration limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height: Height of the block that closes the payday sequence.
+        skip: Number of account rewards to skip for pagination.
+        limit: Maximum number of rewards to return.
+        sort_key: Field used to sort the results.
+        direction: Either ``asc`` or ``desc`` to select the sort direction.
+        mongomotor: Mongo client dependency injected by FastAPI.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of account reward models constrained by the pagination arguments.
+
+    Raises:
+        HTTPException: If parameters are invalid, the network is unsupported, or
+            rewards cannot be retrieved.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -382,8 +461,20 @@ async def get_block_special_events(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_BlockSpecialEvent]:
-    """
-    Endpoint to get special events for the given block.
+    """Fetch special events emitted by the node for a given block.
+
+    Args:
+        request: FastAPI request used to read app limits (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height: Height of the block whose special events are requested.
+        grpcclient: Shared gRPC client dependency.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A list of special event descriptions.
+
+    Raises:
+        HTTPException: If the network is unsupported.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -409,8 +500,20 @@ async def get_block_chain_parameters(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_ChainParameters:
-    """
-    Endpoint to get chain parameters for the given block.
+    """Return the chain parameters that applied at the given block height.
+
+    Args:
+        request: FastAPI request used to read app limits (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        height: Height of the block whose chain parameters are requested.
+        grpcclient: Shared gRPC client dependency.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The chain parameters deserialized from the gRPC response.
+
+    Raises:
+        HTTPException: If the network is unsupported or the parameters cannot be found.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -436,8 +539,19 @@ async def get_last_finalized_block(
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> CCD_FinalizedBlockInfo:
-    """
-    Endpoint to get the last block from the node.
+    """Retrieve the latest finalized block from the node.
+
+    Args:
+        request: FastAPI request used to read app limits (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        grpcclient: Shared gRPC client dependency.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        The most recently finalized block info returned by the node.
+
+    Raises:
+        HTTPException: If the network is unsupported or the data cannot be obtained.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
