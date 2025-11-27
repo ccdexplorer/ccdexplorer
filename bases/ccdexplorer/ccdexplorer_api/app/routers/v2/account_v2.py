@@ -9,6 +9,7 @@
 
 import datetime as dt
 import math
+import inspect
 
 import dateutil
 import grpc
@@ -67,6 +68,27 @@ from pymongo.asynchronous.database import AsyncDatabase
 router = APIRouter(tags=["Account"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
 
+
+def _wrap_router_get(registrar):
+    """Wrap FastAPI's router.get to supply summary/description from docstrings."""
+
+    def wrapper(*args, **kwargs):
+        route_kwargs = dict(kwargs)
+
+        def decorator(func):
+            doc = inspect.getdoc(func) or ""
+            first_paragraph = doc.strip().split("\n\n", 1)[0] if doc else ""
+            first_line = first_paragraph.splitlines()[0] if first_paragraph else ""
+            summary = route_kwargs.pop("summary", None) or first_line
+            description = route_kwargs.pop("description", None) or first_paragraph or first_line
+            return registrar(*args, summary=summary, description=description, **route_kwargs)(func)
+
+        return decorator
+
+    return wrapper
+
+
+router.get = _wrap_router_get(router.get)
 # bump
 
 
