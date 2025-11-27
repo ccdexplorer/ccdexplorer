@@ -20,6 +20,7 @@ from ccdexplorer.mongodb import (
     Collections,
     MongoDB,
 )
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
@@ -59,6 +60,7 @@ class CIS5PublicKeysContracts(BaseModel):
 
 router = APIRouter(tags=["Smart Wallet"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get(

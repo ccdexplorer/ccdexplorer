@@ -6,7 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
 from ccdexplorer.env import API_KEY_HEADER
 from fastapi.security.api_key import APIKeyHeader
@@ -58,6 +58,7 @@ class TokenHolding(BaseModel):
 
 router = APIRouter(tags=["Token"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 def get_owner_history_for_provenance(

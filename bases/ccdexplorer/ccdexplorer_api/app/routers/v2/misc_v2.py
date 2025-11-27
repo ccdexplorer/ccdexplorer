@@ -11,7 +11,7 @@ from datetime import timedelta
 from enum import Enum
 from typing import Any
 
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import dateutil
 import grpc
 import pandas as pd
@@ -45,6 +45,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
 
 router = APIRouter(tags=["Misc"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 class ExchangePeriod(Enum):

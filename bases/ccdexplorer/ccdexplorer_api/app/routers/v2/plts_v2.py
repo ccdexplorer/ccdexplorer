@@ -6,6 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 import dateutil
 import grpc
 from grpc._channel import _MultiThreadedRendezvous
@@ -28,6 +29,7 @@ from calendar import monthrange
 
 router = APIRouter(tags=["Protocol-Level Tokens"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/plt/list-token-ids", response_class=JSONResponse)

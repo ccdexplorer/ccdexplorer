@@ -24,13 +24,19 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_blocks_per_day,
     get_memos,
 )
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, tx_type_translation, TypeContents
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    await_await,
+    tx_type_translation,
+    TypeContents,
+    apply_docstring_router_wrappers,
+)
 from collections import defaultdict
 
 # bump
 
 router = APIRouter(tags=["Transactions"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:

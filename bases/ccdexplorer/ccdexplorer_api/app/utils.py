@@ -1,5 +1,6 @@
 import asyncio
 import datetime as dt
+import inspect
 from collections import defaultdict
 from enum import Enum
 from typing import Any, Optional
@@ -11,6 +12,43 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_UpdatePayload,
 )
 from pydantic import BaseModel
+
+
+def _make_docstring_wrapper(registrar):
+    """Return a decorator factory that injects summary/description from docstrings."""
+
+    def wrapper(*args, **kwargs):
+        supplied_summary = kwargs.pop("summary", None)
+        supplied_description = kwargs.pop("description", None)
+
+        def decorator(func):
+            doc = inspect.getdoc(func) or ""
+            first_paragraph = doc.strip().split("\n\n", 1)[0] if doc else ""
+            first_line = first_paragraph.splitlines()[0] if first_paragraph else ""
+            summary = supplied_summary or first_line or None
+            description = supplied_description or first_paragraph or first_line or None
+            return registrar(
+                *args,
+                summary=summary,
+                description=description,
+                **kwargs,
+            )(func)
+
+        return decorator
+
+    return wrapper
+
+
+def apply_docstring_router_wrappers(router):
+    """Ensure router methods derive summary/description values from docstrings."""
+
+    def safe_getattr(name):
+        return getattr(router, name, None)
+
+    for method_name in ("get", "post", "put", "delete", "patch"):
+        registrar = safe_getattr(method_name)
+        if registrar is not None:
+            setattr(router, method_name, _make_docstring_wrapper(registrar))
 
 
 class PLTToken(BaseModel):
