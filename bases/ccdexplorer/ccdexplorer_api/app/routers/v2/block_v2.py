@@ -6,7 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.domain.mongo import MongoTypePoolReward, MongoTypeAccountReward
@@ -30,6 +30,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mo
 
 router = APIRouter(tags=["Block"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/block/{height_or_hash}", response_class=JSONResponse)

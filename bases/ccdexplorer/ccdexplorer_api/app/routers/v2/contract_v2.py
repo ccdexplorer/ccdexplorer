@@ -6,7 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -34,6 +34,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mo
 
 router = APIRouter(tags=["Contract"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 class GetBalanceOfRequest(BaseModel):

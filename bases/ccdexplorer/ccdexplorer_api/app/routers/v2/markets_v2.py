@@ -1,5 +1,6 @@
 """Routes exposing cached market data sourced from third parties."""
 
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
@@ -12,6 +13,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Markets"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get(

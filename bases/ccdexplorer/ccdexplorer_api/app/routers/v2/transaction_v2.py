@@ -18,10 +18,12 @@ from ccdexplorer.mongodb import (
 from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_db
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 
 
 router = APIRouter(tags=["Transaction"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/transaction/{tx_hash}/logged-events", response_class=JSONResponse)

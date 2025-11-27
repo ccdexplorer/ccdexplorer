@@ -17,6 +17,7 @@ from ccdexplorer.mongodb import (
 )
 from pymongo import ReplaceOne
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from fastapi.encoders import jsonable_encoder
 import httpx
 import datetime as dt
@@ -24,6 +25,7 @@ from ccdexplorer.site_user import SiteUser
 
 router = APIRouter(tags=["Site User"], prefix="/v2", include_in_schema=False)
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/site_user/explanations", response_class=JSONResponse)

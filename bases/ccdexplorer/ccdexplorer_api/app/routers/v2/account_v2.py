@@ -30,6 +30,7 @@ from ccdexplorer.ccdexplorer_api.app.utils import (
     TokenHolding,
     category_to_types,
     await_await,
+    apply_docstring_router_wrappers,
 )
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.domain.mongo import (
@@ -64,7 +65,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 router = APIRouter(tags=["Account"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
-
+apply_docstring_router_wrappers(router)
 # bump
 
 

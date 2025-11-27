@@ -7,7 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 import re
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from ccdexplorer.mongodb import Collections, MongoMotor
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -18,6 +18,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Modules"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/modules/overview", response_class=JSONResponse)

@@ -11,7 +11,7 @@ import json
 import re
 import asyncio
 
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import httpx
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_grpcclient,
@@ -40,6 +40,7 @@ from fastapi.responses import JSONResponse
 
 router = APIRouter(tags=["Accounts"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/accounts/newer/than/{since_index}", response_class=JSONResponse)

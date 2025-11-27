@@ -6,6 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo
 from ccdexplorer.mongodb import (
     Collections,
@@ -21,6 +22,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Blocks"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get("/{net}/blocks/last/{limit}", response_class=JSONResponse)

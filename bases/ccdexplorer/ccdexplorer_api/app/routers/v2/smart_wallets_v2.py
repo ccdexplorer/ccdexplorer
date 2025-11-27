@@ -6,7 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
 from fastapi import APIRouter, Depends, Request, Security, HTTPException
 from fastapi.responses import JSONResponse
@@ -19,6 +19,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_db, get_mong
 
 router = APIRouter(tags=["Smart Wallets"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get(

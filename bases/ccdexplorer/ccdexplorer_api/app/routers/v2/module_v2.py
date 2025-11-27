@@ -9,7 +9,7 @@
 import base64
 import json
 import re
-from ccdexplorer.ccdexplorer_api.app.utils import await_await
+from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
@@ -27,6 +27,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mo
 
 router = APIRouter(tags=["Module"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+apply_docstring_router_wrappers(router)
 
 
 @router.get(
