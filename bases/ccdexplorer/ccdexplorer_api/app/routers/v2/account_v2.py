@@ -1159,10 +1159,12 @@ async def get_validator_current_payday_stats(
     if mongo_result:
         mongo_result = MongoTypePaydayV2(**mongo_result[0])
         if mongo_result:
-            paydays_last_blocks_validated = (
-                mongo_result.height_for_last_block - mongo_result.height_for_first_block + 1  # type: ignore
-            )
-
+            if mongo_result.height_for_last_block:
+                paydays_last_blocks_validated = (
+                    mongo_result.height_for_last_block - mongo_result.height_for_first_block + 1  # type: ignore
+                )
+            else:
+                return "Payday calculation in progress...please wait."
         try:
             pool = grpcclient.get_pool_info_for_pool(index, "last_final", net=NET(net))
             if pool.current_payday_info:
