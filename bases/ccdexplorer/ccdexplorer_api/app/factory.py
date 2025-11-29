@@ -6,17 +6,23 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
-from ccdexplorer.mongodb.core import CollectionsUtilities
 import httpx
 import humanize
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
+from ccdexplorer.mongodb.core import CollectionsUtilities
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    generate_latest,
+    multiprocess,
+)
 
 # from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -337,8 +343,16 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         on_blocked=handle_429,
         config={r"^/v2": rate_limit_rules},
     )
-    instrumentator = Instrumentator().instrument(app)
-    instrumentator.expose(app)
+    Instrumentator().instrument(app)
+
+    @app.get("/metrics")
+    def metrics() -> Response:
+        # Create a registry that reads from PROMETHEUS_MULTIPROC_DIR
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+
+        data = generate_latest(registry)
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
     # # V2
     app.include_router(account_v2.router)
