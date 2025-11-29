@@ -21,10 +21,16 @@ COPY projects/ccdexplorer_site ./projects/ccdexplorer_site
 #    This is the crucial step that makes `ccdexplorer.*` importable.
 RUN uv pip install -e ./projects/ccdexplorer_site
 
+
+# Add entrypoint to root of image
+COPY projects/ccdexplorer_site/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Create a non-root user and group
 RUN addgroup --system app && adduser --system --ingroup app app
 
 USER app
 
 WORKDIR /app/projects/ccdexplorer_site
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "80", "--no-access-log"]

@@ -5,19 +5,25 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+
+import httpx
+import urllib3
+from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountInfo,
     CCD_IpInfo,
 )
-from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
-import httpx
-
-import urllib3
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, Request
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    generate_latest,
+    multiprocess,
+)
 
 # from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -29,7 +35,6 @@ import pickle
 
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from ccdexplorer.env import environment
 from ccdexplorer.ccdexplorer_site.app.routers import (
     account,
     account_pool,
@@ -60,6 +65,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_transactions_count,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
+from ccdexplorer.env import environment
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -263,8 +269,16 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         allow_headers=["*"],
     )
 
-    instrumentator = Instrumentator().instrument(app)
-    instrumentator.expose(app)
+    Instrumentator().instrument(app)
+
+    @app.get("/metrics")
+    def metrics() -> Response:
+        # Create a registry that reads from PROMETHEUS_MULTIPROC_DIR
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+
+        data = generate_latest(registry)
+        return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
     app.add_middleware(
         CORSMiddleware,
