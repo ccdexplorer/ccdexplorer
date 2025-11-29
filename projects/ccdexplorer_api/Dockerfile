@@ -17,9 +17,10 @@ COPY projects/ccdexplorer_api ./projects/ccdexplorer_api
 
 RUN uv pip install -e ./projects/ccdexplorer_api
 
-# Add entrypoint before switching user
-# COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /app/projects/ccdexplorer_api/entrypoint.sh
+# Add entrypoint to root of image
+COPY projects/ccdexplorer_api/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 
 RUN addgroup --system app && adduser --system --ingroup app app
 
