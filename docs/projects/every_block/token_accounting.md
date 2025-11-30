@@ -1,3 +1,5 @@
+# Token Accounting (Project: `ms_token_accounting`)
+
 ## Goal
 The goal of this service is to keep the CIS tokens administration up to date. It does this by looking for new logged events (as created in [Events and Impacted Addresses](events_and_impacted.md)) and parses the events. 
 

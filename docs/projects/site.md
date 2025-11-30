@@ -1,4 +1,6 @@
-The site is built on [FastAPI](https://fastapi.tiangolo.com/), with all data retrieved via the API. 
+# CCDExplorer Site (Project: `ccdexplorer_site`)
+
+The site is built on [FastAPI](https://fastapi.tiangolo.com/) with Jinja templates, and all data is retrieved via the Explorer API.
 
 ## Getting Started
 
@@ -23,3 +25,8 @@ uvicorn projects.site.asgi:app --loop asyncio --host 0.0.0.0 --port 8000
 
 ## Deployment
 A Dockerfile is supplied that builds the project into a Docker image (this is the image that is being used on [CCDExplorer.io](https://ccdexplorer.io)).
+
+## Notable features
+- Server-side rendered pages with progressive enhancement for live charts.
+- Alias-aware account URLs powered by utilities in `bases/ccdexplorer/ccdexplorer_site/app/utils.py`.
+- Integration with the notification stack so users can manage subscriptions directly from `/settings`.***

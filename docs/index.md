@@ -6,7 +6,7 @@ This is the **DRAFT** documentation repository for all things CCDExplorer.io, in
 The repo is organized as a monorepo, using [Polylith for Python](https://github.com/DavidVujic/python-polylith). 
 
 
-Documentation follows the polylith repo organization, so components and projects (with associated bases). 
+Documentation follows the Polylith repo organization (components, bases, projects) and now also ships with an “Entities” section that describes the core Concordium objects (blocks, transactions, accounts, aliases, contracts, modules, tokens). Use the navigation or the quick links below to dive in.
 
 ### Projects
 - User Facing
@@ -27,3 +27,12 @@ Documentation follows the polylith repo organization, so components and projects
         - [New Account Address](projects/every_block/new_address.md)
         - [New/Upgraded Contract](projects/every_block/new_contract.md)
         - [New/Upgraded Module](projects/every_block/new_module.md)
+
+### Entities
+- [Block](entities/block.md)
+- [Transaction](entities/transaction.md)
+- [Account](entities/account.md)
+- [Alias](entities/alias.md)
+- [Contract](entities/contract.md)
+- [Module](entities/module.md)
+- [Token](entities/token.md)

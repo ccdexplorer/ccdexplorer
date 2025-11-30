@@ -26,7 +26,8 @@ These are user initiated transactions and paid for by the sender. Account transa
       show_bases: false
       show_signature: true 
 
-Note that for account transactions, we try to add a `recognized_sender_id` to each transaction. This value is retrieved from `projects.json`. If a match is made, the `project_id` is stored as `recognized_sender_id`.
+Note that for account transactions, we add a `recognized_sender_id` whenever the sender or invoked contract matches an entry in `projects.json`.  
+The lookup happens inside [`ms_indexers`](../projects/every_block/indexers.md) so every document in the `transactions` collection carries a `project_id` tag when possible.
 
 ## Update
 Update transactions are performed by the chain itself. The following payloads are possible:
@@ -39,5 +40,10 @@ Update transactions are performed by the chain itself. The following payloads ar
 
 
 
+## Augmentations performed by CCDExplorer
+- [`ms_events_and_impacts`](../projects/every_block/events_and_impacted.md) adds `impacted_addresses`, including canonical address references for alias-safe queries.
+- [`ms_indexers`](../projects/every_block/indexers.md) fans out transactions into specialized collections (`transactions_transfer`, `transactions_contracts`, etc.) for fast explorer lookups.
+- [`ms_token_accounting`](../projects/every_block/token_accounting.md) reads `logged_events` emitted by `contract_update_issued` transactions to update token ledgers.
+
 ## How is a transaction stored in the system?
-In the [heartbeat](../projects/every_block/heartbeat.md) service, all new transactions are parsed and stored in the db.
+`heartbeat` ingests each block’s transactions and writes them to MongoDB; follow-up workers (listed above) enrich the base documents with project IDs, alias-friendly fields, and derived statistics.***
