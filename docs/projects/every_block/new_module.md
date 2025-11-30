@@ -1,5 +1,6 @@
+# MS Modules (Project: `ms_modules`)
 
-The micro service MS Modules listens to the Celery topic `module_deployed` and starts processing when a new message arrives. The message contains the `block_height`.
+The micro service listens to the Celery topic `module_deployed` and starts processing when a new message arrives. The message contains the `block_height`.
 
 
 ## Steps

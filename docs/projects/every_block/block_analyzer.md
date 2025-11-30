@@ -1,4 +1,6 @@
-The `block analyzer` service watched for new blocks with transactions in the `blocks` collection (so the result of the `heartbeat` service) and parses them.
+# Block Analyzer (Project: `ms_block_analyser`)
+
+The Block Analyzer service watches for new blocks with transactions in the `blocks` collection (the result of the `heartbeat` service) and parses them.***
 
 
 ## PubSub (Celery + Redis)
@@ -18,6 +20,5 @@ The following topics are published when they occur in a block.
 |`plt`|Triggered for for a new PLT deployed and/or a token update transaction, see [MS PLT](plt.md)|
 |`token_accounting`|Triggered for CIS-2 transactions, see [MS Token Accounting](token_accounting.md)|
 |`metadata`|Triggered _by `token_accounting`_ for CIS-2 transactions, see [MS Metadata](metadata.md)|
-
 
 

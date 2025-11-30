@@ -1,7 +1,9 @@
-The heartbeat service is the `heartbeat` of CCDExplorer Universe. It watches for new finalized blocks and parses them. 
-It's main responsibility is watch the node and on every new block, save the block and transactions in the Mongo database. 
+# Heartbeat (Project: `heartbeat`)
 
-It's run per net, so deployed as a `mainnet` and `testnet` service. 
+The heartbeat service is the “heartbeat” of CCDExplorer Universe. It watches for new finalized blocks and parses them. 
+Its main responsibility is to watch the node and, on every new block, save the block and transactions in MongoDB. 
+
+It's run per net, so deployed as both a `mainnet` and a `testnet` service. 
 
 ## Collections impacted
 - `blocks`: every block is stored in this collection as a [CCD_BlockInfo](../../components/grpc.md/#ccdexplorer.grpc_client.CCD_Types.CCD_BlockInfo) type.

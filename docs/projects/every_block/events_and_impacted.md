@@ -1,3 +1,5 @@
+# Events & Impacted Addresses (Project: `ms_events_and_impacts`)
+
 ## Goal
 The goal of this service is to extract relevant information from transactions for every block. Information includes logged events and impacted addresses from these and from the transactions itself. 
 
