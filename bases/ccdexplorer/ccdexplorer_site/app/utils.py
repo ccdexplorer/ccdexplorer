@@ -950,6 +950,8 @@ def account_address_is_alias(account_address: str, net: str, app) -> bool:
     else:
         if not account_address_entry:
             return False
+        if len(account_address) == 29:
+            return False
         is_alias = account_address_entry["account_address"] != account_address
 
     return is_alias
