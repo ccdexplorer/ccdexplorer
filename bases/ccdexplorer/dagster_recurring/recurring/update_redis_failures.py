@@ -68,6 +68,6 @@ def update_redis_failures(context, mongodb: MongoDB, tooter: Tooter, net: str):
         ]
     )
     context.log.info(
-        f"Found {len(blocks_to_retry)} blocks to retry for special purpose processing on {net}: {', '.join(list(blocks_to_retry))}"
+        f"Found {len(blocks_to_retry)} blocks to retry for special purpose processing on {net}: {', '.join([str(x) for x in blocks_to_retry])}"
     )
     return {"_id": "special_purpose_block_request", "heights": list(blocks_to_retry)}

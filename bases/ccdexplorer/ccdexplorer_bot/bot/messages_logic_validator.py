@@ -32,6 +32,9 @@ class ProcessValidator(MessageValidator, Utils):
 
         # We will use the first impacted address for determining whether a user
         # should be notified.
+        if not notification_event.impacted_addresses[0].address:
+            account_index = None
+
         account_index = (
             notification_event.impacted_addresses[0].address.account.index
             if notification_event.impacted_addresses[0].address.account

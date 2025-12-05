@@ -10,6 +10,76 @@ CCDExplorer is the open-source Concordium blockchain explorer that powers [ccdex
 - **On-chain analytics** – scheduled jobs compute data sets such as transactions by type, per-project usage, unique address counts, daily holder & limit statistics, and realized price series to give Concordium participants contextual insights.
 - **Polylith monorepo** – the repository uses [Polylith for Python](https://github.com/DavidVujic/python-polylith) to keep components, bases, and projects isolated yet composable, making it easy to reuse bricks across services.
 
+## Architecture graph
+```mermaid
+flowchart TD
+    
+    subgraph EXT[Concordium]
+        chain[(Nodes 2x mainet, 2x testnet)]
+        %% web((Explorer Users))
+        %% botusers((Telegram / Email Users))
+    end
+    
+    subgraph CORE[Core Infrastructure]
+        mongo[(MongoDB 3 Member Replica Set)]
+        redis[(Redis + Celery Broker)]
+        tooter[(Apprise Notifications)]
+    end
+
+    subgraph INGEST[Real-time Ingestion]
+        heartbeat[Heartbeat]
+        analyzer[Block Analyzer]
+    end
+
+    subgraph MICRO[Microservices]
+        ms_accounts[MS Accounts]
+        ms_events[MS Events & Impacted]
+        ms_indexers[MS Indexers]
+        ms_instances[MS Instances]
+        ms_modules[MS Modules]
+        ms_metadata[MS Metadata]
+        ms_token[MS Token Accounting]
+        ms_plt[MS PLT]
+        %% ms_bot_sender[MS Bot Sender]
+    end
+
+    subgraph ANALYTICS[Analytics]
+        accounts[Accounts Retrieval]
+        dag_nightrunner[Dagster Nightrunner]
+        dag_recurring[Dagster Recurring]
+        dag_paydays[Dagster Paydays]
+    end
+   subgraph Pipelines[Analytics & Events]
+      INGEST[Real-time Ingestion]
+      MICRO[Microservices]
+      ANALYTICS[Analytics]
+    end
+
+    subgraph APPS[User-facing]
+        api[API]
+        site[Site]
+        bot[Bot]
+    end
+    chain --> ANALYTICS --> mongo
+    
+    chain --> INGEST --> mongo
+    analyzer --> redis
+    chain --> api
+    chain --> MICRO
+    
+
+    
+    redis --> MICRO --> mongo
+    MICRO <--> mongo
+    
+    mongo --> api --> site
+    api --> bot
+    redis <--> api
+    
+    bot  --> tooter 
+    
+    
+```
 ## Repository layout
 Key Polylith bricks live under `projects/` (deployable services) and `components/` (shared code). Below is the actual layout currently in use:
 

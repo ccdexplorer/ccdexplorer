@@ -353,12 +353,13 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     async def repeated_task_get_consensus(app: FastAPI):
         # for net in ["mainnet", "testnet"]:
         for net in ["mainnet", "testnet"]:
-            api_result = await get_url_from_api(
-                f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
-            )
-            app.consensus_cache[net] = api_result.return_value if api_result.ok else None
-            if not api_result.ok:
-                print(f"ERROR: {api_result.return_value}")
+            try:
+                api_result = await get_url_from_api(
+                    f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
+                )
+                app.consensus_cache[net] = api_result.return_value if api_result.ok else None
+            except Exception as _:
+                pass
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_accounts_id_providers(app: FastAPI):

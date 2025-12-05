@@ -138,7 +138,8 @@ class Module:
         except Exception as e:
             tooter_message = f"{net.value}: New module failed with error  {e}."
             self.tooter.send_to_tooter(tooter_message)
-            return
+            print(tooter_message)
+            raise Exception(f"Error processing new module: {e}")
 
         module = {
             "_id": module_ref,
@@ -389,7 +390,13 @@ class Module:
             print("No build info found.")
             return None
 
-    async def save_and_send(self, net, module_ref, db_to_use, verification: ModuleVerification):
+    async def save_and_send(
+        self,
+        net,
+        module_ref,
+        db_to_use,
+        verification: ModuleVerification,
+    ):
         """
         Asynchronously saves the module verification status to the database and sends a notification.
         Args:
