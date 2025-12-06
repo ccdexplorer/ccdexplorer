@@ -5,6 +5,7 @@ from ccdexplorer.tooter.core import Tooter, TooterChannel, TooterType
 from pydantic import BaseModel
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
+import dagster as dg
 
 
 class FailureRecord(BaseModel):
@@ -57,17 +58,25 @@ def update_redis_failures(context, mongodb: MongoDB, tooter: Tooter, net: str):
                 message=f"{net}: Adding block {failure.block_height:,.0f} to SR. Failure occurred at {failure.date_done} in {failure.queue}, with error {failure.error}.",
                 notifier_type=TooterType.INFO,
             )
-
-    db_to_use[Collections.helpers].bulk_write(
-        [
-            ReplaceOne(
-                {"_id": "special_purpose_block_request"},
-                {"_id": "special_purpose_block_request", "heights": list(blocks_to_retry)},
-                upsert=True,
+    if len(blocks_to_retry) > 0:
+        db_to_use[Collections.helpers].bulk_write(
+            [
+                ReplaceOne(
+                    {"_id": "special_purpose_block_request"},
+                    {"_id": "special_purpose_block_request", "heights": list(blocks_to_retry)},
+                    upsert=True,
+                )
+            ]
+        )
+        if context:
+            context.log.info(
+                f"Found {len(blocks_to_retry)} blocks to retry for special purpose processing on {net}: {', '.join([str(x) for x in blocks_to_retry])}"
             )
-        ]
-    )
-    context.log.info(
-        f"Found {len(blocks_to_retry)} blocks to retry for special purpose processing on {net}: {', '.join([str(x) for x in blocks_to_retry])}"
-    )
     return {"_id": "special_purpose_block_request", "heights": list(blocks_to_retry)}
+
+
+# if __name__ == "__main__":
+#     tooter = Tooter()
+#     mongodb = MongoDB(tooter=tooter)
+
+#     update_redis_failures(None, mongodb, tooter, "mainnet")
