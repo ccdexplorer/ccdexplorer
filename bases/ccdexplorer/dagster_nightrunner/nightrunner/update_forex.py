@@ -77,11 +77,20 @@ async def retrieve_forex_data(context, d_date: str) -> list[ReplaceOne]:
     session = aiohttp.ClientSession()
     url = f"https://{d_date}.currency-api.pages.dev/v1/currencies/usd.json"
     async with session.get(url) as resp:
-        if resp.ok:
+        result: dict | None = None
+        if not resp.ok:
+            async with session.get(
+                f"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{d_date}/v1/currencies/usd.json"
+            ) as resp:
+                if resp.ok:
+                    result = await resp.json()
+        else:
             result = await resp.json()
-            result: dict = result["usd"]
 
-            for token, price in result.items():
+        if result is not None:
+            result = result["usd"]
+
+            for token, price in result.items():  # pyright: ignore[reportOptionalMemberAccess]
                 token: str = token.upper()
                 return_dict = {
                     "_id": f"USD/{token}-{d_date}",
@@ -98,7 +107,7 @@ async def retrieve_forex_data(context, d_date: str) -> list[ReplaceOne]:
                         upsert=True,
                     )
                 )
-            # sleep to prevent from being rate-limited.
+        # sleep to prevent from being rate-limited.
 
         else:
             return_list_for_date = []
@@ -125,3 +134,8 @@ async def perform_forex_update(context, d_date: str, mongodb: MongoDB) -> bool:
         )
 
     return len(queue) > 0
+
+
+# if __name__ == "__main__":
+#     d_date = "2025-12-05"  # (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+#     asyncio.run(perform_forex_update(None, d_date, mongodb))
