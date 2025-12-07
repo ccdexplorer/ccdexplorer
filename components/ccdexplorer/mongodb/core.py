@@ -177,7 +177,7 @@ class MongoDB:
         self.tooter: Tooter = tooter
         try:
             if nearest:
-                con = MongoClient(MONGO_URI, read_preference=ReadPreference.NEAREST)
+                con = MongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
             else:
                 con = MongoClient(MONGO_URI)
             self.connection: MongoClient = con
@@ -217,7 +217,7 @@ class MongoMotor:
         self.tooter: Tooter = tooter
         try:
             if nearest:
-                con = AsyncMongoClient(MONGO_URI, read_preference=ReadPreference.NEAREST)
+                con = AsyncMongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
             else:
                 con = AsyncMongoClient(MONGO_URI)
             self.connection = con
