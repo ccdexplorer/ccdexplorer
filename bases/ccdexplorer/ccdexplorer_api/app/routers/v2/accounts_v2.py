@@ -447,6 +447,85 @@ async def get_last_accounts(
         )
 
 
+@router.get(
+    "/{net}/accounts/business/{skip}/{limit}/{sort_key}/{direction}", response_class=JSONResponse
+)
+async def get_business_accounts(
+    request: Request,
+    net: str,
+    skip: int,
+    limit: int,
+    sort_key: str,
+    direction: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get the accounts registered through Global Finreg. Maxes out at 50.
+
+    """
+    if net not in ["mainnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="This endpoint only supports mainnet.",
+        )
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    error = None
+    if sort_key:
+        sort_key = "nonce" if sort_key == "sequence_number" else sort_key
+        # sort_key = "nonce" if sort_key == "available_balance" else sort_key
+    try:
+        pipeline = [{"$match": {"ip_identity_credential_0": 3}}]
+        if sort_key:
+            pipeline.append({"$sort": {sort_key: 1 if direction == "asc" else -1}})
+        pipeline.extend(
+            [
+                {
+                    "$facet": {
+                        "results": [
+                            {"$skip": skip},
+                            {"$limit": limit},
+                        ],
+                        "totalCount": [
+                            {"$count": "count"},
+                        ],
+                    }
+                },
+                {"$limit": 1},
+            ]
+        )
+        agg = await await_await(db_to_use, Collections.nightly_accounts, pipeline)
+        if agg:
+            facet = agg[0]
+            result = facet.get("results", [])
+            total_rows = facet.get("totalCount", [{"count": 0}])[0]["count"]
+        else:
+            result = []
+            total_rows = 0
+
+    except Exception as error:  # noqa: F811
+        print(error)
+        result = None
+
+    if result:
+        enriched_results = []
+        for account in result:
+            account_info = grpcclient.get_account_info(
+                "last_final", account_index=account["index"], net=NET(net)
+            )
+            enriched_results.append({"account_info": account_info})
+
+        return {"results": enriched_results, "total_rows": total_rows}
+    else:
+        error = None
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving business accounts on {net}, {error}.",
+        )
+
+
 @router.get("/{net}/accounts/nodes-validators", response_class=JSONResponse)
 async def get_nodes_and_validators(
     request: Request,

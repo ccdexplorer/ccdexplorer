@@ -51,7 +51,7 @@
         </td>
 
         
-        <td class="text-end text-secondary-emphasis ccd">
+        <td class="text-end text-secondary-emphasis">
             {% if "ccd_amount" in event.recognized_event %}
                 {% if event.from_address_canonical == public_key %}
                     - {{event.recognized_event.ccd_amount | micro_ccd_display | safe}}
@@ -66,7 +66,7 @@
                 {% else %}
                     {% set unit = "" %}
                 {% endif %}
-                <span class="text-secondary-emphasis">{{event.recognized_event.token_amount|int|token_amount_using_decimals_rounded(token_decimals, token_decimals)}} {{unit}}</span>
+                <span class="text-secondary-emphasis ccd">{{event.recognized_event.token_amount|int|token_amount_using_decimals_rounded(token_decimals, token_decimals)}} {{unit}}</span>
             {% else %}
                 <span class="text-secondary-emphasis">{{event.recognized_event.token_amount|int|token_amount_using_decimals_rounded(token_decimals, token_decimals)}} </span>
             {%endif%}

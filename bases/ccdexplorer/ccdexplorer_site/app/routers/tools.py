@@ -52,6 +52,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     tx_type_translation_for_js,
     account_link,
     datetime_delta_format_until,
+    create_dict_for_tabulator_display_for_business_accounts,
 )
 
 router = APIRouter()
@@ -148,6 +149,80 @@ async def get_projects_overview(
             "projects": projects,
             "net": "mainnet",
         },
+    )
+
+
+@router.get("/{net}/tools/business-accounts", response_class=HTMLResponse)
+async def business_accounts_page(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    request.state.api_calls = {}
+
+    return request.app.templates.TemplateResponse(
+        "tools/business-accounts.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+@router.get(
+    "/{net}/ajax_business_accounts_tabulator",
+    response_class=HTMLResponse | RedirectResponse,
+)
+async def ajax_business_accounts_tabulator(
+    request: Request,
+    net: str,
+    page: int = Query(),
+    size: int = Query(),
+    sort_key: Optional[str] = Query("last_height_processed"),
+    direction: Optional[str] = Query("desc"),
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    skip = (page - 1) * size
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/business/{skip}/{size}/{sort_key}/{direction}",
+        httpx_client,
+    )
+    accounts = api_result.return_value if api_result.ok else []
+
+    tb_made_up_rows = []
+    for x in accounts["results"]:
+        account_made_up = account_link(
+            x["account_info"]["address"],
+            net,
+            user=user,
+            tags=tags,
+            app=request.app,
+        )
+
+        tb_made_up_rows.append(
+            create_dict_for_tabulator_display_for_business_accounts(
+                net, request.app, x["account_info"], account_made_up
+            )
+        )
+
+    total_rows = accounts["total_rows"]
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
+        {
+            "data": tb_made_up_rows,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
     )
 
 

@@ -1876,6 +1876,25 @@ def create_dict_for_tabulator_display_for_accounts(net, app, account_dict: dict)
     }
 
 
+def create_dict_for_tabulator_display_for_business_accounts(
+    net, app, account_dict: dict, account_made_up: str
+):
+    return {
+        # "address": f'<a class="" href="/{net}/account/{account_dict["address"]}"><i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{account_dict["address"][:6]}</span></a>',
+        "address": account_made_up,
+        "account_index": f'<span class="ccd">{account_dict["index"]}</span>',
+        "available_balance": f"<span  >{micro_ccd_no_decimals(account_dict['available_balance'])}</span>",
+        "sequence_number": f'<span class="ccd">{round_x_decimal_with_comma(account_dict["sequence_number"], 0)}</span>',
+        "identity": account_dict.get("identity", ""),
+        "staking": f"{account_dict['staking'] if account_dict.get('staking', None) else ''}</span>",
+        # "deployment_tx_slot_time": f"{humanize_age(dateutil.parser.parse(account_dict['deployment_tx_slot_time']))}",
+        "account_download": f"{account_dict['address']}",
+        "account_index_download": f"{account_dict['index']}",
+        "available_balance_download": f"{(account_dict['available_balance'] / 1_000_000):,.0f}",
+        "sequence_number_download": f"{account_dict['sequence_number']:,.0f}",
+    }
+
+
 def create_dict_for_tabulator_display_for_contracts(net, app, tags: dict, contract_dict: dict):
     verified = contract_dict["module_info"].get("verification", {"verified": False})["verified"]
     return {

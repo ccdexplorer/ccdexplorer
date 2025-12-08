@@ -1,0 +1,79 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+
+    <div class="row  mt-10">
+      <!-- <div class="border curved-border mb-2 mt-4"> -->
+        {% set title= "Business Accounts (registered through Global Finreg)" %}{% include 'base/box_title.html' %}
+          <div class="col-lg-12 " >
+
+            {% include 'base/tabulator/tabulator-custom-formatters.html' %}
+            {% set ccd_tabulator_table ='business_accounts_table'%}
+            {% set tabulator_ajax_url = '/mainnet/ajax_business_accounts_tabulator' %}
+            {% set filename='business_accounts-'+range(1000,10000)|random|string+'.csv' %}
+                <script>
+                  const {{ccd_tabulator_table}}_columns = [
+                  
+                  {
+                        title: "Account", field: "address", 
+                        minWidth: 120,
+                        // maxWidth: 120,
+                        responsive: 0,
+                        accessorDownload: (value, data) => data.account_download,
+                        formatter: "html",
+                        headerSort: false,
+                        hozAlign: "left", headerHozAlign: "left",
+                        
+                      },
+                      {
+                        title: "Account Index", field: "account_index", 
+                        minWidth: 120,
+                        // maxWidth: 120,
+                        responsive: 0,
+                        accessorDownload: (value, data) => data.account_index_download,
+                        formatter: "html",
+                        headerSort: true,
+                        hozAlign: "right", headerHozAlign: "right",
+                        
+                      },
+                      {
+                        title: "Nonce", field: "sequence_number", 
+                        minWidth: 120,
+                        // maxWidth: 120,
+                        responsive: 0,
+                        accessorDownload: (value, data) => data.sequence_number_download,
+                        formatter: "html",
+                        headerSort: true,
+                        hozAlign: "right", headerHozAlign: "right",
+                        
+                      },
+                      {
+                        title: "Balance", field: "available_balance", 
+                        formatter: "html",
+                        headerSort: false,
+                        hozAlign: "right", headerHozAlign: "right",
+                        accessorDownload: (value, data) => data.available_balance_download,
+                        
+                      }
+                      
+                    ];
+
+                  
+                  
+                  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+                  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+                  window["{{ccd_tabulator_table}}_default_sort_field"] = 'index';
+                  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+                </script>
+                {% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
+                {% include 'base/tabulator/tabulator-table-download-link.html' %}
+
+
+
+          </div>
+        <!-- </div> -->
+    </div>
+
+    
+{% endblock %}
