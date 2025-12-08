@@ -19,12 +19,15 @@ from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import TransactionCla
 from pydantic import BaseModel
 from enum import Enum
 import dateutil
+import plotly.io as pio
 
 # from app.classes.Node_Baker import BakerStatus
 from ccdexplorer.ccdexplorer_site.app.utils import (
     get_url_from_api,
     get_theme_from_request,
     ccdexplorer_plotly_template,
+    add_watermark_to_plot,
+    return_plot_response,
 )
 
 # from app.ajax_helpers import mongo_pagination_html_header
@@ -670,6 +673,8 @@ async def statistics_network_summary_validator_count_plotly(
     )
 
 
+@router.get("/plots/{net}/network_summary_accounts_per_day", response_class=Response)
+@router.get("/plots/{net}/network_summary_accounts_per_day/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_network_summary_accounts_per_day",
     response_class=Response,
@@ -751,11 +756,18 @@ async def statistics_network_summary_accounts_per_day_plotly(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # fig = add_watermark_to_plot(fig, request)
+    # if "/plots" in request.url.path:
+    #     img_bytes = pio.to_image(fig, format="png", width=1200, height=628, scale=2)
+    #     return Response(content=img_bytes, media_type="image/png")
+
+    # else:
+    #     return fig.to_html(
+    #         config={"responsive": True, "displayModeBar": False},
+    #         full_html=request.method == "GET",
+    #         include_plotlyjs=request.method == "GET",
+    #     )
 
 
 @router.post(

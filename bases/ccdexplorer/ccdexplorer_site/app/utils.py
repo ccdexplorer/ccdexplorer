@@ -13,6 +13,8 @@ from enum import Enum
 from functools import lru_cache
 from typing import Any, Optional
 
+# from urllib import request
+import plotly.io as pio
 import cbor2
 from ccdexplorer.cis.core import CIS
 import dateutil
@@ -47,7 +49,8 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer_schema_parser.Schema import Schema
 from dateutil.relativedelta import relativedelta
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
+from plotly.graph_objs.layout._template import Template
 from pydantic import BaseModel
 from rich import print
 from ccdexplorer.domain.s7 import s7_contract_to_erc_version
@@ -445,7 +448,61 @@ class ProcessEventRequest(BaseModel):
     app: typing.Any = None
 
 
-def ccdexplorer_plotly_template(theme: str):
+def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
+    if request.method == "GET":
+        fig.add_annotation(
+            text="CCDExplorer.io",
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+            xanchor="center",
+            yanchor="middle",
+            font=dict(
+                family="Inter, system-ui, -apple-system, BlinkMacSystemFont",
+                size=60,
+                color="rgba(200, 200, 200, 0.20)",
+            ),
+        )
+    return fig
+
+
+def return_plot_response(fig: go.Figure, request: Request, title: str):
+    fig = add_watermark_to_plot(fig, request)
+    if "image.png" in request.url.path:
+        img_bytes = pio.to_image(fig, format="png", width=640)
+        return Response(content=img_bytes, media_type="image/png")
+
+    else:
+        if request.method == "POST":
+            return fig.to_html(
+                config={"responsive": True, "displayModeBar": False},
+                full_html=request.method == "GET",
+                include_plotlyjs=request.method == "GET",
+            )
+        else:
+            fig_html = fig.to_html(
+                config={"responsive": True, "displayModeBar": False},
+                full_html=request.method == "GET",
+                include_plotlyjs=request.method == "GET",
+            )
+            return request.app.templates.TemplateResponse(
+                "base/plots_og.html",
+                {
+                    "request": request,
+                    "title": title,
+                    "plot_url": request.url.path + "/image.png",
+                    "plot_html": fig_html,
+                    "env": request.app.env,
+                    # "nodes": recurring.all_nodes_by_node_id,
+                },
+            )
+
+            return
+
+
+def ccdexplorer_plotly_template(theme: str) -> Template:
     rng = [
         "#EE9B54",
         "#F7D30A",

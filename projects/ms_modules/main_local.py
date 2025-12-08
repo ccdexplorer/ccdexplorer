@@ -17,7 +17,7 @@ from ccdexplorer.env import RUN_ON_NET
 grpcclient = GRPCClient()
 tooter = Tooter()
 mongodb = MongoDB(tooter, nearest=True)
-block_heights: List[int] = [36478537]
+block_heights: List[int] = [39566930]
 db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
 # pipeline = [
 #     {"$match": {"block_info.height": {"$gt": 30_000_000}}},
