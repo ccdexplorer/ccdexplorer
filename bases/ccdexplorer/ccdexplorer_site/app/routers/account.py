@@ -4,6 +4,7 @@ from typing import Optional
 import httpx
 import pandas as pd
 import plotly.express as px
+import plotly
 import json
 import plotly.graph_objects as go
 import polars as polars
@@ -315,6 +316,15 @@ async def account_rewards_bucketed(
                 "#70B785",
                 "#6E97F7",
             ]
+            print("df_group:")
+            print(df_group.schema)
+            print(df_group.head(5))
+
+            print("melt:")
+            print(melt.schema)
+            print(melt.head(10))
+            print(polars.__version__)
+            print(plotly.__version__)
             fig = px.bar(
                 melt,
                 x="date",
