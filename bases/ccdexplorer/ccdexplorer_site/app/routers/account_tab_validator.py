@@ -208,9 +208,9 @@ async def account_baker_performance_graph(
             }
         )
 
-        df_cumsum = df.melt(
-            id_vars="date",  # Identifier column
-            value_vars=["Sum (validated)", "Sum (expectation)"],  # Columns to melt
+        df_cumsum = df.unpivot(
+            index="date",  # Identifier column
+            on=["Sum (validated)", "Sum (expectation)"],  # Columns to melt
             variable_name="var",  # Name for the variable column
             value_name="value",  # Name for the value column
         )
