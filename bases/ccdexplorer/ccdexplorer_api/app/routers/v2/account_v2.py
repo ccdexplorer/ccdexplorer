@@ -2106,7 +2106,7 @@ async def get_account_txs(
             {
                 "$match": {"impacted_address_canonical": {"$eq": account_id[:29]}},
             },
-            {  # this filters out account rewards, as they are special events
+            {
                 "$match": {"tx_hash": {"$exists": True}},
             },
         ]
