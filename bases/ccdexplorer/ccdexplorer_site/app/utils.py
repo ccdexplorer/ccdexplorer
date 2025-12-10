@@ -500,10 +500,10 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                 "base/plots_og.html",
                 {
                     "request": request,
-                    "title": title,
-                    "plot_url": request.url.path + "/image.png",
+                    "plot_title": title,
+                    "plot_url": request.url._url + "/image.png",
                     "page_url": plot_info.get(figure_key, {}).get("page_url", ""),
-                    "description": plot_info.get(figure_key, {}).get("description", ""),
+                    "plot_description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
                     "env": request.app.env,
                 },
