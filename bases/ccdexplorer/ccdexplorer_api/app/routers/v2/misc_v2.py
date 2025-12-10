@@ -1017,6 +1017,13 @@ async def get_validators_failed_rounds(
         validator_ids = set(cumulative.keys()) | set(current_missed.keys())
 
         for validator_id in validator_ids:
+            node_info = (
+                mongodb.mainnet[Collections.dashboard_nodes].find_one(
+                    {"consensusBakerId": str(validator_id)}
+                )
+                or {}
+            )
+
             missed_epoch = current_missed.get(validator_id, 0)
             cumulative[validator_id] = cumulative.get(validator_id, 0) + missed_epoch
 
@@ -1024,6 +1031,8 @@ async def get_validators_failed_rounds(
                 "missed_epoch": missed_epoch,
                 "missed_payday": cumulative[validator_id],
             }
+            if node_info:
+                missed[validator_id]["node_name"] = node_info.get("nodeName", None)
 
         entry["missed"] = missed
         entries.append(entry)

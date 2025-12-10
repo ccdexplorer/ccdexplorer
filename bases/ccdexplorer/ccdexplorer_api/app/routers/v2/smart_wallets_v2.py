@@ -312,6 +312,9 @@ async def _get_paginated_smart_wallets_txs_non_route(
             {  # this filters out account rewards, as they are special events
                 "$match": {"tx_hash": {"$exists": True}},
             },
+            {  # this filters out account rewards, as they are special events
+                "$match": {"effect_type": {"$ne": "contract_initialized"}},
+            },
             {"$sort": {"block_height": DESCENDING}},
             {"$skip": skip},
             {"$limit": limit * 3},  # multiple addresses can be impacted by the same tx

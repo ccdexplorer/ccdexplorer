@@ -16,7 +16,7 @@
     <tr>
       <th class="text-secondary-emphasis">Hour in Payday</th>
       <th class="text-secondary-emphasis">Epoch</th>
-      <th class="text-secondary-emphasis text-start">Validator</th>
+      <th class="text-secondary-emphasis text-start">Validator/Node</th>
       <th class="text-secondary-emphasis text-end">In Epoch</th>
       <th class="text-secondary-emphasis text-end">In Payday</th>
     </tr>
@@ -47,9 +47,16 @@
             <td></td>
           {% endif %}
           <td class=" text-secondary-emphasis text-start">
-            <a class="ccd" href="/{{ net }}/account/{{ validator_id }}">
-              {{ validator_id|int|round_x_decimal_with_comma(0) }}
-            </a>
+            {% if count.node_name %}
+                <a class="ccd" href="/{{ net }}/account/{{ validator_id }}">
+                  {{ count.node_name }}
+                </a>
+              {% else %}
+              <a class="ccd" href="/{{ net }}/account/{{ validator_id }}">
+                  {{ validator_id|int|round_x_decimal_with_comma(0) }}
+                </a>
+                
+              {% endif %}
           </td>
           
           <td class="text-secondary-emphasis text-end ccd">
