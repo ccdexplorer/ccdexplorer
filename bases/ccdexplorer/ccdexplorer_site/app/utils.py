@@ -501,7 +501,7 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                 {
                     "request": request,
                     "plot_title": title,
-                    "plot_url": request.url._url + "/image.png",
+                    "plot_url": "https://ccdexplorer.io" + request.url.path + "/image.png",
                     "page_url": plot_info.get(figure_key, {}).get("page_url", ""),
                     "plot_description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
