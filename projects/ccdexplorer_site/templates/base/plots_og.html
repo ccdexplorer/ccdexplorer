@@ -1,17 +1,23 @@
-{% extends "base/base.html" %}
-
-{% block ogp %}
-  <title>{{ plot_title }}</title>
+<!doctype html>
+<html>
+  <head>
+    <title>{{ plot_title }}</title>
 
   <meta property="og:title" content="{{ plot_title }}">
-  <meta property="og:description" content="{{ plot_title }}">
-  <meta property="og:url" content="{{ plot_url }}">
+  <meta property="og:type" content="website">
+  <meta property="og:logo" content="https://ccdexplorer.io/static/logos/favicon.ico">
+  <meta property="og:description" content="{{ description }}">
+  <meta property="og:url" content="{{ page_url }}">
   <meta property="og:image" content="{{ plot_url }}">
   <meta name="twitter:card" content="summary_large_image">
-{% endblock %}
 
-{% block content %}
+  </head>
+  <body>
+    {% block content %}
   <div class="container py-3">
     {{ plot_html | safe }}
   </div>
 {% endblock %}
+  </body>
+</html>
+

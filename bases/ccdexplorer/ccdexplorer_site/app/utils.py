@@ -468,7 +468,16 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
     return fig
 
 
+plot_info = {
+    "network_summary_accounts_per_day": {
+        "description": "Number of new accounts created per day on the Concordium blockchain.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
+    },
+}
+
+
 def return_plot_response(fig: go.Figure, request: Request, title: str):
+    figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
         img_bytes = pio.to_image(fig, format="png", width=640)
@@ -478,14 +487,14 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
         if request.method == "POST":
             return fig.to_html(
                 config={"responsive": True, "displayModeBar": False},
-                full_html=request.method == "GET",
-                include_plotlyjs=request.method == "GET",
+                full_html=False,
+                include_plotlyjs=False,
             )
         else:
             fig_html = fig.to_html(
                 config={"responsive": True, "displayModeBar": False},
-                full_html=request.method == "GET",
-                include_plotlyjs=request.method == "GET",
+                full_html=True,
+                include_plotlyjs=True,
             )
             return request.app.templates.TemplateResponse(
                 "base/plots_og.html",
@@ -493,9 +502,10 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                     "request": request,
                     "title": title,
                     "plot_url": request.url.path + "/image.png",
+                    "page_url": plot_info.get(figure_key, {}).get("page_url", ""),
+                    "description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
                     "env": request.app.env,
-                    # "nodes": recurring.all_nodes_by_node_id,
                 },
             )
 
