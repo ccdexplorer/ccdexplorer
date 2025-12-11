@@ -480,7 +480,7 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
-        img_bytes = pio.to_image(fig, format="png", width=640)
+        img_bytes = pio.to_image(fig, format="png", width=720)
         return Response(content=img_bytes, media_type="image/png")
 
     else:

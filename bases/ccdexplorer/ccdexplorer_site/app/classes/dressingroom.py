@@ -1108,11 +1108,23 @@ class MakeUp:
                             self.events_list.append(new_event)
 
                 elif effects.data_registered is not None:
+                    try:
+                        data_decoded = cbor2.loads(bytes.fromhex(effects.data_registered))
+                    except Exception:
+                        data_decoded = None
+                    if data_decoded is None:
+                        try:
+                            b = bytes.fromhex(effects.data_registered)
+
+                            # 2) bytes -> string
+                            data_decoded = json.loads(b.decode("utf-8"))
+                        except Exception:
+                            data_decoded = None
                     self.classifier = TransactionClassifier.Data_Registered
                     new_event = EventType(
                         "Data Registered",
-                        None,
                         f"{shorten_address(effects.data_registered)}",
+                        f"<span class='ccd'>{data_decoded if isinstance(data_decoded, dict) and data_decoded is not None else ''}</span>",
                     )
 
                 if new_event and (len(self.events_list) == 0):
