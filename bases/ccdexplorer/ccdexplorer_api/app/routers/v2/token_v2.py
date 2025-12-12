@@ -353,7 +353,15 @@ async def get_info_for_token_address(
                 {"mint_tx_hash": mint_event_logged_event["tx_info"]["tx_hash"]}
             )
         else:
-            token_from_collection.update({"mint_tx_hash": token_from_collection["mint_tx_hash"]})
+            try:
+                token_from_collection.update(
+                    {"mint_tx_hash": token_from_collection["mint_tx_hash"]}
+                )
+            except KeyError:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Requested token_id {token_id} from contract <{contract_index},{contract_subindex}> has no mint transaction hash on {net}.",
+                )
 
         pipeline = [
             {"$match": {"token_holding.token_address": token_address}},
