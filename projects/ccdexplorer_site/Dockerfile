@@ -29,8 +29,18 @@ RUN uv pip install -e ./projects/ccdexplorer_site
 COPY projects/ccdexplorer_site/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Create a non-root user and group
-RUN addgroup --system app && adduser --system --ingroup app app
+
+# Create a non-root user with a real home directory
+RUN addgroup --system app \
+ && adduser  --system --ingroup app --home /home/app --shell /bin/bash app \
+ && mkdir -p /home/app \
+ && chown -R app:app /home/app
+
+# Make sure Chrome has writable dirs
+ENV HOME=/home/app \
+    XDG_CACHE_HOME=/home/app/.cache \
+    XDG_CONFIG_HOME=/home/app/.config \
+    XDG_DATA_HOME=/home/app/.local/share
 
 USER app
 
