@@ -1,23 +1,41 @@
 <!doctype html>
-<html>
+<html lang="en" data-bs-theme="dark">
   <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
     <title>{{ plot_title }}</title>
+    <meta name="description" content="{{ plot_description }}" />
+    <link rel="canonical" href="{{ og_url }}" />
+    <link rel="icon" href="https://ccdexplorer.io/static/logos/favicon.ico" />
 
-  <meta property="og:title" content="{{ plot_title }}">
-  <meta property="og:type" content="website">
-  <meta property="og:logo" content="https://ccdexplorer.io/static/logos/favicon.ico">
-  <meta property="og:description" content="{{ plot_description }}">
-  <meta property="og:url" content="{{ page_url }}">
-  <meta property="og:image" content="{{ plot_url }}">
-  <meta name="twitter:card" content="summary_large_image">
+    <!-- Open Graph -->
+    <meta property="og:title" content="{{ plot_title }}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:description" content="{{ plot_description }}" />
+    <meta property="og:url" content="{{ og_url }}" />
+    <meta property="og:image" content="{{ plot_url }}" />
+    <meta property="og:image:secure_url" content="{{ plot_url }}" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:locale" content="en_US" />
 
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{{ plot_title }}" />
+    <meta name="twitter:description" content="{{ plot_description }}" />
+    <meta name="twitter:image" content="{{ plot_url }}" />
+
+    <!-- Telegram -->
+    <meta property="og:site_name" content="CCDExplorer.io">
   </head>
+
   <body>
-    {% block content %}
-  <div class="container py-3">
-    {{ plot_html | safe }}
-  </div>
-{% endblock %}
+    {% if plot_html %}
+          {{ plot_html | safe }}
+    {% else %}
+      {% if canonical_page_url %}
+        <p><a href="{{ canonical_page_url }}">View chart on CCDExplorer.io</a></p>
+      {% endif %}
+    {% endif %}
   </body>
 </html>
-

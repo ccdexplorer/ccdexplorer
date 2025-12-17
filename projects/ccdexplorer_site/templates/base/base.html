@@ -86,7 +86,46 @@ html {
     
     <script src="/node/microlight/microlight.js"></script>
     
-    
+    <script>
+        async function sharePlot(btn) {
+          const url = btn.getAttribute("data-share-url");
+
+          // Prefer native share on mobile
+          if (navigator.share) {
+            try {
+              await navigator.share({ url });
+              return;
+            } catch (e) {
+              // user cancelled or share failed, fall back to clipboard
+            }
+          }
+
+          try {
+            await navigator.clipboard.writeText(url);
+            btn.textContent = "Copied!";
+            setTimeout(() => (btn.innerHTML = "<i class=\"bi bi-share-fill\"></i>"), 1200);
+          } catch (e) {
+            // last resort fallback
+            prompt("Copy this link:", url);
+          }
+        }
+      </script>
+
+
+      <script>
+          async function copyShareLink(btn) {
+            const url = btn.dataset.shareUrl;
+            try {
+              await navigator.clipboard.writeText(url);
+              const old = btn.textContent;
+              btn.textContent = "Copied";
+              btn.disabled = true;
+              setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 900);
+            } catch (e) {
+              prompt("Copy this link:", url);
+            }
+          }
+        </script>
 
   </body>
 </html>

@@ -566,7 +566,7 @@ class MakeUp:
 
                         new_event = EventType(
                             f"Contract Initialized {instance_link_v2(effects.contract_initialized.address, self.user, self.tags, self.net)}",
-                            f'Initializer: {effects.contract_initialized.init_name}<br>Module: <a href="/{self.net}/module/{effects.contract_initialized.origin_ref}">{effects.contract_initialized.origin_ref[:10]}</a>',
+                            f'Initializer: {effects.contract_initialized.init_name}<br>Module: <a class="ccd"href="/{self.net}/module/{effects.contract_initialized.origin_ref}">{effects.contract_initialized.origin_ref[:10]}</a>',
                             None,
                             logged_events,
                         )

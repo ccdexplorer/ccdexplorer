@@ -451,7 +451,7 @@ class ProcessEventRequest(BaseModel):
 def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
     if request.method == "GET":
         fig.add_annotation(
-            text="CCDExplorer.io",
+            text="<b>CCDExplorer.io</b>",
             x=0.5,
             y=0.5,
             xref="paper",
@@ -459,10 +459,12 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
             showarrow=False,
             xanchor="center",
             yanchor="middle",
+            textangle=0,
             font=dict(
-                family="Inter, system-ui, -apple-system, BlinkMacSystemFont",
-                size=60,
-                color="rgba(200, 200, 200, 0.20)",
+                # pick something that will exist, or install Inter (Option 2)
+                family="Inter, DejaVu Sans, Liberation Sans, Arial, sans-serif",
+                size=72,
+                color="rgba(220, 220, 220, 0.12)",
             ),
         )
     return fig
@@ -502,6 +504,8 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                     "request": request,
                     "plot_title": title,
                     "plot_url": "https://ccdexplorer.io" + request.url.path + "/image.png",
+                    "og_url": str(request.url),
+                    "canonical_page_url": plot_info.get(figure_key, {}).get("page_url", ""),
                     "page_url": plot_info.get(figure_key, {}).get("page_url", ""),
                     "plot_description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
