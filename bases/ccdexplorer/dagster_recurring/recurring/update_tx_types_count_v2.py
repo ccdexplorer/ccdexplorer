@@ -45,7 +45,7 @@ def update_tx_types_count_hourly(
     dd.update(
         {
             "_id": f"{start.strftime('%Y-%m-%d-%H')}-{end.strftime('%H')}",
-            "hour": start.strftime("%H"),
+            "hour": int(start.strftime("%H")),
             "date": start.strftime("%Y-%m-%d"),
         }
     )
