@@ -39,6 +39,7 @@ dependencies = [
     "dagster>=1.11.14",
     "dagster-postgres>=0.27.14",
     "dagster-docker>=0.27.14",
+    "dagster-celery>=0.28.7",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

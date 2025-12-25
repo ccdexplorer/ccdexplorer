@@ -4,40 +4,52 @@ ENV UV_SYSTEM_PYTHON=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DAGSTER_HOME=/opt/dagster/dagster_home
+    DAGSTER_HOME=/opt/dagster/dagster_home \
+    PYTHONPATH=/app
 
 WORKDIR /app
-COPY pyproject.toml uv.lock README.md LICENSE.md ./
-RUN apt-get update && apt-get install -y gcc libpq-dev \
- && pip install --no-cache-dir --upgrade pip setuptools wheel hatchling uv \
- && mkdir -p /root/.cache/uv && chmod -R 777 /root/.cache/uv \
- && test -f pyproject.toml || (echo "pyproject.toml missing in $(pwd)" && exit 1) \
- && echo "==> Running uv sync..." \
- && UV_SYSTEM_PYTHON=1 uv sync --no-dev -vv
 
-# 2) Copy all sources required to assemble the Dagster project
+# 1) Copy workspace metadata first for caching
+COPY pyproject.toml uv.lock README.md LICENSE.md ./
+
+# System deps (psycopg2 build, etc.)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      gcc libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# 2) Copy the Polylith workspace sources (these must exist before uv sync if you have path deps)
 COPY components ./components
 COPY bases ./bases
 COPY projects/dagster_recurring ./projects/dagster_recurring
 
-# 3) Install the Dagster project as editable (important for brick discovery)
-RUN uv pip install -e ./projects/dagster_recurring
+# If your repo has other required workspace files (uncomment if they exist):
+# COPY workspace.toml ./workspace.toml
+# COPY polylith.toml ./polylith.toml
+# COPY .polylith ./\.polylith
 
-# 4) Create Dagster home directory
-# 4) Create Dagster home early
-RUN mkdir -p $DAGSTER_HOME
+# 3) Sync env INCLUDING local path deps (Polylith bricks)
+RUN mkdir -p /root/.cache/uv && chmod -R 777 /root/.cache/uv \
+ && echo "==> uv sync (no dev)" \
+ && uv sync --no-dev -vv
 
-# 5) Create non-root user first
-RUN addgroup --system app && adduser --system --ingroup app app
+# 4) Ensure the code location project is installed (editable) so Dagster can import it
+RUN echo "==> installing dagster_recurring project (editable)" \
+ && uv pip install -e ./projects/dagster_recurring
 
-# 6) Fix permissions (after user exists)
-RUN chown -R app:app $DAGSTER_HOME
+# 5) Build-time sanity checks (fail fast if packaging/imports are wrong)
+RUN python - <<'PY'
+import importlib
+m = importlib.import_module("ccdexplorer.dagster_recurring.repository")
+print("OK imported:", m.__name__)
+PY
 
-# 7) Switch to user
+# 6) Dagster home + user
+RUN mkdir -p $DAGSTER_HOME \
+ && addgroup --system app \
+ && adduser --system --ingroup app app \
+ && chown -R app:app $DAGSTER_HOME
+
 USER app
-
-# 6) Expose gRPC port for Dagster
 EXPOSE 4000
 
-# 7) Launch Dagster code location gRPC server
 CMD ["dagster", "api", "grpc", "-h", "0.0.0.0", "-p", "4000", "-m", "ccdexplorer.dagster_recurring.repository", "-a", "defs"]
