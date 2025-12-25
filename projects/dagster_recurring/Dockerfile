@@ -33,56 +33,18 @@ RUN mkdir -p /root/.cache/uv && chmod -R 777 /root/.cache/uv \
  && uv sync --no-dev -vv
 
 # 4) Ensure the code location project is installed (editable) so Dagster can import it
-RUN echo "==> installing dagster_recurring project (editable)" \
- && uv pip install -e ./projects/dagster_recurring
-
-# After: RUN uv pip install -e ./projects/dagster_recurring
-
-RUN python - <<'PY'
-import sys, pkgutil, importlib, os, pathlib
-
-print("== sys.path ==")
-for p in sys.path:
-    print(" ", p)
-
-print("\n== /app tree (top levels) ==")
-p = pathlib.Path("/app")
-for name in ["projects", "bases", "components", "src"]:
-    pp = p / name
-    print(name, "exists:", pp.exists())
-
-print("\n== installed dists (filtered) ==")
-try:
-    import importlib.metadata as md
-    dists = sorted([d.metadata["Name"] for d in md.distributions()])
-    for n in dists:
-        if "dagster" in n.lower() or "ccd" in n.lower() or "recurr" in n.lower() or "polyl" in n.lower():
-            print(" ", n)
-except Exception as e:
-    print("metadata error:", e)
-
-print("\n== visible top-level modules (filtered) ==")
-mods = sorted([m.name for m in pkgutil.iter_modules() if any(k in m.name for k in ["ccd", "explorer", "recurr", "dagster_recurring"])])
-for m in mods[:200]:
-    print(" ", m)
-
-print("\n== import attempts ==")
-candidates = [
-    "ccdexplorer.dagster_recurring.repository",
-    "dagster_recurring.repository",
-    "projects.dagster_recurring.repository",
-]
-for mod in candidates:
-    try:
-        importlib.import_module(mod)
-        print(" OK:", mod)
-    except Exception as e:
-        print(" FAIL:", mod, "->", repr(e))
-
-# If nothing worked, fail the build explicitly:
-raise SystemExit(1)
-PY
-
+# Install all Polylith bricks (bases/components) that are Python packages,
+# then install the Dagster project that wires them together.
+RUN set -eux; \
+    for p in bases/* components/*; do \
+      if [ -f "$p/pyproject.toml" ]; then \
+        echo "Installing brick: $p"; \
+        uv pip install -e "$p"; \
+      fi; \
+    done; \
+    echo "Installing project: projects/dagster_recurring"; \
+    uv pip install -e ./projects/dagster_recurring; \
+    python -c "import importlib; importlib.import_module('ccdexplorer.dagster_recurring.repository'); print('OK import')"
 
 # 5) Build-time sanity checks (fail fast if packaging/imports are wrong)
 RUN python - <<'PY'
