@@ -9,6 +9,15 @@ tooter: Tooter = Tooter()
 mongodb: MongoDB = MongoDB(tooter, nearest=True)
 
 net_partition = dg.StaticPartitionsDefinition(["mainnet", "testnet"])
+hourly_partition = dg.HourlyPartitionsDefinition(
+    start_date="2021-06-09-09", timezone="UTC", fmt="%Y-%m-%d-%H"
+)
+
+
+partitions_def_hourly_net = dg.MultiPartitionsDefinition(
+    {"datetime": hourly_partition, "net": net_partition}
+)
+
 
 token_list = [
     x["_id"].replace("w", "")
