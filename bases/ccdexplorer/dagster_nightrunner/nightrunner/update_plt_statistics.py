@@ -1,18 +1,27 @@
 import math
+
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections, MongoDB, CollectionsUtilities
-from pymongo import ReplaceOne
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
     CCD_TokenEvent,
     CCD_TokenInfo,
 )
+from ccdexplorer.mongodb import Collections, CollectionsUtilities, MongoDB
+from pymongo import ReplaceOne
+from ccdexplorer.tooter import Tooter
 
-from ..nightrunner.utils import (
-    AnalysisType,
-    get_start_end_block_from_date,
-    write_queue_to_collection,
-)
+try:
+    from ..nightrunner.utils import (
+        AnalysisType,
+        get_start_end_block_from_date,
+        write_queue_to_collection,
+    )
+except ImportError:
+    from ccdexplorer.dagster_nightrunner.nightrunner.utils import (
+        AnalysisType,
+        get_start_end_block_from_date,
+        write_queue_to_collection,
+    )
 
 
 def get_historical_fx_rate_for(token: str, plts_dict: dict, date: str, mongodb: MongoDB) -> float:
@@ -167,3 +176,13 @@ def perform_plt_statistics_update(
     write_queue_to_collection(mongodb, queue, analysis)
     context.log.info(f"info: {contents}")
     return {"dct": contents}
+
+
+# tooter: Tooter = Tooter()
+# mongodb: MongoDB = MongoDB(tooter, nearest=True)
+# grpcclient: GRPCClient = GRPCClient()
+
+
+# if __name__ == "__main__":
+#     d_date = "2025-12-10"  # (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+#     perform_plt_statistics_update(None, d_date, mongodb, grpcclient)

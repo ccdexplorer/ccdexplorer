@@ -15,7 +15,7 @@ from ccdexplorer.domain.generic import NET
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 import pandas as pd
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
@@ -28,7 +28,7 @@ import httpx
 from calendar import monthrange
 
 router = APIRouter(tags=["Protocol-Level Tokens"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

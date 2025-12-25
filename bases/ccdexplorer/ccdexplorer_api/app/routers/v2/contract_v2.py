@@ -21,7 +21,7 @@ from ccdexplorer.mongodb import (
     MongoMotor,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
 import json
@@ -33,7 +33,7 @@ from pydantic import BaseModel, ConfigDict
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Contract"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

@@ -8,7 +8,7 @@
 # pyright: reportArgumentType=false
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
 from ccdexplorer.mongodb import (
@@ -23,7 +23,7 @@ from pydantic import BaseModel
 import re
 
 router = APIRouter(tags=["Tokens"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 
@@ -69,7 +69,7 @@ async def get_tokens_count_estimate(
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     try:
-        result = await db_to_use[Collections.tokens_token_addresses_v2].estimated_document_count()
+        result = db_to_use[Collections.tokens_token_addresses_v2].estimated_document_count()
         error = None
     except Exception as error:
         print(error)

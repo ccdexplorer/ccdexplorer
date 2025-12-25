@@ -3,33 +3,25 @@ from __future__ import annotations
 import asyncio
 import base64
 import datetime as dt
+import io
 import json
 import math
-import io
-import re
 import typing
 from datetime import timedelta
 from enum import Enum
 from functools import lru_cache
 from typing import Any, Optional
 
-# from urllib import request
-import plotly.io as pio
 import cbor2
-from ccdexplorer.cis.core import CIS
 import dateutil
 import dateutil.parser
 import httpx
-
-#
-from ccdexplorer.domain.s7 import (
-    SpaceSevenEvents,
-    s7_erc1155_v1_AddTraderEvent,
-    s7_erc721_v1_AddTraderEvent,
-    s7_erc721_v2_AddTraderEvent,
-)
-from ccdexplorer.domain.generic import NET
 import plotly.graph_objects as go
+
+# from urllib import request
+import plotly.io as pio
+from ccdexplorer.cis.core import CIS
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.domain.mongo import (
     MongoTypeLoggedEventV2,
     MongoTypeTokensTag,
@@ -37,6 +29,15 @@ from ccdexplorer.domain.mongo import (
     depositCIS2TokensEvent,
     transferCIS2TokensEvent,
     withdrawCIS2TokensEvent,
+)
+
+#
+from ccdexplorer.domain.s7 import (
+    SpaceSevenEvents,
+    s7_contract_to_erc_version,
+    s7_erc721_v1_AddTraderEvent,
+    s7_erc721_v2_AddTraderEvent,
+    s7_erc1155_v1_AddTraderEvent,
 )
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountAddress,
@@ -53,7 +54,7 @@ from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
 from pydantic import BaseModel
 from rich import print
-from ccdexplorer.domain.s7 import s7_contract_to_erc_version
+
 # from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import MakeUp
 
 s7 = SpaceSevenEvents()
@@ -401,7 +402,7 @@ def tx_type_translation_for_js():
     return js_map
 
 
-def tx_type_translator(tx_type_contents: str, request_type: str) -> str:
+def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
     result = tx_type_translation.get(tx_type_contents, None)  # type: ignore
     if result:
         result: TypeContents
@@ -461,9 +462,8 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
             yanchor="middle",
             textangle=0,
             font=dict(
-                # pick something that will exist, or install Inter (Option 2)
                 family="Inter, DejaVu Sans, Liberation Sans, Arial, sans-serif",
-                size=72,
+                size=48,
                 color="rgba(220, 220, 220, 0.12)",
             ),
         )

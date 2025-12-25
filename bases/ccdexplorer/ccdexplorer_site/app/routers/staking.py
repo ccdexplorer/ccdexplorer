@@ -222,6 +222,8 @@ async def get_ajax_paydays_tabulator(
         paydays = return_dict["result"]  # type: ignore
         made_up_paydays = []
         for p in paydays:
+            if not p.get("height_for_last_block"):
+                continue
             made_up_payday = {}
             made_up_payday["block_height"] = (
                 f'<a href="/{net}/block/{p["height_for_last_block"] + 1}"><span class="ccd">{round_x_decimal_with_comma(p["height_for_last_block"] + 1, 0)}</span></a>'

@@ -136,6 +136,6 @@ async def perform_forex_update(context, d_date: str, mongodb: MongoDB) -> bool:
     return len(queue) > 0
 
 
-# if __name__ == "__main__":
-#     d_date = "2025-12-05"  # (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-#     asyncio.run(perform_forex_update(None, d_date, mongodb))
+if __name__ == "__main__":
+    d_date = "2025-12-10"  # (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
+    asyncio.run(perform_forex_update(None, d_date, mongodb))

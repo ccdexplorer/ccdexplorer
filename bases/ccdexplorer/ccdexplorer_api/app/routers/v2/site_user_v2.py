@@ -7,7 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
-from ccdexplorer.env import API_KEY_HEADER, API_URL
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, API_URL
 from fastapi.security.api_key import APIKeyHeader
 
 from fastapi.responses import JSONResponse
@@ -24,7 +24,7 @@ import datetime as dt
 from ccdexplorer.site_user import SiteUser
 
 router = APIRouter(tags=["Site User"], prefix="/v2", include_in_schema=False)
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

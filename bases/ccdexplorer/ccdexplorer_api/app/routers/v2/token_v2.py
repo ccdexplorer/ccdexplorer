@@ -8,7 +8,7 @@
 # pyright: reportArgumentType=false
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse, RedirectResponse
 from ccdexplorer.grpc_client import GRPCClient
@@ -57,7 +57,7 @@ class TokenHolding(BaseModel):
 
 
 router = APIRouter(tags=["Token"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 
@@ -517,7 +517,7 @@ async def get_token_current_holders(
         addresses = [x["account_address"] for x in current_holders]
         contract = CCD_ContractAddress.from_index(contract_index, contract_subindex)
         module_name = await get_module_name_from_contract_address(db_to_use, contract)
-        request = GetBalanceOfRequest(
+        balance_request = GetBalanceOfRequest(
             net=net,
             contract_address=contract,
             token_id=token_id,
@@ -526,7 +526,7 @@ async def get_token_current_holders(
             grpcclient=grpcclient,
             motor=mongomotor,
         )
-        token_amounts_from_state = await get_balance_of(request)
+        token_amounts_from_state = await get_balance_of(balance_request)
 
         for holder in current_holders:
             token_holding = TokenHolding(**holder["token_holding"])

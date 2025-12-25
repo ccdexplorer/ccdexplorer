@@ -22,14 +22,14 @@ from ccdexplorer.mongodb import (
     Collections,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
-from ccdexplorer.env import API_KEY_HEADER, TX_REQUEST_LIMIT_DISPLAY
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, TX_REQUEST_LIMIT_DISPLAY
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
 import grpc
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mongo_motor
 
 router = APIRouter(tags=["Block"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

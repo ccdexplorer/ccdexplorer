@@ -39,7 +39,7 @@ from ccdexplorer.domain.mongo import (
     MongoTypeLoggedEventV2,
     MongoTypePaydayV2,
 )
-from ccdexplorer.env import API_KEY_HEADER, TX_REQUEST_LIMIT_DISPLAY
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, TX_REQUEST_LIMIT_DISPLAY
 from fastapi.security.api_key import APIKeyHeader
 
 from ccdexplorer.grpc_client import GRPCClient
@@ -64,7 +64,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
 
 router = APIRouter(tags=["Account"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 # bump
 

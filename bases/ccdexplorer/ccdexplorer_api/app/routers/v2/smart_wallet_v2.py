@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from pymongo import ASCENDING, DESCENDING
 from pydantic import BaseModel, Field
-from ccdexplorer.env import API_KEY_HEADER, API_URL
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, API_URL
 from fastapi.security.api_key import APIKeyHeader
 
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
@@ -59,7 +59,7 @@ class CIS5PublicKeysContracts(BaseModel):
 
 
 router = APIRouter(tags=["Smart Wallet"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 
@@ -757,9 +757,9 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
         return []
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET(net))
 
-    token_balances_fungible: dict[dict] = {}
-    token_balances_non_fungible: dict[dict] = {}
-    token_balances_unverified: dict[dict] = {}
+    token_balances_fungible: dict[str, dict] = {}
+    token_balances_non_fungible: dict[str, dict] = {}
+    token_balances_unverified: dict[str, dict] = {}
 
     public_keys = [public_key]
     for cis_2_contract_address_str, cis2_dict in cis2_contracts_dict.items():

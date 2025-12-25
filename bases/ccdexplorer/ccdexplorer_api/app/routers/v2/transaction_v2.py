@@ -7,7 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
 from pymongo import ASCENDING
@@ -22,7 +22,7 @@ from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrapper
 
 
 router = APIRouter(tags=["Transaction"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

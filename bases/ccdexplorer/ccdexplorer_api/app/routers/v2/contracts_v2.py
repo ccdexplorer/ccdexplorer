@@ -16,13 +16,13 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ContractAddress,
     CCD_BlockItemSummary,
 )
-from ccdexplorer.env import API_KEY_HEADER, API_URL
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, API_URL
 from fastapi.security.api_key import APIKeyHeader
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_httpx_client
 import httpx
 
 router = APIRouter(tags=["Contracts"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 

@@ -12,13 +12,13 @@ from fastapi import APIRouter, Depends, Request, Security, HTTPException
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
 from pymongo import DESCENDING
-from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_db, get_mongo_motor
 
 router = APIRouter(tags=["Smart Wallets"], prefix="/v2")
-API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER)
+API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 
@@ -212,7 +212,7 @@ async def get_all_smart_wallet_contracts(
 
 def get_block_ranges_from_start_and_end_dates(
     start_date: str, end_date: str, db_to_use: dict[Collections, Collection]
-) -> str:
+) -> tuple[int, int]:
     """Resolve calendar dates into the corresponding block height range."""
     start_date_result = db_to_use[Collections.blocks_per_day].find_one({"date": start_date})
     if start_date_result:
@@ -280,7 +280,7 @@ async def get_smart_wallet_public_key_creations_per_day(
     ]
     result = db_to_use[Collections.cis5_public_keys_info].aggregate(pipeline)
 
-    return result
+    return list(result)
 
 
 async def _get_paginated_smart_wallets_txs_non_route(

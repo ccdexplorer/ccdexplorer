@@ -129,3 +129,8 @@ skip-magic-trailing-comma = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+
+[tool.ty.rules]
+possibly-missing-attribute = "ignore"
+deprecated                 = "ignore"
+invalid-argument-type      = "ignore"

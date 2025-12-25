@@ -119,7 +119,7 @@ async def get_api_keys(
     return keys
 
 
-def save_api_keys_for_topic(req: Request = None, mongodb=None, app=None, for_: str = None):
+def save_api_keys_for_topic(req: Request = None, mongodb=None, app=None, for_: str | None = None):
     # print(f"keys for {for_} from collection")
     now = dt.datetime.now().astimezone(dt.UTC)
     pipeline = [
