@@ -54,7 +54,6 @@ def _hour_start(dt: dt.datetime):
 
 @dg.schedule(
     job=job,
-    partitions_def=partitions_def_hourly_net,
     cron_schedule="1 * * * *",
     name=f"s_{asset_name}",
 )
