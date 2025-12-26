@@ -54,23 +54,26 @@ def _hour_start(dt: dt.datetime):
 
 @dg.schedule(
     job=job,
+    partitions_def=partitions_def_hourly_net,
     cron_schedule="1 * * * *",
     name=f"s_{asset_name}",
 )
 def schedule(context: dg.ScheduleEvaluationContext):
-    hour = _hour_start(context.scheduled_execution_time)
-    dt_key = hour.strftime("%Y-%m-%d-%H")
+    # scheduled_execution_time is timezone-aware
+    t = context.scheduled_execution_time
 
-    requests = []
+    # Convert to UTC to match your HourlyPartitionsDefinition(timezone="UTC")
+    t_utc = t.astimezone(dt.timezone.utc)
+
+    # Run the previous fully completed hour partition
+    hour_start = t_utc.replace(minute=0, second=0, microsecond=0) - dt.timedelta(hours=1)
+    datetime_key = hour_start.strftime("%Y-%m-%d-%H")
+
     for net in ["mainnet", "testnet"]:
-        mpk = dg.MultiPartitionKey({"datetime": dt_key, "net": net})
-        requests.append(
-            dg.RunRequest(
-                run_key=f"{hour.isoformat()}_{net}",
-                partition_key=mpk,
-            )
+        yield dg.RunRequest(
+            run_key=f"{hour_start.isoformat()}|{net}",
+            partition_key=f"{datetime_key}|{net}",
         )
-    return requests
 
 
 defs = dg.Definitions(

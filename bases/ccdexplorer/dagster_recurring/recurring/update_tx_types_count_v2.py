@@ -1,7 +1,11 @@
+from backrefs.bregex import F
+import asyncio
 import datetime as dt
+
 from ccdexplorer.mongodb import Collections, MongoDB
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
+from ccdexplorer.tooter import Tooter
 
 
 def update_tx_types_count_hourly(
@@ -10,9 +14,10 @@ def update_tx_types_count_hourly(
     dct = {}
     db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
 
-    context.log.info(
-        f"{net} | Calculating tx count between {start.strftime('%H')} and {end.strftime('%H')}."
-    )
+    if context:
+        context.log.info(
+            f"{net} | Calculating tx count between {start.strftime('%H')} and {end.strftime('%H')}."
+        )
     pipeline = [
         {
             "$match": {
@@ -41,7 +46,14 @@ def update_tx_types_count_hourly(
     result = db[Collections.transactions].aggregate(pipeline)
 
     result = list(result)
-    dd = result[0]
+    if len(result) == 0:
+        # No transactions in this period
+        dd = {
+            "counts": {},
+            "total": 0,
+        }
+    else:
+        dd = result[0]
     dd.update(
         {
             "_id": f"{start.strftime('%Y-%m-%d-%H')}-{end.strftime('%H')}",
@@ -52,5 +64,66 @@ def update_tx_types_count_hourly(
 
     _ = db[Collections.tx_types_count].bulk_write([ReplaceOne({"_id": dd["_id"]}, dd, upsert=True)])
 
-    context.log.info(f"{net} | {dd}.")
-    return dct
+    if context:
+        context.log.info(f"{net} | {dd}.")
+    return dd
+
+
+tooter: Tooter = Tooter()
+mongodb: MongoDB = MongoDB(tooter, nearest=True)
+
+
+if __name__ == "__main__":
+    # d_date = "2025-12-25"
+    # for start_hour in range(24):
+    #     dd: dict = update_tx_types_count_hourly(
+    #         None,
+    #         mongodb,
+    #         "mainnet",
+    #         dt.datetime.fromisoformat(d_date) + dt.timedelta(hours=start_hour),
+    #         dt.datetime.fromisoformat(d_date) + dt.timedelta(hours=start_hour + 1),
+    #     )
+    #     print(f"Processed mainnet {d_date} hour {start_hour}, with total {dd['total']}")
+
+    start_date = dt.date(2021, 6, 9)
+
+    # End at today 08:00
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    end_dt = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if now < end_dt:
+        # If it's before 08:00 now, stop at yesterday 08:00
+        end_dt -= dt.timedelta(days=1)
+
+    current_date = start_date
+
+    while True:
+        day_start = dt.datetime.combine(current_date, dt.time.min).replace(tzinfo=dt.timezone.utc)
+        day_end = day_start + dt.timedelta(days=1)
+
+        # Stop once the day start exceeds our end window
+        if day_start >= end_dt:
+            break
+
+        daily_total = 0
+
+        for start_hour in range(24):
+            hour_start = day_start + dt.timedelta(hours=start_hour)
+            hour_end = hour_start + dt.timedelta(hours=1)
+
+            # Do not go past the final cutoff (today 08:00)
+            if hour_start >= end_dt:
+                break
+
+            dd: dict = update_tx_types_count_hourly(
+                None,
+                mongodb,
+                "mainnet",
+                hour_start,
+                hour_end,
+            )
+
+            daily_total += dd.get("total", 0)
+
+        print(f"Processed mainnet {current_date.isoformat()} → total txs: {daily_total}")
+
+        current_date += dt.timedelta(days=1)
