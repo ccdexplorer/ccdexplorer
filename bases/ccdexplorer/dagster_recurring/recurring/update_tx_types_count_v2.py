@@ -1,5 +1,3 @@
-from backrefs.bregex import F
-import asyncio
 import datetime as dt
 
 from ccdexplorer.mongodb import Collections, MongoDB
@@ -11,7 +9,6 @@ from ccdexplorer.tooter import Tooter
 def update_tx_types_count_hourly(
     context, mongodb: MongoDB, net: str, start: dt.datetime, end: dt.datetime
 ):
-    dct = {}
     db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
 
     if context:
