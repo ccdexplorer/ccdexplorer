@@ -89,8 +89,18 @@ async def get_transaction_types(
         )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    pipeline = [
+        # Turn {"counts": {"a": 2, "b": 5}} into [{"k":"a","v":2},{"k":"b","v":5}]
+        {"$project": {"_id": 0, "counts_kv": {"$objectToArray": "$counts"}}},
+        # One document per tx_type per hour
+        {"$unwind": "$counts_kv"},
+        # Sum across all hour/day docs
+        {"$group": {"_id": "$counts_kv.k", "count": {"$sum": "$counts_kv.v"}}},
+        # Optional: stable ordering like your old find() output usually had
+        {"$sort": {"_id": 1}},
+    ]
     try:
-        return await db_to_use[Collections.tx_types_count].find({}).to_list(length=None)
+        return await await_await(db_to_use, Collections.tx_types_count, pipeline)
 
     except Exception as error:
         raise HTTPException(
@@ -256,11 +266,13 @@ async def get_transactions_with_filter(
     total_for_type = 0
     if filter:
         filter_dict = {"type.contents": filter}
-        result = await db_to_use[Collections.tx_types_count].find_one({"_id": filter})
-        if not result:
-            total_for_type = 0
-        else:
-            total_for_type = result.get("count", 0)
+        pipeline_total = [
+            {"$match": {f"counts.{filter}": {"$exists": True}}},
+            {"$group": {"_id": None, "count": {"$sum": f"$counts.{filter}"}}},
+            {"$project": {"_id": 0, "count": 1}},
+        ]
+        agg = await await_await(db_to_use, Collections.tx_types_count, pipeline_total, 1)
+        total_for_type = agg[0]["count"] if agg else 0
     else:
         filter_dict = {}
 

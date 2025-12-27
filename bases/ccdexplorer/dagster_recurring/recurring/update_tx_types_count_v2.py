@@ -92,7 +92,12 @@ if __name__ == "__main__":
         end_dt -= dt.timedelta(days=1)
 
     current_date = start_date
-
+    sum_total = 0
+    net = "mainnet"
+    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    coll = db[Collections.transactions]
+    print("Mongo target:", coll.database.name, coll.name)
+    print("tx docs:", coll.estimated_document_count())
     while True:
         day_start = dt.datetime.combine(current_date, dt.time.min).replace(tzinfo=dt.timezone.utc)
         day_end = day_start + dt.timedelta(days=1)
@@ -114,13 +119,15 @@ if __name__ == "__main__":
             dd: dict = update_tx_types_count_hourly(
                 None,
                 mongodb,
-                "mainnet",
+                net,
                 hour_start,
                 hour_end,
             )
 
             daily_total += dd.get("total", 0)
-
-        print(f"Processed mainnet {current_date.isoformat()} → total txs: {daily_total}")
+        sum_total += daily_total
+        print(
+            f"Processed {net} {current_date.isoformat()} → total txs: {daily_total:,.0f} - cumulative: {sum_total:,.0f}"
+        )
 
         current_date += dt.timedelta(days=1)

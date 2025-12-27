@@ -1,7 +1,6 @@
 {% extends "base/base.html" %}
 {% block content %}
     {% set hx_post_url = '/' ~ net ~ '/ajax_transaction_types_reporting' %}
-    {% set include_dropdown = False %}
     {% set include_trace_selection = True %}
     {% set traces = {
         'account': 'Account', 'staking': 'Staking', 'smart ctr': 'Smart Contracts', 

@@ -16,7 +16,11 @@ from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,
 )
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_exchange_rates
+from ccdexplorer.ccdexplorer_api.app.state_getters import (
+    get_mongo_motor,
+    get_exchange_rates,
+    get_mongo_db,
+)
 import math
 from typing import Optional
 from pydantic import BaseModel
@@ -44,7 +48,7 @@ class NonFungibleToken(BaseModel):
 async def get_tokens_count_estimate(
     request: Request,
     net: str,
-    mongomotor: MongoDB = Depends(get_mongo_motor),
+    mongob: MongoDB = Depends(get_mongo_db),
     api_key: str = Security(API_KEY_HEADER),
 ) -> int:
     """Return the approximate number of known token addresses.
@@ -67,7 +71,7 @@ async def get_tokens_count_estimate(
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = mongob.testnet if net == "testnet" else mongob.mainnet
     try:
         result = db_to_use[Collections.tokens_token_addresses_v2].estimated_document_count()
         error = None

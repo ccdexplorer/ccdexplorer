@@ -625,11 +625,6 @@ async def get_account(
     else:
         tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None  # type: ignore
 
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/transaction_types", httpx_client
-    )
-    tx_types = api_result.return_value if api_result.ok else None
-
     request.state.api_calls["Account Info"] = (
         f"{request.app.api_url}/docs#/Account/get_account_info_v2__net__account__index_or_hash__info_get"
     )
@@ -746,7 +741,6 @@ async def get_account(
                 "year_month": dt.datetime.now().strftime("%Y-%m"),
                 "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
-                "tx_types": tx_types,
                 "alias_portion": alias_portion,
             },
         )

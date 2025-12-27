@@ -67,15 +67,7 @@
        {% endif %} 
       
           <div class=" col-sm-6">
-      {% if include_dropdown %}
-          <label for="dropdown_id" class="small">Select transaction types:</label>
-          <select name="dropdown_name" id="dropdown_id" multiple class=" form-select form-select-sm small">
-            <option selected value="all">All</option>
-            {% for element in dropdown_elements %}
-                <option value="{{element}}">{{element}}</option>
-            {% endfor %}
-          </select> 
-      {% endif %} 
+      
 
      
 
