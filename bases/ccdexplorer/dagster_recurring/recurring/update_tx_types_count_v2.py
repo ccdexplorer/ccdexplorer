@@ -82,7 +82,7 @@ if __name__ == "__main__":
     #     )
     #     print(f"Processed mainnet {d_date} hour {start_hour}, with total {dd['total']}")
 
-    start_date = dt.date(2021, 6, 9)
+    start_date = dt.date(2022, 6, 9)
 
     # End at today 08:00
     now = dt.datetime.now().astimezone(dt.timezone.utc)
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
     current_date = start_date
     sum_total = 0
-    net = "mainnet"
+    net = "testnet"
     db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
     coll = db[Collections.transactions]
     print("Mongo target:", coll.database.name, coll.name)
@@ -131,3 +131,6 @@ if __name__ == "__main__":
         )
 
         current_date += dt.timedelta(days=1)
+
+if __name__ == "__main__":
+    

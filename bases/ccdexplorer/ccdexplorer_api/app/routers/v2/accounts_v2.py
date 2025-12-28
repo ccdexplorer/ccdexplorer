@@ -37,6 +37,7 @@ from ccdexplorer.mongodb import (
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
+from grpc._channel import _InactiveRpcError
 
 router = APIRouter(tags=["Accounts"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
@@ -736,7 +737,10 @@ async def get_payday_pools(
         }
         suspended_validators = {}
         for validator_id in all_validators_by_validator_id.keys():
-            pool = grpcclient.get_pool_info_for_pool(int(validator_id), "last_final")
+            try:
+                pool = grpcclient.get_pool_info_for_pool(int(validator_id), "last_final")
+            except _InactiveRpcError:
+                pool = None
             if pool:
                 if pool.pool_info:
                     if pool.pool_info.open_status not in pools_for_status.keys():
