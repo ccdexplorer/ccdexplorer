@@ -526,6 +526,8 @@ async def statistics_daily_holders_plotly(
     )
 
 
+@router.get("/plots/{net}/daily_limits", response_class=Response)
+@router.get("/plots/{net}/daily_limits/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_daily_limits",
     response_class=HTMLResponse,
@@ -591,11 +593,13 @@ async def statistics_daily_limits_plotly(
         height=350,
     )
     fig.update_xaxes(title=None)
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.post(

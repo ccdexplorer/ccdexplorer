@@ -1,6 +1,29 @@
-<div
-    class=""
-    hx-trigger="load, switched-theme from:body" 
-    hx-post="{{env.SITE_URL}}/{{net}}/ajax_statistics_plotly_py/statistics_daily_limits"
-    hx-vals='js:{theme: document.querySelector("HTML").getAttribute("data-bs-theme")}'
-></div>
+
+
+<div class="position-relative">
+  <button
+    type="button"
+    class="btn btn-sm position-absolute top-0 start-0 me-2 d-none"
+    style="z-index: 5;"
+    data-share-url="{{ env.SITE_URL }}/plots/{{ net }}/daily_limits"
+    onclick="sharePlot(this)"
+    id="share-btn-daily-limits"
+  >
+    <i class="bi bi-share-fill"></i>
+  </button>
+
+  <div
+    id="plot-daily-limits"
+    hx-trigger="load, switched-theme from:body"
+    hx-post="{{ env.SITE_URL }}/{{ net }}/ajax_statistics_plotly_py/statistics_daily_limits"
+    hx-vals='js:{theme: document.querySelector("html").getAttribute("data-bs-theme")}'
+  ></div>
+</div>
+
+<script>
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target && e.target.id === "plot-daily-limits") {
+      document.getElementById("share-btn-daily-limits")?.classList.remove("d-none");
+    }
+  });
+</script>
