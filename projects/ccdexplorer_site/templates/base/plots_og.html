@@ -7,6 +7,7 @@
     <title>{{ plot_title }}</title>
     <meta name="description" content="{{ plot_description }}" />
     <link rel="canonical" href="{{ og_url }}" />
+    <link rel="stylesheet" href="/static/css/custom_bootstrap.css?v=1.1">
     <link rel="icon" href="https://ccdexplorer.io/static/logos/favicon.ico" />
 
     <!-- Open Graph -->
@@ -30,12 +31,18 @@
   </head>
 
   <body>
+    <div class="container-lg mt-3">
+    <a class="navbar-brand" href="/mainnet"><img id='logo' src="/static/logos/logo_dark.png" alt="" width="125" height="40"></a>
     {% if plot_html %}
           {{ plot_html | safe }}
+          {% if canonical_page_url %}
+        <p><a href="{{ canonical_page_url }}">View chart on CCDExplorer.io</a></p>
+      {% endif %}
     {% else %}
       {% if canonical_page_url %}
         <p><a href="{{ canonical_page_url }}">View chart on CCDExplorer.io</a></p>
       {% endif %}
     {% endif %}
+    </div>
   </body>
 </html>

@@ -475,6 +475,14 @@ plot_info = {
         "description": "Number of new accounts created per day on the Concordium blockchain.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
+    "daily_limits": {
+        "description": "How many CCD do you need to hold to reach the top 100/250?",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
+    },
+    "realized_prices": {
+        "description": "Realized Price is a valuation metric showing the average price at which all existing coins were last moved or purchased on-chain, acting as the network's collective cost basis.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
+    },
 }
 
 

@@ -11,16 +11,24 @@
 {% set title= "Accounts" %}{% include 'base/box_title.html' %}
 <div class="row mt-4 row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/account_growth.html" %}</div>
+    {%set plot_name = "network_summary_accounts_per_day" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_network_summary_accounts_per_day" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
   </div>
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/daily_limits.html" %}</div>
+    {%set plot_name = "daily_limits" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_daily_limits" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>
   </div>
 </div>
 
 <div class="row mt-4 row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/realized_prices.html" %}</div>
+    {%set plot_name = "realized_prices" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_daily_limits" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>
+    <!-- <div class="border content curved-border">{% include "statistics/chain/realized_prices.html" %}</div> -->
   </div>
 
 </div>

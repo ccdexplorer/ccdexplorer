@@ -1830,6 +1830,8 @@ async def statistics_transaction_fees_plotly(
     )
 
 
+@router.get("/plots/{net}/realized_prices", response_class=Response)
+@router.get("/plots/{net}/realized_prices/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_realized_prices",
     response_class=Response,
@@ -1881,11 +1883,12 @@ async def statistics_realized_prices_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 def dates_to_blocks(
