@@ -34,7 +34,9 @@
     <div class="container-lg mt-3">
     <a class="navbar-brand" href="/mainnet"><img id='logo' src="/static/logos/logo_dark.png" alt="" width="125" height="40"></a>
     {% if plot_html %}
+        
           {{ plot_html | safe }}
+          <p>{{plot_description}}</p>
           {% if canonical_page_url %}
         <p><a href="{{ canonical_page_url }}">View chart on CCDExplorer.io</a></p>
       {% endif %}

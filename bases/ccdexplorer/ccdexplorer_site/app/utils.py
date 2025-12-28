@@ -483,6 +483,22 @@ plot_info = {
         "description": "Realized Price is a valuation metric showing the average price at which all existing coins were last moved or purchased on-chain, acting as the network's collective cost basis.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
+    "statistics_network_activity_tps": {
+        "description": "This chart displays both a measure for activity as measured as CCD transferred per day, as well as the traditional TPS (transactions per second) metric.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
+    },
+    "statistics_transaction_details": {
+        "description": "This chart displays different high level transaction types.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
+    },
+    "statistics_fee_stabilization": {
+        "description": "This chart measures the cost for a regular transfer on the blockchain, highlighting the fee stabilization mechanism.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
+    },
+    "statistics_transaction_fees": {
+        "description": "This chart shows how much transaction fees have been paid on the Concordium blockchain over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
+    },
 }
 
 

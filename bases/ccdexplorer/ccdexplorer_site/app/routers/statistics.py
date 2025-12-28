@@ -1091,6 +1091,8 @@ async def statistics_restaked_rewards(
     )
 
 
+@router.get("/plots/{net}/statistics_fee_stabilization", response_class=Response)
+@router.get("/plots/{net}/statistics_fee_stabilization/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_microccd",
     response_class=Response,
@@ -1147,11 +1149,12 @@ async def statistics_microccd_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.post(
@@ -1495,6 +1498,8 @@ async def statistics_percentage_staked_plotly(
     )
 
 
+@router.get("/plots/{net}/statistics_network_activity_tps", response_class=Response)
+@router.get("/plots/{net}/statistics_network_activity_tps/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_network_activity_tps",
     response_class=Response,
@@ -1592,13 +1597,16 @@ async def statistics_network_activity_tps_plotly(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
+@router.get("/plots/{net}/statistics_transaction_details", response_class=Response)
+@router.get("/plots/{net}/statistics_transaction_details/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_transaction_details_histogram",
     response_class=HTMLResponse,
@@ -1664,16 +1672,6 @@ async def statistics_transaction_details_histogram_python(
         ]
     ].melt("date", var_name="transaction_type", value_name="count")
 
-    rng = [
-        "#EE9B54",
-        "#F7D30A",
-        "#6E97F7",
-        "#F36F85",
-        "#AE7CF7",
-        "#508A86",
-        "#005B58",
-        # "#0E2625",
-    ]
     # stacked hist
     title = "Transaction Types"
     fig = px.bar(
@@ -1693,11 +1691,13 @@ async def statistics_transaction_details_histogram_python(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.post(
@@ -1771,6 +1771,8 @@ async def statistics_exchange_wallets_plotly(
     )
 
 
+@router.get("/plots/{net}/statistics_transaction_fees", response_class=Response)
+@router.get("/plots/{net}/statistics_transaction_fees/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_transaction_fees",
     response_class=Response,
@@ -1823,11 +1825,12 @@ async def statistics_transaction_fees_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.get("/plots/{net}/realized_prices", response_class=Response)
