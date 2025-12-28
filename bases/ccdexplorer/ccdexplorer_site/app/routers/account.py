@@ -781,7 +781,6 @@ async def get_account(
                 "year_month": dt.datetime.now().strftime("%Y-%m"),
                 "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
-                "tx_types": tx_types,
                 "alias_portion": alias_portion,
             },
         )
