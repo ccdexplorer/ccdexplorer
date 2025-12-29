@@ -154,6 +154,7 @@ async def get_last_blocks_newer_than(
     Raises:
         HTTPException: If the network is unsupported or the query fails.
     """
+    error = ""
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
@@ -178,5 +179,5 @@ async def get_last_blocks_newer_than(
     else:
         raise HTTPException(
             status_code=500,
-            detail=f"Error retrieving blocks on {net} newer than {since}.",
+            detail=f"Error retrieving blocks on {net} newer than {since} with error: {error}.",
         )

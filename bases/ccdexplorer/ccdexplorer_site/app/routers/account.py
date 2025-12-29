@@ -1090,6 +1090,30 @@ async def request_account_graph(
 
     # Create figure with secondary y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
+    if df.empty:
+        fig.update_layout(
+            title=f"<b>{title}</b><br><sup>{account_index}</sup>",
+            template=ccdexplorer_plotly_template(theme),
+            height=350,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            annotations=[
+                dict(
+                    text="No data available",
+                    x=0.5,
+                    y=0.5,
+                    xref="paper",
+                    yref="paper",
+                    showarrow=False,
+                    font=dict(size=14),
+                )
+            ],
+        )
+        return fig.to_html(
+            config={"responsive": True, "displayModeBar": False},
+            full_html=False,
+            include_plotlyjs=False,
+        )
 
     fig.add_trace(
         go.Scatter(

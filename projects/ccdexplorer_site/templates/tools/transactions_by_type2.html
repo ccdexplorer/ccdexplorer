@@ -7,7 +7,7 @@
   
     <div class="row  mt-10">
         <span class="mb-3 text-uppercase sm-text text-secondary-emphasis">Transactions by Type</span>
-        
+       
         <div class="col ">
             <div class="input-box mt-1 d-flex justify-content-start">
                     
@@ -61,7 +61,7 @@
                         {% endfor %}
                         </select>
 
-            </div>
+            </div> 
           
         </div>
           
@@ -74,6 +74,7 @@
             {% include "base/tabulator/tabulator-txs-by-type.html" %}
 
           </div>
+          <p class="sm-text small text-secondary-emphasis">(Tx counts updated every hour)</p>
     <script>
         window.addEventListener('load', (event) => {
             

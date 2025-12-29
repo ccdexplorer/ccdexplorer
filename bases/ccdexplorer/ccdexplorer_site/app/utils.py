@@ -1217,15 +1217,18 @@ class EventType:
 
 
 def shorten_address(value, address=None):
-    if len(value) < 17:
-        return f"<div class='ccd'>{value}</div>"
+    if value:
+        if len(value) < 17:
+            return f"<div class='ccd'>{value}</div>"
 
-    else:
-        if address:
-            return f"{value[:8]}...{value[-8:]}"
         else:
-            ss = f'<br/><div class="ccd">{value}</div>'
-            return ss
+            if address:
+                return f"{value[:8]}...{value[-8:]}"
+            else:
+                ss = f'<br/><div class="ccd">{value}</div>'
+                return ss
+    else:
+        return "<div class='ccd'>No metadata url found</div>"
 
 
 def decode_memo(hex: str):
