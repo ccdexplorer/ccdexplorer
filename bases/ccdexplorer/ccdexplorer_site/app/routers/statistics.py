@@ -602,6 +602,8 @@ async def statistics_daily_limits_plotly(
     # )
 
 
+@router.get("/plots/{net}/staking_validator_count", response_class=Response)
+@router.get("/plots/{net}/staking_validator_count/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_network_summary_validator_count",
     response_class=Response,
@@ -670,15 +672,16 @@ async def statistics_network_summary_validator_count_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=500,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
-@router.get("/plots/{net}/network_summary_accounts_per_day", response_class=Response)
-@router.get("/plots/{net}/network_summary_accounts_per_day/image.png", response_class=Response)
+@router.get("/plots/{net}/accounts_per_day", response_class=Response)
+@router.get("/plots/{net}/accounts_per_day/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_network_summary_accounts_per_day",
     response_class=Response,
@@ -774,6 +777,8 @@ async def statistics_network_summary_accounts_per_day_plotly(
     #     )
 
 
+@router.get("/plots/{net}/staking_open_pool_count", response_class=Response)
+@router.get("/plots/{net}/staking_open_pool_count/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_open_pool_count",
     response_class=Response,
@@ -797,9 +802,11 @@ async def statistics_classified_pools_open_pool_count_plotly(
     title = "# Open Pools"
     plot_color = "#80B589"
     data_field = "open_pool_count"
-    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+    return await staking_graphs_plotly(analysis, request, title, plot_color, data_field, theme)
 
 
+@router.get("/plots/{net}/staking_delegator_count", response_class=Response)
+@router.get("/plots/{net}/staking_delegator_count/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_delegator_count",
     response_class=Response,
@@ -823,9 +830,11 @@ async def statistics_classified_pools_delegator_count_plotly(
     title = "# Delegators"
     plot_color = "#EE9B54"
     data_field = "delegator_count"
-    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+    return await staking_graphs_plotly(analysis, request, title, plot_color, data_field, theme)
 
 
+@router.get("/plots/{net}/staking_avg_delegator_per_pool_count", response_class=Response)
+@router.get("/plots/{net}/staking_avg_delegator_per_pool_count/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_avg_count_per_pool",
     response_class=Response,
@@ -849,9 +858,11 @@ async def statistics_classified_pools_avg_count_per_pool_plotly(
     title = "Average # Delegators per Pool"
     plot_color = "#6E97F7"
     data_field = "delegator_avg_count_per_pool"
-    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+    return await staking_graphs_plotly(analysis, request, title, plot_color, data_field, theme)
 
 
+@router.get("/plots/{net}/staking_avg_delegator_stake", response_class=Response)
+@router.get("/plots/{net}/staking_avg_delegator_stake/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_classified_pools_avg_stake",
     response_class=Response,
@@ -875,13 +886,17 @@ async def statistics_classified_pools_avg_stake_plotly(
     title = "Delegator's Average Stake"
     plot_color = "#AE7CF7"
     data_field = "delegator_avg_stake"
-    return await staking_graphs_plotly(analysis, request.app, title, plot_color, data_field, theme)
+    return await staking_graphs_plotly(analysis, request, title, plot_color, data_field, theme)
 
 
-async def staking_graphs_plotly(analysis, app, title, plot_color, data_field, theme: str):
+async def staking_graphs_plotly(
+    analysis, request: Request, title, plot_color, data_field, theme: str
+):
     chain_start = dt.date(2021, 6, 9)
     yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-    all_data = await get_all_data_for_analysis_limited(analysis, app, chain_start, yesterday)
+    all_data = await get_all_data_for_analysis_limited(
+        analysis, request.app, chain_start, yesterday
+    )
     d_date = yesterday
     df_pools = pd.DataFrame(all_data)
     df_pools = df_pools[
@@ -929,13 +944,16 @@ async def staking_graphs_plotly(analysis, app, title, plot_color, data_field, th
             name=title,
         )
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
+@router.get("/plots/{net}/staking_distribution_of_rewards", response_class=Response)
+@router.get("/plots/{net}/staking_distribution_of_rewards/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_rewards_explained",
     response_class=Response,
@@ -1017,13 +1035,16 @@ async def statistics_rewards_explained(
     #         colorscale=[(0.0, "white"), (1.0, plot_color)],
     #     ),
     # )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
+@router.get("/plots/{net}/staking_restaked_rewards", response_class=Response)
+@router.get("/plots/{net}/staking_restaked_rewards/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_restaked_rewards",
     response_class=Response,
@@ -1077,22 +1098,16 @@ async def statistics_restaked_rewards(
         height=350,
     )
 
-    # fig.update_traces(
-    #     fillgradient=dict(
-    #         type="vertical",
-    #         colorscale=[(0.0, "white"), (1.0, plot_color)],
-    #     ),
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
     # )
 
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
 
-
-@router.get("/plots/{net}/statistics_fee_stabilization", response_class=Response)
-@router.get("/plots/{net}/statistics_fee_stabilization/image.png", response_class=Response)
+@router.get("/plots/{net}/fee_stabilization", response_class=Response)
+@router.get("/plots/{net}/fee_stabilization/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_microccd",
     response_class=Response,
@@ -1157,6 +1172,8 @@ async def statistics_microccd_plotly(
     # )
 
 
+@router.get("/plots/{net}/staking_validator_staked_amounts", response_class=Response)
+@router.get("/plots/{net}/staking_validator_staked_amounts/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_validator_staking",
     response_class=Response,
@@ -1236,13 +1253,16 @@ async def statistics_validator_staking_plotly(
             "categoryarray": df_bakers["Validator ID"].to_list(),
         },
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
+@router.get("/plots/{net}/ccd_on_exchanges", response_class=Response)
+@router.get("/plots/{net}/ccd_on_exchanges/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/ccd_on_exchanges",
     response_class=HTMLResponse,
@@ -1337,11 +1357,12 @@ async def statistics_ccd_on_exchanges_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.post(
@@ -1437,6 +1458,8 @@ async def statistics_ccd_classified_plotly(
     )
 
 
+@router.get("/plots/{net}/staking_percentage_staked", response_class=Response)
+@router.get("/plots/{net}/staking_percentage_staked/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/percentage_staked",
     response_class=Response,
@@ -1491,15 +1514,16 @@ async def statistics_percentage_staked_plotly(
         yaxis_title=None,
     )
     fig.update_xaxes(title=None)
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
-@router.get("/plots/{net}/statistics_network_activity_tps", response_class=Response)
-@router.get("/plots/{net}/statistics_network_activity_tps/image.png", response_class=Response)
+@router.get("/plots/{net}/network_activity_tps", response_class=Response)
+@router.get("/plots/{net}/network_activity_tps/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_network_activity_tps",
     response_class=Response,
@@ -1605,8 +1629,8 @@ async def statistics_network_activity_tps_plotly(
     # )
 
 
-@router.get("/plots/{net}/statistics_transaction_details", response_class=Response)
-@router.get("/plots/{net}/statistics_transaction_details/image.png", response_class=Response)
+@router.get("/plots/{net}/transaction_types", response_class=Response)
+@router.get("/plots/{net}/transaction_types/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_transaction_details_histogram",
     response_class=HTMLResponse,
@@ -1700,6 +1724,8 @@ async def statistics_transaction_details_histogram_python(
     # )
 
 
+@router.get("/plots/{net}/exchange_wallets", response_class=Response)
+@router.get("/plots/{net}/exchange_wallets/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_exchange_wallets",
     response_class=Response,
@@ -1764,15 +1790,16 @@ async def statistics_exchange_wallets_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
-@router.get("/plots/{net}/statistics_transaction_fees", response_class=Response)
-@router.get("/plots/{net}/statistics_transaction_fees/image.png", response_class=Response)
+@router.get("/plots/{net}/transaction_fees", response_class=Response)
+@router.get("/plots/{net}/transaction_fees/image.png", response_class=Response)
 @router.post(
     "/{net}/ajax_statistics_plotly_py/statistics_transaction_fees",
     response_class=Response,

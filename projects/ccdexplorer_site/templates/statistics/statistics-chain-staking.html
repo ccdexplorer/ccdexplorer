@@ -11,28 +11,50 @@
 {% set title= "Staking" %}{% include 'base/box_title.html' %}
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/pools_open_pools_count.html" %}</div>
+    {%set plot_name = "staking_open_pool_count" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_classified_pools_open_pool_count" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
+    
   </div>
   <div class="col-md-6  col-sm-12">
-      <div class=" content border curved-border">{% include "statistics/chain/pools_delegator_count.html" %}</div>
+    {%set plot_name = "staking_delegator_count" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_classified_pools_delegator_count" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+      
   </div>
 </div>
 
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/pools_avg_count_per_pool.html" %}</div>
+    {%set plot_name = "staking_avg_delegator_per_pool_count" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_classified_pools_avg_count_per_pool" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
   </div>
   <div class="col-md-6  col-sm-12">
-      <div class=" content border curved-border">{% include "statistics/chain/pools_avg_stake.html" %}</div>
+    {%set plot_name = "staking_avg_delegator_stake" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_classified_pools_avg_stake" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
+      
   </div>
 </div>
 
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/restaked_rewards.html" %}</div>
+    {%set plot_name = "staking_restaked_rewards" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_restaked_rewards" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
+      
   </div>
 <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/rewards_explained.html" %}</div>
+  {%set plot_name = "staking_distribution_of_rewards" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/statistics_rewards_explained" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+    
+      
   </div>
 
 </div>
@@ -40,7 +62,11 @@
 
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-      <div class="border content curved-border">{% include "statistics/chain/percentage_staked.html" %}</div>
+    {%set plot_name = "staking_percentage_staked" %}
+    {%set ajax_url = "ajax_statistics_plotly_py/percentage_staked" %}
+    <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
+  
+      
   </div>
 
 </div>

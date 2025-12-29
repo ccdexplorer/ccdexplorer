@@ -11,14 +11,14 @@
 {% set title= "Chain" %}{% include 'base/box_title.html' %}
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-    {%set plot_name = "statistics_network_activity_tps" %}
+    {%set plot_name = "network_activity_tps" %}
     {%set ajax_url = "ajax_statistics_plotly_py/statistics_network_activity_tps" %}
     <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
     
     
   </div>
   <div class="col-md-6  col-sm-12">
-    {%set plot_name = "statistics_transaction_details" %}
+    {%set plot_name = "transaction_types" %}
     {%set ajax_url = "ajax_statistics_plotly_py/statistics_transaction_details_histogram" %}
     <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
   </div>
@@ -26,12 +26,12 @@
 
 <div class="row row-flex">
   <div class="col-md-6  col-sm-12 ">
-    {%set plot_name = "statistics_fee_stabilization" %}
+    {%set plot_name = "fee_stabilization" %}
     {%set ajax_url = "ajax_statistics_plotly_py/statistics_microccd" %}
     <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
   </div>
   <div class="col-md-6  col-sm-12">
-    {%set plot_name = "statistics_transaction_fees" %}
+    {%set plot_name = "transaction_fees" %}
     {%set ajax_url = "ajax_statistics_plotly_py/statistics_transaction_fees" %}
     <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
 

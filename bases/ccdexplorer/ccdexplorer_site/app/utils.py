@@ -471,7 +471,7 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
 
 
 plot_info = {
-    "network_summary_accounts_per_day": {
+    "accounts_per_day": {
         "description": "Number of new accounts created per day on the Concordium blockchain.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
@@ -483,21 +483,65 @@ plot_info = {
         "description": "Realized Price is a valuation metric showing the average price at which all existing coins were last moved or purchased on-chain, acting as the network's collective cost basis.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
-    "statistics_network_activity_tps": {
+    "network_activity_tps": {
         "description": "This chart displays both a measure for activity as measured as CCD transferred per day, as well as the traditional TPS (transactions per second) metric.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
-    "statistics_transaction_details": {
+    "transaction_types": {
         "description": "This chart displays different high level transaction types.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
-    "statistics_fee_stabilization": {
+    "fee_stabilization": {
         "description": "This chart measures the cost for a regular transfer on the blockchain, highlighting the fee stabilization mechanism.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
-    "statistics_transaction_fees": {
+    "transaction_fees": {
         "description": "This chart shows how much transaction fees have been paid on the Concordium blockchain over time.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
+    },
+    "ccd_on_exchanges": {
+        "description": "This chart shows the balance of CCD held on various exchanges over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "exchange_wallets": {
+        "description": "This chart shows the count of exchange wallets (=aliases) over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "staking_open_pool_count": {
+        "description": "This chart shows the count of open pools for staking over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_delegator_count": {
+        "description": "This chart shows the count of delegators over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_avg_delegator_per_pool_count": {
+        "description": "This chart shows the average count of delegators per pool over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_avg_delegator_stake": {
+        "description": "This chart shows the average stake of delegators over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_restaked_rewards": {
+        "description": "This chart shows the percentage of daily rewards restaked over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_distribution_of_rewards": {
+        "description": "This chart shows the daily breakdown of rewards over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_percentage_staked": {
+        "description": "This chart shows the daily percentage of all outstanding CCD that is staked over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
+    },
+    "staking_validator_count": {
+        "description": "This chart shows the count of validators over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/validators",
+    },
+    "staking_validator_staked_amounts": {
+        "description": "This chart shows the amounts validators have staked and their (delegated) pool sizes over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/validators",
     },
 }
 

@@ -11,7 +11,7 @@
 {% set title= "Accounts" %}{% include 'base/box_title.html' %}
 <div class="row mt-4 row-flex">
   <div class="col-md-6  col-sm-12 ">
-    {%set plot_name = "network_summary_accounts_per_day" %}
+    {%set plot_name = "accounts_per_day" %}
     {%set ajax_url = "ajax_statistics_plotly_py/statistics_network_summary_accounts_per_day" %}
     <div class="border content curved-border">{% include "statistics/chain/generic_plot_with_share.html" %}</div>  
     
