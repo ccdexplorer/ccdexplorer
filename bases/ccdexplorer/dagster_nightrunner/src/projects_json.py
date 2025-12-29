@@ -29,7 +29,7 @@ def projects_json_sensor(
     response = requests.get(url)
 
     if response.status_code != 200:
-        raise Exception(f"GitHub API error: {response.status_code}")
+        return dg.SensorResult(skip_reason=f"GitHub API error: {response.status_code}")
 
     latest_commit = response.json()[0]
     latest_hash = latest_commit["sha"]
