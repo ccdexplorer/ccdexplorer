@@ -17,7 +17,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ContractAddress,
 )
 from ccdexplorer.site_user import SiteUser
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Body
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, JSONResponse
 from plotly.subplots import make_subplots
 from pydantic import BaseModel
@@ -47,6 +47,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     tx_type_translation_for_js,
     create_dict_for_tabulator_display,
     create_dict_for_tabulator_display_for_rewards,
+    return_plot_response,
 )
 import math
 
@@ -1062,6 +1063,12 @@ class AccountGraphParams(BaseModel):
     theme: str
 
 
+@router.get(
+    "/plots/{net}/{account_id}/ccd_balance_usd_value", response_class=Response
+)  # note that is is actually the index, not the id
+@router.get(
+    "/plots/{net}/ccd_balance_usd_value/{account_id}/image.png", response_class=Response
+)  # note that is is actually the index, not the id
 @router.post(
     "/ajax_account_graph/{net}/{account_id}",
     response_class=HTMLResponse,
@@ -1069,11 +1076,13 @@ class AccountGraphParams(BaseModel):
 async def request_account_graph(
     request: Request,
     net: str,
-    account_id: str,
-    post_params: AccountGraphParams,
+    account_id: str | int,
+    post_params: AccountGraphParams | None = Body(default=None),
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    if post_params is None:
+        post_params = AccountGraphParams(theme="dark")
     user: SiteUser | None = await get_user_detailsv2(request)
     theme = post_params.theme
     account_index = from_address_to_index(account_id, net, request.app)
@@ -1158,11 +1167,12 @@ async def request_account_graph(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
-    )
+    return return_plot_response(fig, request, title)
+    # return fig.to_html(
+    #     config={"responsive": True, "displayModeBar": False},
+    #     full_html=False,
+    #     include_plotlyjs=False,
+    # )
 
 
 @router.get("/{net}/account/{account_address}/sent_latest_first", response_class=HTMLResponse)

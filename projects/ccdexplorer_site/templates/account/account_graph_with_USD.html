@@ -1,4 +1,4 @@
-
+<!-- 
 <div  hx-trigger="click, {% if account.sequence_number < 1000 %}intersect, {%endif%} switched-theme from:body" 
       hx-post='/ajax_account_graph/{{net}}/{{account_id}}'
       hx-ext='json-enc'
@@ -7,4 +7,38 @@
       
       }' type="button" id="account-graph-add-button" ><span class="htmx-indicator">
             <img src="/static/misc/bars.svg"/> Loading data...
+           </span></div> -->
+
+
+{% set plot_name = "ccd_balance_usd_value" %}
+<div class="position-relative">
+  <button
+    type="button"
+    class="btn btn-sm position-absolute top-0 start-0 me-2 d-none"
+    style="z-index: 5;"
+    data-share-url="{{ env.SITE_URL }}/plots/{{ net }}/{{account_id}}/{{plot_name}}"
+    onclick="sharePlot(this)"
+    id="share-btn-{{plot_name}}"
+  >
+    <i class="bi bi-share-fill"></i>
+  </button>
+
+  <div
+    id="plot-{{plot_name}}"
+    hx-ext='json-enc'
+    hx-indicator=".htmx-indicator"      
+    hx-trigger="intersect, switched-theme from:body"
+    hx-post='/ajax_account_graph/{{net}}/{{account_id}}'
+    hx-vals='js:{theme: document.querySelector("html").getAttribute("data-bs-theme")}'
+  ><span class="htmx-indicator">
+            <img src="/static/misc/bars.svg"/> Loading data...
            </span></div>
+</div>
+
+<script>
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target && e.target.id === "plot-{{plot_name}}") {
+      document.getElementById("share-btn-{{plot_name}}")?.classList.remove("d-none");
+    }
+  });
+</script>

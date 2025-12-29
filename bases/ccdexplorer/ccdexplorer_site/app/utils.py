@@ -543,6 +543,10 @@ plot_info = {
         "description": "This chart shows the amounts validators have staked and their (delegated) pool sizes over time.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/validators",
     },
+    "ccd_balance_usd_value": {
+        "description": "This chart shows the USD value of an account's CCD balance over time.",
+        "page_url": "https://ccdexplorer.io/mainnet/account/",
+    },
 }
 
 
@@ -566,6 +570,10 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                 full_html=True,
                 include_plotlyjs=True,
             )
+
+            page_url = plot_info.get(figure_key, {}).get("page_url", "")
+            if figure_key == "ccd_balance_usd_value":
+                page_url += request.url.path.split("/")[-2]
             return request.app.templates.TemplateResponse(
                 "base/plots_og.html",
                 {
@@ -573,8 +581,8 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
                     "plot_title": title,
                     "plot_url": "https://ccdexplorer.io" + request.url.path + "/image.png",
                     "og_url": str(request.url),
-                    "canonical_page_url": plot_info.get(figure_key, {}).get("page_url", ""),
-                    "page_url": plot_info.get(figure_key, {}).get("page_url", ""),
+                    "canonical_page_url": page_url,
+                    "page_url": page_url,
                     "plot_description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
                     "env": request.app.env,
@@ -1065,7 +1073,7 @@ async def get_address_identifiers(account_address_or_index: str | int, net: str,
             return account_address, canonical, account_index
 
 
-def from_address_to_index(account_address: str, net: str, app):
+def from_address_to_index(account_address: str | int, net: str, app):
     """Translate account_address to index. ."""
     if "." in net:
         net = net.split(".")[1].lower()
@@ -1073,7 +1081,7 @@ def from_address_to_index(account_address: str, net: str, app):
         int_value = int(account_address)
         return int_value
     except:  # noqa: E722
-        canonical = account_address[:29]
+        canonical = account_address[:29]  # ty:ignore[non-subscriptable]
         if canonical not in app.addresses_to_indexes[net]:
             return account_address
         else:
