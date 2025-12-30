@@ -131,6 +131,3 @@ if __name__ == "__main__":
         )
 
         current_date += dt.timedelta(days=1)
-
-if __name__ == "__main__":
-    
