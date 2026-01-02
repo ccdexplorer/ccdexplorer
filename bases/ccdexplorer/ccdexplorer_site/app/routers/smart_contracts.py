@@ -479,12 +479,9 @@ async def get_module_instances_tabulator(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
 ):
-    limit = 10
-    user: SiteUser | None = await get_user_detailsv2(request)
-
     skip = (page - 1) * size
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/module/{module_ref}/instances/{skip}/{limit}",
+        f"{request.app.api_url}/v2/{net}/module/{module_ref}/instances/{skip}/{size}",
         httpx_client,
     )
     instances_result = api_result.return_value if api_result.ok else None
