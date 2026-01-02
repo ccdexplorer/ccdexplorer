@@ -2065,6 +2065,10 @@ def create_dict_for_tabulator_display_for_contracts(net, app, tags: dict, contra
     }
 
 
+def create_dict_for_tabulator_display_for_module_instances(net, tags: dict, contract: str):
+    return {"address": instance_link_from_str(contract, net), "address_download": contract}
+
+
 def create_dict_for_tabulator_display_for_plt_token(net, row: dict):
     ti = row["tag_information"]
     token_decimals = ti["decimals"]

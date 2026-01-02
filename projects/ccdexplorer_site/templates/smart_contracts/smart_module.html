@@ -3,36 +3,6 @@
 <script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
 {% endblock %}
 {% block content %}
-<script>
-    async function getInstances(requested_page, total_rows) {
-      instances = document.getElementById('instances');
-      var module_ref = document.querySelector('.module_ref').title;
-      url = '/module_instances/{{net}}/' + module_ref + '/' + requested_page + '/' + total_rows + '/' + api_key;
-      instances.innerHTML = '{% include "base/spinner.html" %}'
-      await fetch(url)
-        .then((response) => {
-          return response.text();
-        })
-        .then((data) => {
-            instances.innerHTML = data;
-        })
-        .catch(function (error) {
-          console.log(error);
-        });
-    }
-  
-    function prev_instances(requested_page, total_rows) {
-        getInstances(requested_page, total_rows)
-    };
-    function next_instances(requested_page, total_rows) {
-        getInstances(requested_page, total_rows)
-    };
-  
-    window.addEventListener('load', (event) => {
-        getInstances(0, 0);
-    });
-    
-  </script>
 
 {% include 'base/search_bar_non_home_inclusion.html' %}
 
@@ -116,7 +86,12 @@
   <div class="row mt-4">
     <div class="col-sm-12">
       <div class="border curved-border" id="instances">
-          
+          {% set ccd_tabulator_table ='module_instances_table'%}
+                
+                {% set tabulator_ajax_url = '/module_instances/'+net+'/'+module_ref|string %}
+                
+                {% set filename='module-instances-'+module_ref|string +'.csv' %}
+                {% include "base/tabulator/tabulator-module-instances.html" %}
       </div>
   </div>  
 

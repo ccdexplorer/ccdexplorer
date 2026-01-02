@@ -36,14 +36,11 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_user_detailsv2,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
-    PaginationRequest,
     account_link,
     add_account_info_to_cache,
-    calculate_skip,
     ccdexplorer_plotly_template,
     from_address_to_index,
     get_url_from_api,
-    pagination_calculator,
     tx_type_translation_for_js,
     create_dict_for_tabulator_display,
     create_dict_for_tabulator_display_for_rewards,

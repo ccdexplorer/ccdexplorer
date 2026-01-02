@@ -46,11 +46,9 @@ from ccdexplorer.ccdexplorer_site.app.state import (
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
     create_dict_for_tabulator_display_for_contracts,
+    create_dict_for_tabulator_display_for_module_instances,
     get_url_from_api,
     ccdexplorer_plotly_template,
-    calculate_skip,
-    pagination_calculator,
-    PaginationRequest,
     create_dict_for_tabulator_display,
     tx_type_translation_for_js,
 )
@@ -469,23 +467,22 @@ async def smart_contracts_usage(
 
 
 @router.get(
-    "/module_instances/{net}/{module_ref}/{requested_page}/{total_rows}/{api_key}",
+    "/module_instances/{net}/{module_ref}",
     response_class=HTMLResponse,
 )
-async def get_module_instances(
+async def get_module_instances_tabulator(
     request: Request,
     net: str,
     module_ref: str,
-    requested_page: int,
-    total_rows: int,
-    api_key: str,
+    page: int = Query(),
+    size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
 ):
     limit = 10
     user: SiteUser | None = await get_user_detailsv2(request)
 
-    skip = calculate_skip(requested_page, total_rows, limit)
+    skip = (page - 1) * size
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/module/{module_ref}/instances/{skip}/{limit}",
         httpx_client,
@@ -505,27 +502,20 @@ async def get_module_instances(
     module_instances = instances_result["module_instances"]
     total_rows = instances_result["instances_count"]
 
-    pagination_request = PaginationRequest(
-        total_txs=total_rows,
-        requested_page=requested_page,
-        word="contract",
-        action_string="instance",
-        limit=limit,
-    )
-    pagination = pagination_calculator(pagination_request)
-    html = request.app.templates.get_template("smart_contracts/smart_module_instances.html").render(
+    tb_made_up_txs = []
+    for instance in module_instances:
+        tb_made_up_txs.append(
+            create_dict_for_tabulator_display_for_module_instances(net, None, instance)
+        )
+
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
         {
-            "module_instances": module_instances,
-            "tags": tags,
-            "net": net,
-            "request": request,
-            "pagination": pagination,
-            "totals_in_pagination": True,
-            "total_rows": total_rows,
+            "data": tb_made_up_txs,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
         }
     )
-
-    return html
 
 
 @router.get("/{net}/module/{module_ref}")  # type:ignore
