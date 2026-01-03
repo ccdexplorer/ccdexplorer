@@ -58,6 +58,7 @@ def dashboard_nodes_schedule(context):
         dg.RunRequest(
             run_key=f"{context.scheduled_execution_time.isoformat()}_{partition_key}",
             partition_key=partition_key,
+            tags={"dagster/max_runtime": "60"},
         )
         for partition_key in partition_keys
     ]
