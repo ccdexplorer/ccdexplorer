@@ -5,7 +5,7 @@ import httpx
 import pandas as pd
 import plotly.express as px
 import plotly
-import json
+
 import plotly.graph_objects as go
 import polars as polars
 from ccdexplorer.domain.mongo import MongoTypeTokensTag
@@ -533,9 +533,7 @@ async def get_account(
     else:
         account_is_validator = False
         pool = None
-        node = None
         pool_apy_object = None
-        earliest_win_time = None
 
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{account_id}/rewards-available",
@@ -1080,7 +1078,7 @@ async def request_account_graph(
 ):
     if post_params is None:
         post_params = AccountGraphParams(theme="dark")
-    user: SiteUser | None = await get_user_detailsv2(request)
+
     theme = post_params.theme
     account_index = from_address_to_index(account_id, net, request.app)
     if net == "testnet":

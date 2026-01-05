@@ -202,6 +202,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.schema_cache = {"mainnet": {}, "testnet": {}}
         app.cns_domain_cache = {"mainnet": {}, "testnet": {}}
         app.blocks_cache = {"mainnet": [], "testnet": []}
+        app.last_finalized_block = {"mainnet": 0, "testnet": 0}
+
         app.transactions_cache = {"mainnet": [], "testnet": []}
         app.accounts_cache = {"mainnet": [], "testnet": []}
         app.identity_providers_cache = {"mainnet": {}, "testnet": {}}
@@ -343,7 +345,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 f"{app.api_url}/v2/{net}/blocks/last/50", app.httpx_client
             )
             app.blocks_cache[net] = api_result.return_value if api_result.ok else None
-
+            app.last_finalized_block[net] = (
+                app.blocks_cache[net][0]["height"] if app.blocks_cache[net] else 0
+            )
             api_result = await get_url_from_api(
                 f"{app.api_url}/v2/{net}/transactions/last/50", app.httpx_client
             )

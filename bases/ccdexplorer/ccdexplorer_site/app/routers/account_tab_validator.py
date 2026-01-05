@@ -11,28 +11,17 @@
 # pyright: reportIndexIssue=false
 
 import datetime as dt
+import math
 
 import dateutil
 import httpx
 import plotly.graph_objects as go
 import polars as polars
-from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_AccountInfo,
-    CCD_BlockItemSummary,
-)
-import math
-from ccdexplorer.site_user import SiteUser
-from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
-from plotly.subplots import make_subplots
-
 from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
     MakeUp,
     MakeUpRequest,
     RequestingRoute,
 )
-from ccdexplorer.env import environment
-
 from ccdexplorer.ccdexplorer_site.app.state import (
     get_httpx_client,
     get_labeled_accounts,
@@ -40,10 +29,19 @@ from ccdexplorer.ccdexplorer_site.app.state import (
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
     ccdexplorer_plotly_template,
+    create_dict_for_tabulator_display,
     get_url_from_api,
     verbose_timedelta,
-    create_dict_for_tabulator_display,
 )
+from ccdexplorer.env import environment
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_AccountInfo,
+    CCD_BlockItemSummary,
+)
+from ccdexplorer.site_user import SiteUser
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from plotly.subplots import make_subplots
 
 router = APIRouter()
 
