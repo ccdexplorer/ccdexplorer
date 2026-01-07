@@ -26,12 +26,13 @@
                 pool.all_pool_total_capital)* 100)|round_x_decimal_no_comma(5) }}%</td>
         </tr>
         
-        <tr class="sm-text">
-            <td class=" text-secondary-emphasis">Room left in pool</td>
-            <td class=" text-end align-middle text-secondary-emphasis">{{ (pool.delegated_capital_cap - pool.delegated_capital)|micro_ccd_no_decimals|safe }} <span class=" text-end align-middle text-secondary-emphasis ccd">({{ (100*(1-(pool.delegated_capital/pool.delegated_capital_cap)))
-                |round_x_decimal_no_comma(2) }}%)</span></td>
-        </tr>
-
+        {% if pool.delegated_capital_cap > 0 %}
+            <tr class="sm-text">
+                <td class=" text-secondary-emphasis">Room left in pool</td>
+                <td class=" text-end align-middle text-secondary-emphasis">{{ (pool.delegated_capital_cap - pool.delegated_capital)|micro_ccd_no_decimals|safe }} <span class=" text-end align-middle text-secondary-emphasis ccd">({{ (100*(1-(pool.delegated_capital/pool.delegated_capital_cap)))
+                    |round_x_decimal_no_comma(2) }}%)</span></td>
+            </tr>
+        {% endif %}
         {% endif %}
         <tr class="sm-text">
             <td  class=" text-secondary-emphasis" colspan="2"><i>Commission Rates</i></td>
