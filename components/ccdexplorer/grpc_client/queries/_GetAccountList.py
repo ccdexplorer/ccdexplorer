@@ -23,7 +23,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: list[AccountInfo] = self.stub_on_net(
-            net, "GetAccountList", blockHashInput
+            net, "GetAccountList", blockHashInput, streaming=True
         )
 
         for account in list(grpc_return_value):

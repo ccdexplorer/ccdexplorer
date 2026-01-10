@@ -25,7 +25,7 @@ class Mixin(_SharedConverters):
         )
 
         grpc_return_value: list[CCD_WinningBaker] | None = self.stub_on_net(
-            net, "GetWinningBakersEpoch", epoch_request
+            net, "GetWinningBakersEpoch", epoch_request, streaming=True
         )
 
         if grpc_return_value is None:

@@ -15,7 +15,6 @@ class Mixin(_SharedConverters):
     def check_health(self: GRPCClient):
         result = {}
 
-        self.check_connection(sys._getframe().f_code.co_name)
         grpc_return_value: NodeHealthResponse = self.health.Check(request=NodeHealthRequest())
 
         return grpc_return_value

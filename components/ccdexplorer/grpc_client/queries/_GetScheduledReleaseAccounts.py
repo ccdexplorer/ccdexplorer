@@ -24,7 +24,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: list[CCD_AccountPending] = self.stub_on_net(
-            net, "GetScheduledReleaseAccounts", blockHashInput
+            net, "GetScheduledReleaseAccounts", blockHashInput, streaming=True
         )
 
         for account_pending in list(grpc_return_value):

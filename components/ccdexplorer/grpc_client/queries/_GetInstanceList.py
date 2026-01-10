@@ -25,7 +25,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: Iterator[ContractAddress] = self.stub_on_net(
-            net, "GetInstanceList", blockHashInput
+            net, "GetInstanceList", blockHashInput, streaming=True
         )
         for instance in list(grpc_return_value):
             result.append(self.convertType(instance))

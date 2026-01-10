@@ -26,7 +26,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: Iterator[DelegatorInfo] = self.stub_on_net(
-            net, "GetPassiveDelegators", blockHashInput
+            net, "GetPassiveDelegators", blockHashInput, streaming=True
         )
         for delegator in list(grpc_return_value):
             delegator_dict = {

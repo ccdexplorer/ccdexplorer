@@ -9,8 +9,16 @@ import grpc
 from ccdexplorer.domain.generic import NET
 import os
 from rich.console import Console
+import threading
+import time
+import random
 
 console = Console()
+
+_RETRYABLE = {
+    grpc.StatusCode.UNAVAILABLE,
+    grpc.StatusCode.DEADLINE_EXCEEDED,
+}
 
 HOME_IP = os.environ.get("HOME_IP", "")
 
@@ -171,29 +179,59 @@ class GRPCClient(  # type: ignore
     _GetWinningBakersEpoch,
     # _SendBlockItem,
 ):
-    def __init__(self, net: str = "mainnet", devnet: bool = False):
+    def __init__(
+        self,
+        net: str = "mainnet",
+        devnet: bool = False,
+        *,
+        warmup: bool = True,
+        warmup_timeout_s: float = 1.0,
+        warmup_attempts: int = 1,
+        warmup_nets: tuple[NET, ...] | None = None,
+    ):
         self.net = NET(net)
-        # self.channel_mainnet: grpc.Channel
-        # self.channel_testnet: grpc.Channel
-        self.stub_mainnet: QueriesStub
-        self.stub_testnet: QueriesStub
-        # self.stub_to_net: dict[NET:QueriesStub]
+        self._was_ready = {NET.MAINNET: False, NET.TESTNET: False}
         self.host_index = {NET.MAINNET: 0, NET.TESTNET: 0}
-        self.hosts = {}
+        self.hosts: dict[NET, list[dict]] = {}
+        self._down_until: dict[tuple[NET, int], float] = {}
+        self._cooldown_s = 30.0
+        # Configure hosts
         self.hosts[NET.MAINNET] = GRPC_MAINNET
         if devnet:
             self.hosts[NET.MAINNET] = [
-                {
-                    "host": "--secure--grpc.devnet-plt-beta.concordium.com",
-                    "port": 20000,
-                }
+                {"host": "--secure--grpc.devnet-plt-beta.concordium.com", "port": 20000}
             ]
 
         self.hosts[NET.TESTNET] = GRPC_TESTNET
-        if len(GRPC_MAINNET) > 0:
-            self.connect()
-            self.check_connection(NET.MAINNET)
-            self.check_connection(NET.TESTNET)
+
+        # Reconnect locks (single-process stampede protection)
+        self._reconnect_lock = {
+            NET.MAINNET: threading.Lock(),
+            NET.TESTNET: threading.Lock(),
+        }
+
+        # Build channels/stubs if host lists exist
+        self.channel_mainnet = None
+        self.stub_mainnet = None
+        self.channel_testnet = None
+        self.stub_testnet = None
+
+        if self.hosts.get(NET.MAINNET):
+            self._connect_net(NET.MAINNET)
+
+        if self.hosts.get(NET.TESTNET):
+            self._connect_net(NET.TESTNET)
+
+        # Optional warmup: bounded, never infinite
+        if warmup:
+            if warmup_nets is None:
+                # Default: warm the configured net only (safer startup)
+                warmup_nets = (self.net,)
+
+            for n in warmup_nets:
+                if self.hosts.get(n):
+                    # bounded check; does not loop forever
+                    self.check_connection(n, attempts=warmup_attempts, timeout_s=warmup_timeout_s)
 
     def connect(self):
         host = self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]["host"]
@@ -234,44 +272,170 @@ class GRPCClient(  # type: ignore
 
         self.stub = QueriesStub(self.channel)
 
-    def stub_on_net(self, net, method_name, *args):
-        self.check_connection(net)
-        stub = self.stub_mainnet if net == NET.MAINNET else self.stub_testnet
-        method = getattr(stub, method_name, None)
+    def stub_on_net(
+        self,
+        net: NET,
+        method_name: str,
+        request,
+        *,
+        timeout: float = 30.0,
+        retries: int = 2,
+        streaming: bool = False,
+        connect_timeout_s: float = 0.5,
+    ):
+        """
+        Unary: returns the response message.
+        Streaming: returns a list of streamed messages (consumes the stream).
+        """
 
-        if method:
-            return method(timeout=30, *args)
-        else:
-            return None
+        for attempt in range(retries + 1):
+            # Fast readiness gate (bounded)
+            ok = self.check_connection(net, attempts=1, timeout_s=connect_timeout_s)
+            if not ok:
+                # If the channel isn't ready, treat as retryable within our bounded loop
+                if attempt < retries:
+                    self._rotate_host(net)
+                    self._reconnect_net(net)
+                    self._backoff(attempt)
+                    continue
+                raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
 
-    def switch_to_net(self, net: str = "mainnet"):
-        # only switch when we need to connect to a different net
-        if not net:
-            net = NET.MAINNET.value
+            stub = self.stub_mainnet if net == NET.MAINNET else self.stub_testnet
+            method = getattr(stub, method_name, None)
+            if method is None:
+                raise AttributeError(f"No gRPC method {method_name}")
 
-        if net != self.net.value:
-            self.net = NET(net)
-            self.connect()
-
-    def check_connection(self, net: NET = NET.MAINNET, f=None):
-        connected = {NET.MAINNET: False, NET.TESTNET: False}
-
-        while not connected[net]:
-            channel_to_check = self.channel_mainnet if net == NET.MAINNET else self.channel_testnet
             try:
-                grpc.channel_ready_future(channel_to_check).result(timeout=1)
-                connected[net] = True
+                if not streaming:
+                    # Correct unary call pattern
+                    return method(request, timeout=timeout)
 
+                # Server-streaming: call and consume the iterator so we can retry cleanly
+                stream_iter = method(request, timeout=timeout)
+                out = []
+                for item in stream_iter:
+                    out.append(item)
+                return out
+
+            except grpc.RpcError as e:
+                if self._is_retryable(e) and attempt < retries:
+                    # Mark not-ready so your transition logging will fire on recovery
+                    self._was_ready[net] = False
+                    self._rotate_host(net)
+                    self._reconnect_net(net)
+                    self._backoff(attempt)
+                    continue
+                raise
+
+    def _is_retryable(self, e: grpc.RpcError) -> bool:
+        try:
+            return e.code() in _RETRYABLE  # type: ignore[attr-defined]
+        except Exception:
+            return False
+
+    def _pick_next_host(self, net: NET) -> None:
+        n = len(self.hosts[net])
+        now = time.monotonic()
+
+        for _ in range(n):
+            self.host_index[net] = (self.host_index[net] + 1) % n
+            if self._down_until.get((net, self.host_index[net]), 0.0) <= now:
+                return
+        # If all are cooled down, just keep current index (we'll try anyway)
+
+    def _backoff(self, attempt: int) -> None:
+        # Small bounded exponential backoff with jitter (keeps incidents from flapping)
+        base = 0.1 * (2**attempt)  # 0.1, 0.2, 0.4 ...
+        sleep_s = min(0.5, base) + random.uniform(0.0, 0.05)
+        time.sleep(sleep_s)
+
+    def check_connection(
+        self, net: NET = NET.MAINNET, *, attempts: int = 2, timeout_s: float = 1.0
+    ) -> bool:
+        channel_to_check = self.channel_mainnet if net == NET.MAINNET else self.channel_testnet
+
+        for _ in range(attempts):
+            try:
+                grpc.channel_ready_future(channel_to_check).result(timeout=timeout_s)
+
+                if not self._was_ready[net]:
+                    console.log(
+                        f"GRPCClient channel ready for {net.value}: "
+                        f"{self.hosts[net][self.host_index[net]]['host']}:"
+                        f"{self.hosts[net][self.host_index[net]]['port']}"
+                    )
+
+                self._was_ready[net] = True
+                return True
             except grpc.FutureTimeoutError:
-                console.log(
-                    f"""GRPCClient for {net.value} Timeout for :
-                      {self.hosts[net][self.host_index[net]]["host"]}:
-                      {self.hosts[net][self.host_index[net]]["port"]}"""
-                )
-                self.host_index[net] += 1
-                if self.host_index[net] == len(self.hosts[net]):
-                    self.host_index[net] = 0
-                self.connect()
+                self._mark_host_down(net)
+                self._was_ready[net] = False
+                self._rotate_host(net)
+                self._reconnect_net(net)
+
+        return False
+
+    def _mark_host_down(self, net: NET) -> None:
+        self._down_until[(net, self.host_index[net])] = time.monotonic() + self._cooldown_s
+
+    def _rotate_host(self, net: NET) -> None:
+        import time
+
+        n = len(self.hosts[net])
+        now = time.monotonic()
+        for _ in range(n):
+            self.host_index[net] = (self.host_index[net] + 1) % n
+            if self._down_until.get((net, self.host_index[net]), 0.0) <= now:
+                return
+        # all cooled down, keep current index
+
+    def _reconnect_net(self, net: NET) -> None:
+        # prevent stampede inside a single process
+        with self._reconnect_lock[net]:
+            self._connect_net(net)
+
+    def _connect_net(self, net: NET) -> None:
+        # connect ONLY this net; leave the other untouched
+        if net == NET.MAINNET:
+            self.channel_mainnet, self.stub_mainnet = self._build_channel_and_stub(net)
+        else:
+            self.channel_testnet, self.stub_testnet = self._build_channel_and_stub(net)
+
+    def _build_channel_and_stub(self, net: NET):
+        host_cfg = self.hosts[net][self.host_index[net]]
+        host = host_cfg["host"]
+        port = host_cfg["port"]
+
+        use_secure = "--secure--" in host
+        host = host.replace("--secure--", "")
+        address = f"{host}:{port}"
+
+        # Common options: conservative defaults, no behavior change yet
+        options = [
+            ("grpc.keepalive_time_ms", 30_000),
+            ("grpc.keepalive_timeout_ms", 30_000),
+            ("grpc.keepalive_permit_without_calls", 1),
+            ("grpc.http2.max_pings_without_data", 0),
+        ]
+
+        if use_secure:
+            creds = grpc.ssl_channel_credentials()
+
+            # Keep your existing override behavior
+            options.append(("grpc.ssl_target_name_override", "grpc.devnet-plt-beta.concordium.com"))
+
+            channel = grpc.secure_channel(address, creds, options=options)
+        else:
+            channel = grpc.insecure_channel(address, options=options)
+
+        stub = QueriesStub(channel)
+
+        console.log(
+            f"GRPCClient building channel for {net.value} on {address} "
+            f"({'secure' if use_secure else 'insecure'})"
+        )
+
+        return channel, stub
 
     def connection_info(self, caller: str, tooter: Tooter, ADMIN_CHAT_ID: int) -> None:
         message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n"

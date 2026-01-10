@@ -101,7 +101,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_input)
 
         grpc_return_value = self.stub_on_net(  # type: ignore
-            net, "GetBlockSpecialEvents", blockHashInput
+            net, "GetBlockSpecialEvents", blockHashInput, streaming=True
         )
 
         events = []

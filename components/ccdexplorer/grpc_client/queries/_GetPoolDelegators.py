@@ -29,7 +29,7 @@ class Mixin(_SharedConverters):
         delegatorsRequest = GetPoolDelegatorsRequest(baker=baker_id, block_hash=blockHashInput)
 
         grpc_return_value: Iterator[DelegatorInfo] = self.stub_on_net(
-            net, "GetPoolDelegators", delegatorsRequest
+            net, "GetPoolDelegators", delegatorsRequest, streaming=True
         )
 
         for delegator in list(grpc_return_value):

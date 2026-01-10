@@ -776,7 +776,9 @@ class Mixin(_SharedConverters):
     ) -> CCD_Block:
         blockHashInput = self.generate_block_hash_input_from(block_input)
 
-        grpc_return_value = self.stub_on_net(net, "GetBlockTransactionEvents", blockHashInput)
+        grpc_return_value = self.stub_on_net(
+            net, "GetBlockTransactionEvents", blockHashInput, streaming=True
+        )
 
         tx_list = []
         if not grpc_return_value:

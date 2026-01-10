@@ -59,7 +59,9 @@ class Mixin(_SharedConverters):
     ) -> list[CCD_PendingUpdate]:
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
-        grpc_return_value = self.stub_on_net(net, "GetBlockPendingUpdates", blockHashInput)
+        grpc_return_value = self.stub_on_net(
+            net, "GetBlockPendingUpdates", blockHashInput, streaming=True
+        )
 
         events = []
         for tx in list(grpc_return_value):

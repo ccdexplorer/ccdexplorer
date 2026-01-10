@@ -25,18 +25,17 @@ class Mixin(_SharedConverters):
         result = []
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
-        self.check_connection(net, sys._getframe().f_code.co_name)
-        if net == NET.MAINNET:
-            grpc_return_value: Iterator[DelegatorInfo] = (
-                self.stub_mainnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
-            )
-        else:
-            grpc_return_value: Iterator[DelegatorInfo] = (
-                self.stub_testnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
-            )
+        # if net == NET.MAINNET:
+        #     grpc_return_value: Iterator[DelegatorInfo] = (
+        #         self.stub_mainnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
+        #     )
+        # else:
+        #     grpc_return_value: Iterator[DelegatorInfo] = (
+        #         self.stub_testnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
+        #     )
 
         grpc_return_value: Iterator[DelegatorInfo] = self.stub_on_net(
-            net, "GetPassiveDelegatorsRewardPeriod", blockHashInput
+            net, "GetPassiveDelegatorsRewardPeriod", blockHashInput, streaming=True
         )
 
         for delegator in list(grpc_return_value):

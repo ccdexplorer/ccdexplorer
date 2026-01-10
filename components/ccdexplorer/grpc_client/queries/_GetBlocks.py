@@ -29,7 +29,6 @@ class Mixin(_SharedConverters):
         self: GRPCClient,
         net: Enum = NET.MAINNET,
     ) -> CCD_ArrivedBlockInfo:
-        self.check_connection(net, sys._getframe().f_code.co_name)
         if net == NET.MAINNET:
             for block in self.stub_mainnet.GetBlocks(request=Empty()):
                 return self.convertBlock(block)

@@ -23,7 +23,9 @@ class Mixin(_SharedConverters):
         result = []
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
-        grpc_return_value: list[BakerId] = self.stub_on_net(net, "GetBakerList", blockHashInput)
+        grpc_return_value: list[BakerId] = self.stub_on_net(
+            net, "GetBakerList", blockHashInput, streaming=True
+        )
         for baker in list(grpc_return_value):
             result.append(self.convertType(baker))
 

@@ -24,7 +24,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: Iterator[IpInfo] = self.stub_on_net(
-            net, "GetIdentityProviders", blockHashInput
+            net, "GetIdentityProviders", blockHashInput, streaming=True
         )
 
         for ip in list(grpc_return_value):

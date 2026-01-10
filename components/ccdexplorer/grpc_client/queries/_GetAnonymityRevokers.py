@@ -22,7 +22,7 @@ class Mixin(_SharedConverters):
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
         grpc_return_value: list[ArInfo] = self.stub_on_net(
-            net, "GetAnonymityRevokers", blockHashInput
+            net, "GetAnonymityRevokers", blockHashInput, streaming=True
         )
 
         for ar in list(grpc_return_value):
