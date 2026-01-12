@@ -557,6 +557,22 @@ class CCD_Token(BaseModel):
 
 
 #### PLT END ###
+class CCD_BakerInfo(BaseModel):
+    """Information about a validator.
+
+    GRPC documentation: [concordium.v2.BakerInfo](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.BakerInfo)
+
+    Attributes:
+        baker_id (CCD_BakerId): Identity of the validator. This is actually the account index of the account controlling the validator.
+        election_key (CCD_BakerElectionVerifyKey): Validator's public key used to check whether they won the lottery or not.
+        signature_key (CCD_BakerSignatureVerifyKey): Validator's public key used to check that they are indeed the ones who produced the block.
+        aggregation_key (CCD_BakerAggregationVerifyKey): Validator's public key used to check signatures on finalization records. This is only used if the validator has sufficient stake to participate in finalization.
+    """
+
+    aggregation_key: str
+    election_key: str
+    baker_id: int
+    signature_key: str
 
 
 class CCD_RejectReason_InvalidInitMethod(BaseModel):
@@ -929,6 +945,28 @@ class CCD_CommissionRates(BaseModel):
     baking: float
     finalization: float
     transaction: float
+
+
+class CCD_BakerRewardPeriodInfo(BaseModel):
+    """Information about a particular validator with respect to the current reward period. The below values are historical value from the last payday block.
+
+    GRPC documentation: [concordium.v2.BakerRewardPeriodInfo](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.BakerRewardPeriodInfo)
+
+    Attributes:
+        baker (BakerInfo): The validator id and public keys for the validator.
+        effective_stake (microCCD): The effective stake of the validator for the consensus protocol. The returned amount accounts for delegation, capital bounds and leverage bounds.
+        commission_rates (CCD_CommissionRates): The effective commission rate for the validator that applies for the reward period.
+        equity_capital (microCCD): The amount staked by the validator itself.
+        delegated_capital (microCCD): The total amount of capital delegated to this validator pool.
+        is_finalizer (bool): Whether the validator is a finalizer or not.
+    """
+
+    baker: CCD_BakerInfo
+    effective_stake: microCCD
+    commission_rates: CCD_CommissionRates
+    equity_capital: microCCD
+    delegated_capital: microCCD
+    is_finalizer: bool
 
 
 class CCD_BakerPoolInfo(BaseModel):
@@ -2428,24 +2466,6 @@ class CCD_ReleaseSchedule(BaseModel):
 
     schedules: list[CCD_Release]
     total: int
-
-
-class CCD_BakerInfo(BaseModel):
-    """Information about a validator.
-
-    GRPC documentation: [concordium.v2.BakerInfo](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.BakerInfo)
-
-    Attributes:
-        baker_id (CCD_BakerId): Identity of the validator. This is actually the account index of the account controlling the validator.
-        election_key (CCD_BakerElectionVerifyKey): Validator's public key used to check whether they won the lottery or not.
-        signature_key (CCD_BakerSignatureVerifyKey): Validator's public key used to check that they are indeed the ones who produced the block.
-        aggregation_key (CCD_BakerAggregationVerifyKey): Validator's public key used to check signatures on finalization records. This is only used if the validator has sufficient stake to participate in finalization.
-    """
-
-    aggregation_key: str
-    election_key: str
-    baker_id: int
-    signature_key: str
 
 
 class CCD_AccountStakingInfo_Baker(BaseModel):

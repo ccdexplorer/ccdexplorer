@@ -486,6 +486,24 @@ class Mixin(Protocol):
 
         return CCD_BakerPoolInfo(**result)
 
+    def convertBakerRewardPeriodInfo(self, message) -> CCD_BakerRewardPeriodInfo:
+        result = {}
+
+        for descriptor in message.DESCRIPTOR.fields:
+            key, value = self.get_key_value_from_descriptor(descriptor, message)
+            if key == "is_finalizer":
+                result[key] = value
+            elif key == "baker":
+                result[key] = self.convertTypeWithSingleValues(value)
+            else:
+                if type(value) in self.simple_types:
+                    result[key] = self.convertType(value)
+
+                elif type(value) is CommissionRates:
+                    result[key] = self.convertCommissionRates(value)
+
+        return CCD_BakerRewardPeriodInfo(**result)
+
     def convertPoolCurrentPaydayInfo(self, message) -> CCD_CurrentPaydayStatus:
         result = {}
 

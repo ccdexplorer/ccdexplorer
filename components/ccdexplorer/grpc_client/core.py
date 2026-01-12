@@ -134,10 +134,12 @@ from .queries._GetTokenList import (
 from .queries._GetWinningBakersEpoch import (
     Mixin as _GetWinningBakersEpoch,
 )
-
-# from .queries._SendBlockItem import (
-#     Mixin as _SendBlockItem,
-# )
+from .queries._GetModuleList import (
+    Mixin as _GetModuleList,
+)
+from .queries._GetBakersRewardPeriod import (
+    Mixin as _GetBakersRewardPeriod,
+)
 
 
 class GRPCClient(  # type: ignore
@@ -177,6 +179,8 @@ class GRPCClient(  # type: ignore
     _GetTokenInfo,
     _GetTokenList,
     _GetWinningBakersEpoch,
+    _GetModuleList,
+    _GetBakersRewardPeriod,
     # _SendBlockItem,
 ):
     def __init__(
