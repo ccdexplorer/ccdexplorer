@@ -35,11 +35,12 @@ class ProcessValidator(MessageValidator, Utils):
         if not notification_event.impacted_addresses[0].address:
             account_index = None
 
-        account_index = (
-            notification_event.impacted_addresses[0].address.account.index
-            if notification_event.impacted_addresses[0].address.account
-            else None
-        )
+        else:
+            account_index = (
+                notification_event.impacted_addresses[0].address.account.index
+                if notification_event.impacted_addresses[0].address.account
+                else None
+            )
         if user.accounts.get(str(account_index)):
             user_account: AccountForUser = user.accounts[str(account_index)]
 
