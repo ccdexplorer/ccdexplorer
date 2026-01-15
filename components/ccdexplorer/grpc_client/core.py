@@ -284,89 +284,89 @@ class GRPCClient(  # type: ignore
 
         #     self.stub = QueriesStub(self.channel)
 
-        def stub_on_net(
-            self,
-            net: NET,
-            method_name: str,
-            request,
-            *,
-            timeout: float = 30.0,
-            retries: int = 2,
-            streaming: bool = False,
-            connect_timeout_s: float = 0.5,
-        ):
-            """
-            Unary: returns the response message.
-            Streaming: returns a list of streamed messages (consumes the stream).
-            """
+    def stub_on_net(
+        self,
+        net: NET,
+        method_name: str,
+        request,
+        *,
+        timeout: float = 30.0,
+        retries: int = 2,
+        streaming: bool = False,
+        connect_timeout_s: float = 0.5,
+    ):
+        """
+        Unary: returns the response message.
+        Streaming: returns a list of streamed messages (consumes the stream).
+        """
 
-            for attempt in range(retries + 1):
-                # Adjust readiness timeout for secure endpoints (you already have _current_is_secure, or inline the logic)
-                rt = connect_timeout_s
-                if "--secure--" in self.hosts[net][self.host_index[net]]["host"]:
-                    rt = max(rt, 2.0)
+        for attempt in range(retries + 1):
+            # Adjust readiness timeout for secure endpoints (you already have _current_is_secure, or inline the logic)
+            rt = connect_timeout_s
+            if "--secure--" in self.hosts[net][self.host_index[net]]["host"]:
+                rt = max(rt, 2.0)
 
-                # Fast readiness gate (bounded)
-                ok = self.check_connection(net, attempts=1, timeout_s=rt)
-                if not ok:
-                    # If the channel is not ready, treat as retryable within our bounded loop
-                    if attempt < retries:
-                        if len(self.hosts[net]) > 1:
-                            self._mark_host_down(net)
-                            self._rotate_host(net)
-                        self._reconnect_net(net)
-                        self._backoff(attempt)
-                        continue
+            # Fast readiness gate (bounded)
+            ok = self.check_connection(net, attempts=1, timeout_s=rt)
+            if not ok:
+                # If the channel is not ready, treat as retryable within our bounded loop
+                if attempt < retries:
+                    if len(self.hosts[net]) > 1:
+                        self._mark_host_down(net)
+                        self._rotate_host(net)
+                    self._reconnect_net(net)
+                    self._backoff(attempt)
+                    continue
 
-                    # All readiness attempts exhausted → net considered unresponsive for this call
-                    GRPC_NET_UNRESPONSIVE_TOTAL.labels(
-                        net=net.value,
-                        reason="connect_not_ready",
-                    ).inc()
-                    raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
+                # All readiness attempts exhausted → net considered unresponsive for this call
+                GRPC_NET_UNRESPONSIVE_TOTAL.labels(
+                    net=net.value,
+                    reason="connect_not_ready",
+                ).inc()
+                raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
 
-                stub = self.stub_mainnet if net == NET.MAINNET else self.stub_testnet
-                method = getattr(stub, method_name, None)
-                if method is None:
-                    raise AttributeError(f"No gRPC method {method_name}")
+            stub = self.stub_mainnet if net == NET.MAINNET else self.stub_testnet
+            method = getattr(stub, method_name, None)
+            if method is None:
+                raise AttributeError(f"No gRPC method {method_name}")
 
-                try:
-                    if not streaming:
-                        # Unary call
-                        return method(request, timeout=timeout)
+            try:
+                if not streaming:
+                    # Unary call
+                    return method(request, timeout=timeout)
 
-                    # Server-streaming: call and consume the iterator so we can retry cleanly
-                    stream_iter = method(request, timeout=timeout)
-                    out = []
-                    for item in stream_iter:
-                        out.append(item)
-                    return out
+                # Server-streaming: call and consume the iterator so we can retry cleanly
+                stream_iter = method(request, timeout=timeout)
+                out = []
+                for item in stream_iter:
+                    out.append(item)
+                return out
 
-                except grpc.RpcError as e:
-                    retryable = self._is_retryable(e)
+            except grpc.RpcError as e:
+                retryable = self._is_retryable(e)
 
-                    if retryable and attempt < retries:
-                        # Retryable error: mark not-ready, switch host if possible, then retry
-                        self._was_ready[net] = False
-                        if len(self.hosts[net]) > 1:
-                            self._mark_host_down(net)
-                            self._rotate_host(net)
-                        self._reconnect_net(net)
-                        self._backoff(attempt)
-                        continue
+                if retryable and attempt < retries:
+                    # Retryable error: mark not-ready, switch host if possible, then retry
+                    self._was_ready[net] = False
+                    if len(self.hosts[net]) > 1:
+                        self._mark_host_down(net)
+                        self._rotate_host(net)
+                    self._reconnect_net(net)
+                    self._backoff(attempt)
+                    continue
 
-                    # Retries exhausted or non-retryable error → net considered unresponsive for this call
-                    if retryable:
-                        reason = "rpc_retry_exhausted"
-                    else:
-                        reason = "rpc_non_retryable"
+                # Retries exhausted or non-retryable error → net considered unresponsive for this call
+                if retryable:
+                    reason = "rpc_retry_exhausted"
+                else:
+                    reason = "rpc_non_retryable"
 
-                    GRPC_NET_UNRESPONSIVE_TOTAL.labels(
-                        net=net.value,
-                        reason=reason,
-                    ).inc()
+                GRPC_NET_UNRESPONSIVE_TOTAL.labels(
+                    net=net.value,
+                    reason=reason,
+                ).inc()
 
-                    raise
+                raise
 
     def _is_retryable(self, e: grpc.RpcError) -> bool:
         try:
