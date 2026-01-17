@@ -36,6 +36,7 @@ dependencies = [
     "googleapis-common-protos",
     "httpx",
     "ccdexplorer_schema_parser",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]
