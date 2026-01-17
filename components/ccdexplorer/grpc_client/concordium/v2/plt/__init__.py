@@ -132,7 +132,9 @@ class TokenTransferEvent(betterproto.Message):
     amount: "TokenAmount" = betterproto.message_field(3)
     """The amount of tokens transferred."""
 
-    memo: Optional["__v2__.Memo"] = betterproto.message_field(4, optional=True, group="_memo")
+    memo: Optional["__v2__.Memo"] = betterproto.message_field(
+        4, optional=True, group="_memo"
+    )
     """
     An optional memo field that can be used to attach a message to the token
     transfer.
@@ -200,7 +202,9 @@ class TokenModuleRejectReason(betterproto.Message):
     type: str = betterproto.string_field(2)
     """The type of the reject reason."""
 
-    details: Optional["Cbor"] = betterproto.message_field(3, optional=True, group="_details")
+    details: Optional["Cbor"] = betterproto.message_field(
+        3, optional=True, group="_details"
+    )
     """(Optional) CBOR-encoded details."""
 
 

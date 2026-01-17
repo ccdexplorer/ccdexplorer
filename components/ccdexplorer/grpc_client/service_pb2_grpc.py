@@ -2,10 +2,31 @@
 """Client and server classes corresponding to protobuf-defined services."""
 
 import grpc
+import warnings
 
 import ccdexplorer.grpc_client.kernel_pb2 as kernel__pb2
 import ccdexplorer.grpc_client.protocol_level_tokens_pb2 as protocol__level__tokens__pb2
 import ccdexplorer.grpc_client.types_pb2 as types__pb2
+
+GRPC_GENERATED_VERSION = "1.75.1"
+GRPC_VERSION = grpc.__version__
+_version_not_supported = False
+
+try:
+    from grpc._utilities import first_version_is_lower
+
+    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+except ImportError:
+    _version_not_supported = True
+
+if _version_not_supported:
+    raise RuntimeError(
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + f" but the generated code in service_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
+    )
 
 
 class QueriesStub(object):
@@ -21,316 +42,385 @@ class QueriesStub(object):
             "/concordium.v2.Queries/GetBlocks",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.ArrivedBlockInfo.FromString,
+            _registered_method=True,
         )
         self.GetFinalizedBlocks = channel.unary_stream(
             "/concordium.v2.Queries/GetFinalizedBlocks",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.FinalizedBlockInfo.FromString,
+            _registered_method=True,
         )
         self.GetAccountInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetAccountInfo",
             request_serializer=types__pb2.AccountInfoRequest.SerializeToString,
             response_deserializer=types__pb2.AccountInfo.FromString,
+            _registered_method=True,
         )
         self.GetTokenInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetTokenInfo",
             request_serializer=types__pb2.TokenInfoRequest.SerializeToString,
             response_deserializer=types__pb2.TokenInfo.FromString,
+            _registered_method=True,
         )
         self.GetAccountList = channel.unary_stream(
             "/concordium.v2.Queries/GetAccountList",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=kernel__pb2.AccountAddress.FromString,
+            _registered_method=True,
         )
         self.GetTokenList = channel.unary_stream(
             "/concordium.v2.Queries/GetTokenList",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=protocol__level__tokens__pb2.TokenId.FromString,
+            _registered_method=True,
         )
         self.GetModuleList = channel.unary_stream(
             "/concordium.v2.Queries/GetModuleList",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.ModuleRef.FromString,
+            _registered_method=True,
         )
         self.GetAncestors = channel.unary_stream(
             "/concordium.v2.Queries/GetAncestors",
             request_serializer=types__pb2.AncestorsRequest.SerializeToString,
             response_deserializer=types__pb2.BlockHash.FromString,
+            _registered_method=True,
         )
         self.GetModuleSource = channel.unary_unary(
             "/concordium.v2.Queries/GetModuleSource",
             request_serializer=types__pb2.ModuleSourceRequest.SerializeToString,
             response_deserializer=types__pb2.VersionedModuleSource.FromString,
+            _registered_method=True,
         )
         self.GetInstanceList = channel.unary_stream(
             "/concordium.v2.Queries/GetInstanceList",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.ContractAddress.FromString,
+            _registered_method=True,
         )
         self.GetInstanceInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetInstanceInfo",
             request_serializer=types__pb2.InstanceInfoRequest.SerializeToString,
             response_deserializer=types__pb2.InstanceInfo.FromString,
+            _registered_method=True,
         )
         self.GetInstanceState = channel.unary_stream(
             "/concordium.v2.Queries/GetInstanceState",
             request_serializer=types__pb2.InstanceInfoRequest.SerializeToString,
             response_deserializer=types__pb2.InstanceStateKVPair.FromString,
+            _registered_method=True,
         )
         self.InstanceStateLookup = channel.unary_unary(
             "/concordium.v2.Queries/InstanceStateLookup",
             request_serializer=types__pb2.InstanceStateLookupRequest.SerializeToString,
             response_deserializer=types__pb2.InstanceStateValueAtKey.FromString,
+            _registered_method=True,
         )
         self.GetNextAccountSequenceNumber = channel.unary_unary(
             "/concordium.v2.Queries/GetNextAccountSequenceNumber",
             request_serializer=kernel__pb2.AccountAddress.SerializeToString,
             response_deserializer=types__pb2.NextAccountSequenceNumber.FromString,
+            _registered_method=True,
         )
         self.GetConsensusInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetConsensusInfo",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.ConsensusInfo.FromString,
+            _registered_method=True,
         )
         self.GetBlockItemStatus = channel.unary_unary(
             "/concordium.v2.Queries/GetBlockItemStatus",
             request_serializer=types__pb2.TransactionHash.SerializeToString,
             response_deserializer=types__pb2.BlockItemStatus.FromString,
+            _registered_method=True,
         )
         self.GetCryptographicParameters = channel.unary_unary(
             "/concordium.v2.Queries/GetCryptographicParameters",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.CryptographicParameters.FromString,
+            _registered_method=True,
         )
         self.GetBlockInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetBlockInfo",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockInfo.FromString,
+            _registered_method=True,
         )
         self.GetBakerList = channel.unary_stream(
             "/concordium.v2.Queries/GetBakerList",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BakerId.FromString,
+            _registered_method=True,
         )
         self.GetPoolInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetPoolInfo",
             request_serializer=types__pb2.PoolInfoRequest.SerializeToString,
             response_deserializer=types__pb2.PoolInfoResponse.FromString,
+            _registered_method=True,
         )
         self.GetPassiveDelegationInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetPassiveDelegationInfo",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.PassiveDelegationInfo.FromString,
+            _registered_method=True,
         )
         self.GetBlocksAtHeight = channel.unary_unary(
             "/concordium.v2.Queries/GetBlocksAtHeight",
             request_serializer=types__pb2.BlocksAtHeightRequest.SerializeToString,
             response_deserializer=types__pb2.BlocksAtHeightResponse.FromString,
+            _registered_method=True,
         )
         self.GetTokenomicsInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetTokenomicsInfo",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.TokenomicsInfo.FromString,
+            _registered_method=True,
         )
         self.InvokeInstance = channel.unary_unary(
             "/concordium.v2.Queries/InvokeInstance",
             request_serializer=types__pb2.InvokeInstanceRequest.SerializeToString,
             response_deserializer=types__pb2.InvokeInstanceResponse.FromString,
+            _registered_method=True,
         )
         self.GetPoolDelegators = channel.unary_stream(
             "/concordium.v2.Queries/GetPoolDelegators",
             request_serializer=types__pb2.GetPoolDelegatorsRequest.SerializeToString,
             response_deserializer=types__pb2.DelegatorInfo.FromString,
+            _registered_method=True,
         )
         self.GetPoolDelegatorsRewardPeriod = channel.unary_stream(
             "/concordium.v2.Queries/GetPoolDelegatorsRewardPeriod",
             request_serializer=types__pb2.GetPoolDelegatorsRequest.SerializeToString,
             response_deserializer=types__pb2.DelegatorRewardPeriodInfo.FromString,
+            _registered_method=True,
         )
         self.GetPassiveDelegators = channel.unary_stream(
             "/concordium.v2.Queries/GetPassiveDelegators",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.DelegatorInfo.FromString,
+            _registered_method=True,
         )
         self.GetPassiveDelegatorsRewardPeriod = channel.unary_stream(
             "/concordium.v2.Queries/GetPassiveDelegatorsRewardPeriod",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.DelegatorRewardPeriodInfo.FromString,
+            _registered_method=True,
         )
         self.GetBranches = channel.unary_unary(
             "/concordium.v2.Queries/GetBranches",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.Branch.FromString,
+            _registered_method=True,
         )
         self.GetElectionInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetElectionInfo",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.ElectionInfo.FromString,
+            _registered_method=True,
         )
         self.GetIdentityProviders = channel.unary_stream(
             "/concordium.v2.Queries/GetIdentityProviders",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.IpInfo.FromString,
+            _registered_method=True,
         )
         self.GetAnonymityRevokers = channel.unary_stream(
             "/concordium.v2.Queries/GetAnonymityRevokers",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.ArInfo.FromString,
+            _registered_method=True,
         )
         self.GetAccountNonFinalizedTransactions = channel.unary_stream(
             "/concordium.v2.Queries/GetAccountNonFinalizedTransactions",
             request_serializer=kernel__pb2.AccountAddress.SerializeToString,
             response_deserializer=types__pb2.TransactionHash.FromString,
+            _registered_method=True,
         )
         self.GetBlockTransactionEvents = channel.unary_stream(
             "/concordium.v2.Queries/GetBlockTransactionEvents",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockItemSummary.FromString,
+            _registered_method=True,
         )
         self.GetBlockSpecialEvents = channel.unary_stream(
             "/concordium.v2.Queries/GetBlockSpecialEvents",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockSpecialEvent.FromString,
+            _registered_method=True,
         )
         self.GetBlockPendingUpdates = channel.unary_stream(
             "/concordium.v2.Queries/GetBlockPendingUpdates",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.PendingUpdate.FromString,
+            _registered_method=True,
         )
         self.GetNextUpdateSequenceNumbers = channel.unary_unary(
             "/concordium.v2.Queries/GetNextUpdateSequenceNumbers",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.NextUpdateSequenceNumbers.FromString,
+            _registered_method=True,
         )
         self.GetScheduledReleaseAccounts = channel.unary_stream(
             "/concordium.v2.Queries/GetScheduledReleaseAccounts",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.AccountPending.FromString,
+            _registered_method=True,
         )
         self.GetCooldownAccounts = channel.unary_stream(
             "/concordium.v2.Queries/GetCooldownAccounts",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.AccountPending.FromString,
+            _registered_method=True,
         )
         self.GetPreCooldownAccounts = channel.unary_stream(
             "/concordium.v2.Queries/GetPreCooldownAccounts",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.AccountIndex.FromString,
+            _registered_method=True,
         )
         self.GetPrePreCooldownAccounts = channel.unary_stream(
             "/concordium.v2.Queries/GetPrePreCooldownAccounts",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.AccountIndex.FromString,
+            _registered_method=True,
         )
         self.GetBakerEarliestWinTime = channel.unary_unary(
             "/concordium.v2.Queries/GetBakerEarliestWinTime",
             request_serializer=types__pb2.BakerId.SerializeToString,
             response_deserializer=types__pb2.Timestamp.FromString,
+            _registered_method=True,
         )
         self.Shutdown = channel.unary_unary(
             "/concordium.v2.Queries/Shutdown",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.PeerConnect = channel.unary_unary(
             "/concordium.v2.Queries/PeerConnect",
             request_serializer=types__pb2.IpSocketAddress.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.PeerDisconnect = channel.unary_unary(
             "/concordium.v2.Queries/PeerDisconnect",
             request_serializer=types__pb2.IpSocketAddress.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.GetBannedPeers = channel.unary_unary(
             "/concordium.v2.Queries/GetBannedPeers",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.BannedPeers.FromString,
+            _registered_method=True,
         )
         self.BanPeer = channel.unary_unary(
             "/concordium.v2.Queries/BanPeer",
             request_serializer=types__pb2.PeerToBan.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.UnbanPeer = channel.unary_unary(
             "/concordium.v2.Queries/UnbanPeer",
             request_serializer=types__pb2.BannedPeer.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.DumpStart = channel.unary_unary(
             "/concordium.v2.Queries/DumpStart",
             request_serializer=types__pb2.DumpRequest.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.DumpStop = channel.unary_unary(
             "/concordium.v2.Queries/DumpStop",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.Empty.FromString,
+            _registered_method=True,
         )
         self.GetPeersInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetPeersInfo",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.PeersInfo.FromString,
+            _registered_method=True,
         )
         self.GetNodeInfo = channel.unary_unary(
             "/concordium.v2.Queries/GetNodeInfo",
             request_serializer=types__pb2.Empty.SerializeToString,
             response_deserializer=types__pb2.NodeInfo.FromString,
+            _registered_method=True,
         )
         self.SendBlockItem = channel.unary_unary(
             "/concordium.v2.Queries/SendBlockItem",
             request_serializer=types__pb2.SendBlockItemRequest.SerializeToString,
             response_deserializer=types__pb2.TransactionHash.FromString,
+            _registered_method=True,
         )
         self.GetAccountTransactionSignHash = channel.unary_unary(
             "/concordium.v2.Queries/GetAccountTransactionSignHash",
             request_serializer=types__pb2.PreAccountTransaction.SerializeToString,
             response_deserializer=types__pb2.AccountTransactionSignHash.FromString,
+            _registered_method=True,
+        )
+        self.GetAccountTransactionV1SignHash = channel.unary_unary(
+            "/concordium.v2.Queries/GetAccountTransactionV1SignHash",
+            request_serializer=types__pb2.PreAccountTransactionV1.SerializeToString,
+            response_deserializer=types__pb2.AccountTransactionSignHash.FromString,
+            _registered_method=True,
         )
         self.GetBlockChainParameters = channel.unary_unary(
             "/concordium.v2.Queries/GetBlockChainParameters",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.ChainParameters.FromString,
+            _registered_method=True,
         )
         self.GetBlockFinalizationSummary = channel.unary_unary(
             "/concordium.v2.Queries/GetBlockFinalizationSummary",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockFinalizationSummary.FromString,
+            _registered_method=True,
         )
         self.GetBlockItems = channel.unary_stream(
             "/concordium.v2.Queries/GetBlockItems",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockItem.FromString,
+            _registered_method=True,
         )
         self.GetBakersRewardPeriod = channel.unary_stream(
             "/concordium.v2.Queries/GetBakersRewardPeriod",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BakerRewardPeriodInfo.FromString,
+            _registered_method=True,
         )
         self.GetBlockCertificates = channel.unary_unary(
             "/concordium.v2.Queries/GetBlockCertificates",
             request_serializer=types__pb2.BlockHashInput.SerializeToString,
             response_deserializer=types__pb2.BlockCertificates.FromString,
+            _registered_method=True,
         )
         self.GetWinningBakersEpoch = channel.unary_stream(
             "/concordium.v2.Queries/GetWinningBakersEpoch",
             request_serializer=types__pb2.EpochRequest.SerializeToString,
             response_deserializer=types__pb2.WinningBaker.FromString,
+            _registered_method=True,
         )
         self.GetFirstBlockEpoch = channel.unary_unary(
             "/concordium.v2.Queries/GetFirstBlockEpoch",
             request_serializer=types__pb2.EpochRequest.SerializeToString,
             response_deserializer=types__pb2.BlockHash.FromString,
+            _registered_method=True,
         )
         self.GetConsensusDetailedStatus = channel.unary_unary(
             "/concordium.v2.Queries/GetConsensusDetailedStatus",
             request_serializer=types__pb2.ConsensusDetailedStatusQuery.SerializeToString,
             response_deserializer=types__pb2.ConsensusDetailedStatus.FromString,
+            _registered_method=True,
         )
         self.DryRun = channel.stream_stream(
             "/concordium.v2.Queries/DryRun",
             request_serializer=types__pb2.DryRunRequest.SerializeToString,
             response_deserializer=types__pb2.DryRunResponse.FromString,
+            _registered_method=True,
         )
 
 
@@ -802,6 +892,20 @@ class QueriesServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def GetAccountTransactionV1SignHash(self, request, context):
+        """Get the hash to be signed for an account transaction v1. The
+        hash returned should be signed and the signatures included as an
+        AccountTransactionV1Signatures when calling `SendBlockItem`. This is
+        provided as a convenience to support cases where the right SDK is not
+        available for interacting with the node. If an SDK is available then it is
+        strongly recommended to compute this hash off-line using it. That reduces
+        the trust in the node, removes networking failure modes, and will perform
+        better.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def GetBlockChainParameters(self, request, context):
         """Get the values of chain parameters in effect in the given block."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1197,6 +1301,11 @@ def add_QueriesServicer_to_server(servicer, server):
             request_deserializer=types__pb2.PreAccountTransaction.FromString,
             response_serializer=types__pb2.AccountTransactionSignHash.SerializeToString,
         ),
+        "GetAccountTransactionV1SignHash": grpc.unary_unary_rpc_method_handler(
+            servicer.GetAccountTransactionV1SignHash,
+            request_deserializer=types__pb2.PreAccountTransactionV1.FromString,
+            response_serializer=types__pb2.AccountTransactionSignHash.SerializeToString,
+        ),
         "GetBlockChainParameters": grpc.unary_unary_rpc_method_handler(
             servicer.GetBlockChainParameters,
             request_deserializer=types__pb2.BlockHashInput.FromString,
@@ -1247,6 +1356,7 @@ def add_QueriesServicer_to_server(servicer, server):
         "concordium.v2.Queries", rpc_method_handlers
     )
     server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers("concordium.v2.Queries", rpc_method_handlers)
 
 
 # This class is part of an EXPERIMENTAL API.
@@ -1280,6 +1390,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1309,6 +1420,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1338,6 +1450,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1367,6 +1480,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1396,6 +1510,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1425,6 +1540,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1454,6 +1570,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1483,6 +1600,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1512,6 +1630,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1541,6 +1660,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1570,6 +1690,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1599,6 +1720,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1628,6 +1750,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1657,6 +1780,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1686,6 +1810,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1715,6 +1840,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1744,6 +1870,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1773,6 +1900,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1802,6 +1930,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1831,6 +1960,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1860,6 +1990,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1889,6 +2020,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1918,6 +2050,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1947,6 +2080,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -1976,6 +2110,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2005,6 +2140,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2034,6 +2170,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2063,6 +2200,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2092,6 +2230,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2121,6 +2260,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2150,6 +2290,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2179,6 +2320,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2208,6 +2350,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2237,6 +2380,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2266,6 +2410,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2295,6 +2440,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2324,6 +2470,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2353,6 +2500,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2382,6 +2530,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2411,6 +2560,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2440,6 +2590,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2469,6 +2620,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2498,6 +2650,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2527,6 +2680,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2556,6 +2710,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2585,6 +2740,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2614,6 +2770,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2643,6 +2800,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2672,6 +2830,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2701,6 +2860,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2730,6 +2890,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2759,6 +2920,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2788,6 +2950,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2817,6 +2980,37 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def GetAccountTransactionV1SignHash(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/concordium.v2.Queries/GetAccountTransactionV1SignHash",
+            types__pb2.PreAccountTransactionV1.SerializeToString,
+            types__pb2.AccountTransactionSignHash.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2846,6 +3040,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2875,6 +3070,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2904,6 +3100,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2933,6 +3130,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2962,6 +3160,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -2991,6 +3190,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -3020,6 +3220,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -3049,6 +3250,7 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )
 
     @staticmethod
@@ -3078,4 +3280,5 @@ class Queries(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )

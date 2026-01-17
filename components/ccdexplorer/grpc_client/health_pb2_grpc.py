@@ -2,8 +2,29 @@
 """Client and server classes corresponding to protobuf-defined services."""
 
 import grpc
+import warnings
 
-from . import health_pb2 as health__pb2
+import ccdexplorer.grpc_client.health_pb2 as health__pb2
+
+GRPC_GENERATED_VERSION = "1.75.1"
+GRPC_VERSION = grpc.__version__
+_version_not_supported = False
+
+try:
+    from grpc._utilities import first_version_is_lower
+
+    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+except ImportError:
+    _version_not_supported = True
+
+if _version_not_supported:
+    raise RuntimeError(
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + f" but the generated code in health_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
+    )
 
 
 class HealthStub(object):
@@ -19,6 +40,7 @@ class HealthStub(object):
             "/concordium.health.Health/Check",
             request_serializer=health__pb2.NodeHealthRequest.SerializeToString,
             response_deserializer=health__pb2.NodeHealthResponse.FromString,
+            _registered_method=True,
         )
 
 
@@ -56,6 +78,7 @@ def add_HealthServicer_to_server(servicer, server):
         "concordium.health.Health", rpc_method_handlers
     )
     server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers("concordium.health.Health", rpc_method_handlers)
 
 
 # This class is part of an EXPERIMENTAL API.
@@ -75,7 +98,7 @@ class Health(object):
         timeout=None,
         metadata=None,
     ):
-        return grpc.experimental.unary_unary(  # type: ignore
+        return grpc.experimental.unary_unary(
             request,
             target,
             "/concordium.health.Health/Check",
@@ -89,4 +112,5 @@ class Health(object):
             wait_for_ready,
             timeout,
             metadata,
+            _registered_method=True,
         )

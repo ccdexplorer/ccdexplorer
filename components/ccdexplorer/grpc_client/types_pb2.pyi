@@ -1,10 +1,11 @@
-from . import kernel_pb2 as _kernel_pb2
-from . import protocol_level_tokens_pb2 as _protocol_level_tokens_pb2
+import kernel_pb2 as _kernel_pb2
+import protocol_level_tokens_pb2 as _protocol_level_tokens_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -85,6 +86,7 @@ class ProtocolVersion(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PROTOCOL_VERSION_7: _ClassVar[ProtocolVersion]
     PROTOCOL_VERSION_8: _ClassVar[ProtocolVersion]
     PROTOCOL_VERSION_9: _ClassVar[ProtocolVersion]
+    PROTOCOL_VERSION_10: _ClassVar[ProtocolVersion]
 OPEN_STATUS_OPEN_FOR_ALL: OpenStatus
 OPEN_STATUS_CLOSED_FOR_NEW: OpenStatus
 OPEN_STATUS_CLOSED_FOR_ALL: OpenStatus
@@ -145,6 +147,7 @@ PROTOCOL_VERSION_6: ProtocolVersion
 PROTOCOL_VERSION_7: ProtocolVersion
 PROTOCOL_VERSION_8: ProtocolVersion
 PROTOCOL_VERSION_9: ProtocolVersion
+PROTOCOL_VERSION_10: ProtocolVersion
 
 class Empty(_message.Message):
     __slots__ = ()
@@ -1912,15 +1915,25 @@ class UpdatePayload(_message.Message):
     create_plt_update: _protocol_level_tokens_pb2.CreatePLT
     def __init__(self, protocol_update: _Optional[_Union[ProtocolUpdate, _Mapping]] = ..., election_difficulty_update: _Optional[_Union[ElectionDifficulty, _Mapping]] = ..., euro_per_energy_update: _Optional[_Union[ExchangeRate, _Mapping]] = ..., micro_ccd_per_euro_update: _Optional[_Union[ExchangeRate, _Mapping]] = ..., foundation_account_update: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., mint_distribution_update: _Optional[_Union[MintDistributionCpv0, _Mapping]] = ..., transaction_fee_distribution_update: _Optional[_Union[TransactionFeeDistribution, _Mapping]] = ..., gas_rewards_update: _Optional[_Union[GasRewards, _Mapping]] = ..., baker_stake_threshold_update: _Optional[_Union[BakerStakeThreshold, _Mapping]] = ..., root_update: _Optional[_Union[RootUpdate, _Mapping]] = ..., level_1_update: _Optional[_Union[Level1Update, _Mapping]] = ..., add_anonymity_revoker_update: _Optional[_Union[ArInfo, _Mapping]] = ..., add_identity_provider_update: _Optional[_Union[IpInfo, _Mapping]] = ..., cooldown_parameters_cpv_1_update: _Optional[_Union[CooldownParametersCpv1, _Mapping]] = ..., pool_parameters_cpv_1_update: _Optional[_Union[PoolParametersCpv1, _Mapping]] = ..., time_parameters_cpv_1_update: _Optional[_Union[TimeParametersCpv1, _Mapping]] = ..., mint_distribution_cpv_1_update: _Optional[_Union[MintDistributionCpv1, _Mapping]] = ..., gas_rewards_cpv_2_update: _Optional[_Union[GasRewardsCpv2, _Mapping]] = ..., timeout_parameters_update: _Optional[_Union[TimeoutParameters, _Mapping]] = ..., min_block_time_update: _Optional[_Union[Duration, _Mapping]] = ..., block_energy_limit_update: _Optional[_Union[Energy, _Mapping]] = ..., finalization_committee_parameters_update: _Optional[_Union[FinalizationCommitteeParameters, _Mapping]] = ..., validator_score_parameters_update: _Optional[_Union[ValidatorScoreParameters, _Mapping]] = ..., create_plt_update: _Optional[_Union[_protocol_level_tokens_pb2.CreatePLT, _Mapping]] = ...) -> None: ...
 
+class SponsorDetails(_message.Message):
+    __slots__ = ("cost", "sponsor")
+    COST_FIELD_NUMBER: _ClassVar[int]
+    SPONSOR_FIELD_NUMBER: _ClassVar[int]
+    cost: Amount
+    sponsor: _kernel_pb2.AccountAddress
+    def __init__(self, cost: _Optional[_Union[Amount, _Mapping]] = ..., sponsor: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ...) -> None: ...
+
 class AccountTransactionDetails(_message.Message):
-    __slots__ = ("cost", "sender", "effects")
+    __slots__ = ("cost", "sender", "effects", "sponsor")
     COST_FIELD_NUMBER: _ClassVar[int]
     SENDER_FIELD_NUMBER: _ClassVar[int]
     EFFECTS_FIELD_NUMBER: _ClassVar[int]
+    SPONSOR_FIELD_NUMBER: _ClassVar[int]
     cost: Amount
     sender: _kernel_pb2.AccountAddress
     effects: AccountTransactionEffects
-    def __init__(self, cost: _Optional[_Union[Amount, _Mapping]] = ..., sender: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., effects: _Optional[_Union[AccountTransactionEffects, _Mapping]] = ...) -> None: ...
+    sponsor: SponsorDetails
+    def __init__(self, cost: _Optional[_Union[Amount, _Mapping]] = ..., sender: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., effects: _Optional[_Union[AccountTransactionEffects, _Mapping]] = ..., sponsor: _Optional[_Union[SponsorDetails, _Mapping]] = ...) -> None: ...
 
 class AccountCreationDetails(_message.Message):
     __slots__ = ("credential_type", "address", "reg_id")
@@ -2768,14 +2781,18 @@ class NodeInfo(_message.Message):
     def __init__(self, peer_version: _Optional[str] = ..., local_time: _Optional[_Union[Timestamp, _Mapping]] = ..., peer_uptime: _Optional[_Union[Duration, _Mapping]] = ..., network_info: _Optional[_Union[NodeInfo.NetworkInfo, _Mapping]] = ..., bootstrapper: _Optional[_Union[Empty, _Mapping]] = ..., node: _Optional[_Union[NodeInfo.Node, _Mapping]] = ...) -> None: ...
 
 class SendBlockItemRequest(_message.Message):
-    __slots__ = ("account_transaction", "credential_deployment", "update_instruction")
+    __slots__ = ("account_transaction", "credential_deployment", "update_instruction", "account_transaction_v1", "raw_block_item")
     ACCOUNT_TRANSACTION_FIELD_NUMBER: _ClassVar[int]
     CREDENTIAL_DEPLOYMENT_FIELD_NUMBER: _ClassVar[int]
     UPDATE_INSTRUCTION_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_TRANSACTION_V1_FIELD_NUMBER: _ClassVar[int]
+    RAW_BLOCK_ITEM_FIELD_NUMBER: _ClassVar[int]
     account_transaction: AccountTransaction
     credential_deployment: CredentialDeployment
     update_instruction: UpdateInstruction
-    def __init__(self, account_transaction: _Optional[_Union[AccountTransaction, _Mapping]] = ..., credential_deployment: _Optional[_Union[CredentialDeployment, _Mapping]] = ..., update_instruction: _Optional[_Union[UpdateInstruction, _Mapping]] = ...) -> None: ...
+    account_transaction_v1: AccountTransactionV1
+    raw_block_item: bytes
+    def __init__(self, account_transaction: _Optional[_Union[AccountTransaction, _Mapping]] = ..., credential_deployment: _Optional[_Union[CredentialDeployment, _Mapping]] = ..., update_instruction: _Optional[_Union[UpdateInstruction, _Mapping]] = ..., account_transaction_v1: _Optional[_Union[AccountTransactionV1, _Mapping]] = ..., raw_block_item: _Optional[bytes] = ...) -> None: ...
 
 class CredentialDeployment(_message.Message):
     __slots__ = ("message_expiry", "raw_payload")
@@ -2830,6 +2847,14 @@ class AccountTransactionSignature(_message.Message):
     signatures: _containers.MessageMap[int, AccountSignatureMap]
     def __init__(self, signatures: _Optional[_Mapping[int, AccountSignatureMap]] = ...) -> None: ...
 
+class AccountTransactionV1Signatures(_message.Message):
+    __slots__ = ("sender_signatures", "sponsor_signatures")
+    SENDER_SIGNATURES_FIELD_NUMBER: _ClassVar[int]
+    SPONSOR_SIGNATURES_FIELD_NUMBER: _ClassVar[int]
+    sender_signatures: AccountTransactionSignature
+    sponsor_signatures: AccountTransactionSignature
+    def __init__(self, sender_signatures: _Optional[_Union[AccountTransactionSignature, _Mapping]] = ..., sponsor_signatures: _Optional[_Union[AccountTransactionSignature, _Mapping]] = ...) -> None: ...
+
 class AccountTransactionHeader(_message.Message):
     __slots__ = ("sender", "sequence_number", "energy_amount", "expiry")
     SENDER_FIELD_NUMBER: _ClassVar[int]
@@ -2841,6 +2866,20 @@ class AccountTransactionHeader(_message.Message):
     energy_amount: Energy
     expiry: TransactionTime
     def __init__(self, sender: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., sequence_number: _Optional[_Union[SequenceNumber, _Mapping]] = ..., energy_amount: _Optional[_Union[Energy, _Mapping]] = ..., expiry: _Optional[_Union[TransactionTime, _Mapping]] = ...) -> None: ...
+
+class AccountTransactionHeaderV1(_message.Message):
+    __slots__ = ("sender", "sequence_number", "energy_amount", "expiry", "sponsor")
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    SEQUENCE_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    ENERGY_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    EXPIRY_FIELD_NUMBER: _ClassVar[int]
+    SPONSOR_FIELD_NUMBER: _ClassVar[int]
+    sender: _kernel_pb2.AccountAddress
+    sequence_number: SequenceNumber
+    energy_amount: Energy
+    expiry: TransactionTime
+    sponsor: _kernel_pb2.AccountAddress
+    def __init__(self, sender: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., sequence_number: _Optional[_Union[SequenceNumber, _Mapping]] = ..., energy_amount: _Optional[_Union[Energy, _Mapping]] = ..., expiry: _Optional[_Union[TransactionTime, _Mapping]] = ..., sponsor: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ...) -> None: ...
 
 class InitContractPayload(_message.Message):
     __slots__ = ("amount", "module_ref", "init_name", "parameter")
@@ -2910,6 +2949,14 @@ class PreAccountTransaction(_message.Message):
     payload: AccountTransactionPayload
     def __init__(self, header: _Optional[_Union[AccountTransactionHeader, _Mapping]] = ..., payload: _Optional[_Union[AccountTransactionPayload, _Mapping]] = ...) -> None: ...
 
+class PreAccountTransactionV1(_message.Message):
+    __slots__ = ("header", "payload")
+    HEADER_FIELD_NUMBER: _ClassVar[int]
+    PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    header: AccountTransactionHeaderV1
+    payload: AccountTransactionPayload
+    def __init__(self, header: _Optional[_Union[AccountTransactionHeaderV1, _Mapping]] = ..., payload: _Optional[_Union[AccountTransactionPayload, _Mapping]] = ...) -> None: ...
+
 class AccountTransaction(_message.Message):
     __slots__ = ("signature", "header", "payload")
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
@@ -2919,6 +2966,16 @@ class AccountTransaction(_message.Message):
     header: AccountTransactionHeader
     payload: AccountTransactionPayload
     def __init__(self, signature: _Optional[_Union[AccountTransactionSignature, _Mapping]] = ..., header: _Optional[_Union[AccountTransactionHeader, _Mapping]] = ..., payload: _Optional[_Union[AccountTransactionPayload, _Mapping]] = ...) -> None: ...
+
+class AccountTransactionV1(_message.Message):
+    __slots__ = ("signatures", "header", "payload")
+    SIGNATURES_FIELD_NUMBER: _ClassVar[int]
+    HEADER_FIELD_NUMBER: _ClassVar[int]
+    PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    signatures: AccountTransactionV1Signatures
+    header: AccountTransactionHeaderV1
+    payload: AccountTransactionPayload
+    def __init__(self, signatures: _Optional[_Union[AccountTransactionV1Signatures, _Mapping]] = ..., header: _Optional[_Union[AccountTransactionHeaderV1, _Mapping]] = ..., payload: _Optional[_Union[AccountTransactionPayload, _Mapping]] = ...) -> None: ...
 
 class UpdateInstructionHeader(_message.Message):
     __slots__ = ("sequence_number", "effective_time", "timeout")
@@ -3139,16 +3196,20 @@ class BlockFinalizationSummary(_message.Message):
     def __init__(self, none: _Optional[_Union[Empty, _Mapping]] = ..., record: _Optional[_Union[FinalizationSummary, _Mapping]] = ...) -> None: ...
 
 class BlockItem(_message.Message):
-    __slots__ = ("hash", "account_transaction", "credential_deployment", "update_instruction")
+    __slots__ = ("hash", "account_transaction", "credential_deployment", "update_instruction", "account_transaction_v1", "raw_block_item")
     HASH_FIELD_NUMBER: _ClassVar[int]
     ACCOUNT_TRANSACTION_FIELD_NUMBER: _ClassVar[int]
     CREDENTIAL_DEPLOYMENT_FIELD_NUMBER: _ClassVar[int]
     UPDATE_INSTRUCTION_FIELD_NUMBER: _ClassVar[int]
+    ACCOUNT_TRANSACTION_V1_FIELD_NUMBER: _ClassVar[int]
+    RAW_BLOCK_ITEM_FIELD_NUMBER: _ClassVar[int]
     hash: TransactionHash
     account_transaction: AccountTransaction
     credential_deployment: CredentialDeployment
     update_instruction: UpdateInstruction
-    def __init__(self, hash: _Optional[_Union[TransactionHash, _Mapping]] = ..., account_transaction: _Optional[_Union[AccountTransaction, _Mapping]] = ..., credential_deployment: _Optional[_Union[CredentialDeployment, _Mapping]] = ..., update_instruction: _Optional[_Union[UpdateInstruction, _Mapping]] = ...) -> None: ...
+    account_transaction_v1: AccountTransactionV1
+    raw_block_item: bytes
+    def __init__(self, hash: _Optional[_Union[TransactionHash, _Mapping]] = ..., account_transaction: _Optional[_Union[AccountTransaction, _Mapping]] = ..., credential_deployment: _Optional[_Union[CredentialDeployment, _Mapping]] = ..., update_instruction: _Optional[_Union[UpdateInstruction, _Mapping]] = ..., account_transaction_v1: _Optional[_Union[AccountTransactionV1, _Mapping]] = ..., raw_block_item: _Optional[bytes] = ...) -> None: ...
 
 class BakerRewardPeriodInfo(_message.Message):
     __slots__ = ("baker", "effective_stake", "commission_rates", "equity_capital", "delegated_capital", "is_finalizer")
