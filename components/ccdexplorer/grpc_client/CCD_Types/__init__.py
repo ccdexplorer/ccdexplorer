@@ -95,6 +95,8 @@ class ProtocolVersions(Enum):
         PROTOCOL_VERSION_6 (int): Protocol version 6.
         PROTOCOL_VERSION_7 (int): Protocol version 7.
         PROTOCOL_VERSION_8 (int): Protocol version 8.
+        PROTOCOL_VERSION_9 (int): Protocol version 9.
+        PROTOCOL_VERSION_10 (int): Protocol version 10.
     """
 
     PROTOCOL_VERSION_1 = 0
@@ -106,6 +108,7 @@ class ProtocolVersions(Enum):
     PROTOCOL_VERSION_7 = 6
     PROTOCOL_VERSION_8 = 7
     PROTOCOL_VERSION_9 = 8
+    PROTOCOL_VERSION_10 = 9
 
 
 class CCD_OpenStatusTranslation(Enum):
@@ -478,6 +481,9 @@ class CCD_ModuleAccountState(BaseModel):
 
 class CCD_TokenModuleRejectReasonDetails(BaseModel):
     """NOT mirrored to an official class. Represents the state of a module in the blockchain."""
+
+    required_balance: Optional[CCD_TokenAmount] = Field(default=None, alias="requiredBalance")
+    available_balance: Optional[CCD_TokenAmount] = Field(default=None, alias="availableBalance")
 
 
 # Cbor deccoding classes
@@ -1829,6 +1835,20 @@ class CCD_AccountTransactionEffects(BaseModel):
     token_update_effect: Optional[CCD_TokenEffect] = None
 
 
+class CCD_SponsorDetails(BaseModel):
+    """Details about the sponsor of a transaction.
+
+    GRPC documentation: [concordium.v2.SponsorDetails](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.SponsorDetails)
+
+    Attributes:
+        cost (microCCD): The cost of the transaction. Paid by the sponsor.
+        sponsor (CCD_AccountAddress): The sponsor of the transaction.
+    """
+
+    cost: microCCD
+    sponsor: CCD_AccountAddress
+
+
 class CCD_AccountTransactionDetails(BaseModel):
     """Details about an account transaction.
 
@@ -1838,12 +1858,14 @@ class CCD_AccountTransactionDetails(BaseModel):
         cost (microCCD): The cost of the transaction. Paid by the sender.
         sender (CCD_AccountAddress): The sender of the transaction.
         effects (CCD_AccountTransactionEffects): The effects of the transaction.
+        sponsor (Optional[CCD_SponsorDetails]): The optional sponsor details of the transaction.
     """
 
     cost: microCCD
     sender: CCD_AccountAddress
     outcome: str
     effects: CCD_AccountTransactionEffects
+    sponsor: Optional[CCD_SponsorDetails] = None
 
 
 class CCD_AccountCreationDetails(BaseModel):

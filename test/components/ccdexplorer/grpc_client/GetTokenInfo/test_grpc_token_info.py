@@ -1,4 +1,3 @@
-from structlog import dev
 import pytest
 
 

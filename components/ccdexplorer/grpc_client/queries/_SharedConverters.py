@@ -1101,6 +1101,28 @@ class Mixin(Protocol):
 
         return CCD_RejectReason_DuplicateCredIds(**result)
 
+    def convertTokenModuleRejectReason(self, message) -> CCD_TokenModuleRejectReason:
+        result = {}
+
+        for descriptor in message.DESCRIPTOR.fields:
+            key, value = self.get_key_value_from_descriptor(descriptor, message)
+
+            if key == "details":
+                cbor_decoded = cbor2.loads(value.value)
+                tmp_result = {}
+                if "requiredBalance" in cbor_decoded:
+                    token_amount = self.convertDecimal(cbor_decoded.get("requiredBalance"))
+                    tmp_result["requiredBalance"] = token_amount
+                if "availableBalance" in cbor_decoded:
+                    token_amount = self.convertDecimal(cbor_decoded.get("availableBalance"))
+                    tmp_result["availableBalance"] = token_amount
+
+                result[key] = CCD_TokenModuleRejectReasonDetails(**tmp_result)
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
+
+        return CCD_TokenModuleRejectReason(**result)
+
     def convertRejectReason(self, message) -> CCD_RejectReason:
         result = {}
         _type = None
@@ -1231,6 +1253,9 @@ class Mixin(Protocol):
                 RejectReason.RejectedReceive,
             ]:
                 result[key] = self.convertTypeWithSingleValues(value)
+
+            elif type(value) is TokenModuleRejectReason:
+                result[key] = self.convertTokenModuleRejectReason(value)
 
             elif type(value) is RejectReason.DuplicateCredIds:
                 result[key] = self.convertDuplicateCredIds(value)

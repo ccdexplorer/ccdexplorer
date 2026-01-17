@@ -52,19 +52,19 @@ class ImpactedAddresses(Utils):
                 if field_set == "transfer_in":
                     if not bm.transfer_in:
                         bm.transfer_in = []
-                    bm.transfer_in.extend(balance_movement_to_add.transfer_in)  # type: ignore
+                    bm.transfer_in.extend(balance_movement_to_add.transfer_in)
                 elif field_set == "transfer_out":
                     if not bm.transfer_out:
                         bm.transfer_out = []
-                    bm.transfer_out.extend(balance_movement_to_add.transfer_out)  # type: ignore
+                    bm.transfer_out.extend(balance_movement_to_add.transfer_out)
                 elif field_set == "plt_transfer_in":
                     if not bm.plt_transfer_in:
                         bm.plt_transfer_in = []
-                    bm.plt_transfer_in.extend(balance_movement_to_add.plt_transfer_in)  # type: ignore
+                    bm.plt_transfer_in.extend(balance_movement_to_add.plt_transfer_in)
                 elif field_set == "plt_transfer_out":
                     if not bm.plt_transfer_out:
                         bm.plt_transfer_out = []
-                    bm.plt_transfer_out.extend(balance_movement_to_add.plt_transfer_out)  # type: ignore
+                    bm.plt_transfer_out.extend(balance_movement_to_add.plt_transfer_out)
 
                 elif field_set == "amount_encrypted":
                     bm.amount_encrypted = balance_movement_to_add.amount_encrypted
@@ -110,7 +110,7 @@ class ImpactedAddresses(Utils):
                     "plt_token_id": plt_token_id,
                     "date": f"{tx.block_info.slot_time:%Y-%m-%d}",
                 }
-            )  # type: ignore
+            )
             impacted_addresses_in_tx[impacted_address] = impacted_address_as_class
 
     def file_balance_movements(
@@ -164,7 +164,7 @@ class ImpactedAddresses(Utils):
         plt_token_id: str,
     ):
         # first add to sender balance_movement
-        if int(event.amount.value) > 0:  # type: ignore
+        if int(event.amount.value) > 0:
             balance_movement = AccountStatementEntryType(
                 plt_transfer_out=[PLTTransferType(event=event, token_id=plt_token_id)]
             )
@@ -180,7 +180,7 @@ class ImpactedAddresses(Utils):
         )
 
         # then to the receiver balance_movement
-        if int(event.amount.value) > 0:  # type: ignore
+        if int(event.amount.value) > 0:
             balance_movement = AccountStatementEntryType(
                 plt_transfer_in=[PLTTransferType(event=event, token_id=plt_token_id)]
             )
@@ -229,16 +229,28 @@ class ImpactedAddresses(Utils):
                 )
 
         elif tx.account_transaction:
-            # Always store the fee for the sender
-            balance_movement = AccountStatementEntryType(
-                transaction_fee=tx.account_transaction.cost
-            )
-            self.file_a_balance_movement(
-                tx,
-                impacted_addresses_in_tx,
-                tx.account_transaction.sender,
-                balance_movement,
-            )
+            # Always store the fee. Normally for the sender, but use sponsor if present
+            if not tx.account_transaction.sponsor:
+                balance_movement = AccountStatementEntryType(
+                    transaction_fee=tx.account_transaction.cost
+                )
+                self.file_a_balance_movement(
+                    tx,
+                    impacted_addresses_in_tx,
+                    tx.account_transaction.sender,
+                    balance_movement,
+                )
+            else:
+                balance_movement = AccountStatementEntryType(
+                    sponsored_transaction_fee=tx.account_transaction.sponsor.cost
+                )
+                self.file_a_balance_movement(
+                    tx,
+                    impacted_addresses_in_tx,
+                    tx.account_transaction.sponsor.sponsor,
+                    balance_movement,
+                )
+
             if tx.account_transaction.effects.contract_initialized:
                 if tx.account_transaction.effects.contract_initialized.amount > 0:
                     self.file_balance_movements(
@@ -357,16 +369,16 @@ class ImpactedAddresses(Utils):
             if event.module_event:
                 # no impacted addresses other than governance address, which is captured by the fee in CCD
                 # but need to update to add plt_token_id!
-                impacted_addresses_in_tx[tx.account_transaction.sender].plt_token_id = (  # type: ignore
-                    event.token_id
-                )
+                impacted_addresses_in_tx[
+                    tx.account_transaction.sender
+                ].plt_token_id = event.token_id
 
             elif event.transfer_event:
                 self.file_balance_movements_plt(
                     tx,
                     impacted_addresses_in_tx,
                     event.transfer_event,
-                    plt_token_id=event.token_id,  # type: ignore
+                    plt_token_id=event.token_id,
                 )
             elif event.mint_event or event.burn_event:
                 if event.mint_event:
@@ -375,17 +387,17 @@ class ImpactedAddresses(Utils):
                         plt_transfer_in=[
                             PLTTransferType(
                                 event=event.mint_event,
-                                token_id=event.token_id,  # type: ignore
+                                token_id=event.token_id,
                             )
                         ]
                     )
                 else:
-                    impacted_address = event.burn_event.target.account  # type: ignore
+                    impacted_address = event.burn_event.target.account
                     balance_movement = AccountStatementEntryType(
                         plt_transfer_out=[
                             PLTTransferType(
-                                event=event.burn_event,  # type: ignore
-                                token_id=event.token_id,  # type: ignore
+                                event=event.burn_event,
+                                token_id=event.token_id,
                             )
                         ]
                     )
@@ -393,7 +405,7 @@ class ImpactedAddresses(Utils):
                 self.file_a_balance_movement(
                     tx,
                     impacted_addresses_in_tx,
-                    impacted_address,  # type: ignore
+                    impacted_address,
                     balance_movement,
                     plt_token_id=event.token_id,
                 )

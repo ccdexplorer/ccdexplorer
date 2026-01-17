@@ -46,6 +46,7 @@ from ccdexplorer.grpc_client.types_pb2 import (
     TransactionFeeDistribution,
     UpdateDetails,
     UpdatePayload,
+    SponsorDetails,
 )
 
 if TYPE_CHECKING:
@@ -93,6 +94,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_TransferredWithSchedule,
     CCD_UpdateDetails,
     CCD_UpdatePayload,
+    CCD_SponsorDetails,
 )
 from google.protobuf.json_format import MessageToDict
 
@@ -628,7 +630,8 @@ class Mixin(_SharedConverters):
             key = field.name
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
-
+            if type(value) is SponsorDetails:
+                result[key] = CCD_SponsorDetails(**self.convertTypeWithSingleValues(value))
             if type(value) in [AccountTransactionEffects, TokenEffect]:
                 (
                     result[key],

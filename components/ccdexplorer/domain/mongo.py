@@ -492,6 +492,7 @@ class AccountStatementEntryType(BaseModel):
         finalization_reward (Optional[microCCD]): The reward received from finalization.
         foundation_reward (Optional[microCCD]): The reward received from the foundation.
         transaction_fee (Optional[microCCD]): The transaction fee associated with the account statement entry.
+        sponsored_transaction_fee (Optional[microCCD]): The sponsored transaction fee when acting as a sponsor.
         transaction_fee_reward (Optional[microCCD]): The reward received from transaction fees.
         transfer_in (Optional[list[AccountStatementTransferType]]): List of incoming transfers.
         transfer_out (Optional[list[AccountStatementTransferType]]): List of outgoing transfers.
@@ -503,6 +504,7 @@ class AccountStatementEntryType(BaseModel):
     finalization_reward: Optional[microCCD] = None
     foundation_reward: Optional[microCCD] = None
     transaction_fee: Optional[microCCD] = None
+    sponsored_transaction_fee: Optional[microCCD] = None
     transaction_fee_reward: Optional[microCCD] = None
     transfer_in: Optional[list[AccountStatementTransferType]] = None
     transfer_out: Optional[list[AccountStatementTransferType]] = None
