@@ -1,3 +1,4 @@
+from structlog import dev
 import pytest
 
 
@@ -8,6 +9,11 @@ from rich import print
 @pytest.fixture
 def grpcclient():
     return GRPCClient()
+
+
+@pytest.fixture
+def grpcclient_devnet():
+    return GRPCClient(devnet=True)
 
 
 def test_token_info(grpcclient: GRPCClient):
@@ -25,3 +31,11 @@ def test_token_info(grpcclient: GRPCClient):
     #     ai.schedule.schedules[0].transactions[0]
     #     == "f33050060051c6b738549b60e99498fc7f59fb0b6c915ed9e90a11a7584f2d30"
     # )
+
+
+def test_token_info_devnet(grpcclient_devnet: GRPCClient):
+    token_id = "EURtest"
+    block_hash = "a5315892b588ff0dc15716ce72bcc33647cacc8797ff8e125c5c8f5705833ebb"
+    ti = grpcclient_devnet.get_token_info(block_hash, token_id)
+    assert ti.token_id == token_id
+    print(ti)

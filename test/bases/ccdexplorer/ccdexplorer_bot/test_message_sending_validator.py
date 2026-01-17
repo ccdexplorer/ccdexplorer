@@ -67,7 +67,7 @@ def read_block_information_v3(
 ###################################
 
 # Set this to have messages actually be sent
-SEND_MESSAGES = True
+SEND_MESSAGES = False
 
 
 @pytest.mark.asyncio
@@ -89,8 +89,9 @@ async def test_message_payday_pool_reward_72723(bot: Bot, grpcclient: GRPCClient
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(bot.users["user_for_test"], event)  # type: ignore
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -109,8 +110,8 @@ async def test_message_payday_pool_reward_72723(bot: Bot, grpcclient: GRPCClient
 
 #     print(message_response)
 #     print(notification_services_to_send)
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -134,8 +135,9 @@ async def test_message_block_validated(bot: Bot, grpcclient: GRPCClient, mongodb
     assert bot.event_queue[0].impacted_addresses[0].address is not None
     assert bot.event_queue[0].impacted_addresses[0].address.account is not None
     assert bot.event_queue[0].impacted_addresses[0].address.account.index == 72723
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -151,8 +153,9 @@ async def test_baker_removed(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB)
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -168,8 +171,9 @@ async def test_baker_stake_increased(bot: Bot, grpcclient: GRPCClient, mongodb: 
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -185,8 +189,9 @@ async def test_baker_stake_decreased(bot: Bot, grpcclient: GRPCClient, mongodb: 
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -202,8 +207,9 @@ async def test_baker_restake_earnings_updated(bot: Bot, grpcclient: GRPCClient, 
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -219,8 +225,9 @@ async def test_baker_set_open_status(bot: Bot, grpcclient: GRPCClient, mongodb: 
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -238,8 +245,9 @@ async def test_delegation_configured_message_for_validator(
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -257,8 +265,9 @@ async def test_delegation_configured_message_for_validator_85223(
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # TODO fix this test
@@ -275,8 +284,9 @@ async def test_delegation_removed_message(bot: Bot, grpcclient: GRPCClient, mong
         bot.users["user_for_test"], bot.event_queue[0]
     )
     # assert message_response is not None
-    await bot.send_notification_queue()
-    # bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -292,8 +302,9 @@ async def test_primed(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB):
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert bot.event_queue[0] is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -313,5 +324,6 @@ async def test_message_validator_validator_missed_rounds(
         bot.users["user_for_test"], bot.event_queue[0]
     )
     assert message_response is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()

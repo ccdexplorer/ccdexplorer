@@ -44,6 +44,8 @@ lock:
 docs:
     uv run mkdocs serve -a 0.0.0.0:8001 --livereload
     
+zens:
+    uv run zensical serve -a 0.0.0.0:8001
 # --- Formatting / linting / testing ---
 
 lint:
@@ -53,9 +55,9 @@ format:
     uv run ruff format .
 
 test:
-    uv run pytest  --cov=. --cov-report=xml:cov.xml --cov-report=term -n auto \
-    uv run coverage html \
-    open htmlcov/index.html
+	uv run pytest --cov=. --cov-report=xml:cov.xml --cov-report=term -n auto && \
+	uv run coverage html && \
+	open htmlcov/index.html
 
 
  

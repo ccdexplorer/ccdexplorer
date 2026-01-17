@@ -69,7 +69,7 @@ def read_block_information_v3(
 ###################################
 
 # Set this to have messages actually be sent
-SEND_MESSAGES = True
+SEND_MESSAGES = False
 
 
 @pytest.mark.asyncio

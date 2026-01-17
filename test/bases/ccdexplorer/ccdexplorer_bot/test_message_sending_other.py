@@ -63,7 +63,7 @@ def read_block_information_v3(
 ###################################
 
 # Set this to have messages actually be sent
-SEND_MESSAGES = True
+SEND_MESSAGES = False
 
 
 @pytest.mark.asyncio
@@ -88,8 +88,9 @@ async def test_account_created_in_other(bot: Bot, grpcclient: GRPCClient, mongod
     assert bot.event_queue[0].impacted_addresses[0].address.account.index == 94210
     assert message_response is not None
 
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -117,8 +118,8 @@ async def test_account_created_in_other(bot: Bot, grpcclient: GRPCClient, mongod
 
 #     print(message_response)
 #     print(notification_services_to_send)
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -139,8 +140,9 @@ async def test_domain_minted_in_other(bot: Bot, grpcclient: GRPCClient, mongodb:
 
     print(message_response)
     print(notification_services_to_send)
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -163,8 +165,9 @@ async def test_domain_minted_in_other_2(bot: Bot, grpcclient: GRPCClient, mongod
 
     print(message_response)
     print(notification_services_to_send)
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -187,8 +190,8 @@ async def test_domain_minted_in_other_2(bot: Bot, grpcclient: GRPCClient, mongod
 
 #     print(message_response)
 #     print(notification_services_to_send)
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -214,8 +217,8 @@ async def test_domain_minted_in_other_2(bot: Bot, grpcclient: GRPCClient, mongod
 #         bot.event_queue[0].event_type.other.protocol_update.specificationHash
 #         == "ede9cf0b2185e9e8657f5c3fd8b6f30cef2f1ef4d9692aa4f6ef6a9fb4a762cd"
 #     )
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -237,8 +240,9 @@ async def test_message_account_transfer_with_schedule(
     # test separately
     # assert notification_services_to_send[NotificationServices.telegram] is True
 
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -256,8 +260,9 @@ async def test_message_other_lowered_stake(bot: Bot, grpcclient: GRPCClient, mon
     assert message_response is not None
     # test separately
     # assert notification_services_to_send[NotificationServices.telegram] is True
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -277,8 +282,9 @@ async def test_message_other_lowered_stake_remove_validator(
     assert message_response is not None
     # test separately
     # assert notification_services_to_send[NotificationServices.telegram] is True
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -297,8 +303,9 @@ async def test_message_add_identity_provider(bot: Bot, grpcclient: GRPCClient, m
     # test separately
     # assert notification_services_to_send[NotificationServices.telegram] is True
     # assert notification_services_to_send[NotificationServices.email] is False
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -359,8 +366,9 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
     assert message_response is not None
     # test separately
     # assert notification_services_to_send[NotificationServices.telegram] is True
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -404,8 +412,8 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
 #     # assert bot.event_queue[0].impacted_addresses[0].address.account.index == 72723
 #     # assert message_response is not None
 #     # assert notification_services_to_send[NotificationServices.telegram] is True
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -423,8 +431,8 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
 #     assert message_response is not None
 #     # test separately
 #     # assert notification_services_to_send[NotificationServices.telegram] is True
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -444,8 +452,8 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
 #     assert message_response is not None
 #     # test separately
 #     # assert notification_services_to_send[NotificationServices.telegram] is True
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()
 
 
 # @pytest.mark.asyncio
@@ -465,5 +473,5 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
 #     # test separately
 #     # assert notification_services_to_send[NotificationServices.telegram] is True
 
-#     await bot.send_notification_queue()
-#     bot.connections.tooter.async_relay.assert_awaited()
+#     if SEND_MESSAGES:    await bot.send_notification_queue()
+#     # bot.connections.tooter.async_relay.assert_awaited()

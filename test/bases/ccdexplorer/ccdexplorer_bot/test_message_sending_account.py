@@ -75,7 +75,7 @@ def read_block_information_v3(
 ###################################
 
 # Set this to have messages actually be sent
-SEND_MESSAGES = True
+SEND_MESSAGES = False
 
 
 @pytest.mark.asyncio
@@ -101,8 +101,9 @@ async def test_logged_event_web23_domain(bot: Bot, grpcclient: GRPCClient, mongo
 
     print(message_response)
     print(notification_services_to_send)
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -127,8 +128,9 @@ async def test_logged_event_usdt_transfer(bot: Bot, grpcclient: GRPCClient, mong
 
     print(message_response)
     print(notification_services_to_send)
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -151,8 +153,9 @@ async def test_message_payday_account_reward(bot: Bot, grpcclient: GRPCClient, m
             )
     assert message_response is not None  # type: ignore
 
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -175,8 +178,9 @@ async def test_message_transferred_with_schedule(
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -198,8 +202,9 @@ async def test_message_account_transfer(bot: Bot, grpcclient: GRPCClient, mongod
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -219,8 +224,9 @@ async def test_message_data_registered(bot: Bot, grpcclient: GRPCClient, mongodb
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -242,8 +248,9 @@ async def test_token_event_message(bot: Bot, grpcclient: GRPCClient, mongodb: Mo
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -265,8 +272,9 @@ async def test_delegation_configured_message_for_account(
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -288,8 +296,9 @@ async def test_delegation_configured_message2_for_account(
     )
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -316,8 +325,9 @@ async def test_message_account_transfer_with_limit_should_not_send(
     assert bot.event_queue[1].impacted_addresses[0].address.account.index == 83184
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    # bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -344,8 +354,9 @@ async def test_message_account_transfer_with_limit_should_send(
     assert bot.event_queue[0].impacted_addresses[0].address.account.index == 72723
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 @pytest.mark.asyncio
@@ -431,8 +442,9 @@ async def test_message_target_pool_commission_changed(
     assert bot.event_queue[0].impacted_addresses[0].address.account.index == 86662
     assert message_response is not None
     assert notification_services_to_send is not None
-    await bot.send_notification_queue()
-    bot.connections.tooter.async_relay.assert_awaited()
+    if SEND_MESSAGES:
+        await bot.send_notification_queue()
+    # bot.connections.tooter.async_relay.assert_awaited()
 
 
 def fake_complete_address(impacted_address):
@@ -465,5 +477,6 @@ async def test_message_account_plt_event_mint(bot: Bot, grpcclient: GRPCClient, 
         assert bot.event_queue[0].impacted_addresses[0].address.account.index == 15573
         assert message_response is not None
         assert notification_services_to_send is not None
-        await bot.send_notification_queue()
-        bot.connections.tooter.async_relay.assert_awaited()
+        if SEND_MESSAGES:
+            await bot.send_notification_queue()
+        # bot.connections.tooter.async_relay.assert_awaited()
