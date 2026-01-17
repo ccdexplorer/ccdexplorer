@@ -42,6 +42,7 @@ dependencies = [
     "dagster-docker>=0.27.14",
     "gitpython>=3.1.45",
     "polars>=1.34.0",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

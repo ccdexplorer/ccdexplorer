@@ -34,6 +34,7 @@ dependencies = [
   "celery[redis,mongodb]",
   "protobuf",
   "googleapis-common-protos",
+  "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

@@ -36,6 +36,7 @@ dependencies = [
     "googleapis-common-protos",
     # "httpx",
     "scheduler>=0.8.8",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

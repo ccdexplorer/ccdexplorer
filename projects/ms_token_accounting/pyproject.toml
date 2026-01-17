@@ -35,6 +35,7 @@ dependencies = [
     "protobuf",
     "googleapis-common-protos",
     "httpx",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

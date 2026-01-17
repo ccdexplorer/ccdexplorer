@@ -37,6 +37,7 @@ dependencies = [
     # "httpx",
     "scheduler>=0.8.8",
     "python-telegram-bot[job-queue]>=22.5",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

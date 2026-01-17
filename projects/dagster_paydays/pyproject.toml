@@ -39,6 +39,7 @@ dependencies = [
     "dagster>=1.11.14",
     "dagster-postgres>=0.27.14",
     "dagster-docker>=0.27.14",
+    "prometheus-client",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]
