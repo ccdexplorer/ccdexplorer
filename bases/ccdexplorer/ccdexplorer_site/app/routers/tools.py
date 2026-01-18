@@ -983,7 +983,7 @@ async def ajax_accounts_cooldown(
             {"end_time": k, "total_amount": v["total_amount"], "count": v["count"]}
             for k, v in aggregates.items()
         ],
-        key=lambda x: dt.datetime.strptime(str(x["end_time"]), "%Y-%m-%dT%H:%M:%SZ"),
+        key=lambda x: dt.datetime.fromisoformat(x["end_time"].replace("Z", "+00:00")),
     )
     summary_totals = {
         "total_amount": sum([x["total_amount"] for x in summary]),

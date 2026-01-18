@@ -523,6 +523,7 @@ async def module_module_address(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    error = None
     request.state.api_calls = {}
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
@@ -556,48 +557,51 @@ async def module_module_address(
     )
     schema_result: Schema | None = api_result.return_value if api_result.ok else None
 
-    encoded = schema_result["module_source"]
-    version = schema_result["version"]
-    if version == "v1":
-        ms = VersionedModuleSource()
-        ms.v1.value = base64.decodebytes(json.loads(encoded).encode())
-        schema = Schema(ms.v1.value, 1)
+    if not schema_result:
+        error = {
+            "error": True,
+            "errorMessage": f"No module schema on {net} found for {module_ref}.",
+        }
     else:
-        ms = VersionedModuleSource()
-        ms.v0.value = base64.decodebytes(json.loads(encoded).encode())
-        schema = Schema(ms.v0.value, 0)
-    if schema:
-        if schema.schema:
-            schema_available = True
-            schema_dict["init_param"] = schema.extract_init_param_schema(module_name)
-            schema_dict["init_error"] = schema.extract_init_error_schema(module_name)
-            schema_dict["event"] = schema.extract_event_schema(module_name)
-            for method_name in module.methods:
-                schema_methods[method_name] = {
-                    "receive_param": schema.extract_receive_param_schema(module_name, method_name),
-                    "receive_error": schema.extract_receive_error_schema(module_name, method_name),
-                    "receive_return": schema.extract_receive_return_value_schema(
-                        module_name, method_name
-                    ),
-                }
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/module/{module_ref}/instances/0/1",
-            httpx_client,
-        )
-        module_instances_result: list[str] | None = (
-            api_result.return_value if api_result.ok else {"instances_count": 0}
-        )
-        module_instance_count = module_instances_result["instances_count"]
+        encoded = schema_result["module_source"]
+        version = schema_result["version"]
+        if version == "v1":
+            ms = VersionedModuleSource()
+            ms.v1.value = base64.decodebytes(json.loads(encoded).encode())
+            schema = Schema(ms.v1.value, 1)
+        else:
+            ms = VersionedModuleSource()
+            ms.v0.value = base64.decodebytes(json.loads(encoded).encode())
+            schema = Schema(ms.v0.value, 0)
+        if schema:
+            if schema.schema:
+                schema_available = True
+                schema_dict["init_param"] = schema.extract_init_param_schema(module_name)
+                schema_dict["init_error"] = schema.extract_init_error_schema(module_name)
+                schema_dict["event"] = schema.extract_event_schema(module_name)
+                for method_name in module.methods:
+                    schema_methods[method_name] = {
+                        "receive_param": schema.extract_receive_param_schema(
+                            module_name, method_name
+                        ),
+                        "receive_error": schema.extract_receive_error_schema(
+                            module_name, method_name
+                        ),
+                        "receive_return": schema.extract_receive_return_value_schema(
+                            module_name, method_name
+                        ),
+                    }
+            api_result = await get_url_from_api(
+                f"{request.app.api_url}/v2/{net}/module/{module_ref}/instances/0/1",
+                httpx_client,
+            )
+            module_instances_result: list[str] | None = (
+                api_result.return_value if api_result.ok else {"instances_count": 0}
+            )  # ty:ignore[invalid-assignment]
+            module_instance_count = module_instances_result[
+                "instances_count"
+            ]  # ty:ignore[not-subscriptable]
 
-    # else:
-    #     module = None
-    #     module_instances_result = None
-    #     module_instance_count = 0
-    #     schema_dict = {}
-    #     schema_methods = {}
-    #     tx_deployed = None
-
-    error = None
     if not module:
         error = {
             "error": True,
