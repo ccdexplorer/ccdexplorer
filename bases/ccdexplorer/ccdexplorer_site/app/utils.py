@@ -1,5 +1,4 @@
 from __future__ import annotations
-from alembic.op import f
 
 import asyncio
 import base64
