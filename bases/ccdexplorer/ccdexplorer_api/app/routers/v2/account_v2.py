@@ -1377,10 +1377,10 @@ async def get_validator_inactive(
 
     db_to_use = mongomotor.mainnet
     try:
-        ninety_days_ago = dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=90)
+        days_ago = dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=180)
         pipeline = [
             {"$match": {"baker_id": index}},
-            {"$match": {"date": {"$gte": ninety_days_ago.strftime("%Y-%m-%d")}}},
+            {"$match": {"date": {"$gte": days_ago.strftime("%Y-%m-%d")}}},
             {"$group": {"_id": "$action", "count": {"$sum": 1}}},
             {"$sort": {"count": DESCENDING}},
         ]
