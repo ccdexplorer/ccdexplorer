@@ -23,11 +23,17 @@
     {% if 'custom_token_id' in result.model_fields_set %}
     <tr class="table-row-line-height ">
         <td class='text-secondary-emphasis'>Token</td>
-        <td><span class='text-secondary-emphasis '>    <a class="ccd text-break" href="/{{net}}/token/{{ai.contract|split_contract_into_url_slug_and_token_id(result.custom_token_id)}}">
-           {% if ai.token_metadata %} 
-                {{ai.token_metadata.name}}
+        <td><span class='text-secondary-emphasis '>
+            {% if not result.custom_token_id %}
+                <span class="ccd">N/A</span>
             {% else %}
-                {{result.custom_token_id}}
+
+                    <a class="ccd text-break" href="/{{net}}/token/{{ai.contract|split_contract_into_url_slug_and_token_id(result.custom_token_id)}}">
+                {% if ai.token_metadata %} 
+                        {{ai.token_metadata.name}}
+                    {% else %}
+                        {{result.custom_token_id}}
+                    {% endif %}
             {% endif %}
         </a></span></td>
     {% endif %}
@@ -68,7 +74,13 @@
         </tr>{% endif %}
     {% if 'value' in result.model_fields_set %}<tr class="table-row-line-height ">
         <td class='text-secondary-emphasis'>Value</td>
-        <td><span class='text-secondary-emphasis ccd'>{{result.value}}</span></td>
+        <td><span class='text-secondary-emphasis ccd'>
+            {% if result.value %}
+                {{result.value}}
+            {% else %}
+                N/A
+            {% endif %}
+        </span></td>
     </tr>{% endif %}
     {% if 'lot_id' in result.model_fields_set %}<tr class="table-row-line-height ">
         <td class='text-secondary-emphasis'>Lot ID</td>

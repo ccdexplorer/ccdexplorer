@@ -3112,9 +3112,9 @@ class s7_erc721_v2_CreatedEvent(BaseModel):
 
 class s7_erc1155_v1_TransferEvent(BaseModel):
     type: int
-    operator: CCD_AccountAddress | CCD_ContractAddress
-    custom_token_id: int
-    value: int
+    operator: Optional[CCD_AccountAddress | CCD_ContractAddress] = None
+    custom_token_id: Optional[int] = None
+    value: Optional[int] = None
     from_: Optional[CCD_AccountAddress] = None
     to_: Optional[CCD_AccountAddress] = None
 
@@ -3350,6 +3350,18 @@ class SpaceSevenEvents:
         bs = io.BytesIO(bytes.fromhex(hexParameter))
         type_ = int.from_bytes(bs.read(1), "little")
         operator = cis.address(bs)
+        if operator is None:
+            return s7_erc1155_v1_TransferEvent(
+                **{
+                    "type": type_,
+                    "operator": operator,
+                    "custom_token_id": None,
+                    "value": None,
+                    "from_": None,
+                    "to_": None,
+                }
+            )
+
         custom_token_id = self.custom_token_id(bs)
         value = int.from_bytes(bs.read(8), byteorder="little")
         optional = int.from_bytes(bs.read(1), "little")

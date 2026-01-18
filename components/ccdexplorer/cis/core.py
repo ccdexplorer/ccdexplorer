@@ -713,7 +713,7 @@ class CIS:
         elif t == 1:
             return self.contract_address(bs)
         else:
-            raise Exception("invalid type")
+            return None
 
     def receiver(self, bs: io.BytesIO):
         """
