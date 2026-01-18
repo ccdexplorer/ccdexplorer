@@ -3,7 +3,7 @@
     <tbody>
         <tr class=" sm-text ">
             <td class="text-start text-secondary-emphasis ">tx {{tx.hash|tx_hash_link(net)|safe}} at height {{ transaction.start_4| safe }} {{ transaction.start_2| safe }}</td>
-            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
+            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
             
         </tr>
     

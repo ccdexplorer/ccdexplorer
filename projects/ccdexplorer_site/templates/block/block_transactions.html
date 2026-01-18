@@ -5,7 +5,7 @@
         {% for tx in transactions %}
         <tr class="table-row-line-height sm-text">
             <td class="text-start text-secondary-emphasis">{{tx.transaction.hash|tx_hash_link(net)|safe}}</td>
-            <td class="text-start ">{{tx.transaction.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{tx.transaction.type.contents|tx_type_translator("display")|safe}}</span></td>
+            <td class="text-start ">{{tx.transaction.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{tx.transaction.type.contents|tx_type_translator("display")|safe}}</span></td>
             <td class="text-end text-secondary-emphasis">
             {% if tx.transaction.account_transaction %}
             {{tx.transaction.account_transaction.sender|account_link(net,user,tags,request.app)|safe }}

@@ -45,6 +45,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockInfo,
     CCD_ContractAddress,
     CCD_RejectReason,
+    CCD_SponsorDetails,
     CCD_UpdatePayload,
 )
 from ccdexplorer.site_user import SiteUser
@@ -402,8 +403,10 @@ def tx_type_translation_for_js():
     return js_map
 
 
-def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
-    result = tx_type_translation.get(tx_type_contents, None)  # type: ignore
+def tx_type_translator(
+    tx_type_contents: str, request_type: str, sponsor: CCD_SponsorDetails | None = None
+) -> str | None:
+    result = tx_type_translation.get(tx_type_contents, None)
     if result:
         result: TypeContents
         if request_type == "icon":
@@ -426,7 +429,10 @@ def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
             elif result.category == TypeContentsCategories.chain:
                 icon = '<img class="tiny-logo" src="/static/logos/small-logo-grey.png" alt="small-logo" height="16px" width="16px">'
 
-            return icon  # type: ignore
+            if sponsor and result.category != TypeContentsCategories.chain:
+                return '<i style="color:#F6DB9A;" class="bi bi-people-fill"></i> ' + icon
+            else:
+                return icon
         else:
             return result.display_str
 

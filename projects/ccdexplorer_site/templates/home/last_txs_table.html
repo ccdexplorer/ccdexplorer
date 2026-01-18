@@ -29,7 +29,7 @@
     
     <td class="text-end text-secondary-emphasis">{{row.block_info.slot_time|datetime_delta_format_since}}</td>
 
-    <td class="text-start ">{{row.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
+    <td class="text-start ">{{row.type.contents|tx_type_translator("icon", row.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
     <td class="text-end text-secondary-emphasis">
       {% if row.account_transaction %}
       {{row.account_transaction.sender|account_link(net,user,tags,request.app)|safe }}

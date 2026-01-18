@@ -31,7 +31,7 @@
         
         <td class="text-end text-secondary-emphasis">{{row.block_info.slot_time|datetime_delta_format_since}}</td>
         <td class="text-end text-secondary-emphasis"><span class="tab-text-large"><span class="ccd">{{row.energy_cost|round_x_decimal_with_comma(0) }} NRG</span></span><span class="tab-text-small"></span></td>
-        <td class="text-start ">{{row.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
+        <td class="text-start ">{{row.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
         <td class=""><span class="tab-text-large"><a class=" " href="/{{net}}/block/{{row.block_info.height}}"><span class="ccd">{{row.block_info.height|round_x_decimal_with_comma(0)}}</span></a></span><span class="tab-text-small"></span></td>
         <td class="text-end text-secondary-emphasis">
           {% if row.account_transaction %}

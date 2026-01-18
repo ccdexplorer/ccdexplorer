@@ -1,6 +1,12 @@
 <div class="row mb-3 ps-3">
     <div class="col-sm-12">
-        {% if tx.type.type =="account_transaction" %}Account Transaction{% endif %}
+        {% if tx.type.type =="account_transaction" %}
+            {% if tx.account_transaction.sponsor %}
+                Sponsored Account Transaction
+            {% else %}
+                Account Transaction
+            {% endif %}
+        {% endif %}
         {% if tx.type.type =="account_creation" %}Account Creation{% endif %}
         {% if tx.type.type =="update" %}Update Transaction{% endif %}
     

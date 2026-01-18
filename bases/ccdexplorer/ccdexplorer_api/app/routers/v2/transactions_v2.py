@@ -39,13 +39,13 @@ API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
 
-def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
-    """Look up the canonical transaction type name for a given contents label."""
-    result: TypeContents | None = tx_type_translation.get(tx_type_contents)
-    if result:
-        result.category.value
-    else:
-        return None
+# def tx_type_translator(tx_type_contents: str, request_type: str) -> str | None:
+#     """Look up the canonical transaction type name for a given contents label."""
+#     result: TypeContents | None = tx_type_translation.get(tx_type_contents)
+#     if result:
+#         result.category.value
+#     else:
+#         return None
 
 
 def reverse_tx_type_translation(tx_type_translation: dict) -> dict:

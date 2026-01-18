@@ -41,28 +41,39 @@
         <tr class="table-row-line-height sm-text">
             <td class="text-start text-secondary-emphasis">Transaction Type</td>
             <td class="text-end ">
-                {{tx.type.contents|tx_type_translator("icon")|safe}} 
+                {{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} 
                 <span class="text-secondary-emphasis">{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
         </tr>
         {%endif%}
     {% elif tx.update %}
         <tr class="table-row-line-height sm-text">
             <td class="text-start text-secondary-emphasis">Transaction Type</td>
-            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon")|safe}} 
+            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} 
                 <span class="text-secondary-emphasis">{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
         </tr>
 
     {%endif%}    
-    
     {% if tx.account_transaction %}
-    <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Transaction Cost</td>
-        <td class="text-end text-secondary-emphasis">{% if tx.account_transaction %}
-            {{tx.account_transaction.cost|micro_ccd_display|safe}}
-          {% else %}
-            -
-          {%endif%}</td>
-    </tr>
+        <tr class="table-row-line-height sm-text">
+            <td class="text-start text-secondary-emphasis">Transaction Cost</td>
+            <td class="text-end text-secondary-emphasis">
+                {% if tx.account_transaction %}
+                    {% if tx.account_transaction.sponsor %}
+                        {{tx.account_transaction.sponsor.cost|micro_ccd_display|safe}}
+                    {% else %}
+                        {{tx.account_transaction.cost|micro_ccd_display|safe}}
+                    {% endif %}
+                {% else %}
+                    -
+                {%endif%}
+            </td>
+        </tr>
+        {% if tx.account_transaction.sponsor %}
+            <tr class="table-row-line-height sm-text">
+                <td class="text-start text-secondary-emphasis">Sponsor</td>
+                <td class="text-end text-secondary-emphasis">{{tx.account_transaction.sponsor.sponsor|account_link(net,user,tags,request.app)|safe }}</td>
+            </tr>
+        {%endif%} 
     {%endif%}    
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Energy Spent</td>

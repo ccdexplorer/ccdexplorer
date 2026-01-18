@@ -36,7 +36,7 @@
       {% else %}
           
       {%endif%}</span></td>
-          <td class="text-start ">{{row.transaction.type.contents|tx_type_translator("icon")|safe}} <span class="text-secondary-emphasis" >{{row.transaction.type.contents|tx_type_translator("display")|safe}}</span></td>
+          <td class="text-start ">{{row.transaction.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{row.transaction.type.contents|tx_type_translator("display")|safe}}</span></td>
           <td class="text-end text-secondary-emphasis " >
             {% if row.additional_info.type == 'amount' %}
                 {{row.additional_info.value|micro_ccd_no_decimals|safe}}
