@@ -38,6 +38,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     calculate_skip,
     get_url_from_api,
     create_dict_for_tabulator_display,
+    create_dict_for_tabulator_display_smart_wallet_events,
     pagination_calculator,
     tx_type_translation_for_js,
 )
@@ -77,7 +78,7 @@ async def search_public_key(request: Request, search_request: SearchRequestPubli
 
 
 @router.get(
-    "/smart_wallet_events/{net}/{index}/{subindex}/{public_key}/{requested_page}/{total_rows}/{api_key}",
+    "/smart_wallet_events/{net}/{index}/{subindex}/{public_key}",
     response_class=HTMLResponse,
 )
 async def get_public_key_events(
@@ -86,20 +87,14 @@ async def get_public_key_events(
     index: int,
     subindex: int,
     public_key: str,
-    requested_page: int,
-    total_rows: int,
-    api_key: str,
+    page: int = Query(),
+    size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
 ):
-    """ """
-    limit = 10
-    user: SiteUser | None = await get_user_detailsv2(request)
-
-    skip = calculate_skip(requested_page, total_rows, limit)
-
+    skip = (page - 1) * size
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/smart-wallet/{index}/{subindex}/public-key/{public_key}/logged-events/{skip}/{limit}",
+        f"{request.app.api_url}/v2/{net}/smart-wallet/{index}/{subindex}/public-key/{public_key}/logged-events/{skip}/{size}",
         httpx_client,
     )
     logged_events = api_result.return_value if api_result.ok else []
@@ -140,30 +135,45 @@ async def get_public_key_events(
             balances_all[token_address] = token_info
 
     total_rows = logged_events["all_logged_events_count"]
-    pagination_request = PaginationRequest(
-        total_txs=total_rows,
-        requested_page=requested_page,
-        word="event",
-        action_string="cis5_event",
-        limit=limit,
-        returned_rows=len(logged_events["logged_events_selected"]),
-    )
-    pagination = pagination_calculator(pagination_request)
-    html = request.app.templates.get_template("smart_wallets/public_key_events.html").render(
+    # pagination_request = PaginationRequest(
+    #     total_txs=total_rows,
+    #     requested_page=requested_page,
+    #     word="event",
+    #     action_string="cis5_event",
+    #     limit=limit,
+    #     returned_rows=len(logged_events["logged_events_selected"]),
+    # )
+    # pagination = pagination_calculator(pagination_request)
+    # html = request.app.templates.get_template("smart_wallets/public_key_events.html").render(
+    #     {
+    #         "logged_events": logged_events,
+    #         "tags": tags,
+    #         "net": net,
+    #         "request": request,
+    #         "pagination": pagination,
+    #         "totals_in_pagination": True,
+    #         "total_rows": total_rows,
+    #         "cis5_event_translations": cis5_event_translations,
+    #         "balances_all": balances_all,
+    #     }
+    # )
+
+    # return html
+    made_up_events = []
+    for event in logged_events["logged_events_selected"]:
+        made_up_events.append(
+            create_dict_for_tabulator_display_smart_wallet_events(
+                net, event, balances_all, cis5_event_translations, public_key
+            )
+        )
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
         {
-            "logged_events": logged_events,
-            "tags": tags,
-            "net": net,
-            "request": request,
-            "pagination": pagination,
-            "totals_in_pagination": True,
-            "total_rows": total_rows,
-            "cis5_event_translations": cis5_event_translations,
-            "balances_all": balances_all,
+            "data": made_up_events,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
         }
     )
-
-    return html
 
 
 @router.get(

@@ -380,7 +380,7 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
                     {"to_address_canonical": public_key},
                     {"from_address_canonical": public_key},
                 ]
-            },
+            }
         },
         {"$match": {"event_info.contract": wallet_contract_address}},
         {
@@ -389,18 +389,23 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
                     {"recognized_event.token_amount": {"$ne": "0"}},
                     {"recognized_event.token_amount": {"$exists": False}},
                 ]
-            },
+            }
         },
         {"$sort": {"tx_info.block_height": DESCENDING}},
-        {"$skip": skip},
-        {"$limit": limit},
+        {
+            "$facet": {
+                "results": [{"$skip": skip}, {"$limit": limit}],
+                "total_count": [{"$count": "count"}],
+            }
+        },
     ]
     result = list(db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline))
-    logged_events_selected = result
-
+    doc = result[0]
+    rows = doc["results"]
+    total = doc["total_count"][0]["count"] if doc["total_count"] else 0
     return {
-        "logged_events_selected": logged_events_selected,
-        "all_logged_events_count": 0,
+        "logged_events_selected": rows,
+        "all_logged_events_count": total,
     }
 
 

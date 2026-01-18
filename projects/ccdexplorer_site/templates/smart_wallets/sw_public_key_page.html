@@ -98,7 +98,13 @@
     <div class="tab-pane fade show active" id="pills-txs" role="tabpanel" aria-labelledby="pills-txs-tab" tabindex="0">
       <div class="row mt-4">
         <div class=" col-md-12  col-sm-12">
-          <div class="border curved-border" id="events"></div>
+          <div class="border curved-border" id="events">
+            {% set ccd_tabulator_table ='smart_wallet_events'%}
+                {% set tabulator_ajax_url = '/smart_wallet_events/' + net + '/' + index|string + '/' + subindex|string + '/' + public_key  %}
+                {% set filename='smart-wallet-events-'+index|string + '/' + subindex|string + '/' + public_key|string+'.csv' %}
+                {% include "base/tabulator/tabulator-smart-wallet-events.html" %}
+               
+          </div>
         </div>  
         
       </div>
@@ -118,7 +124,7 @@
   {%endif %}
   <script>
     window.addEventListener('load', (event) => {
-      getCIS5LoggedEvents(0, 0);
+      // getCIS5LoggedEvents(0, 0);
       getCIS5Tokens(0, 0);
         
       });

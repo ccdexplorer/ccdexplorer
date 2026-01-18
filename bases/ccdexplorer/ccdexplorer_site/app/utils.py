@@ -1,4 +1,5 @@
 from __future__ import annotations
+from alembic.op import f
 
 import asyncio
 import base64
@@ -2394,4 +2395,75 @@ def create_dict_for_tabulator_display_plt_transactions(
             else "Chain"
         ),
         "transaction_block_info_slot_time_download": f"{dateutil.parser.parse(classified_tx.transaction.block_info.slot_time.isoformat()):%Y-%m-%d %H:%M:%S}",
+    }
+
+
+def create_dict_for_tabulator_display_smart_wallet_events(
+    net, event: dict, balances_all: dict, cis5_event_translations, public_key: str
+):
+    if "ccd_amount" not in event["recognized_event"]:
+        token_address = f"{event['recognized_event']['cis2_token_contract_address']}-{event['recognized_event']['token_id']}"
+        token_info = balances_all[token_address]
+        if token_info:
+            ai = token_info["address_information"]
+            vi = token_info["verified_information"]
+            token_decimals = 0
+
+            if vi:
+                token_decimals = vi.get("decimals", 0)
+                token_name = vi["display_name"]
+            else:
+                token_name = event["recognized_event"]["cis2_token_contract_address"]
+                if ai:
+                    token_decimals = ai.get("decimals", 0)
+
+            if ai:
+                if ai.get("token_metadata"):
+                    token_name = ai["token_metadata"]["name"]
+
+    token_display = ""
+    token_display_download = ""
+    if "ccd" in event["event_info"]["event_type"]:
+        token_display = "CCD"
+        token_display_download = "CCD"
+    else:
+        if vi:
+            token_display = (
+                f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt="">'
+            )
+        token_display += (
+            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{token_name}</a>'
+        )
+        token_display_download = f"{split_into_url_slug(token_address)}-{token_name}"
+    if "ccd_amount" in event["recognized_event"]:
+        if event["from_address_canonical"] == public_key:
+            amount = f"- {micro_ccd_display(event['recognized_event']['ccd_amount'])}"
+        else:
+            amount = f"{micro_ccd_display(event['recognized_event']['ccd_amount'])}"
+    elif "token_amount" in event["recognized_event"]:
+        unit = ""
+        if vi:
+            if vi["token_type"] == "fungible":
+                unit = vi["_id"]
+
+        amount = f"{
+            token_amount_using_decimals_rounded(
+                event['recognized_event']['token_amount'], token_decimals, token_decimals
+            )
+        } {unit}"
+    return {
+        "hash": f'<a href="/{net}/transaction/{event["tx_info"]["tx_hash"]}"><span class="ccd">{tx_hash_link(event["tx_info"]["tx_hash"], net)}</span></a>',
+        "date": event["tx_info"]["date"],
+        "action": cis5_event_translations[event["event_info"]["event_type"]],
+        "ccd_token": token_display,
+        "amount": amount,
+        "hash_download": event["tx_info"]["tx_hash"],
+        "date_download": event["tx_info"]["date"],
+        "action_download": cis5_event_translations[event["event_info"]["event_type"]],
+        "ccd_token_download": token_display_download,
+        "amount_download": (
+            event["recognized_event"]["ccd_amount"]
+            if "ccd_amount" in event["recognized_event"]
+            else event["recognized_event"]["token_amount"]
+        ),
     }
