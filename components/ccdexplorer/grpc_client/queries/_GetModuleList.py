@@ -16,7 +16,7 @@ from ccdexplorer.grpc_client.CCD_Types import CCD_ModuleRef
 
 class Mixin(_SharedConverters):
     def get_module_list(
-        self: GRPCClient,  # type: ignore
+        self: GRPCClient,
         block_hash: str,
         net: Enum = NET.MAINNET,
     ) -> list[CCD_ModuleRef]:
@@ -25,7 +25,7 @@ class Mixin(_SharedConverters):
 
         grpc_return_value: list[ModuleRef] = self.stub_on_net(
             net, "GetModuleList", blockHashInput, streaming=True
-        )  # type: ignore
+        )
 
         for module in list(grpc_return_value):
             result.append(self.convertType(module))

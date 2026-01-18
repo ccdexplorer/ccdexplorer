@@ -6,15 +6,17 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
+from markdown_it.rules_core import block
 import re
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.domain.generic import NET
+from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mongo_motor
+from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers, await_await
+from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
+from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, MongoMotor
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
-
-from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
 
 router = APIRouter(tags=["Modules"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
@@ -99,6 +101,57 @@ async def search_modules(
     ]
     result = await await_await(db_to_use, Collections.modules, pipeline, 10)
     return result
+
+
+@router.get(
+    "/{net}/modules/list/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_modules_list(
+    request: Request,
+    net: str,
+    skip: int,
+    limit: int,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Page through modules.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of modules to skip.
+        limit: Maximum number of modules to return.
+        mongodb: Mongo client dependency used to query ``modules``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with the list of module ids and the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > request.app.REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
+    result: list[str] = grpcclient.get_module_list(block_hash="last_final", net=NET(net))
+
+    return {"modules": result[skip : skip + limit], "modules_count": len(result)}
 
 
 # @router.get("/{net}/modules/{year}/{month}", response_class=JSONResponse)

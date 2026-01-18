@@ -345,7 +345,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     )
     Instrumentator().instrument(app)
 
-    @app.get("/metrics")
+    @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
         # Create a registry that reads from PROMETHEUS_MULTIPROC_DIR
         registry = CollectorRegistry()
