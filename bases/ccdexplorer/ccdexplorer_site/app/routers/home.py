@@ -687,7 +687,6 @@ async def ajax_last_blocks_own_page(
     net: str,
     page: int = Query(),
     size: int = Query(),
-    tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     if net not in ["mainnet", "testnet"]:
@@ -732,7 +731,6 @@ async def ajax_last_blocks_since(
     request: Request,
     net: str,
     since_height: int = Query(),
-    tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     if net not in ["mainnet", "testnet"]:
@@ -766,7 +764,6 @@ async def ajax_last_accounts_since(
     request: Request,
     net: str,
     since_index: int = Query(),
-    tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     if net not in ["mainnet", "testnet"]:
@@ -860,7 +857,6 @@ async def ajax_last_accounts_own_page(
     net: str,
     page: int = Query(),
     size: int = Query(),
-    tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     if net not in ["mainnet", "testnet"]:

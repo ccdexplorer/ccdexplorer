@@ -264,7 +264,7 @@ async def get_original_labeled_accounts(
         (
             dt.datetime.now().astimezone(dt.timezone.utc) - req.app.labeled_accounts_last_requested
         ).total_seconds()
-        < 9
+        < 15
     ) and (req.app.tags):
         tags: dict[str, MongoTypeTokensTag] | None = req.app.tags
         # print("labeled_accounts from cache.")
@@ -286,27 +286,28 @@ async def get_original_labeled_accounts(
 async def get_labeled_accounts(
     req: Request,
 ):
-    if (
-        (
-            dt.datetime.now().astimezone(dt.timezone.utc) - req.app.labeled_accounts_last_requested
-        ).total_seconds()
-        < 9
-    ) and (req.app.tags):
-        tags: dict[str, MongoTypeTokensTag] | None = req.app.tags
-        # print("labeled_accounts from cache.")
-    else:
-        try:
-            response = await req.app.httpx_client.get(
-                f"{req.app.api_url}/v2/mainnet/misc/community-labeled-accounts"
-            )
-            response.raise_for_status()
-            tags = response.json()
-            req.app.labeled_accounts_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
-        except httpx.HTTPError:
-            req.app.tags = None
-            tags = None
+    return req.app.community_labels
+    # if (
+    #     (
+    #         dt.datetime.now().astimezone(dt.timezone.utc) - req.app.labeled_accounts_last_requested
+    #     ).total_seconds()
+    #     < 15
+    # ) and (req.app.tags):
+    #     tags: dict[str, MongoTypeTokensTag] | None = req.app.tags
+    #     # print("labeled_accounts from cache.")
+    # else:
+    #     try:
+    #         response = await req.app.httpx_client.get(
+    #             f"{req.app.api_url}/v2/mainnet/misc/community-labeled-accounts"
+    #         )
+    #         response.raise_for_status()
+    #         tags = response.json()
+    #         req.app.labeled_accounts_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
+    #     except httpx.HTTPError:
+    #         req.app.tags = None
+    #         tags = None
 
-        return tags
+    #     return tags
 
 
 async def get_nodes(

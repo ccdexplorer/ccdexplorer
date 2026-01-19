@@ -215,8 +215,11 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             "closed_for_new": {},
             "closed_for_all": {},
         }
+        app.community_labels = None
+        app.community_labels_last_requested = init_time
         await repeated_task_get_staking_pools(app)
         await repeated_task_get_accounts_id_providers(app)
+        await repeated_task_get_community_labeled_accounts(app)
         scheduler.start()
         yield
         scheduler.shutdown()
@@ -364,6 +367,19 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 app.consensus_cache[net] = api_result.return_value if api_result.ok else None
             except Exception as _:
                 pass
+
+    @scheduler.scheduled_job("interval", seconds=60, args=[app])
+    async def repeated_task_get_community_labeled_accounts(app: FastAPI):
+        try:
+            print("community labeled accounts update...")
+            api_result = await get_url_from_api(
+                f"{app.api_url}/v2/mainnet/misc/community-labeled-accounts", app.httpx_client
+            )
+            app.community_labels = api_result.return_value if api_result.ok else None
+
+            app.community_labels_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
+        except httpx.HTTPError:
+            app.community_labels = None
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_accounts_id_providers(app: FastAPI):
