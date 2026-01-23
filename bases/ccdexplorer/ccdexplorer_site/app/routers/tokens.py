@@ -30,7 +30,6 @@ from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
 )
 from ccdexplorer.ccdexplorer_site.app.state import *
 from ccdexplorer.ccdexplorer_site.app.utils import (
-    PaginationRequest,
     account_link,
     calculate_skip,
     create_dict_for_tabulator_display_for_cis2_token_holders,
@@ -766,70 +765,3 @@ async def get_cis2_token_holders_paginated(
             "last_row": total_rows,
         }
     )
-
-
-@router.get(
-    "/{net}/token/{contract_index}/{contract_subindex}/{token_id}/{requested_page}/{total_rows}/{api_key}",
-    response_class=HTMLResponse,
-)
-async def get_token_current_holders(
-    request: Request,
-    net: str,
-    contract_index: int,
-    contract_subindex: int,
-    token_id: str,
-    requested_page: int,
-    total_rows: int,
-    api_key: str,
-    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
-    tags: dict = Depends(get_labeled_accounts),
-):
-    user: SiteUser | None = await get_user_detailsv2(request)
-    limit = 10
-    skip = calculate_skip(requested_page, total_rows, limit)
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/token/{contract_index}/{contract_subindex}/{token_id}/info",
-        request.app.httpx_client,
-    )
-    stored_token_address = api_result.return_value if api_result.ok else None
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/token/{contract_index}/{contract_subindex}/{token_id}/holders/{skip}/{limit}",
-        httpx_client,
-    )
-    current_holders = api_result.return_value["current_holders"] if api_result.ok else None
-    total_rows = api_result.return_value["total_count"] if api_result.ok else None
-    pagination_request = PaginationRequest(
-        total_txs=total_rows,
-        requested_page=requested_page,
-        word="holder",
-        action_string="holder",
-        limit=limit,
-    )
-    pagination = pagination_calculator(pagination_request)
-
-    curren_holder_with_id = current_holders
-
-    current_holders = []
-    for holder in curren_holder_with_id:
-        if "-" in holder["account_address_canonical"]:
-            address_to_lookup = holder["account_address_canonical"].split("-")[1]
-        else:
-            address_to_lookup = holder["account_address_canonical"]
-        holder.update({"account_index": from_address_to_index(address_to_lookup, net, request.app)})
-        current_holders.append(holder)
-
-    html = request.app.templates.get_template("tokens/generic/token_current_holders.html").render(
-        {
-            "co": current_holders,
-            "tags": tags,
-            "user": user,
-            "net": net,
-            "request": request,
-            "pagination": pagination,
-            "totals_in_pagination": True,
-            "total_rows": total_rows,
-            "stored_token_address": stored_token_address,
-        }
-    )
-
-    return html

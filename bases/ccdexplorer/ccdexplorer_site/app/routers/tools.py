@@ -58,13 +58,20 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
 router = APIRouter()
 
 
+class SortItem(BaseModel):
+    field: str
+    dir: str
+
+
 @router.get(
     "/{net}/protocol-update-txs",
     response_class=HTMLResponse,
 )
-async def get_account_transactions(
+async def get_protocol_transactions(
     request: Request,
     net: str,
+    page: int = Query(),
+    size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
 ):
@@ -75,25 +82,10 @@ async def get_account_transactions(
         f"{request.app.api_url}/v2/{net}/misc/protocol-updates",
         httpx_client,
     )
-    tx_result = api_result.return_value if api_result.ok else None
-    if not tx_result:
-        error = f"Request error getting protocol update transactions on {net}."
-        return request.app.templates.TemplateResponse(
-            "base/error-request.html",
-            {
-                "request": request,
-                "error": error,
-                "env": environment,
-                "net": net,
-            },
-        )
-
-    tx_result_transactions = tx_result  # ["transactions"]
-    total_rows = 0
-
+    txs = api_result.return_value if api_result.ok else None
     made_up_txs = []
-    if len(tx_result_transactions) > 0:
-        for transaction in tx_result_transactions:
+    if len(txs) > 0:
+        for transaction in txs:
             transaction = CCD_BlockItemSummary(**transaction)
             makeup_request = MakeUpRequest(
                 **{
@@ -102,29 +94,77 @@ async def get_account_transactions(
                     "tags": tags,
                     "user": user,
                     "app": request.app,
-                    "requesting_route": RequestingRoute.account,
+                    "requesting_route": RequestingRoute.other,
                 }
             )
 
             classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
                 transaction, "", False
             )
-            made_up_txs.append(classified_tx)
 
-    html = request.app.templates.get_template("base/transactions_simple_list.html").render(
+            type_additional_info, sender = await classified_tx.transform_for_tabulator()
+
+            made_up_txs.append(
+                create_dict_for_tabulator_display(net, classified_tx, type_additional_info, sender)
+            )
+    last_page = math.ceil(len(txs) / size)
+    return JSONResponse(
         {
-            "transactions": made_up_txs,
-            "tags": tags,
-            "user": user,
-            "net": net,
-            "show_amounts": True,
-            "request": request,
-            "totals_in_pagination": True,
-            "total_rows": total_rows,
+            "data": made_up_txs,
+            "last_page": max(1, last_page),
+            "last_row": len(txs),
         }
     )
+    # tx_result = api_result.return_value if api_result.ok else None
+    # if not tx_result:
+    #     error = f"Request error getting protocol update transactions on {net}."
+    #     return request.app.templates.TemplateResponse(
+    #         "base/error-request.html",
+    #         {
+    #             "request": request,
+    #             "error": error,
+    #             "env": environment,
+    #             "net": net,
+    #         },
+    #     )
 
-    return html
+    # tx_result_transactions = tx_result  # ["transactions"]
+    # total_rows = 0
+
+    # made_up_txs = []
+    # if len(tx_result_transactions) > 0:
+    #     for transaction in tx_result_transactions:
+    #         transaction = CCD_BlockItemSummary(**transaction)
+    #         makeup_request = MakeUpRequest(
+    #             **{
+    #                 "net": net,
+    #                 "httpx_client": httpx_client,
+    #                 "tags": tags,
+    #                 "user": user,
+    #                 "app": request.app,
+    #                 "requesting_route": RequestingRoute.account,
+    #             }
+    #         )
+
+    #         classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+    #             transaction, "", False
+    #         )
+    #         made_up_txs.append(classified_tx)
+
+    # html = request.app.templates.get_template("base/transactions_simple_list.html").render(
+    #     {
+    #         "transactions": made_up_txs,
+    #         "tags": tags,
+    #         "user": user,
+    #         "net": net,
+    #         "show_amounts": True,
+    #         "request": request,
+    #         "totals_in_pagination": True,
+    #         "total_rows": total_rows,
+    #     }
+    # )
+
+    # return html
 
 
 @router.get("/{net}/tools/projects", response_class=HTMLResponse)
@@ -281,6 +321,7 @@ async def chain_information(
             "ar": ar,
             "ip": ip,
             "net": "mainnet",
+            "tx_type_translation_from_python": tx_type_translation_for_js(),
         },
     )
 
@@ -391,11 +432,6 @@ async def today_in(
         return response
 
 
-class SortItem(BaseModel):  # type: ignore
-    field: str
-    dir: str
-
-
 class PostDataTransfer(BaseModel):
     theme: str
     gte: str | int
@@ -490,6 +526,24 @@ async def ajax_tx_search_transfers(
     )
 
 
+@router.get("/mainnet/ajax_tools/transactions-search-temp", response_class=HTMLResponse)
+async def search_temp(
+    request: Request,
+    search: str = Query(...),
+):
+    user: SiteUser = await get_user_detailsv2(request)
+    return request.app.templates.TemplateResponse(
+        "tools/temp_data.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": "mainnet",
+            "hex": search,
+        },
+    )
+
+
 class PostDatHEX(BaseModel):
     theme: str
     search: str
@@ -519,8 +573,9 @@ async def ajax_tx_search_data(
         httpx_client,
         json_post_content={"hex": post_data.search},
     )
-    txs = api_result.return_value if api_result.ok else None
+    txs_result = api_result.return_value if api_result.ok else None
 
+    txs = txs_result["transactions"] if txs_result else []
     made_up_txs = []
     if len(txs) > 0:
         for transaction in txs:
@@ -539,34 +594,20 @@ async def ajax_tx_search_data(
             classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
                 transaction, "", False
             )
-            made_up_txs.append(classified_tx)
 
-    pagination_request = PaginationRequest(
-        total_txs=0,
-        requested_page=requested_page,
-        word="transaction",
-        action_string="tx",
-        limit=limit,
-        returned_rows=len(txs),
-    )
-    pagination = pagination_calculator(pagination_request)
-    html = request.app.templates.TemplateResponse(
-        "tools/last_txs_table_by_type.html",
+            type_additional_info, sender = await classified_tx.transform_for_tabulator()
+
+            made_up_txs.append(
+                create_dict_for_tabulator_display(net, classified_tx, type_additional_info, sender)
+            )
+    last_page = math.ceil(txs_result["total"] / limit)
+    return JSONResponse(
         {
-            "request": request,
-            "tx_type_translation": tx_type_translation,
-            "transactions": made_up_txs,
-            "net": net,
-            "totals_in_pagination": False,
-            "total_rows": 0,
-            "requested_page": requested_page,
-            "tags": tags,
-            "user": user,
-            "pagination": pagination,
-        },
+            "data": made_up_txs,
+            "last_page": max(1, last_page),
+            "last_row": txs_result["total"],
+        }
     )
-
-    return html
 
 
 @router.get("/{net}/tools/transactions-search", response_class=HTMLResponse | RedirectResponse)
@@ -578,7 +619,7 @@ async def transactions_search(
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
     chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
-    date_start = dt.date(2022, 1, 1).strftime("%Y-%m-%d")
+    date_start = dt.date(2025, 1, 1).strftime("%Y-%m-%d")
     return request.app.templates.TemplateResponse(
         "/tools/transactions_search_home.html",
         {

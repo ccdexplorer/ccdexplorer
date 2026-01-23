@@ -401,7 +401,7 @@ async def get_transactions_from_data_registered(
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
-) -> list[dict]:
+) -> dict:
     """Search transactions by the exact ``data_registered`` payload.
 
     Args:
@@ -442,17 +442,25 @@ async def get_transactions_from_data_registered(
     pipeline = [
         {"$match": {"account_transaction.effects.data_registered": hex}},
         {"$sort": {"block_info.height": -1}},
-        {"$skip": skip} if skip else {"$skip": 0},
-        {"$limit": limit},
+        {
+            "$facet": {
+                "data": [
+                    {"$skip": skip if skip else 0},
+                    {"$limit": limit},
+                ],
+                "total": [{"$count": "count"}],
+            }
+        },
+        {"$addFields": {"total": {"$ifNull": [{"$arrayElemAt": ["$total.count", 0]}, 0]}}},
     ]
 
     result = await await_await(db_to_use, Collections.transactions, pipeline, limit)
 
     if result:
-        txs = [CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in result]
-        return txs
+        txs = [CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in result[0]["data"]]
+        return {"transactions": txs, "total": result[0]["total"]}
     else:
-        return []
+        return {}
 
 
 async def get_tx_ids_for_memo(memo_to_search: str, memos: dict):

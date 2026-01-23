@@ -135,30 +135,7 @@ async def get_public_key_events(
             balances_all[token_address] = token_info
 
     total_rows = logged_events["all_logged_events_count"]
-    # pagination_request = PaginationRequest(
-    #     total_txs=total_rows,
-    #     requested_page=requested_page,
-    #     word="event",
-    #     action_string="cis5_event",
-    #     limit=limit,
-    #     returned_rows=len(logged_events["logged_events_selected"]),
-    # )
-    # pagination = pagination_calculator(pagination_request)
-    # html = request.app.templates.get_template("smart_wallets/public_key_events.html").render(
-    #     {
-    #         "logged_events": logged_events,
-    #         "tags": tags,
-    #         "net": net,
-    #         "request": request,
-    #         "pagination": pagination,
-    #         "totals_in_pagination": True,
-    #         "total_rows": total_rows,
-    #         "cis5_event_translations": cis5_event_translations,
-    #         "balances_all": balances_all,
-    #     }
-    # )
 
-    # return html
     made_up_events = []
     for event in logged_events["logged_events_selected"]:
         made_up_events.append(

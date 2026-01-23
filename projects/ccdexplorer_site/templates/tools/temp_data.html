@@ -1,0 +1,4 @@
+{% set ccd_tabulator_table ='txs_table_data'%}
+                {% set tabulator_ajax_url = "/{{net}}/ajax_tools/transactions-search/data/1"%}
+                {% set filename='transactions-data-'+hex|string +'.csv' %}
+                  {% include 'tools/transactions_search_data_tabulator.html' %}

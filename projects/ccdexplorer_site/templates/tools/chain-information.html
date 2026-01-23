@@ -6,7 +6,7 @@
 {% else %}
 
 <!-- Get Transactions -->
-<script>
+<!-- <script>
   function getTransactions(requested_page, total_rows) {
     transactions = document.getElementById('transactions');
     url = '/ajax_protocol_updates/{{net}}/' + requested_page + '/' + total_rows + '/' + api_key;
@@ -34,7 +34,7 @@
     getTransactions(0, 0)
     
   });
-</script>
+</script> -->
 
 <h4>Chain Information</h4>
 <br/>
@@ -87,11 +87,11 @@
         <div class="row mt-4">
           <div class=" col-md-12  col-sm-12">
             <div class="border curved-border">
-                <div
-                    hx-trigger="intersect, switched-theme from:body" 
-                    hx-get="/{{net}}/protocol-update-txs"
-                    
-                    ></div>
+              {% set ccd_tabulator_table ='txs_table_protocol'%}
+                {% set tabulator_ajax_url = '/'+net+"/protocol-update-txs"%}
+                {% set filename='chain-protocol.csv' %}
+                {% include "base/tabulator/tabulator-txs.html" %}
+         
               
             </div>
           </div>  
