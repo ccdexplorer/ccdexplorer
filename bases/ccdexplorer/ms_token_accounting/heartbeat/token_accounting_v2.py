@@ -121,6 +121,7 @@ class TokenAccountingV2:
     ):
         self.entrypoint_cache: dict
         if not self.entrypoint_cache.get(contract_address.to_str()):
+            await asyncio.sleep(10)  # wait for an instance to be saved
             result = self.db[Collections.instances].find_one({"_id": contract_address.to_str()})
             instance = MongoTypeInstance(**result)  # type: ignore
 

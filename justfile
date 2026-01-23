@@ -75,6 +75,8 @@ api:
 site:
     uvicorn projects.ccdexplorer_site.asgi:app --reload --loop asyncio --port 8000
     
+accounts:
+    python -m bases.ccdexplorer.accounts_retrieval
 # --- Help message ---
 
 help:
