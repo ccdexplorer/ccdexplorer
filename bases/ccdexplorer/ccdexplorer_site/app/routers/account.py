@@ -4,7 +4,7 @@ from typing import Optional
 import httpx
 import pandas as pd
 import plotly.express as px
-import plotly
+
 
 import plotly.graph_objects as go
 import polars as polars
@@ -221,6 +221,31 @@ async def account_rewards_bucketed(
             }
             for x in result_pp
         ]
+        total_finalization = sum(x["Finalization Reward"] for x in ff)
+
+        if total_finalization == 0:
+            for x in ff:
+                x.pop("Finalization Reward", None)
+            aggsum = [
+                polars.sum("Transaction Fees"),
+                polars.sum("Validation Reward"),
+            ]
+            melt_on = [
+                "Transaction Fees",
+                "Validation Reward",
+            ]
+
+        else:
+            aggsum = [
+                polars.sum("Transaction Fees"),
+                polars.sum("Validation Reward"),
+                polars.sum("Finalization Reward"),
+            ]
+            melt_on = [
+                "Transaction Fees",
+                "Validation Reward",
+                "Finalization Reward",
+            ]
         df = polars.DataFrame(ff)
         df = df.with_columns(polars.col("date").str.to_datetime("%Y-%m-%d"))
 
@@ -230,22 +255,12 @@ async def account_rewards_bucketed(
             df_group = (
                 df.sort("date")
                 .group_by_dynamic("date", every="1mo", period="1mo", offset="0mo", closed="right")
-                .agg(
-                    [
-                        polars.sum("Transaction Fees"),
-                        polars.sum("Validation Reward"),
-                        polars.sum("Finalization Reward"),
-                    ]
-                )
+                .agg(aggsum)
             )
 
             melt = df_group.unpivot(
                 index=["date"],  # Identifier column(s) to keep
-                on=[
-                    "Transaction Fees",
-                    "Validation Reward",
-                    "Finalization Reward",
-                ],  # Columns to unpivot
+                on=melt_on,  # Columns to unpivot
                 variable_name="Reward Type",  # Name of the variable column
                 value_name="Value",  # Name of the value column
             )
