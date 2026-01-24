@@ -162,6 +162,7 @@ async def get_last_blocks_newer_than(
         )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    error = None
     try:
         result = (
             await db_to_use[Collections.blocks]
@@ -174,8 +175,8 @@ async def get_last_blocks_newer_than(
         print(error)
         result = None
 
-    if result:
-        return result
+    if not error:
+        return result or []
     else:
         raise HTTPException(
             status_code=500,

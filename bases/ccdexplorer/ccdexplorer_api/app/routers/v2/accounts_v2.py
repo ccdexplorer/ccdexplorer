@@ -85,7 +85,7 @@ async def get_last_accounts_newer_than(
                 {"$limit": 1000},
             ],
         )
-        return result
+        return result or []
     except Exception as error:
         raise HTTPException(
             status_code=500,

@@ -97,10 +97,10 @@ async function pollNewAccounts(){
     try {
       const resp = await fetch(`/{{net}}/ajax_accounts/new?since_index=${since}`);
       if (!resp.ok) throw new Error(resp.statusText);
-      const newBlocks = await resp.json();
+      const newAccounts = await resp.json();
 
-      if (newBlocks.length){
-        await window["{{ccd_tabulator_table}}_table"].addData(newBlocks, true);
+      if (newAccounts.length){
+        await window["{{ccd_tabulator_table}}_table"].addData(newAccounts, true);
       }
     } catch (e) {
       
