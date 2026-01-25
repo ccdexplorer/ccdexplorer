@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 ENV UV_SYSTEM_PYTHON=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
