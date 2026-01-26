@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import httpx
+import importlib
 import humanize
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
@@ -17,12 +18,11 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport
-from prometheus_client import (
-    CONTENT_TYPE_LATEST,
-    CollectorRegistry,
-    generate_latest,
-    multiprocess,
-)
+_prometheus_client = importlib.import_module("prometheus_client")
+CONTENT_TYPE_LATEST = _prometheus_client.CONTENT_TYPE_LATEST
+CollectorRegistry = _prometheus_client.CollectorRegistry
+generate_latest = _prometheus_client.generate_latest
+multiprocess = _prometheus_client.multiprocess
 
 # from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
