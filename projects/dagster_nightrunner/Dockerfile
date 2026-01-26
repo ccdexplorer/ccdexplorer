@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y gcc libpq-dev \
 # ---- 2) Copy source bricks ----
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/dagster_nightrunner ./projects/dagster_nightrunner
 
 # ---- 3) Install project in editable mode ----

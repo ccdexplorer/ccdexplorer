@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y gcc libpq-dev \
 # 2) Copy all sources required to assemble the Dagster project
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/dagster_recurring ./projects/dagster_recurring
 
 # 3) Install the Dagster project as editable (important for brick discovery)

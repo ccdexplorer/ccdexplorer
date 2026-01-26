@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir uv \
 # ---- 2) Copy monorepo sources ----
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/accounts_retrieval ./projects/accounts_retrieval
 
 # ---- 3) Install the project editably ----

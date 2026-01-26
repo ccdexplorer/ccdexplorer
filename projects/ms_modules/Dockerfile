@@ -33,6 +33,7 @@ RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev
 # --- Copy Polylith bricks and the ms_modules project ---
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/ms_modules ./projects/ms_modules
 
 # Install the project editably (hatch-polylith assembles it)

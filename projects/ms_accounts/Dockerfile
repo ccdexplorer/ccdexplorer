@@ -15,6 +15,7 @@ RUN pip install --no-cache-dir uv \
 # 2) Copy monorepo sources so the project can assemble bricks
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/ms_accounts ./projects/ms_accounts
 
 # 3) Install the project package (this runs hatchling + hatch-polylith-bricks)

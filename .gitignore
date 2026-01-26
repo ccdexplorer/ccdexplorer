@@ -185,7 +185,7 @@ site/projects/timed_services/transactions_by_projects/index.html
 site/projects/timed_services/transactions_by_type_contents/index.html
 __marimo__/session/s7_get_links.py.json
 __marimo__/session/s7.py.json
-development/*
+# development/*
 site/*
 site/assets/javascripts/bundle.00c35305.min.js
 site/assets/javascripts/LICENSE

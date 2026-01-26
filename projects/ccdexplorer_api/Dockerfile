@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir uv \
 
 COPY components ./components
 COPY bases ./bases
+COPY development/grpc_gen ./development/grpc_gen
 COPY projects/ccdexplorer_api ./projects/ccdexplorer_api
 
 RUN uv pip install -e ./projects/ccdexplorer_api
