@@ -51,6 +51,8 @@ async def get_last_accounts_newer_than(
     since_index: int,
     # tx_index: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
     """Return accounts created after the given index threshold.
@@ -75,8 +77,16 @@ async def get_last_accounts_newer_than(
         )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    response = await httpx_client.get(f"{request.app.api_url}/v2/{net}/misc/identity-providers")
+    identity_providers = {}
+    for id in response.json():
+        id = CCD_IpInfo(**id)
+        identity_providers[str(id.identity)] = {
+            "ip_identity": id.identity,
+            "ip_description": id.description.name,
+        }
     try:
-        result = await await_await(
+        accounts = await await_await(
             db_to_use,
             Collections.all_account_addresses,
             [
@@ -85,7 +95,41 @@ async def get_last_accounts_newer_than(
                 {"$limit": 1000},
             ],
         )
-        return result or []
+        rr = []
+        for x in accounts:
+            account_info = grpcclient.get_account_info(
+                "last_final", account_index=x["account_index"], net=NET(net)
+            )
+            response = await httpx_client.get(
+                f"{request.app.api_url}/v2/{net}/account/{account_info.address}/deployed"
+            )
+            response.raise_for_status()
+            deployment_tx = CCD_BlockItemSummary(**response.json())
+            if account_info.stake:
+                if account_info.stake.delegator:
+                    staking = "Delegator"
+                elif account_info.stake.baker:
+                    staking = "Validator"
+                else:
+                    staking = None
+            else:
+                staking = None
+            rr.append(
+                {
+                    "address": account_info.address,
+                    "account_index": account_info.index,
+                    "available_balance": account_info.available_balance,
+                    "sequence_number": account_info.sequence_number,
+                    "staking": staking,
+                    "identity": identity_providers[
+                        str(Identity(account_info).credentials[0]["ip_identity"])
+                    ]["ip_description"],
+                    "deployment_tx_slot_time": deployment_tx.block_info.slot_time,
+                }
+            )
+
+        return rr or []
+
     except Exception as error:
         raise HTTPException(
             status_code=500,
