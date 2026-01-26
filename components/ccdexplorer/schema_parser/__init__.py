@@ -1,3 +1,3 @@
-from ccdexplorer_schema_parser.Schema import Schema
+import ccdexplorer_schema_parser
 
-__all__ = ["Schema"]
+__all__ = ["ccdexplorer_schema_parser.Schema"]

@@ -28,7 +28,7 @@ from ccdexplorer.site_user import SiteUser
 from ccdexplorer.grpc_client.CCD_Types import *
 from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 
-from ccdexplorer_schema_parser.Schema import Schema
+import ccdexplorer_schema_parser
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
@@ -555,7 +555,9 @@ async def module_module_address(
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/module/{module_ref}/schema", httpx_client
     )
-    schema_result: Schema | None = api_result.return_value if api_result.ok else None
+    schema_result: ccdexplorer_schema_parser.Schema | None = (
+        api_result.return_value if api_result.ok else None
+    )
 
     if not schema_result:
         error = {
@@ -568,11 +570,11 @@ async def module_module_address(
         if version == "v1":
             ms = VersionedModuleSource()
             ms.v1.value = base64.decodebytes(json.loads(encoded).encode())
-            schema = Schema(ms.v1.value, 1)
+            schema = ccdexplorer_schema_parser.Schema(ms.v1.value, 1)
         else:
             ms = VersionedModuleSource()
             ms.v0.value = base64.decodebytes(json.loads(encoded).encode())
-            schema = Schema(ms.v0.value, 0)
+            schema = ccdexplorer_schema_parser.Schema(ms.v0.value, 0)
         if schema:
             if schema.schema:
                 schema_available = True

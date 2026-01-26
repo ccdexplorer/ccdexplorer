@@ -49,7 +49,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_UpdatePayload,
 )
 from ccdexplorer.site_user import SiteUser
-from ccdexplorer_schema_parser.Schema import Schema
+import ccdexplorer_schema_parser
 from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
@@ -1952,7 +1952,11 @@ async def get_schema_from_source_utils(app, net: str, contract_address_str: str)
 
     ms_bytes = base64.decodebytes(json.loads(api_repsonse["module_source"]).encode())
 
-    schema = Schema(ms_bytes, 1) if api_repsonse["version"] == "v1" else Schema(ms_bytes, 0)
+    schema = (
+        ccdexplorer_schema_parser.Schema(ms_bytes, 1)
+        if api_repsonse["version"] == "v1"
+        else ccdexplorer_schema_parser.Schema(ms_bytes, 0)
+    )
     source_module_name = api_repsonse["source_module_name"]
     return schema, source_module_name
 
