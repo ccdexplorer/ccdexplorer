@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import httpx
+import importlib
 import urllib3
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -18,12 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, Request
-from prometheus_client import (
-    CONTENT_TYPE_LATEST,
-    CollectorRegistry,
-    generate_latest,
-    multiprocess,
-)
+_prometheus_client = importlib.import_module("prometheus_client")
+CONTENT_TYPE_LATEST = _prometheus_client.CONTENT_TYPE_LATEST
+CollectorRegistry = _prometheus_client.CollectorRegistry
+generate_latest = _prometheus_client.generate_latest
+multiprocess = _prometheus_client.multiprocess
 
 # from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator

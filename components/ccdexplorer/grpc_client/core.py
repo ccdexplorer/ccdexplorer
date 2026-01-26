@@ -7,13 +7,15 @@ from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 from .types_pb2 import *
 import grpc
 from ccdexplorer.domain.generic import NET
+import importlib
 import os
 from rich.console import Console
 import threading
 import time
 import random
 
-from prometheus_client import Counter
+_prometheus_client = importlib.import_module("prometheus_client")
+Counter = _prometheus_client.Counter
 
 
 console = Console()
