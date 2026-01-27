@@ -45,6 +45,30 @@ from .utils import Utils as Utils
 console = Console()
 
 
+async def wait_for_finalized_block(grpcclient, height, *, timeout=20.0, interval=0.2):
+    """
+    Polls until the finalized block at `height` exists.
+    Raises TimeoutError if not found within `timeout`.
+    """
+    import asyncio
+    import time
+
+    start = time.monotonic()
+
+    while True:
+        try:
+            block = await asyncio.to_thread(grpcclient.get_finalized_block_at_height, height)
+            if block:
+                return block
+        except Exception:
+            pass
+
+        if time.monotonic() - start > timeout:
+            raise TimeoutError(f"Finalized block at height {height} not found within timeout")
+
+        await asyncio.sleep(interval)
+
+
 class Mixin(Utils):
     def prepare_notification_event(
         self,
@@ -604,9 +628,13 @@ class Mixin(Utils):
                 )
                 self.add_notification_event_to_queue(notification_event)
 
-            last_block_of_payday_hash = self.connections.grpcclient.get_finalized_block_at_height(  # type: ignore
-                block.block_info.height - 1
-            ).hash
+            # last_block_of_payday_hash = self.connections.grpcclient.get_finalized_block_at_height(  # type: ignore
+            #     block.block_info.height - 1
+            # ).hash
+            finalized_block = await wait_for_finalized_block(
+                self.connections.grpcclient, block.block_info.height - 1
+            )
+            last_block_of_payday_hash = finalized_block.hash
 
             # first fill the account reward dict for later lookup
             # in pool reward loop
