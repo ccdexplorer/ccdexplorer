@@ -1,16 +1,17 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
+
+from enum import Enum
+from typing import TYPE_CHECKING
+
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import TYPE_CHECKING
-import sys
+from ccdexplorer.grpc_client.types_pb2 import Empty
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.CCD_Types import CCD_FinalizedBlockInfo
 
 
 class Mixin(_SharedConverters):
@@ -28,7 +29,7 @@ class Mixin(_SharedConverters):
     def get_finalized_blocks(
         self: GRPCClient,
         net: Enum = NET.MAINNET,
-    ) -> CCD_FinalizedBlockInfo:
+    ) -> CCD_FinalizedBlockInfo | None:
         if net == NET.MAINNET:
             for block in self.stub_mainnet.GetFinalizedBlocks(request=Empty()):
                 return self.convertFinalizedBlock(block)

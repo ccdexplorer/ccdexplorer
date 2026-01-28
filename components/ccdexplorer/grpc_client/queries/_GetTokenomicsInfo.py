@@ -1,22 +1,26 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
-from ccdexplorer.domain.generic import NET
+
 from enum import Enum
+from typing import TYPE_CHECKING
+
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
 
-
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_MintRate,
+    CCD_TokenomicsInfo,
+    CCD_TokenomicsInfo_V0,
+    CCD_TokenomicsInfo_V1,
+)
+from ccdexplorer.grpc_client.types_pb2 import MintRate, TokenomicsInfo
 
 
 class Mixin(_SharedConverters):
-    def convertTokenomicsV0(self, message) -> CCD_TokenomicsInfo_V0:
+    def convertTokenomicsV0(self, message) -> CCD_TokenomicsInfo_V0 | None:
         if self.valueIsEmpty(message):
             return None
         else:
@@ -29,7 +33,7 @@ class Mixin(_SharedConverters):
 
             return CCD_TokenomicsInfo_V0(**result)
 
-    def convertTokenomicsV1(self, message) -> CCD_TokenomicsInfo_V1:
+    def convertTokenomicsV1(self, message) -> CCD_TokenomicsInfo_V1 | None:
         if self.valueIsEmpty(message):
             return None
         else:

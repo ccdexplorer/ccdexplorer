@@ -1,18 +1,49 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
+
+from enum import Enum
+from typing import TYPE_CHECKING, Union
+
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import TYPE_CHECKING, Union
+from ccdexplorer.grpc_client.types_pb2 import (
+    AuthorizationsV0,
+    AuthorizationsV1,
+    BlockSpecialEvent,
+    ChainParameters,
+    ConsensusParametersV1,
+    CooldownParametersCpv1,
+    ExchangeRate,
+    FinalizationCommitteeParameters,
+    GasRewards,
+    GasRewardsCpv2,
+    HigherLevelKeys,
+    MintDistributionCpv0,
+    MintDistributionCpv1,
+    PoolParametersCpv1,
+    TimeParametersCpv1,
+    TransactionFeeDistribution,
+    ValidatorScoreParameters,
+)
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 
 
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_BlockSpecialEvent_AccountAmounts,
+    CCD_BlockSpecialEvent_AccountAmounts_Entry,
+    CCD_BlockSpecialEvent_BakingRewards,
+    CCD_BlockSpecialEvent_FinalizationRewards,
+    CCD_ChainParameters,
+    CCD_ChainParametersV0,
+    CCD_ChainParametersV1,
+    CCD_ChainParametersV2,
+    CCD_ChainParametersV3,
+    CCD_ExchangeRate,
+)
 from google.protobuf.json_format import MessageToDict
-from ccdexplorer.grpc_client.CCD_Types import *
 
 
 class Mixin(_SharedConverters):
@@ -30,7 +61,7 @@ class Mixin(_SharedConverters):
 
         return entries
 
-    def convertAccountAmountsBakingRewards(self, message) -> CCD_BlockSpecialEvent_BakingRewards:
+    def convertAccountAmountsBakingRewards(self, message) -> CCD_BlockSpecialEvent_AccountAmounts:
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)
@@ -40,7 +71,7 @@ class Mixin(_SharedConverters):
 
     def convertAccountAmountsFinalizationRewards(
         self, message
-    ) -> CCD_BlockSpecialEvent_FinalizationRewards:
+    ) -> CCD_BlockSpecialEvent_AccountAmounts:
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)

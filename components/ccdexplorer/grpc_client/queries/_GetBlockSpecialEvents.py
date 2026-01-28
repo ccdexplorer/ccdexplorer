@@ -1,6 +1,5 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
+from ccdexplorer.grpc_client.types_pb2 import BlockSpecialEvent
 from ccdexplorer.domain.generic import NET
 from typing import TYPE_CHECKING
 
@@ -9,7 +8,16 @@ if TYPE_CHECKING:
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_BlockSpecialEvent_AccountAmounts_Entry,
+    CCD_BlockSpecialEvent_AccountAmounts,
+    CCD_BlockSpecialEvent_BakingRewards,
+    CCD_BlockSpecialEvent_FinalizationRewards,
+    CCD_BlockSpecialEvent_ValidatorPrimedForSuspension,
+    CCD_BlockSpecialEvent_ValidatorSuspended,
+    CCD_BlockSpecialEvent,
+)
+from enum import Enum
 
 
 class Mixin(_SharedConverters):

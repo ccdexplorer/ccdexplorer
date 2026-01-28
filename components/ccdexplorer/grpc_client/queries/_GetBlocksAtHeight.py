@@ -1,30 +1,23 @@
-# ruff: noqa: F403, F405, E402
-# pyright: reportOptionalMemberAccess=false
-# pyright: reportOptionalSubscript=false
-# pyright: reportAttributeAccessIssue=false
-# pyright: reportAssignmentType=false
-# pyright: reportPossiblyUnboundVariable=false
-# pyright: reportArgumentType=false
-# pyright: reportOptionalOperand=false
-# pyright: reportOptionalIterable=false
-# pyright: reportCallIssue=false
-# pyright: reportReturnType=false
-# pyright: reportIndexIssue=false
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
-from ccdexplorer.domain.generic import NET
+
 from enum import Enum
+from typing import TYPE_CHECKING
+
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import TYPE_CHECKING
+from ccdexplorer.grpc_client.types_pb2 import (
+    AbsoluteBlockHeight,
+    BlocksAtHeightRequest,
+    BlocksAtHeightResponse,
+)
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 from typing import Iterator
 
-from ccdexplorer.grpc_client.CCD_Types import *
-from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo, CCD_BlockHash
+from ccdexplorer.grpc_client.CCD_Types import CCD_BlockHash, CCD_BlockInfo
 
 
 class Mixin(_SharedConverters):
@@ -57,7 +50,9 @@ class Mixin(_SharedConverters):
     ) -> CCD_BlockInfo | None:
         # blocks_at_height = self.get_blocks_at_height(block_height, net)
         try:
-            bi: CCD_BlockInfo = self.get_block_info(block_height, net)
+            bi: CCD_BlockInfo = self.get_block_info(  # ty:ignore[unresolved-attribute]
+                block_height, net
+            )
         except:  # noqa
             return None
         if bi.finalized:

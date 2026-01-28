@@ -1,18 +1,19 @@
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
 
-# ruff: noqa: F403, F405, E402
+from typing import TYPE_CHECKING, Iterator
+
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import Iterator
-from typing import TYPE_CHECKING
+from ccdexplorer.grpc_client.types_pb2 import ContractAddress
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 
-from ccdexplorer.grpc_client.CCD_Types import *
+from enum import Enum
+
+from ccdexplorer.grpc_client.CCD_Types import CCD_ContractAddress
 
 
 class Mixin(_SharedConverters):
@@ -20,7 +21,7 @@ class Mixin(_SharedConverters):
         self: GRPCClient,
         block_hash: str,
         net: Enum = NET.MAINNET,
-    ) -> list[ContractAddress]:
+    ) -> list[CCD_ContractAddress]:
         result = []
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 

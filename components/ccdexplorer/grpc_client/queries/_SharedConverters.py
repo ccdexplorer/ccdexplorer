@@ -1,4 +1,5 @@
 # ruff: noqa: F403, F405, E402
+
 from __future__ import annotations
 
 import datetime as dt
@@ -8,7 +9,7 @@ from typing import Any, Protocol, Union
 from decimal import Decimal
 import base58
 import cbor2
-from google._upb._message import RepeatedCompositeContainer
+from google._upb._message import RepeatedCompositeContainer  # ty:ignore[unresolved-import]
 from google.protobuf.json_format import MessageToDict
 
 

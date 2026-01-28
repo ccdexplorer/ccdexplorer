@@ -66,6 +66,8 @@ def grpc_client():
     }
     c.host_index = {NET.MAINNET: 0, NET.TESTNET: 0}
     c._was_ready = {NET.MAINNET: False, NET.TESTNET: False}
+    c._down_until = {}
+    c._cooldown_s = 30.0
 
     # patchable hooks
     c._backoff = lambda attempt: None  # no sleeping in unit tests

@@ -1,15 +1,24 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
+
+from typing import TYPE_CHECKING
+
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.grpc_client.CCD_Types import *
+from enum import Enum
+
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_InstanceInfo_V0,
+    CCD_InstanceInfo_V1,
+    CCD_ModuleRef,
+    CCD_ReceiveName,
+    CCD_VersionedModuleSource,
+)
+from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 
 
 class Mixin(_SharedConverters):

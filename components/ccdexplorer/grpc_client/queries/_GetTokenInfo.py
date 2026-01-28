@@ -1,19 +1,26 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import TokenInfoRequest, TokenInfo
+
+from enum import Enum
+from typing import TYPE_CHECKING
+
+import cbor2
+from ccdexplorer.domain.generic import NET
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_ModuleState,
+    CCD_TokenAmount,
+    CCD_TokenInfo,
+    CCD_TokenState,
+)
 from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import (
+    TokenAmount,
     TokenId,
     TokenState,
-    TokenAmount,
 )
-from google.protobuf import message
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-import cbor2
-from ccdexplorer.domain.generic import NET
-from typing import TYPE_CHECKING
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.types_pb2 import TokenInfo, TokenInfoRequest
+from google.protobuf import message
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
@@ -55,7 +62,7 @@ class Mixin(_SharedConverters):
         return CCD_TokenState(**keys)
 
     def get_token_info(
-        self: GRPCClient,  # type: ignore
+        self: GRPCClient,
         block_hash: str,
         token_id: str,
         net: Enum = NET.MAINNET,
@@ -66,7 +73,7 @@ class Mixin(_SharedConverters):
             block_hash=blockHashInput, token_id=TokenId(value=token_id)
         )
 
-        grpc_return_value: TokenInfo = self.stub_on_net(net, "GetTokenInfo", token_info_request)  # type: ignore
+        grpc_return_value: TokenInfo = self.stub_on_net(net, "GetTokenInfo", token_info_request)
 
         result = {}
         for descriptor in grpc_return_value.DESCRIPTOR.fields:

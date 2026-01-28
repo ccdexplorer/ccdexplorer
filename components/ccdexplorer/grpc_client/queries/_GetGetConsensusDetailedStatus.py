@@ -1,18 +1,50 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_RawQuorumCertificate,
-    CCD_RoundStatus,
-)
-from ccdexplorer.grpc_client.types_pb2 import *
-from ccdexplorer.domain.generic import NET
+
 from enum import Enum
+from typing import TYPE_CHECKING, Optional
+
+from ccdexplorer.domain.generic import NET
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_BakerId,
+    CCD_BakersAndFinalizers,
+    CCD_BlockHash,
+    CCD_BlockTableSummary,
+    CCD_BranchBlocks,
+    CCD_ConsensusDetailedStatus,
+    CCD_EpochBakers,
+    CCD_FinalizerIndex,
+    CCD_FullBakerInfo,
+    CCD_PersistentRoundStatus,
+    CCD_QuorumMessage,
+    CCD_RawFinalizationEntry,
+    CCD_RawFinalizerRound,
+    CCD_RawQuorumCertificate,
+    CCD_RawTimeoutCertificate,
+    CCD_RoundExistingBlock,
+    CCD_RoundExistingQC,
+    CCD_RoundStatus,
+    CCD_RoundTimeout,
+    CCD_TimeoutMessage,
+    CCD_TimeoutMessages,
+)
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from ccdexplorer.grpc_client.CCD_Types import *
-
-from typing import TYPE_CHECKING
+from ccdexplorer.grpc_client.types_pb2 import (
+    BakersAndFinalizers,
+    BlockTableSummary,
+    ConsensusDetailedStatus,
+    EpochBakers,
+    PersistentRoundStatus,
+    QuorumMessage,
+    RawFinalizationEntry,
+    RawQuorumCertificate,
+    RawTimeoutCertificate,
+    RoundStatus,
+    RoundTimeout,
+    TimeoutMessage,
+    TimeoutMessages,
+)
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient

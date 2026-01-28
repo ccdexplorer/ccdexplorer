@@ -1,22 +1,46 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
+
+from enum import Enum
+from typing import TYPE_CHECKING
+
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import TYPE_CHECKING
+from ccdexplorer.grpc_client.types_pb2 import (
+    ArInfo,
+    BakerStakeThreshold,
+    CooldownParametersCpv1,
+    ElectionDifficulty,
+    ExchangeRate,
+    GasRewards,
+    IpInfo,
+    Level1Update,
+    MintDistributionCpv0,
+    MintDistributionCpv1,
+    PoolParametersCpv1,
+    ProtocolUpdate,
+    RootUpdate,
+    TimeParametersCpv1,
+    TransactionFeeDistribution,
+    UpdatePayload,
+)
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 
 
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_ExchangeRate,
+    CCD_PendingUpdate,
+    CCD_UpdateDetails,
+    CCD_UpdatePayload,
+)
 from google.protobuf.json_format import MessageToDict
-from ccdexplorer.grpc_client.CCD_Types import *
 
 
 class Mixin(_SharedConverters):
-    def convertPendingUpdatePayload(self, message) -> CCD_UpdatePayload:
+    def convertPendingUpdatePayload(self, message) -> tuple[CCD_UpdatePayload, dict] | None:
         if MessageToDict(message) == {}:
             return None
         else:
@@ -32,7 +56,7 @@ class Mixin(_SharedConverters):
 
             return CCD_UpdatePayload(**result), _type
 
-    def convertPendingUpdateDetails(self, message) -> CCD_UpdateDetails:
+    def convertPendingUpdateDetails(self, message) -> tuple[CCD_UpdateDetails, dict] | None:
         if MessageToDict(message) == {}:
             return None
         else:

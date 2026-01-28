@@ -1,19 +1,59 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import cbor2
-from google.protobuf import message
-
 from ccdexplorer.domain.generic import NET
+from ccdexplorer.grpc_client.CCD_Types import (
+    CCD_AccountCredential,
+    CCD_AccountInfo,
+    CCD_AccountStakingInfo,
+    CCD_AccountVerifyKey,
+    CCD_ChainArData,
+    CCD_Commitment,
+    CCD_Cooldown,
+    CCD_CredentialCommitments,
+    CCD_CredentialPublicKeys,
+    CCD_EncryptedBalance,
+    CCD_InitialCredentialValues,
+    CCD_ModuleAccountState,
+    CCD_NormalCredentialValues,
+    CCD_Policy,
+    CCD_Token,
+    CCD_TokenAccountState,
+    CCD_TokenAmount,
+    CCD_YearMonth,
+    CCD_Policy_Attributes,
+    CredentialDocType,
+    CredentialElement,
+    CoolDownStatus,
+)
 from ccdexplorer.grpc_client.kernel_pb2 import AccountAddress
 from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import TokenAmount
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from ccdexplorer.grpc_client.types_pb2 import *
-from ccdexplorer.grpc_client.CCD_Types import *
+from ccdexplorer.grpc_client.types_pb2 import (
+    AccountInfo,
+    AccountInfoRequest,
+    AccountStakingInfo,
+    Amount,
+    BakerId,
+    BakerInfo,
+    BakerPoolInfo,
+    CredentialCommitments,
+    CredentialPublicKeys,
+    DelegationTarget,
+    EncryptedBalance,
+    InitialCredentialValues,
+    NormalCredentialValues,
+    Policy,
+    ReleaseSchedule,
+    StakePendingChange,
+    YearMonth,
+)
+from google.protobuf import message
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
@@ -44,7 +84,7 @@ class Mixin(_SharedConverters):
 
         return attributes
 
-    def convertPolicy_AttributesEntry(self, message) -> CCD_Policy_Attributes:
+    def convertPolicy_AttributesEntry(self, message) -> dict[str, CCD_Policy_Attributes]:
         attributes = {}
         for element, value in message.items():
             if CredentialElement(element).name == "idDocType":
@@ -86,7 +126,7 @@ class Mixin(_SharedConverters):
 
         return CCD_Policy(**result)
 
-    def convertListOfCommitments(self, message) -> CCD_Commitment:
+    def convertListOfCommitments(self, message) -> list[CCD_Commitment]:
         entries = []
 
         for list_entry in message:
@@ -256,7 +296,7 @@ class Mixin(_SharedConverters):
 
         return result
 
-    def convertAccountStakingInfo(self, message: message):
+    def convertAccountStakingInfo(self, message) -> CCD_AccountStakingInfo:
         result = {}
         which_one = message.WhichOneof("staking_info")
         if not which_one:
@@ -306,8 +346,8 @@ class Mixin(_SharedConverters):
     def get_account_info(
         self: GRPCClient,
         block_hash: str,
-        hex_address: str = None,
-        account_index: int = None,
+        hex_address: str | None = None,
+        account_index: int | None = None,
         net: Enum = NET.MAINNET,
     ) -> CCD_AccountInfo:
         blockHashInput = self.generate_block_hash_input_from(block_hash)

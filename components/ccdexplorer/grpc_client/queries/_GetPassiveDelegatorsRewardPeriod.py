@@ -1,19 +1,17 @@
-# ruff: noqa: F403, F405, E402
 from __future__ import annotations
-from ccdexplorer.grpc_client.types_pb2 import *
-from ccdexplorer.domain.generic import NET
+
 from enum import Enum
+from typing import TYPE_CHECKING, Iterator
+
+from ccdexplorer.domain.generic import NET
+from ccdexplorer.grpc_client.CCD_Types import CCD_DelegatorRewardPeriodInfo
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from typing import Iterator
-from ccdexplorer.grpc_client.CCD_Types import CCD_DelegatorRewardPeriodInfo
-from typing import TYPE_CHECKING
-import sys
+from ccdexplorer.grpc_client.types_pb2 import DelegatorInfo
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.grpc_client.CCD_Types import *
 
 
 class Mixin(_SharedConverters):
@@ -24,15 +22,6 @@ class Mixin(_SharedConverters):
     ) -> list[CCD_DelegatorRewardPeriodInfo]:
         result = []
         blockHashInput = self.generate_block_hash_input_from(block_hash)
-
-        # if net == NET.MAINNET:
-        #     grpc_return_value: Iterator[DelegatorInfo] = (
-        #         self.stub_mainnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
-        #     )
-        # else:
-        #     grpc_return_value: Iterator[DelegatorInfo] = (
-        #         self.stub_testnet.GetPassiveDelegatorsRewardPeriod(request=blockHashInput)
-        #     )
 
         grpc_return_value: Iterator[DelegatorInfo] = self.stub_on_net(
             net, "GetPassiveDelegatorsRewardPeriod", blockHashInput, streaming=True

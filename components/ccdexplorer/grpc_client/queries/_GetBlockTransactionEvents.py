@@ -12,7 +12,6 @@ from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import (
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-
 from ccdexplorer.grpc_client.types_pb2 import (
     AccountCreationDetails,
     AccountTransactionDetails,
@@ -42,11 +41,11 @@ from ccdexplorer.grpc_client.types_pb2 import (
     ProtocolUpdate,
     RegisteredData,
     RootUpdate,
+    SponsorDetails,
     TimeParametersCpv1,
     TransactionFeeDistribution,
     UpdateDetails,
     UpdatePayload,
-    SponsorDetails,
 )
 
 if TYPE_CHECKING:
@@ -87,6 +86,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_EncryptedSelfAmountAddedEvent,
     CCD_ExchangeRate,
     CCD_NewRelease,
+    CCD_SponsorDetails,
     CCD_TokenCreationDetails,
     CCD_TokenEffect,
     CCD_TokenEvent,
@@ -94,7 +94,6 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_TransferredWithSchedule,
     CCD_UpdateDetails,
     CCD_UpdatePayload,
-    CCD_SponsorDetails,
 )
 from google.protobuf.json_format import MessageToDict
 
@@ -773,7 +772,7 @@ class Mixin(_SharedConverters):
         return CCD_UpdateDetails(**result), CCD_TransactionType(**_type)
 
     def get_block_transaction_events(
-        self: GRPCClient,  # type: ignore
+        self: GRPCClient,
         block_input: Union[str, int],
         net: Enum = NET.MAINNET,
     ) -> CCD_Block:
