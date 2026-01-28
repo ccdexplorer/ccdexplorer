@@ -316,7 +316,7 @@ async def show_token_address(
         "contract": contract,
         "tx_deployed": tx_deployed,
         "stored_token_address": stored_token_address,
-        "token_id": token_id,
+        "token_id": use_token_id,
         "compliant_contract": compliant_contract,
         # "stored_tag": tokens_tag,
         # "is_PTRT": False,
