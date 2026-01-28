@@ -30,7 +30,7 @@ from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.cns import CNSActions, CNSDomain, CNSEvent
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
 from ccdexplorer.site_user import SiteUser
-import ccdexplorer_schema_parser
+from ccdexplorer.schema_parser import Schema
 from pydantic import BaseModel
 from ccdexplorer.cis import CIS
 from ccdexplorer.ccdexplorer_site.app.classes.Enums import *  # type: ignore
@@ -156,11 +156,7 @@ class MakeUp:
 
         ms_bytes = base64.decodebytes(json.loads(api_repsonse["module_source"]).encode())
 
-        schema = (
-            ccdexplorer_schema_parser.Schema(ms_bytes, 1)
-            if api_repsonse["version"] == "v1"
-            else ccdexplorer_schema_parser.Schema(ms_bytes, 0)
-        )
+        schema = Schema(ms_bytes, 1) if api_repsonse["version"] == "v1" else Schema(ms_bytes, 0)
         source_module_name = api_repsonse["source_module_name"]
 
         # add to cache
@@ -1498,7 +1494,7 @@ class MakeUp:
     def try_schema_parsing_for_event(
         self,
         logged_events: list,
-        schema: ccdexplorer_schema_parser.Schema,
+        schema: Schema,
         source_module_name: str,
         event: str,
         net,
@@ -1531,7 +1527,7 @@ class MakeUp:
 
     def try_schema_parsing_for_parameter(
         self,
-        schema: ccdexplorer_schema_parser.Schema,
+        schema: Schema,
         source_module_name: str,
         function_name: str,
         parameter: str,
