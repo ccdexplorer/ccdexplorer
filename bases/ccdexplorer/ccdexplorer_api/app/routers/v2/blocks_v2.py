@@ -154,11 +154,17 @@ async def get_last_blocks_newer_than(
     Raises:
         HTTPException: If the network is unsupported or the query fails.
     """
-    error = ""
+
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
             status_code=404,
             detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if since == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="`Since` parameter cannot be zero.",
         )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
@@ -171,9 +177,10 @@ async def get_last_blocks_newer_than(
             .to_list(length=min(since, 1000))
         )
 
-    except Exception as error:
-        print(error)
+    except Exception as exc:
+        print(exc)
         result = None
+        error = exc
 
     if not error:
         return result or []
