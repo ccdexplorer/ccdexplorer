@@ -40,7 +40,7 @@ class Address:
                 ai_stable = AccountInfoStable.from_account_info(account_info)
                 canonical_address = ai_stable.account_address[:29]
 
-                _ = db_to_use[Collections.all_account_addresses].bulk_write(
+                _ = db_to_use[Collections.stable_address_info].bulk_write(
                     [ReplaceOne({"_id": canonical_address}, ai_stable.to_collection(), upsert=True)]
                 )
                 tooter_message = f"{net.value}: New address processed {new_address} at index {account_info.index}."

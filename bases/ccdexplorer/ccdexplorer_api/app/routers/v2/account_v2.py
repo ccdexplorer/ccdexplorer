@@ -1019,7 +1019,7 @@ async def account_is_alias(
     api_key: str = Security(API_KEY_HEADER),
 ) -> bool:
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    result = await db_to_use[Collections.all_account_addresses].find_one({"_id": index_hash[:29]})
+    result = await db_to_use[Collections.stable_address_info].find_one({"_id": index_hash[:29]})
     if not result:
         return False
 
@@ -1064,7 +1064,7 @@ async def get_account_info(
             if len(index_or_hash) == 29:
                 try:
                     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-                    result = await db_to_use[Collections.all_account_addresses].find_one(
+                    result = await db_to_use[Collections.stable_address_info].find_one(
                         {"_id": index_or_hash}
                     )
                     if result:

@@ -97,7 +97,7 @@ def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heigh
         holder_to_ids.setdefault(account["token_holder"], []).append(account["token_id"])
 
     for account in holder_to_ids.keys():
-        canonical_account_address_entry = db[Collections.all_account_addresses].find_one(
+        canonical_account_address_entry = db[Collections.stable_address_info].find_one(
             {"_id": account[:29]}
         )
         if not canonical_account_address_entry:
@@ -221,7 +221,7 @@ def label_governance_account(
     db_utilities: dict[CollectionsUtilities, Collection],
     create_plt: CCD_CreatePLT,
 ) -> None:
-    ga_account = db[Collections.all_account_addresses].find_one(
+    ga_account = db[Collections.stable_address_info].find_one(
         {"account_address": create_plt.initialization_parameters.governance_account.account}
     )
 

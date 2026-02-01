@@ -15,7 +15,7 @@ from ..nightrunner.utils import (
 
 
 def get_all_account_addresses(mongodb: MongoDB):
-    result = mongodb.mainnet[Collections.all_account_addresses].find({})
+    result = mongodb.mainnet[Collections.stable_address_info].find({})
     return {x["_id"]: x for x in result}
 
 

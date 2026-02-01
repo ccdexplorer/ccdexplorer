@@ -88,7 +88,7 @@ async def get_last_accounts_newer_than(
     try:
         accounts = await await_await(
             db_to_use,
-            Collections.all_account_addresses,
+            Collections.stable_address_info,
             [
                 {"$match": {"account_index": {"$gt": since_index}}},
                 {"$sort": {"account_index": -1}},
@@ -168,7 +168,7 @@ async def get_accounts_count_estimate(
     try:
         result = await await_await(
             db_to_use,
-            Collections.all_account_addresses,
+            Collections.stable_address_info,
             [
                 {"$sort": {"account_index": -1}},
             ],
@@ -225,7 +225,7 @@ async def get_account_indexes(
     try:
         result = await await_await(
             db_to_use,
-            Collections.all_account_addresses,
+            Collections.stable_address_info,
             [{"$match": {"_id": {"$in": account_ids}}}],
         )
         error = None
@@ -297,7 +297,7 @@ async def search_accounts(
             }
         },
     ]
-    result = await await_await(db_to_use, Collections.all_account_addresses, pipeline)
+    result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
     return result
 
 
@@ -338,7 +338,7 @@ async def get_account_addresses(
     try:
         result = await await_await(
             db_to_use,
-            Collections.all_account_addresses,
+            Collections.stable_address_info,
             [{"$match": {"account_index": {"$in": account_indexes}}}],
         )
         error = None
@@ -454,7 +454,7 @@ async def get_last_accounts(
     try:
         result = [
             x["account_index"]
-            for x in await db_to_use[Collections.all_account_addresses]
+            for x in await db_to_use[Collections.stable_address_info]
             .find({}, {"account_index": 1, "_id": 0})
             .sort({"account_index": -1})
             .to_list(count)
@@ -1247,11 +1247,11 @@ async def get_paginated_accounts(
         }
     try:
         # total documents for client-side page computations
-        total_docs = await db[Collections.all_account_addresses].estimated_document_count()
+        total_docs = await db[Collections.stable_address_info].estimated_document_count()
 
         # fetch the requested slice, sorted by height desc
         cursor = (
-            db[Collections.all_account_addresses]
+            db[Collections.stable_address_info]
             .find({})
             .sort("account_index", -1)
             .skip(skip)

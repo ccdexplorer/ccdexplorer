@@ -20,7 +20,7 @@
 #         patch.object(tooter, "send_to_tooter") as _,
 #         patch.dict(
 #             mongodb.mainnet,
-#             {Collections.all_account_addresses: mock_collection},
+#             {Collections.stable_address_info: mock_collection},
 #             clear=False,
 #         ),
 #     ):

@@ -15,9 +15,7 @@ async def main():
 
         get_all_addresses = {
             x["_id"]: x["account_index"]
-            for x in await db_to_use[Collections.all_account_addresses]
-            .find({})
-            .to_list(length=None)
+            for x in await db_to_use[Collections.stable_address_info].find({}).to_list(length=None)
         }
 
         with open(
@@ -27,9 +25,7 @@ async def main():
 
         get_all_addresses = {
             x["_id"]: x
-            for x in await db_to_use[Collections.all_account_addresses]
-            .find({})
-            .to_list(length=None)
+            for x in await db_to_use[Collections.stable_address_info].find({}).to_list(length=None)
         }
 
         with open(
