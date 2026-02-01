@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+
 import datetime as dt
 import pickle
 import pandas as pd
 import math
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.domain.generic import NET
+from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.grpc_client.CCD_Types import CCD_AccountInfo
 from ccdexplorer.mongodb import (
     Collections,
@@ -15,6 +16,7 @@ from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 from git import Repo
 from rich import print
 from rich.console import Console
+from pymongo import ReplaceOne
 
 
 console = Console()
@@ -33,6 +35,7 @@ class Account:
 
     def process_grpc_account_info(self):
         ai: CCD_AccountInfo = self.grpcclient.get_account_info(self.block_hash, self.account)
+        self.ai_stable: AccountInfoStable = AccountInfoStable.from_account_info(ai)
         if ai.tokens is not None:
             self.tokens = {}
             self.tokens["account_address"] = self.account
@@ -186,15 +189,19 @@ class Daily:
         if self.processed_accounts == {}:
             results = []
             plt_results = []
+            ai_stable_results = []
             for index, account in enumerate(self.accounts):
                 if (index % 10_000) == 0:
                     console.log(f"Working on account_index {index:,.0f}...")
-                result, plt_result = self._perform_account_action(account)
+                result, plt_result, ai_stable_result = self._perform_account_action(account)
                 results.append(result)
+                ai_stable_results.append(ai_stable_result)
                 if plt_result:
                     plt_results.append(plt_result)
+
             self.processed_accounts = results
             self.plt_results = plt_results
+            self.ai_stable_results = ai_stable_results
 
     def _perform_account_action(self, account):
         # after this step, acc holds the accountInfo for this account at the relevant block.
@@ -238,7 +245,7 @@ class Daily:
 
         dd["ip_identity_credential_0"] = acc.ip_identity
 
-        return dd, acc.tokens
+        return dd, acc.tokens, acc.ai_stable
 
     def save_downloaded_accounts_to_disk(self):
         try:
@@ -246,6 +253,22 @@ class Daily:
             save_object = self.processed_accounts
             pickle.dump(save_object, f)
             f.close()
+        except Exception as e:
+            print(e)
+
+    def send_queue_to_mongodb_stable_address_info(self, queue: list[dict]):
+        try:
+            if len(queue) > 0:
+                self.mongodb.mainnet[Collections.stable_address_info].bulk_write(
+                    [
+                        ReplaceOne(
+                            {"_id": rec["_id"]},
+                            rec,
+                            upsert=True,
+                        )
+                        for rec in queue
+                    ]
+                )
         except Exception as e:
             print(e)
 
@@ -286,6 +309,17 @@ class Daily:
                 message=f"Accounts Retrieval: Nightly accounts saved to MongoDB for {self.date}.",
                 notifier_type=TooterType.INFO,
             )
+
+            queue = []
+            for account in self.ai_stable_results:
+                record = account.to_collection()
+                queue.append(record)
+                if len(queue) >= 1000:
+                    self.send_queue_to_mongodb_stable_address_info(queue)
+                    queue = []
+            if len(queue) > 0:
+                self.send_queue_to_mongodb_stable_address_info(queue)
+
         except Exception as e:
             print(e)
 

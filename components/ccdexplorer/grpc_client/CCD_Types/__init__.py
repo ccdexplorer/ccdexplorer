@@ -80,6 +80,7 @@ class CredentialDocType(Enum):
     National_ID_Card = "2"
     Driving_License = "3"
     Immigration_Card = "4"
+    Danish_MITID = "DK:MITID"
 
 
 class ProtocolVersions(Enum):

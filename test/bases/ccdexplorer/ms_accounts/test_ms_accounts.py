@@ -7,6 +7,7 @@ from ccdexplorer.mongodb import MongoDB, MongoMotor, Collections
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.ms_accounts.subscriber import Subscriber
+from rich import print
 
 
 @pytest.mark.asyncio
@@ -26,16 +27,15 @@ async def test_new_account(
     ):
         subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
         net = NET.MAINNET
-        block_height = 37061947
+        block_height = 1985375
         await subscriber.process_new_address(net, block_height)
         mock_bulk_write.assert_called_once()
         args, kwargs = mock_bulk_write.call_args
         ops = args[0]
         op = ops[0]
-        account_address = "3fknDNHU4gb1pqWHMbWFVnopshLT5hjVXvcqQxdbL18C6yuwP9"
+        account_address = "3d4tsSiBrJXn2aiNHdfqMq2b9oGttoKn2LDCZbHHMm1WZi2c95"
         assert isinstance(op, ReplaceOne)
-        assert op._doc == {
-            "_id": account_address[:29],
-            "account_address": account_address,
-            "account_index": 103187,
-        }
+        assert op._doc["account_address"] == account_address
+        assert op._doc["_id"] == account_address[:29]
+        assert op._doc["account_index"] == 76933
+        print(op._doc)

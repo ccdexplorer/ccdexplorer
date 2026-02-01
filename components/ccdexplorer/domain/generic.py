@@ -1,4 +1,16 @@
+from __future__ import annotations
+
+from ccdexplorer.domain.credential import Credentials
 from enum import Enum
+from typing import TYPE_CHECKING
+
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from ccdexplorer.grpc_client.CCD_Types import (
+        CCD_AccountInfo,
+        CCD_Policy,
+    )
 
 
 class NET(Enum):
@@ -27,3 +39,34 @@ class StandardIdentifiers(Enum):
     CIS_4 = "CIS-4"
     CIS_5 = "CIS-5"
     CIS_6 = "CIS-6"
+
+
+class CredentialShort(BaseModel):
+    created_at: str
+    valid_to: str
+    ip_id: int
+
+
+class AccountInfoStable(BaseModel):
+    account_address: str
+    account_index: int
+    account_threshold: int
+    credential_count: int
+    credentials: list
+
+    @classmethod
+    def from_account_info(cls, ai: CCD_AccountInfo) -> "AccountInfoStable":
+        credentials = Credentials().determine_id_providers(ai.credentials)
+
+        return cls(
+            account_address=ai.address,
+            account_index=ai.index,
+            account_threshold=ai.threshold,
+            credentials=credentials,
+            credential_count=len(ai.credentials.keys()),
+        )
+
+    def to_collection(self) -> dict:
+        md = self.model_dump()
+        md["_id"] = md["account_address"][:29]
+        return md

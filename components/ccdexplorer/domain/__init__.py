@@ -1,4 +1,4 @@
-from ccdexplorer.domain.generic import NET
+from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.domain.mongo import (
     MongoLabeledAccount,
     AccountStatementEntry,
@@ -40,6 +40,7 @@ from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
 
 __all__ = [
     "NET",
+    "AccountInfoStable",
     "MongoLabeledAccount",
     "AccountStatementEntry",
     "AccountStatementTransferType",

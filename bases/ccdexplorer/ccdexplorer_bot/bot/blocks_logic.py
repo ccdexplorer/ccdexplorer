@@ -643,9 +643,9 @@ class Mixin(Utils):
                 # Payday Account Rewards
                 account_id = Reward(reward).account_reward()
                 if account_id:
-                    from_nightly = self.nightly_accounts_by_account_id.get(account_id)  # type: ignore
-                    if from_nightly:
-                        account_index = from_nightly["index"]
+                    from_stable = self.stable_address_info_by_account_id.get(account_id)  # type: ignore
+                    if from_stable:
+                        account_index = from_stable["account_index"]
                         account_rewards_by_account_index[account_index] = (
                             reward.payday_account_reward
                         )

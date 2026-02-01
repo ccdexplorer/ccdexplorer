@@ -34,9 +34,9 @@ class Utils:
                 if len(impacted_address) > 28:
                     account_id = impacted_address
 
-                    from_nightly = self.nightly_accounts_by_account_id.get(account_id)
-                    if from_nightly:
-                        account_index = from_nightly["index"]
+                    from_stable = self.stable_address_info_by_account_id.get(account_id)
+                    if from_stable:
+                        account_index = from_stable["account_index"]
                     else:
                         account_index = grpcclient.get_account_info(
                             "last_final", impacted_address
@@ -52,9 +52,9 @@ class Utils:
 
             elif isinstance(impacted_address, int):
                 account_index = impacted_address
-                from_nightly = self.nightly_accounts_by_account_index.get(account_index)
-                if from_nightly:
-                    account_id = from_nightly["_id"]
+                from_stable = self.stable_address_info_by_account_index.get(account_index)
+                if from_stable:
+                    account_id = from_stable["_id"]
                 else:
                     account_id = self.connections.grpcclient.get_account_info(
                         "last_final", account_index=impacted_address

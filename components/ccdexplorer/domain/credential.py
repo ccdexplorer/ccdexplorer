@@ -13,13 +13,13 @@ from ccdexplorer.grpc_client.CCD_Types import (
 )  # noqa: F405
 
 
-class CredentialElement(Enum):
+class CredentialElementDescription(Enum):
     firstName = "First Name"
     lastName = "Last Name"
     sex = "Sex"
     dob = "Date of Birth"
     countryOfResidence = "Country of Residence"
-    nationality = "Nationatility"
+    nationality = "Nationality"
     idDocType = "Identity Document Type"
     idDocNo = "Identity Document Number"
     idDocIssuer = "Identity Document Issuer"
@@ -40,6 +40,7 @@ class CredentialDocType(Enum):
     National_ID_Card = "2"
     Driving_License = "3"
     Immigration_Card = "4"
+    Danish_MITID = "DK:MITID"
 
 
 class Credentials:
@@ -76,7 +77,7 @@ class Credentials:
                 for key_policy, commitmentAttribute in v.policy.attributes.items():
                     value = commitmentAttribute
                     policy_attributes.append(
-                        {"key": CredentialElement[key_policy].value, "value": value}
+                        {"key": CredentialElementDescription[key_policy].value, "value": value}
                     )
                 c.update({"policy_attributes": policy_attributes})
             if normal:
@@ -87,7 +88,12 @@ class Credentials:
                         commitmentAttribute,
                     ) in v.commitments.attributes.items():
                         value = commitmentAttribute
-                        commitment_attributes.append(CredentialElement[key_commitment].value)
+                        commitment_attributes.append(
+                            {
+                                "key": CredentialElementDescription[key_commitment].value,
+                                "value": value,
+                            }
+                        )
                     c.update({"commitment_attributes": commitment_attributes})
             credentials.append(c)
         return credentials

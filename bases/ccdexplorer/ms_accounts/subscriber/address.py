@@ -1,9 +1,9 @@
-from ccdexplorer.domain.generic import NET
+from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import (
     Collections,
 )
-from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
+from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary, CCD_AccountInfo
 from ccdexplorer.tooter import Tooter
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
@@ -34,23 +34,20 @@ class Address:
                 if tx.account_creation is None:
                     continue
                 new_address = tx.account_creation.address
-                account_info = self.grpc_client.get_account_info(
+                account_info: CCD_AccountInfo = self.grpc_client.get_account_info(
                     "last_final", hex_address=new_address, net=net
                 )
-                canonical_address = new_address[:29]
-                new_record = {
-                    "_id": canonical_address,
-                    "account_address": new_address,
-                    "account_index": account_info.index,
-                }
+                ai_stable = AccountInfoStable.from_account_info(account_info)
+                canonical_address = ai_stable.account_address[:29]
+
                 _ = db_to_use[Collections.all_account_addresses].bulk_write(
-                    [ReplaceOne({"_id": canonical_address}, new_record, upsert=True)]
+                    [ReplaceOne({"_id": canonical_address}, ai_stable.to_collection(), upsert=True)]
                 )
                 tooter_message = f"{net.value}: New address processed {new_address} at index {account_info.index}."
                 console.log(tooter_message)
-                self.tooter.send_to_tooter(tooter_message)  # type: ignore
+                self.tooter.send_to_tooter(tooter_message)
         except Exception as e:
             tooter_message = f"{net.value}: New address failed with error  {e}."
             console.log(tooter_message)
-            self.tooter.send_to_tooter(tooter_message)  # type: ignore
+            self.tooter.send_to_tooter(tooter_message)
             return

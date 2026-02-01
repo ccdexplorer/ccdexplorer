@@ -21,7 +21,7 @@ import plotly.graph_objects as go
 # from urllib import request
 import plotly.io as pio
 from ccdexplorer.cis.core import CIS
-from ccdexplorer.domain.generic import NET
+from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.domain.mongo import (
     MongoTypeLoggedEventV2,
     MongoTypeTokensTag,
@@ -1976,7 +1976,9 @@ def split_contract_into_url_slug_and_token_id(contract_str: str, token_id: str):
 
 def add_account_info_to_cache(account_info: CCD_AccountInfo, app: FastAPI, net: str):
     app.addresses_to_indexes[net][account_info.address[:29]] = account_info.index  # type: ignore
-    app.addresses_to_indexes_complete[net][account_info.address[:29]] = account_info  # type: ignore
+    app.addresses_to_indexes_complete[net][account_info.address[:29]] = (
+        AccountInfoStable.from_account_info(account_info)
+    )  # type: ignore
     app.max_index_known[net] = max(app.addresses_to_indexes[net].values())  # type: ignore
 
 
