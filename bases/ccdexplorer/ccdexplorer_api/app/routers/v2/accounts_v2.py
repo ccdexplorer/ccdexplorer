@@ -520,9 +520,10 @@ async def get_business_accounts(
     error = None
     if sort_key:
         sort_key = "nonce" if sort_key == "sequence_number" else sort_key
+        sort_key = "account_index" if sort_key == "index" else sort_key
         # sort_key = "nonce" if sort_key == "available_balance" else sort_key
     try:
-        pipeline = [{"$match": {"ip_identity_credential_0": 3}}]
+        pipeline = [{"$match": {"credentials.ip_identity": 3}}]
         if sort_key:
             pipeline.append({"$sort": {sort_key: 1 if direction == "asc" else -1}})
         pipeline.extend(
@@ -541,7 +542,7 @@ async def get_business_accounts(
                 {"$limit": 1},
             ]
         )
-        agg = await await_await(db_to_use, Collections.nightly_accounts, pipeline)
+        agg = await await_await(db_to_use, Collections.stable_address_info, pipeline)
         if agg:
             facet = agg[0]
             result = facet.get("results", [])
@@ -558,7 +559,7 @@ async def get_business_accounts(
         enriched_results = []
         for account in result:
             account_info = grpcclient.get_account_info(
-                "last_final", account_index=account["index"], net=NET(net)
+                "last_final", account_index=account["account_index"], net=NET(net)
             )
             enriched_results.append({"account_info": account_info})
 
@@ -1300,3 +1301,102 @@ async def get_paginated_accounts(
             status_code=500,
             detail=f"Error retrieving accounts: {e}",
         )
+
+
+@router.get(
+    "/{net}/accounts/credential-summary",
+    response_class=JSONResponse,
+)
+async def get_credential_summary(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> list[CCD_AccountIndex]:
+    """
+    Endpoint to get a summary of credential information for all accounts
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    pipeline = [
+        # One row per credential
+        {"$unwind": "$credentials"},
+        {
+            "$facet": {
+                # 1. Counts over policy_attributes key/value pairs
+                "key_value_counts": [
+                    {
+                        "$match": {
+                            "credentials.policy_attributes": {
+                                "$exists": True,
+                                "$ne": [],
+                            }
+                        }
+                    },
+                    {"$unwind": "$credentials.policy_attributes"},
+                    {
+                        "$group": {
+                            "_id": {
+                                "key": "$credentials.policy_attributes.key",
+                                "value": "$credentials.policy_attributes.value",
+                            },
+                            "count": {"$sum": 1},
+                        }
+                    },
+                    {"$sort": {"count": -1, "_id.key": 1, "_id.value": 1}},
+                ],
+                # 2. Counts over ip_identity (per credential)
+                "ip_identity_counts": [
+                    {
+                        "$group": {
+                            "_id": "$credentials.ip_identity",
+                            "count": {"$sum": 1},
+                        }
+                    },
+                    {"$sort": {"_id": 1}},
+                ],
+                # 3. Counts over commitment_attributes (per attribute string)
+                "commitment_attribute_counts": [
+                    {
+                        "$match": {
+                            "credentials.commitment_attributes": {
+                                "$exists": True,
+                                "$ne": [],
+                            }
+                        }
+                    },
+                    {"$unwind": "$credentials.commitment_attributes"},
+                    {
+                        "$group": {
+                            "_id": "$credentials.commitment_attributes",
+                            "count": {"$sum": 1},
+                        }
+                    },
+                    {"$sort": {"count": -1, "_id": 1}},
+                ],
+            }
+        },
+    ]
+    result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
+
+    raw_kv = result[0]["key_value_counts"]
+    raw_ip = result[0]["ip_identity_counts"]
+    raw_commit = result[0]["commitment_attribute_counts"]
+
+    # Convert to Python dicts
+    kv_counts = {(d["_id"]["key"], d["_id"]["value"]): d["count"] for d in raw_kv}
+
+    ip_counts = {d["_id"]: d["count"] for d in raw_ip}
+    commitment_counts = {d["_id"]: d["count"] for d in raw_commit}
+    if len(result) > 0:
+        result = CCD_BlockItemSummary(**result[0])
+    else:
+        result = None
+
+    return pre_pre_cooldown_accounts

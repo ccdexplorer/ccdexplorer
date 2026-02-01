@@ -43,10 +43,10 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
                 contracts_with_tag_info[contract] = MongoTypeTokensTag(**token_tag)
         self.contracts_with_tag_info = contracts_with_tag_info
 
-    def read_nightly_accounts(self):
-        result = self.connections.mongodb.mainnet[Collections.nightly_accounts].find({})
-        self.nightly_accounts_by_account_id = {x["_id"]: x for x in list(result)}
-        self.nightly_accounts_by_account_index = {x["index"]: x for x in list(result)}
+    def read_stable_address_info(self):
+        result = self.connections.mongodb.mainnet[Collections.stable_address_info].find({})
+        self.stable_address_info_by_account_id = {x["_id"]: x for x in list(result)}
+        self.stable_address_info_by_account_index = {x["account_index"]: x for x in list(result)}
 
     def read_payday_last_blocks_validated(self):
         pp = [{"$sort": {"date": -1}}, {"$limit": 1}]
@@ -120,7 +120,7 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
         self.read_users_from_collection()
 
     async def async_read_nightly_accounts(self, context: ContextTypes.DEFAULT_TYPE):
-        self.read_nightly_accounts()
+        self.read_stable_address_info()
 
     async def async_read_payday_last_blocks_validated(self, context: ContextTypes.DEFAULT_TYPE):
         self.read_payday_last_blocks_validated()
@@ -136,7 +136,7 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
         self.full_blocks_to_process: list[CCD_BlockComplete] = []
         self.event_queue: list[NotificationEvent] = []
         self.missed_rounds_by_id = {}
-        self.read_nightly_accounts()
+        self.read_stable_address_info()
         self.read_payday_last_blocks_validated()
         self.labeled_accounts = {
             x["account_index"]: MongoLabeledAccount(**x)

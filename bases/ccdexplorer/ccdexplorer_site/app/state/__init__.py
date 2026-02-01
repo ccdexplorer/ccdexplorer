@@ -98,23 +98,6 @@ def get_blocks_per_day(
     return req.app.blocks_per_day
 
 
-async def get_nightly_accounts(app):
-    if (
-        (
-            dt.datetime.now().astimezone(dt.timezone.utc) - app.nightly_accounts_last_requested
-        ).total_seconds()
-        < 60
-    ) and (app.nightly_accounts_by_account_id):
-        pass
-    else:
-        result = app.mongodb.mainnet[Collections.nightly_accounts].find({})
-        app.nightly_accounts_by_account_id = {x["_id"][:29]: x for x in list(result)}
-        # req.app.nightly_accounts_by_account_index = {x["index"]: x for x in list(result)}
-        app.nightly_accounts_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
-
-    return app.nightly_accounts_by_account_id
-
-
 async def get_exchange_rates(
     req: Request,
 ):

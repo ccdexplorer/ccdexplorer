@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import datetime as dt
+from ccdexplorer.domain.credential import Credentials
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -42,8 +42,8 @@ class StandardIdentifiers(Enum):
 
 
 class CredentialShort(BaseModel):
-    created_at: dt.date
-    valid_to: dt.date
+    created_at: str
+    valid_to: str
     ip_id: int
 
 
@@ -52,34 +52,12 @@ class AccountInfoStable(BaseModel):
     account_index: int
     account_threshold: int
     credential_count: int
-    credentials: dict[int, CredentialShort]
+    credentials: list
 
     @classmethod
     def from_account_info(cls, ai: CCD_AccountInfo) -> "AccountInfoStable":
-        credentials = {}
-        for cred_id, cred in ai.credentials.items():
-            if cred.initial is not None:
-                policy: CCD_Policy = cred.initial.policy
-                ip_identity_credential = cred.initial.ip_id
-            else:
-                assert cred.normal is not None
-                policy: CCD_Policy = cred.normal.policy
-                ip_identity_credential = cred.normal.ip_id
-            credential_creation_date = dt.date(
-                policy.created_at.year,
-                policy.created_at.month,
-                getattr(policy.created_at, "day", 1),
-            )
-            credential_valid_to_date = dt.date(
-                policy.valid_to.year,
-                policy.valid_to.month,
-                getattr(policy.valid_to, "day", 1),
-            )
-            credentials[cred_id] = CredentialShort(
-                created_at=credential_creation_date,
-                valid_to=credential_valid_to_date,
-                ip_id=ip_identity_credential,
-            )
+        credentials = Credentials().determine_id_providers(ai.credentials)
+
         return cls(
             account_address=ai.address,
             account_index=ai.index,

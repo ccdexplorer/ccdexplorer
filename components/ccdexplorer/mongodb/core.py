@@ -127,6 +127,7 @@ class Collections(Enum):
     plts_links = "plts_links"
     plts_tags = "plts_tags"
     celery_taskmeta = "celery_taskmeta"
+    stable_address_info = "stable_address_info"
 
 
 class CollectionsUtilities(Enum):
