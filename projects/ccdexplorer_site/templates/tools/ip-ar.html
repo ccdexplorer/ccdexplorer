@@ -1,10 +1,13 @@
     <div class="card-body p-2">
         <div class="clearfix mt-2">
-            <div class="card-header ">Name: <b>{{ provider.description.name}}</b>  
+            <div class="card-header ">Name: <b>{{ provider.description.name}}</b>  {% if provider_type == 'ip' %}
+                (Used for <span class="ccd">{{ ip_counts[provider.identity|string]|round_x_decimal_with_comma(0)}}</span> credentials)
+            {% endif %}
             <br/>
             <div>Url: <a href = '{{ provider.description.url}}'>{{ provider.description.url}}</a></div>
             <br/>
             <div>Description: {{ provider.description.description}}</div>
+            
             </div>
         </div>
         

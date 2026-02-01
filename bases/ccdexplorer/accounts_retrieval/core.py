@@ -299,16 +299,10 @@ class Daily:
         ]
 
         try:
-            self.mongodb.mainnet[Collections.nightly_accounts].delete_many(
-                {"account": {"$exists": True}}
-            )
-            self.mongodb.mainnet[Collections.nightly_accounts].insert_many(all_records)
-
-            self.tooter.send(
-                channel=TooterChannel.NOTIFIER,
-                message=f"Accounts Retrieval: Nightly accounts saved to MongoDB for {self.date}.",
-                notifier_type=TooterType.INFO,
-            )
+            # self.mongodb.mainnet[Collections.nightly_accounts].delete_many(
+            #     {"account": {"$exists": True}}
+            # )
+            # self.mongodb.mainnet[Collections.nightly_accounts].insert_many(all_records)
 
             queue = []
             for account in self.ai_stable_results:
@@ -319,6 +313,12 @@ class Daily:
                     queue = []
             if len(queue) > 0:
                 self.send_queue_to_mongodb_stable_address_info(queue)
+
+            self.tooter.send(
+                channel=TooterChannel.NOTIFIER,
+                message=f"Accounts Retrieval: Stable addresses saved to MongoDB for {self.date}.",
+                notifier_type=TooterType.INFO,
+            )
 
         except Exception as e:
             print(e)
@@ -339,7 +339,7 @@ class Daily:
             )
             self.tooter.send(
                 channel=TooterChannel.NOTIFIER,
-                message=f"Accounts Retrieval: Nightly accounts pushed and helper updated for {self.date}.",
+                message=f"Accounts Retrieval: Stable addresses pushed and helper updated for {self.date}.",
                 notifier_type=TooterType.INFO,
             )
         except Exception as e:

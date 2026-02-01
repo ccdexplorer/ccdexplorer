@@ -42,17 +42,22 @@
         
     <li class="nav-item" role="presentation">
       <button class="nav-link active explorer bg-secondary-subtle" id="pills-ip-tab" data-bs-toggle="pill" data-bs-target="#pills-ip" type="button" role="tab" aria-controls="pills-ip" aria-selected="true">
-        <span class="tab-text-large">Identity Providers</span><span class="tab-text-small">ID Providers</span>
+        <span class="tab-text-large">Identity Providers</span><span class="tab-text-small">ID</span>
     </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link  explorer bg-secondary-subtle" id="pills-ar-tab" data-bs-toggle="pill" data-bs-target="#pills-ar" type="button" role="tab" aria-controls="pills-ar" aria-selected="true">
-          <span class="tab-text-large">Anonymity Revokers</span><span class="tab-text-small">Anonymity Revokers</span>
+          <span class="tab-text-large">Anonymity Revokers</span><span class="tab-text-small">AR</span>
       </button>
       </li>
       <li class="nav-item" role="presentation">
         <button class="nav-link  explorer bg-secondary-subtle" id="pills-chain-tab" data-bs-toggle="pill" data-bs-target="#pills-chain" type="button" role="tab" aria-controls="pills-chain" aria-selected="true">
-          <span class="tab-text-large">Protocol Updates</span><span class="tab-text-small">Protocol Updates</span>
+          <span class="tab-text-large">Protocol Updates</span><span class="tab-text-small">Protocol</span>
+      </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link  explorer bg-secondary-subtle" id="pills-credentials-tab" data-bs-toggle="pill" data-bs-target="#pills-credentials" type="button" role="tab" aria-controls="pills-credentials" aria-selected="true">
+          <span class="tab-text-large">Credentials</span><span class="tab-text-small">Credentials</span>
       </button>
       </li>
 </ul>
@@ -63,6 +68,7 @@
       <div class="row mt-4">
         <div class=" col-md-12  col-sm-12">
           <div class="border curved-border" >
+            {% set provider_type = 'ip' %}
             {% for provider in ip %}
                 {% include "/tools/ip-ar.html" %}
                 {%endfor %}
@@ -75,6 +81,7 @@
         <div class="row mt-4">
           <div class=" col-md-12  col-sm-12">
             <div class="border curved-border" >
+              {% set provider_type = 'ar' %}
               {% for provider in ar %}
                   {% include "/tools/ip-ar.html" %}
                   {%endfor %}
@@ -93,6 +100,20 @@
                 {% include "base/tabulator/tabulator-txs.html" %}
          
               
+            </div>
+          </div>  
+          
+        </div>
+      </div>
+      <div class="tab-pane fade show " id="pills-credentials" role="tabpanel" aria-labelledby="pills-credentials-tab" tabindex="0">
+        <div class="row mt-4">
+          <div class=" col-md-12  col-sm-12">
+            <div class="border curved-border" >
+              {% set ccd_tabulator_table ='commitments'%}
+                {% set tabulator_ajax_url = '/'+net+"/ajax_commitment_attributes"%}
+                {% set filename='chain-commitments.csv' %}
+                {% include "base/tabulator/tabulator-commitments.html" %}
+         
             </div>
           </div>  
           

@@ -312,6 +312,13 @@ async def chain_information(
     )
     ar = api_result.return_value if api_result.ok else []
 
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/credentials/ip-usage-summary",
+        httpx_client,
+    )
+    credential_summary = api_result.return_value if api_result.ok else {}
+    ip_counts = credential_summary.get("ip_identity_counts", {})
+
     return request.app.templates.TemplateResponse(
         "tools/chain-information.html",
         {
@@ -320,9 +327,57 @@ async def chain_information(
             "user": user,
             "ar": ar,
             "ip": ip,
-            "net": "mainnet",
+            "ip_counts": ip_counts,
+            "net": net,
             "tx_type_translation_from_python": tx_type_translation_for_js(),
         },
+    )
+
+
+@router.get(
+    "/{net}/ajax_commitment_attributes",
+    response_class=HTMLResponse | RedirectResponse,
+)
+async def ajax_commitment_attributes_tabulator(
+    request: Request,
+    net: str,
+    page: int = Query(),
+    size: int = Query(),
+    tags: dict = Depends(get_labeled_accounts),
+    # tags_community: dict = Depends(get_community_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/credentials/commitment-attributes-summary",
+        httpx_client,
+    )
+    commitment_attributes_result = api_result.return_value if api_result.ok else {}
+    commitment_attributes = commitment_attributes_result.get("commitment_attribute_counts", [])
+    # tb_made_up_rows = []
+    # for x in accounts["results"]:
+    #     account_made_up = account_link(
+    #         x["account_info"]["address"],
+    #         net,
+    #         user=user,
+    #         tags=tags,
+    #         app=request.app,
+    #     )
+
+    #     tb_made_up_rows.append(
+    #         create_dict_for_tabulator_display_for_business_accounts(
+    #             net, request.app, x["account_info"], account_made_up
+    #         )
+    #     )
+
+    total_rows = len(commitment_attributes)
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
+        {
+            "data": commitment_attributes,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
     )
 
 

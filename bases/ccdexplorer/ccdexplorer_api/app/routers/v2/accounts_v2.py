@@ -1304,18 +1304,18 @@ async def get_paginated_accounts(
 
 
 @router.get(
-    "/{net}/accounts/credential-summary",
+    "/{net}/accounts/credentials/commitment-attributes-summary",
     response_class=JSONResponse,
 )
-async def get_credential_summary(
+async def get_credential_commitment_attributes_summary(
     request: Request,
     net: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     grpcclient: GRPCClient = Depends(get_grpcclient),
     api_key: str = Security(API_KEY_HEADER),
-) -> list[CCD_AccountIndex]:
+) -> dict:
     """
-    Endpoint to get a summary of credential information for all accounts
+    Endpoint to get a summary of credential commitment attributes information for all accounts
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
@@ -1329,39 +1329,6 @@ async def get_credential_summary(
         {"$unwind": "$credentials"},
         {
             "$facet": {
-                # 1. Counts over policy_attributes key/value pairs
-                "key_value_counts": [
-                    {
-                        "$match": {
-                            "credentials.policy_attributes": {
-                                "$exists": True,
-                                "$ne": [],
-                            }
-                        }
-                    },
-                    {"$unwind": "$credentials.policy_attributes"},
-                    {
-                        "$group": {
-                            "_id": {
-                                "key": "$credentials.policy_attributes.key",
-                                "value": "$credentials.policy_attributes.value",
-                            },
-                            "count": {"$sum": 1},
-                        }
-                    },
-                    {"$sort": {"count": -1, "_id.key": 1, "_id.value": 1}},
-                ],
-                # 2. Counts over ip_identity (per credential)
-                "ip_identity_counts": [
-                    {
-                        "$group": {
-                            "_id": "$credentials.ip_identity",
-                            "count": {"$sum": 1},
-                        }
-                    },
-                    {"$sort": {"_id": 1}},
-                ],
-                # 3. Counts over commitment_attributes (per attribute string)
                 "commitment_attribute_counts": [
                     {
                         "$match": {
@@ -1385,18 +1352,53 @@ async def get_credential_summary(
     ]
     result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
 
-    raw_kv = result[0]["key_value_counts"]
-    raw_ip = result[0]["ip_identity_counts"]
     raw_commit = result[0]["commitment_attribute_counts"]
 
-    # Convert to Python dicts
-    kv_counts = {(d["_id"]["key"], d["_id"]["value"]): d["count"] for d in raw_kv}
+    commitment_counts = [{"commitment": d["_id"], "count": d["count"]} for d in raw_commit]
+    return {"commitment_attribute_counts": commitment_counts}
 
+
+@router.get(
+    "/{net}/accounts/credentials/ip-usage-summary",
+    response_class=JSONResponse,
+)
+async def get_credential_ip_usage_summary(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get a summary of credential IP usage information for all accounts
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    pipeline = [
+        # One row per credential
+        {"$unwind": "$credentials"},
+        {
+            "$facet": {
+                # 2. Counts over ip_identity (per credential)
+                "ip_identity_counts": [
+                    {
+                        "$group": {
+                            "_id": "$credentials.ip_identity",
+                            "count": {"$sum": 1},
+                        }
+                    },
+                    {"$sort": {"_id": 1}},
+                ],
+            }
+        },
+    ]
+    result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
+
+    raw_ip = result[0]["ip_identity_counts"]
     ip_counts = {d["_id"]: d["count"] for d in raw_ip}
-    commitment_counts = {d["_id"]: d["count"] for d in raw_commit}
-    if len(result) > 0:
-        result = CCD_BlockItemSummary(**result[0])
-    else:
-        result = None
-
-    return pre_pre_cooldown_accounts
+    return {"ip_identity_counts": ip_counts}

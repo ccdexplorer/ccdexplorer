@@ -1,0 +1,38 @@
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+<script>
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Commitment Attribute", field: "commitment", 
+        minWidth: 60,
+        // maxWidth: 60,
+        responsive: 0,
+        sorter: "number",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        
+      },
+      {
+        title: "Count", field: "count", 
+        minWidth: 100,
+        maxWidth: 100,
+        responsive: 50,
+        formatter: intFormatterRounded,
+        headerSort:false,
+        
+        hozAlign: "right", headerHozAlign: "right",
+        
+      },
+      
+    ];
+
+  
+  
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+  window["{{ccd_tabulator_table}}_default_sort_field"] = 'block_height';
+  window["{{ccd_tabulator_table}}_default_sort_field_direction"] = 'desc';
+</script>
+{% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
+{% include 'base/tabulator/tabulator-table-download-link.html' %}
