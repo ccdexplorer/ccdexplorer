@@ -23,6 +23,15 @@ import logging
 
 logging.getLogger("apscheduler").propagate = False
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://9e4d7daa546f8e53fae6a8ce4ba6cac0@o4503924901347328.ingest.us.sentry.io/4510815580389376",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
+
 if __name__ == "__main__":
     bot = Bot(
         Connections(tooter=tooter, mongodb=mongodb, mongomoter=mongomotor, grpcclient=grpcclient)

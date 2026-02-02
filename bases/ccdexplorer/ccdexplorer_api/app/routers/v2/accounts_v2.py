@@ -1325,34 +1325,28 @@ async def get_credential_commitment_attributes_summary(
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
 
     pipeline = [
-        # One row per credential
         {"$unwind": "$credentials"},
         {
-            "$facet": {
-                "commitment_attribute_counts": [
-                    {
-                        "$match": {
-                            "credentials.commitment_attributes": {
-                                "$exists": True,
-                                "$ne": [],
-                            }
-                        }
-                    },
-                    {"$unwind": "$credentials.commitment_attributes"},
-                    {
-                        "$group": {
-                            "_id": "$credentials.commitment_attributes",
-                            "count": {"$sum": 1},
-                        }
-                    },
-                    {"$sort": {"count": -1, "_id": 1}},
-                ],
+            "$match": {
+                "credentials.commitment_attributes": {
+                    "$exists": True,
+                    "$ne": [],
+                }
             }
         },
+        {"$unwind": "$credentials.commitment_attributes"},
+        {
+            "$group": {
+                # if you want key + value:
+                "_id": "$credentials.commitment_attributes.key",
+                "count": {"$sum": 1},
+            }
+        },
+        {"$sort": {"count": -1, "_id": 1}},
     ]
     result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
 
-    raw_commit = result[0]["commitment_attribute_counts"]
+    raw_commit = result
 
     commitment_counts = [{"commitment": d["_id"], "count": d["count"]} for d in raw_commit]
     return {"commitment_attribute_counts": commitment_counts}

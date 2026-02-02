@@ -25,6 +25,7 @@ dependencies = [
     "requests",
     "apprise",
     "py-graphql-client",
+    "sentry-sdk[fastapi]>=2.41.0",
     "chardet",
     "pre-commit",
     "cbor2",

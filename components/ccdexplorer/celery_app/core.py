@@ -1,12 +1,14 @@
 from __future__ import annotations
-import os
-from celery import Celery
-from ccdexplorer.env import REDIS_URL, RUN_ON_NET
-import datetime as dt
-from ccdexplorer.mongodb import Collections, MongoDB
 
-from typing import Optional, Literal
-from pydantic import BaseModel, Field, ConfigDict
+import datetime as dt
+import os
+from typing import Literal, Optional
+
+import sentry_sdk
+from ccdexplorer.env import REDIS_URL, RUN_ON_NET
+from ccdexplorer.mongodb import Collections, MongoDB
+from celery import Celery
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskResult(BaseModel):
@@ -38,6 +40,13 @@ class TaskResult(BaseModel):
         doc = self.model_dump(by_alias=True, exclude_none=True)
         return doc
 
+
+sentry_sdk.init(
+    dsn="https://514fe6c4c0481f29c21e71f1b7ad2755@o4503924901347328.ingest.us.sentry.io/4510817932935168",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
 
 RESULT_MONGO_DB = "concordium_mainnet" if RUN_ON_NET == "mainnet" else "concordium_testnet"
 
