@@ -1101,7 +1101,8 @@ def account_address_is_alias(account_address: str, net: str, app) -> bool:
     account_address_entry = app.addresses_to_indexes_complete[net].get(account_address[:29], None)  # type: ignore
     if isinstance(account_address_entry, CCD_AccountInfo):
         is_alias = account_address_entry.address != account_address
-
+    elif isinstance(account_address_entry, AccountInfoStable):
+        is_alias = account_address_entry.account_address != account_address
     else:
         if not account_address_entry:
             return False

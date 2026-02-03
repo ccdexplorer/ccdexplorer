@@ -45,7 +45,7 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
 
     def read_stable_address_info(self):
         result = self.connections.mongodb.mainnet[Collections.stable_address_info].find({})
-        self.stable_address_info_by_account_id = {x["_id"]: x for x in list(result)}
+        self.stable_address_info_by_account_id = {x["account_address"]: x for x in list(result)}
         self.stable_address_info_by_account_index = {x["account_index"]: x for x in list(result)}
 
     def read_payday_last_blocks_validated(self):
