@@ -107,11 +107,7 @@ async def request_ajax_source_module(
 
     df.columns = ["date", "transaction_count"]
     df["date"] = pd.to_datetime(df["date"])
-    df = (
-        df.groupby([pd.Grouper(key="date", axis=0, freq="W-MON", label="left", closed="left")])
-        .sum()
-        .reset_index()
-    )
+    df = df.groupby([pd.Grouper(key="date", freq="W-MON", label="left", closed="left")]).sum().reset_index()
 
     rng = [
         "#AE7CF7",

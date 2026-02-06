@@ -159,9 +159,7 @@ async def statistics_plt_transfers(
     }
 
     df_per_day = (
-        df_per_day.groupby(
-            [pd.Grouper(key="date", axis=0, freq=letter, label="left", closed="left")]  # type: ignore
-        )
+        df_per_day.groupby([pd.Grouper(key="date", freq=letter, label="left", closed="left")])  # type: ignore
         .agg(agg_map)
         .reset_index()
     )
