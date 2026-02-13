@@ -11,8 +11,9 @@ function txTypeFormatter(cell){
   const key = cell.getValue();
   const map = tx_type_translation[key];
   if(!map) return ""; 
+  const row = cell.getRow().getData();
 
-  let icon;
+  let icon = "";
   switch(map.category){
     case "smart_contract":
       icon = `<i style="color:${map.color}" class="bi bi-card-checklist"></i>`;
@@ -40,6 +41,12 @@ function txTypeFormatter(cell){
                      src="/static/logos/small-logo-grey.png"
                      height="16" width="16">`;
       break;
+  }
+
+  const isSponsored = Boolean(row.sponsored);
+  
+  if (isSponsored && map.category !== "chain") {
+    icon = `<i title="Sponsored Account Transaction" style="color:#F6DB9A;" class="bi bi-people-fill"></i> ${icon}`;
   }
 
   return `${icon} <span class="tx_type text-secondary-emphasis">${map.display_str}</span>`;

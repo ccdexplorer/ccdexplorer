@@ -430,7 +430,10 @@ def tx_type_translator(
                 icon = '<img class="tiny-logo" src="/static/logos/small-logo-grey.png" alt="small-logo" height="16px" width="16px">'
 
             if sponsor and result.category != TypeContentsCategories.chain:
-                return '<i style="color:#F6DB9A;" class="bi bi-people-fill"></i> ' + icon
+                return (
+                    '<i title="Sponsored Account Transaction" style="color:#F6DB9A;" class="bi bi-people-fill"></i> '
+                    + icon
+                )
             else:
                 return icon
         else:
@@ -1168,7 +1171,9 @@ def account_link(
         if isinstance(value, str):
             tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i>{value[:4]}'
         else:
-            tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i>{value}'
+            tag_label = (
+                f'<i class="bi bi-person-bounding-box pe-1"></i><span class="ccd">{value}</span>'
+            )
 
         return f'<a class="" href="/{net}/account/{value}">{tag_label}</a>'
 
@@ -1181,7 +1186,9 @@ def account_link(
             else:
                 tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value[:4]}</span>'
         else:
-            tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value}</span>'
+            tag_label = (
+                f'<i class="bi bi-person-bounding-box pe-1"></i><span class="ccd">{value}</span>'
+            )
 
     if wallet_contract_address:
         return_string = f'<a class="" href="/{net}/smart-wallet/{wallet_contract_address.index}/{wallet_contract_address.subindex}/{value}">{tag_label}</a>'
@@ -2307,6 +2314,9 @@ def create_dict_for_tabulator_display(
     #     classified_tx.transaction.block_info.slot_time.isoformat()
     # )
     return {
+        "sponsored": classified_tx.transaction.account_transaction.sponsor is not None
+        if classified_tx.transaction.account_transaction
+        else False,
         "human_age": f"{humanize_age(classified_tx.transaction.block_info.slot_time)}",
         "timestamp": f'<span class="ccd">{classified_tx.transaction.block_info.slot_time:%H:%M:%S}</span>',
         "transaction_block_info_slot_time": classified_tx.transaction.block_info.slot_time.isoformat(),

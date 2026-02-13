@@ -1110,6 +1110,9 @@ class MakeUp:
                 elif effects.data_registered is not None:
                     try:
                         data_decoded = cbor2.loads(bytes.fromhex(effects.data_registered))
+                        if "hash" in data_decoded:
+                            if isinstance(data_decoded["hash"], bytes):
+                                data_decoded["hash"] = data_decoded["hash"].hex()
                     except Exception:
                         data_decoded = None
                     if data_decoded is None:
@@ -1124,7 +1127,7 @@ class MakeUp:
                     new_event = EventType(
                         "Data Registered",
                         f"{shorten_address(effects.data_registered)}",
-                        f"<span class='ccd'>{data_decoded if isinstance(data_decoded, dict) and data_decoded is not None else ''}</span>",
+                        data_decoded if isinstance(data_decoded, dict) else None,
                     )
 
                 if new_event and (len(self.events_list) == 0):

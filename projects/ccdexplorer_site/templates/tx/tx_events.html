@@ -14,11 +14,19 @@
                     <br><span class="  parameter">{{event.update | safe}}</span>
                     {% endif %}
                     {% if event.emit %}
-                    <br><span class=" parameter">{{event.emit | safe}}</span>
+                    <br>
+                    {% if event.emit is mapping %}
+                            
+                                <pre class="ccd">{{ event.emit | tojson(indent=2) }}</pre>
+                            {% else %}
+                    <span class=" parameter">{{event.emit | safe}}</span>
+                    {% endif %}
                     {% endif %}
                 </td>
             </tr>
+            
             {% if event.logged_events %}
+           
             {% for logged_event in event.logged_events %}
             <tr class=" sm-text">
                 {% if events_list|length > 1%}
@@ -28,8 +36,19 @@
                     {% if logged_event.update %}
                     <br><span class="text-muted">{{logged_event.update | safe}}</span>
                     {% endif %}
+                    
                     {% if logged_event.emit %}
-                    <br><span class="text-muted">{{logged_event.emit | safe}}</span>
+                    
+                        <br>
+                        <span class="text-muted">
+                            
+                            {% if logged_event.emit is mapping %}
+                            
+                                <pre class="ccd">{{ logged_event.emit | tojson(indent=2) }}</pre>
+                            {% else %}
+                                {{ logged_event.emit | safe }}
+                            {% endif %}
+                        </span>
                     {% endif %}
                 </td>
             </tr>
