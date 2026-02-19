@@ -43,6 +43,7 @@ dependencies = [
     "gitpython>=3.1.45",
     "polars>=1.34.0",
     "prometheus-client",
+    "sentry-sdk[fastapi]>=2.41.0",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]

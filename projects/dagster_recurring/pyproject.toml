@@ -41,6 +41,7 @@ dependencies = [
     "dagster-docker>=0.27.14",
     "dagster-celery>=0.28.7",
     "prometheus-client",
+    "sentry-sdk[fastapi]>=2.41.0",
 ]
 
 [tool.hatch.build.hooks.polylith-bricks]
