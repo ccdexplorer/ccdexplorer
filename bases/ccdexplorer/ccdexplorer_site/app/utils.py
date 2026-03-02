@@ -1289,13 +1289,31 @@ def shorten_address(value, address=None):
 
 def decode_memo(hex: str):
     raw = bytes.fromhex(hex)
+
+    # 1. Try CBOR
     try:
         return cbor2.loads(raw)
     except Exception:
-        try:
-            return json.loads(raw.decode("utf-8"))
-        except Exception:
-            return raw
+        pass
+
+    # 2. Try JSON
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except Exception:
+        pass
+
+    # 3. Try to extract ASCII tail
+    # Find the longest ASCII suffix
+    i = len(raw)
+    while i > 0 and 32 <= raw[i - 1] <= 126:
+        i -= 1
+    ascii_tail = raw[i:].decode("ascii", errors="ignore")
+
+    if ascii_tail:
+        return ascii_tail
+
+    # 4. Fallback: return raw bytes
+    return raw
 
 
 def parse_account_or_contract(key, value, net, user, tags, app):
