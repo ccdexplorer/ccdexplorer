@@ -21,13 +21,38 @@ def update_tx_types_count_hourly(
                 "block_info.slot_time": {"$gte": start, "$lt": end},
             }
         },
-        # First: count per type
-        {"$group": {"_id": "$type.contents", "count": {"$sum": 1}}},
+        # First: count per type, plus sponsored-only count per type.
+        {
+            "$group": {
+                "_id": "$type.contents",
+                "count": {"$sum": 1},
+                "sponsored_count": {
+                    "$sum": {
+                        "$cond": [
+                            {
+                                "$and": [
+                                    {"$ne": [{"$ifNull": ["$account_transaction", None]}, None]},
+                                    {
+                                        "$ne": [
+                                            {"$ifNull": ["$account_transaction.sponsor", None]},
+                                            None,
+                                        ]
+                                    },
+                                ]
+                            },
+                            1,
+                            0,
+                        ]
+                    }
+                },
+            }
+        },
         # Then: fold into a single document with an array of k/v pairs
         {
             "$group": {
                 "_id": None,
                 "counts_kv": {"$push": {"k": "$_id", "v": "$count"}},
+                "sponsored_counts_kv": {"$push": {"k": "$_id", "v": "$sponsored_count"}},
                 "total": {"$sum": "$count"},
             }
         },
@@ -36,6 +61,15 @@ def update_tx_types_count_hourly(
             "$project": {
                 "_id": 0,
                 "counts": {"$arrayToObject": "$counts_kv"},
+                "sponsored_counts": {
+                    "$arrayToObject": {
+                        "$filter": {
+                            "input": "$sponsored_counts_kv",
+                            "as": "item",
+                            "cond": {"$gt": ["$$item.v", 0]},
+                        }
+                    }
+                },
                 "total": 1,
             }
         },
@@ -47,6 +81,7 @@ def update_tx_types_count_hourly(
         # No transactions in this period
         dd = {
             "counts": {},
+            "sponsored_counts": {},
             "total": 0,
         }
     else:
