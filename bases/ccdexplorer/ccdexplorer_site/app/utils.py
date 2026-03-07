@@ -2331,6 +2331,18 @@ def create_dict_for_tabulator_display(
     # classified_tx.transaction.block_info.slot_time = (
     #     classified_tx.transaction.block_info.slot_time.isoformat()
     # )
+    cost = 0
+    if classified_tx.transaction.account_transaction:
+        cost = (
+            classified_tx.transaction.account_transaction.cost
+            if classified_tx.transaction.account_transaction
+            else 0
+        )
+        cost = (
+            classified_tx.transaction.account_transaction.sponsor.cost
+            if classified_tx.transaction.account_transaction.sponsor
+            else cost
+        )
     return {
         "sponsored": classified_tx.transaction.account_transaction.sponsor is not None
         if classified_tx.transaction.account_transaction
@@ -2338,11 +2350,7 @@ def create_dict_for_tabulator_display(
         "human_age": f"{humanize_age(classified_tx.transaction.block_info.slot_time)}",
         "timestamp": f'<span class="ccd">{classified_tx.transaction.block_info.slot_time:%H:%M:%S}</span>',
         "transaction_block_info_slot_time": classified_tx.transaction.block_info.slot_time.isoformat(),
-        "transaction_account_transaction_cost": (
-            classified_tx.transaction.account_transaction.cost
-            if classified_tx.transaction.account_transaction
-            else 0
-        ),
+        "transaction_account_transaction_cost": cost,
         "transaction_type_contents": f"{classified_tx.transaction.type.contents}{'-' + classified_tx.transaction.type.additional_data if classified_tx.transaction.type.additional_data else ''}",
         "plt_event": classified_tx.transaction.type.additional_data,
         # "transaction": classified_tx.transaction.model_dump(
