@@ -722,7 +722,7 @@ async def transactions_by_type_page(
     user: SiteUser | None = await get_user_detailsv2(request)
 
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/transaction_types", httpx_client
+        f"{request.app.api_url}/v2/{net}/transaction_types/all", httpx_client
     )
     tx_type_counts = api_result.return_value if api_result.ok else None
     tx_type_counts = {x["_id"]: x["count"] for x in tx_type_counts}  # type: ignore
@@ -749,6 +749,25 @@ async def transactions_by_type_page(
     )
 
 
+@router.get("/{net}/ajax_transaction_type_counts", response_class=JSONResponse)
+async def ajax_transaction_type_counts(
+    request: Request,
+    net: str,
+    sponsored: bool = False,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    if sponsored:
+        api_url = f"{request.app.api_url}/v2/{net}/transaction_types/sponsored"
+    else:
+        api_url = f"{request.app.api_url}/v2/{net}/transaction_types/all"
+
+    api_result = await get_url_from_api(api_url, httpx_client)
+    tx_type_counts = api_result.return_value if api_result.ok else []
+    tx_type_counts = {x["_id"]: x["count"] for x in tx_type_counts}
+
+    return tx_type_counts
+
+
 ##########################
 class SortItem(BaseModel):
     field: str
@@ -758,7 +777,7 @@ class SortItem(BaseModel):
 class FilterItem(BaseModel):
     field: str
     type: str
-    value: str
+    value: str | bool
 
 
 class TabulatorRequest(BaseModel):
@@ -780,21 +799,35 @@ async def get_account_transactions_for_tabulator(
     user: SiteUser | None = await get_user_detailsv2(request)
     page = body.page
     size = body.size
-    filters = body.filter
+    filters = body.filter or []
     skip = (page - 1) * size
 
     if len(filters) == 0:
-        filters.append(
-            FilterItem(
-                field="type",
-                type="like",
-                value="transfers",
-            )
+        filters.extend(
+            [
+                FilterItem(
+                    field="type",
+                    type="=",
+                    value="initial",
+                ),
+                FilterItem(
+                    field="sponsored",
+                    type="=",
+                    value="false",
+                ),
+            ]
         )
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/transactions/{size}/{skip}/{filters[0].value}",
+    filters = [x.model_dump(exclude_none=True) for x in filters]
+    api_result = await post_url_from_api(
+        f"{request.app.api_url}/v2/{net}/transactions/{size}/{skip}",
         httpx_client,
+        json_post_content={"filter": filters},
     )
+
+    # api_result = await get_url_from_api(
+    #     f"{request.app.api_url}/v2/{net}/transactions/{size}/{skip}/{filters[0].value}",
+    #     httpx_client,
+    # )
     latest_txs_result = api_result.return_value if api_result.ok else None
     if not latest_txs_result:
         error = f"Request error getting the most recent transactions on {net}."

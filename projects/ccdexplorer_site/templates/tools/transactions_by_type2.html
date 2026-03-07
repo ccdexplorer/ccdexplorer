@@ -16,7 +16,7 @@
                         id="tx_type_contents_selector"
                         name="tx_type_contents_selector"
                         >
-                        <option disabled>Account Creation</option>
+                        <!-- <option disabled>Account Creation</option>
                         <option value="initial">Initial ({{tx_type_counts["initial"]|millify}})</option>
                         <option value="normal">Normal ({{tx_type_counts["normal"]|millify}})</option>
                         <option disabled>──────────</option>
@@ -58,15 +58,20 @@
                                 {{ tx_type|replace('_', ' ')|title }} {% if tx_type in tx_type_counts%}({{tx_type_counts[tx_type]|millify}}){%endif%}
                             </option>
                             {% endif %}
-                        {% endfor %}
+                        {% endfor %} -->
                         </select>
-
+<input type="checkbox" class="form-check-input" id="sponsored-filter"  />
+<label for="sponsored-filter">Show only Sponsored Txs</label>      
             </div> 
-          
+    
         </div>
           
-    </div>
-        
+    
+    
+        <!-- <select class="form-select form-select-sm search_selector_filter_types text-start"  id="sponsored-filter"> -->
+   </div>
+    
+
     <div id="results">
             {% set ccd_tabulator_table ='transactions_by_type_table'%}
             {% set tabulator_ajax_url = '/'+net+'/ajax_last_transactions_by_type/'%}
@@ -75,22 +80,231 @@
 
           </div>
           <p class="sm-text small text-secondary-emphasis">(Tx counts updated every hour)</p>
+
+
+
+<script>
+// const tx_type_translation = {{ tx_type_translation_from_python | tojson }};
+console.log(tx_type_translation)
+let currentTxTypeCounts = {{ tx_type_counts | tojson }};
+function formatCount(count) {
+    const n = count ?? 0;
+
+    if (n < 1000) {
+        return n.toLocaleString("en");
+    }
+
+    return new Intl.NumberFormat("en", {
+        notation: "compact",
+        compactDisplay: "short",
+        maximumFractionDigits: 1,
+    }).format(n);
+}
+
+function makeOption(value, label, count, selected = false) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.selected = selected;
+    option.textContent = `${label} (${formatCount(count)})`;
+    return option;
+}
+
+function makeDisabledOption(label) {
+    const option = document.createElement("option");
+    option.disabled = true;
+    option.textContent = label;
+    return option;
+}
+
+function txLabel(txType) {
+    return txType.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function shouldRenderTxType(txType, counts) {
+    if (!transactionFilterState.sponsored) {
+        return true;
+    }
+    return (counts[txType] ?? 0) > 0;
+}
+
+function rebuildTypeSelector(counts, selectedValue) {
+    const select = document.getElementById("tx_type_contents_selector");
+    if (!select) return;
+
+    const previousValue = selectedValue || select.value;
+    const sponsoredOnly = transactionFilterState.sponsored;
+
+    select.innerHTML = "";
+
+    if (!sponsoredOnly) {
+        select.appendChild(makeDisabledOption("Account Creation"));
+
+        select.appendChild(
+            makeOption(
+                "initial",
+                "Initial",
+                counts["initial"] ?? 0,
+                previousValue === "initial"
+            )
+        );
+
+        select.appendChild(
+            makeOption(
+                "normal",
+                "Normal",
+                counts["normal"] ?? 0,
+                previousValue === "normal"
+            )
+        );
+
+        select.appendChild(makeDisabledOption("──────────"));
+
+        select.appendChild(makeDisabledOption("Chain Update"));
+
+        Object.keys(tx_type_translation).sort().forEach((txType) => {
+            if (tx_type_translation[txType].category == "chain") {
+                select.appendChild(
+                    makeOption(
+                        txType,
+                        txLabel(txType),
+                        counts[txType] ?? 0,
+                        previousValue === txType
+                    )
+                );
+            }
+        });
+
+        select.appendChild(makeDisabledOption("──────────"));
+    }
+
+    select.appendChild(makeDisabledOption("Account Transaction - Success"));
+
+    Object.keys(tx_type_translation).sort().forEach((txType) => {
+        if (
+            tx_type_translation[txType].category != "rejected" &&
+            tx_type_translation[txType].category != "chain"
+        ) {
+            if (!["initial", "normal"].includes(txType)) {
+                if (!shouldRenderTxType(txType, counts)) return;
+
+                select.appendChild(
+                    makeOption(
+                        txType,
+                        txLabel(txType),
+                        counts[txType] ?? 0,
+                        previousValue === txType
+                    )
+                );
+            }
+        }
+    });
+
+    select.appendChild(makeDisabledOption("──────────"));
+
+    select.appendChild(makeDisabledOption("Account Transaction - Rejected"));
+
+    Object.keys(tx_type_translation).sort().forEach((txType) => {
+        if (tx_type_translation[txType].category == "rejected") {
+            if (!shouldRenderTxType(txType, counts)) return;
+
+            select.appendChild(
+                makeOption(
+                    txType,
+                    txLabel(txType),
+                    counts[txType] ?? 0,
+                    previousValue === txType
+                )
+            );
+        }
+    });
+
+    const selectableOptions = [...select.options].filter((o) => !o.disabled);
+
+    if (selectableOptions.length === 0) {
+        transactionFilterState.type = "";
+        return;
+    }
+
+    const stillExists = selectableOptions.some((o) => o.value === previousValue);
+
+    if (stillExists) {
+        select.value = previousValue;
+        transactionFilterState.type = previousValue;
+    } else {
+        select.value = selectableOptions[0].value;
+        transactionFilterState.type = selectableOptions[0].value;
+    }
+}
+
+
+async function refreshTypeCounts() {
+    const url = `/${"{{ net }}"}/ajax_transaction_type_counts?sponsored=${transactionFilterState.sponsored}`;
+    const response = await fetch(url, {
+        method: "GET",
+        headers: {
+            "Accept": "application/json"
+        }
+    });
+
+    if (!response.ok) {
+        console.error("Failed to fetch tx type counts");
+        return;
+    }
+
+    currentTxTypeCounts = await response.json();
+    rebuildTypeSelector(currentTxTypeCounts, transactionFilterState.type);
+}
+
+const transactionFilterState = {
+    type: "initial",
+    sponsored: false,
+};
+
+function applyTransactionFilters() {
+    const table = window["{{ccd_tabulator_table}}_table"];
+    const filters = [];
+    filters.push({
+        field: "type",
+        type: "=",
+        value: transactionFilterState.type,
+    });
+    
+
+    filters.push({
+        field: "sponsored",
+        type: "=",
+        value: transactionFilterState.sponsored,
+    });
+    
+
+    // table.setPage(1);
+    table.setFilter(filters);
+}
+
+document.getElementById("tx_type_contents_selector")?.addEventListener("change", function () {
+    transactionFilterState.type = this.value;
+    applyTransactionFilters();
+});
+
+document.getElementById("sponsored-filter")?.addEventListener("change", async function () {
+    transactionFilterState.sponsored = this.checked;
+    await refreshTypeCounts();
+    applyTransactionFilters();
+});
+
+</script>
+
     <script>
         window.addEventListener('load', (event) => {
-            
-                const table = window["{{ccd_tabulator_table}}_table"];
+                let currentTxTypeCounts = {{ tx_type_counts | tojson }};
+             rebuildTypeSelector(currentTxTypeCounts, transactionFilterState.type);
                 const select = document.getElementById("tx_type_contents_selector");
-                table.setFilter("type", "=", select.value);
-                // table.setData("{{tabulator_ajax_url}}");
+               transactionFilterState.type = select.value;
+               const spon = document.getElementById("sponsored-filter");
+                transactionFilterState.sponsored = spon.checked;
+                applyTransactionFilters();
                 
         });
-        const doc = document.getElementById('tx_type_contents_selector');
-        doc.addEventListener('change', function() {
-            // Reset requested_page to 1
-            const table = window["{{ccd_tabulator_table}}_table"];
-            table.setFilter("type", "=", this.value);
-        
-        
-    });
+    
     </script>
 {% endblock %}

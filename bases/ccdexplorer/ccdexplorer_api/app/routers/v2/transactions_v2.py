@@ -15,6 +15,8 @@ from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,
 )
+from typing import Optional
+from pydantic import BaseModel
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
 )
@@ -61,10 +63,11 @@ def reverse_tx_type_translation(tx_type_translation: dict) -> dict:
 reversed_type_contents_dict = reverse_tx_type_translation(tx_type_translation)
 
 
-@router.get("/{net}/transaction_types", response_class=JSONResponse)
+@router.get("/{net}/transaction_types/{collection}", response_class=JSONResponse)
 async def get_transaction_types(
     request: Request,
     net: str,
+    collection: str,  # either all or sponsored
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
@@ -73,6 +76,7 @@ async def get_transaction_types(
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.
+        collection: str, either all or sponsored
         mongomotor: Mongo client dependency used to query the ``tx_types_count`` collection.
         api_key: API key extracted from the incoming request headers.
 
@@ -89,9 +93,10 @@ async def get_transaction_types(
         )
 
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    collection_to_get = "$counts" if collection != "sponsored" else "$sponsored_counts"
     pipeline = [
         # Turn {"counts": {"a": 2, "b": 5}} into [{"k":"a","v":2},{"k":"b","v":5}]
-        {"$project": {"_id": 0, "counts_kv": {"$objectToArray": "$counts"}}},
+        {"$project": {"_id": 0, "counts_kv": {"$objectToArray": collection_to_get}}},
         # One document per tx_type per hour
         {"$unwind": "$counts_kv"},
         # Sum across all hour/day docs
@@ -228,12 +233,14 @@ async def get_last_blocks_newer_than(
 
 
 @router.get("/{net}/transactions/{count}/{skip}/{filter}", response_class=JSONResponse)
+@router.get("/{net}/transactions/{count}/{skip}/{filter}/{collection}", response_class=JSONResponse)
 async def get_transactions_with_filter(
     request: Request,
     net: str,
     count: int,
     skip: int | None = None,
     filter: str | None = None,
+    collection: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -276,13 +283,22 @@ async def get_transactions_with_filter(
     else:
         filter_dict = {}
 
+    sponsored_match = None
+    if collection == "sponsored":
+        sponsored_match = {"$match": {"account_transaction.sponsor": {"$exists": True}}}
     try:
-        pipeline = [
-            {"$match": filter_dict} if filter_dict else {"$match": {}},
-            {"$sort": {"block_info.height": -1}},
-            {"$skip": skip} if skip else {"$skip": 0},
-            {"$limit": count},
-        ]
+        pipeline = [{"$match": filter_dict} if filter_dict else {"$match": {}}]
+
+        if sponsored_match:
+            pipeline.extend([sponsored_match])
+
+        pipeline.extend(
+            [
+                {"$sort": {"block_info.height": -1}},
+                {"$skip": skip} if skip else {"$skip": 0},
+                {"$limit": count},
+            ]
+        )
 
         result = await await_await(db_to_use, Collections.transactions, pipeline)
 
@@ -292,6 +308,120 @@ async def get_transactions_with_filter(
             ],
             "total_for_type": total_for_type,
             "tx_type": filter,
+        }
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error retrieving last {count} transactions on {net}, {error}.",
+        )
+
+
+class SortItem(BaseModel):
+    field: str
+    dir: str
+
+
+class FilterItem(BaseModel):
+    field: str
+    type: str
+    value: str | bool
+
+
+class TabulatorRequest(BaseModel):
+    filter: Optional[list[FilterItem]] = []
+
+
+@router.post("/{net}/transactions/{count}/{skip}", response_class=JSONResponse)
+async def post_transactions_with_filter(
+    request: Request,
+    net: str,
+    count: int,
+    skip: int,
+    body: TabulatorRequest,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Provide paginated transactions plus the total for an optional filter.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        count: Maximum number of transactions to return (capped at 500).
+        skip: Starting offset inside the sorted list.
+        filter: Optional category key from ``tx_type_translation`` to restrict the query.
+        mongomotor: Mongo client dependency used to reach the ``transactions`` collection.
+        api_key: API key extracted from the incoming request headers.
+
+    Returns:
+        A dictionary containing the serialized transactions plus the total count for the filter.
+
+    Raises:
+        HTTPException: If the network is unsupported or the database query fails.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=404,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    count = min(500, max(count, 1))
+    filters = body.filter or []
+    type_filter = any([x.field == "type" for x in filters])
+    total_for_type = 0
+    filters_dict = {x.field: x.value for x in filters}
+    filters_dict["type"] = "no_tx" if filters_dict["type"] == "" else filters_dict["type"]
+    filter_on_sponsored = filters_dict["sponsored"] is True
+    if type_filter:
+        filter_dict = {"type.contents": filters_dict["type"]}
+        pipeline_total = [
+            {
+                "$match": {
+                    f"{'sponsored_' if filter_on_sponsored else ''}counts.{filters_dict['type']}": {
+                        "$exists": True
+                    }
+                }
+            },
+            {
+                "$group": {
+                    "_id": None,
+                    "count": {
+                        "$sum": f"${'sponsored_' if filter_on_sponsored else ''}counts.{filters_dict['type']}"
+                    },
+                }
+            },
+            {"$project": {"_id": 0, "count": 1}},
+        ]
+        agg = await await_await(db_to_use, Collections.tx_types_count, pipeline_total, 1)
+        total_for_type = agg[0]["count"] if agg else 0
+    else:
+        filter_dict = {}
+
+    sponsored_match = None
+    if filter_on_sponsored:
+        sponsored_match = {"$match": {"account_transaction.sponsor": {"$exists": True}}}
+    try:
+        pipeline = [{"$match": filter_dict} if filter_dict else {"$match": {}}]
+
+        if sponsored_match:
+            pipeline.extend([sponsored_match])
+
+        pipeline.extend(
+            [
+                {"$sort": {"block_info.height": -1}},
+                {"$skip": skip} if skip else {"$skip": 0},
+                {"$limit": count},
+            ]
+        )
+
+        result = await await_await(db_to_use, Collections.transactions, pipeline)
+
+        return {
+            "transactions": [
+                CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in result
+            ],
+            "total_for_type": total_for_type,
+            "tx_type": filters_dict["type"],
         }
     except Exception as error:
         raise HTTPException(
