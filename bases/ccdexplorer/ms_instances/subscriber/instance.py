@@ -114,12 +114,12 @@ class Instance:
     async def process_upgraded_instance(
         self, net: NET, upgraded_effect: CCD_ContractTraceElement_Upgraded
     ):
-        self.motor_mainnet: dict[Collections, Collection]
-        self.motor_testnet: dict[Collections, Collection]
+        self.mainnet: dict[Collections, Collection]
+        self.testnet: dict[Collections, Collection]
         self.grpc_client: GRPCClient
         self.tooter: Tooter
 
-        db_to_use = self.motor_testnet if net == "testnet" else self.motor_mainnet
+        db_to_use = self.testnet if net == "testnet" else self.mainnet
 
         instance_as_class = db_to_use[Collections.instances].find_one(
             {"_id": upgraded_effect.address.to_str()}
