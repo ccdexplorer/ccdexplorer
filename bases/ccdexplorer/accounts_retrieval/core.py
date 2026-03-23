@@ -34,8 +34,12 @@ class Account:
         self.process_grpc_account_info()
 
     def process_grpc_account_info(self):
-        ai: CCD_AccountInfo = self.grpcclient.get_account_info(self.block_hash, self.account)
-        self.ai_stable: AccountInfoStable = AccountInfoStable.from_account_info(ai)
+        try:
+            ai: CCD_AccountInfo = self.grpcclient.get_account_info(self.block_hash, self.account)
+            self.ai_stable: AccountInfoStable = AccountInfoStable.from_account_info(ai)
+        except Exception as e:
+            print(self.block_hash, self.account, e)
+            exit()
         if ai.tokens is not None:
             self.tokens = {}
             self.tokens["account_address"] = self.account

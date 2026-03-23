@@ -48,7 +48,7 @@ class RepoResource(dg.ConfigurableResource):
         repo_dir = REPO_DIR
         if ON_SERVER:
             repo_dir = "/home/git_dir"
-        print(f"Using repo-dir: {REPO_DIR}")
+
         repo = Repo(repo_dir)
         origin = repo.remote(name="origin")
         _ = origin.pull()
