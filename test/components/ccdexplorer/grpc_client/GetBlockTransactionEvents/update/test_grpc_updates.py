@@ -140,3 +140,17 @@ def test_tx_update_level2_keys_2(grpcclient: GRPCClient):
 
     payload = tx.update.payload
     assert payload.level_1_update.level_2_keys_update_v1.parameter_cooldown.access_threshold == 7
+
+
+def test_tx_update_root_keys(grpcclient: GRPCClient):
+    block_hash = "4d534cf70077e27aab13fe28de898ca3f4c84d6cecc9a6d0e98fe95bbff0d6b8"
+    tx = tx_at_index_from(0, block_hash, grpcclient, NET.TESTNET)
+
+    # TODO: this needs more assertions (but it's a very long list...)
+    # assert tx.hash == "3f0ec87d5081f73a8492ed84ffad93bcbb313ee2e77ba49254326e0596ead8a2"
+    # # assert tx.type == {"type": "update", "contents": "level_1_update"}
+    # assert tx.type.type == "update"
+    # assert tx.type.contents == "level_1_update"
+
+    # payload = tx.update.payload
+    # assert payload.level_1_update.level_2_keys_update_v1.parameter_cooldown.access_threshold == 7

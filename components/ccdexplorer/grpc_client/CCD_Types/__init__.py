@@ -2086,10 +2086,10 @@ class CCD_RootUpdate(BaseModel):
         level_2_keys_update_v1 (Optional[CCD_AuthorizationsV1]): The level 2 keys were updated. This is similar to level_2_keys_update_v0 except that a few more keys can be updated.
     """
 
-    root_keys_update: CCD_HigherLevelKeys
-    level_1_keys_update: CCD_HigherLevelKeys
-    level_2_keys_update_v0: CCD_AuthorizationsV0
-    level_2_keys_update_v1: CCD_AuthorizationsV1
+    root_keys_update: Optional[CCD_HigherLevelKeys] = None
+    level_1_keys_update: Optional[CCD_HigherLevelKeys] = None
+    level_2_keys_update_v0: Optional[CCD_AuthorizationsV0] = None
+    level_2_keys_update_v1: Optional[CCD_AuthorizationsV1] = None
 
 
 class CCD_Level1Update(BaseModel):

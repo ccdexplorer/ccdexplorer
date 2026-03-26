@@ -184,3 +184,10 @@ def test_tx_account_info_cooldown_P7_2(grpcclient: GRPCClient):
     # assert ai.cooldowns[0].status == CoolDownStatus.PRE_PRE_COOLDOWN
     # assert ai.cooldowns[0].amount == 12500000000
     # assert ai.address == "38BkoGvD3EPiChHjWJ55Do6zSn8QugJFhGyhdB9ybowSqPi8Ta"
+
+
+def test_tx_account_info_coin98(grpcclient: GRPCClient):
+    account = "4B1KVztfVJRSE9ki6ALGfXJbjHX3tag3VQ7KjrHB5uJrXEzb3x"
+    block_hash = "last_final"
+    ai = grpcclient.get_account_info(block_hash, hex_address=account, net=NET.MAINNET)
+    print(ai)
