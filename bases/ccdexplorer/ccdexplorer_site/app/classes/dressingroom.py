@@ -1335,11 +1335,19 @@ class MakeUp:
                 )
                 self.events_list.append(new_event)
 
+            elif t.update.payload.root_update:
+                new_event = EventType(
+                    "Root Keys Update",
+                    f"Effective Time: {eff}",
+                    self._payload_details_for_display(t.update.payload.root_update),
+                )
+                self.events_list.append(new_event)
+
             elif t.update.payload.level_1_update:
                 new_event = EventType(
                     "Level 1 Keys Update",
-                    f"Effective Time: {eff}<br>",
-                    None,
+                    f"Effective Time: {eff}",
+                    self._payload_details_for_display(t.update.payload.level_1_update),
                 )
                 self.events_list.append(new_event)
 
@@ -1389,6 +1397,18 @@ class MakeUp:
                 )
                 self.events_list.append(new_event)
 
+            if len(self.events_list) == 0:
+                payload_dict = t.update.payload.model_dump(exclude_none=True)
+                if payload_dict:
+                    payload_name, payload_value = next(iter(payload_dict.items()))
+                    self.events_list.append(
+                        EventType(
+                            self._payload_title_for_display(payload_name),
+                            f"Effective Time: {eff}",
+                            payload_value,
+                        )
+                    )
+
             self.classifier = TransactionClassifier.Chain
 
             self.dct = dct
@@ -1425,6 +1445,16 @@ class MakeUp:
 
     def determine_if_we_show_events(self):
         return self.makeup_request.requesting_route == RequestingRoute.transaction
+
+    def _payload_details_for_display(self, payload):
+        if payload is None or not hasattr(payload, "model_dump"):
+            return None
+
+        return payload.model_dump(exclude_none=True)
+
+    def _payload_title_for_display(self, payload_name: str) -> str:
+        label = payload_translation.get(payload_name, payload_name.replace("_", " "))
+        return f"{label.title()} Update"
 
     async def try_logged_event_parsing(
         self,
