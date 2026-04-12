@@ -16,8 +16,8 @@ from ccdexplorer.env import API_TOKEN
 # bump
 grpcclient = GRPCClient()
 tooter = Tooter()
-mongodb = MongoDB(tooter)
-mongomotor = MongoMotor(tooter)
+mongodb = MongoDB(tooter, caller_name="bot")
+mongomotor = MongoMotor(tooter, caller_name="bot")
 
 import logging
 

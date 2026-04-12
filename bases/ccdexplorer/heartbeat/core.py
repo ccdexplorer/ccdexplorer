@@ -23,8 +23,8 @@ console = Console()
 grpcclient = GRPCClient()
 tooter = Tooter()
 
-mongodb = MongoDB(tooter)
-motormongo = MongoMotor(tooter)
+mongodb = MongoDB(tooter, caller_name=f"heartbeat on {RUN_ON_NET}")
+motormongo = MongoMotor(tooter, caller_name=f"heartbeat on {RUN_ON_NET}")
 
 heartbeat = Heartbeat(grpcclient, tooter, mongodb, motormongo, RUN_ON_NET)
 

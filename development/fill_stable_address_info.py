@@ -9,7 +9,7 @@ from pymongo import ReplaceOne
 from rich import print
 
 tooter = Tooter()
-mongodb = MongoDB(tooter)
+mongodb = MongoDB(tooter, caller_name=__name__)
 grpc_client = GRPCClient()
 
 net = "mainnet"

@@ -26,8 +26,8 @@ from redis.asyncio import Redis
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter, nearest=True)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_block_analyser")
+mongodb = MongoDB(tooter, nearest=True, caller_name="ms_block_analyser")
 
 
 class Settings(BaseModel):

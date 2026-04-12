@@ -17,7 +17,7 @@ class MongoDBResource(dg.ConfigurableResource):
 
     def get_client(self) -> MongoDB:
         tooter: Tooter = Tooter()
-        mongodb: MongoDB = MongoDB(tooter, nearest=True)
+        mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_paydays")
         return mongodb
 
 

@@ -8,9 +8,6 @@ from ..nightrunner.utils import (
     write_queue_to_collection,
 )
 
-# tooter: Tooter = Tooter()
-# mongodb: MongoDB = MongoDB(tooter, nearest=True)
-
 
 def perform_data_for_tx_types(context, d_date: str, mongodb: MongoDB) -> dict:
     """

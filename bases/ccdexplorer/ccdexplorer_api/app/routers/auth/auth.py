@@ -15,7 +15,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pymongo import ReplaceOne
 
 tooter = Tooter()
-motormongo = MongoMotor(tooter)
+motormongo = MongoMotor(tooter, caller_name="api_auth")
 
 
 router = APIRouter(prefix="/auth", include_in_schema=False)

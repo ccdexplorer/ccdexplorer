@@ -23,8 +23,8 @@ warnings.simplefilter("ignore", CPendingDeprecationWarning)
 logger = get_task_logger(__name__)
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_instances")
+mongodb = MongoDB(tooter, caller_name="ms_instances")
 subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
 #################################################
 processor_for_consumer = "contract"

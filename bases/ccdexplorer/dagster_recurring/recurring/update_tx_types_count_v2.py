@@ -102,7 +102,7 @@ def update_tx_types_count_hourly(
 
 
 tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True)
+mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="update_tx_types_count_hourly")
 
 
 if __name__ == "__main__":

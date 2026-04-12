@@ -3,7 +3,7 @@ from ccdexplorer.mongodb import MongoDB, Collections
 from ccdexplorer.tooter import Tooter
 
 tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True)
+mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="materialize_external_asset")
 
 instance = dg.DagsterInstance.get()
 for x in mongodb.mainnet[Collections.paydays].find({}).sort("date", 1):

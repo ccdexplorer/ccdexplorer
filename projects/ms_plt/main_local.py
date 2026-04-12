@@ -14,8 +14,8 @@ from rich.progress import track
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_plt")
+mongodb = MongoDB(tooter, caller_name="ms_plt")
 net = "mainnet"
 blocks = [37211558]
 db = mongodb.mainnet if net == "mainnet" else mongodb.testnet

@@ -6,7 +6,7 @@ from ccdexplorer.mongodb import (
 from ccdexplorer.tooter import Tooter
 
 tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True)
+mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_recurring")
 
 net_partition = dg.StaticPartitionsDefinition(["mainnet", "testnet"])
 hourly_partition = dg.HourlyPartitionsDefinition(

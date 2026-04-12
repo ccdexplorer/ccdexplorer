@@ -5,8 +5,8 @@ import asyncio
 import pickle
 
 tooter = Tooter()
-motormongo = MongoMotor(tooter)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, caller_name="get_addresses")
+mongodb = MongoDB(tooter, caller_name="get_addresses")
 
 
 async def main():

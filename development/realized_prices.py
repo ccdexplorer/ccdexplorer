@@ -44,7 +44,7 @@ def _():
 
 @app.cell
 def _(MongoDB):
-    mongodb = MongoDB(None)
+    mongodb = MongoDB(None, caller_name=__name__)
     return (mongodb,)
 
 

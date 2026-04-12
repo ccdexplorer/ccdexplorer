@@ -1,3 +1,4 @@
+import inspect
 from enum import Enum
 from typing import Dict
 
@@ -11,6 +12,29 @@ from ccdexplorer.env import MONGO_URI
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 
 console = Console()
+
+
+def _resolve_caller_name(caller_name: str | None) -> str:
+    if caller_name:
+        return caller_name
+
+    frame = inspect.currentframe()
+    try:
+        outer_frame = frame.f_back.f_back if frame and frame.f_back else None
+        if outer_frame is None:
+            return "<unknown>"
+        return outer_frame.f_globals.get("__name__", "<unknown>")
+    finally:
+        del frame
+
+
+def _build_connection_error_message(
+    client_name: str, caller_name: str, error: Exception
+) -> str:
+    return (
+        "BOT ERROR! Cannot connect to MongoDB, "
+        f"caller_name={caller_name}, client={client_name}, with error: {error}"
+    )
 
 
 class Collections(Enum):
@@ -174,8 +198,14 @@ class CollectionsUtilities(Enum):
 
 
 class MongoDB:
-    def __init__(self, tooter: Tooter, nearest: bool = False):
-        self.tooter: Tooter = tooter
+    def __init__(
+        self,
+        tooter: Tooter | None,
+        nearest: bool = False,
+        caller_name: str | None = None,
+    ):
+        self.tooter = tooter
+        self.caller_name = _resolve_caller_name(caller_name)
         try:
             if nearest:
                 con = MongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
@@ -205,17 +235,25 @@ class MongoDB:
 
             console.log(con.server_info()["version"])
         except Exception as e:
-            print(e)
-            tooter.send(
-                channel=TooterChannel.NOTIFIER,
-                message=f"BOT ERROR! Cannot connect to MongoDB, with error: {e}",
-                notifier_type=TooterType.MONGODB_ERROR,
-            )
+            message = _build_connection_error_message("MongoDB", self.caller_name, e)
+            print(message)
+            if self.tooter is not None:
+                self.tooter.send(
+                    channel=TooterChannel.NOTIFIER,
+                    message=message,
+                    notifier_type=TooterType.MONGODB_ERROR,
+                )
 
 
 class MongoMotor:
-    def __init__(self, tooter: Tooter, nearest: bool = False):
-        self.tooter: Tooter = tooter
+    def __init__(
+        self,
+        tooter: Tooter | None,
+        nearest: bool = False,
+        caller_name: str | None = None,
+    ):
+        self.tooter = tooter
+        self.caller_name = _resolve_caller_name(caller_name)
         try:
             if nearest:
                 con = AsyncMongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
@@ -239,12 +277,14 @@ class MongoMotor:
                 self.utilities[collection] = self.utilities_db[collection.value]
             # console.log(f'Motor: {con.server_info()["version"]}')
         except Exception as e:
-            print(e)
-            tooter.send(
-                channel=TooterChannel.NOTIFIER,
-                message=f"BOT ERROR! Cannot connect to Motor MongoDB, with error: {e}",
-                notifier_type=TooterType.MONGODB_ERROR,
-            )
+            message = _build_connection_error_message("MongoMotor", self.caller_name, e)
+            print(message)
+            if self.tooter is not None:
+                self.tooter.send(
+                    channel=TooterChannel.NOTIFIER,
+                    message=message,
+                    notifier_type=TooterType.MONGODB_ERROR,
+                )
 
 
 def build_collection_identifier(namespace: str, collection: Collections):

@@ -28,8 +28,8 @@ processor = "plt"
 # Instantiate once per worker process
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_plt")
+mongodb = MongoDB(tooter, caller_name="ms_plt")
 
 
 @shared_task(

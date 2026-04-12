@@ -10,7 +10,7 @@ from ccdexplorer.env import RUN_ON_NET
 from ccdexplorer.tooter import Tooter
 
 tooter = Tooter()
-mongodb = MongoDB(tooter)
+mongodb = MongoDB(tooter, caller_name=__name__)
 grpc_client = GRPCClient()
 
 net = RUN_ON_NET

@@ -6,7 +6,7 @@ from ccdexplorer.mongodb import (
 from ccdexplorer.tooter import Tooter
 
 tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True)
+mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_paydays")
 
 token_list = [
     x["_id"].replace("w", "")

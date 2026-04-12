@@ -16,7 +16,7 @@ from ccdexplorer.env import RUN_ON_NET
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-mongodb = MongoDB(tooter, nearest=True)
+mongodb = MongoDB(tooter, nearest=True, caller_name="ms_modules")
 block_heights: List[int] = [39566930]
 db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
 # pipeline = [
@@ -35,8 +35,8 @@ async def main() -> None:
     # Build dependencies (same as in main.py)
     grpcclient = GRPCClient()
     tooter = Tooter()
-    motormongo = MongoMotor(tooter, nearest=True)
-    mongodb = MongoDB(tooter)
+    motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_modules")
+    mongodb = MongoDB(tooter, caller_name="ms_modules")
     concordium_client = ConcordiumClient(tooter=tooter)
     subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb, concordium_client)
 

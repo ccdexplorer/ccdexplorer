@@ -12,8 +12,8 @@ from ccdexplorer.env import RUN_ON_NET
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-mongodb = MongoDB(tooter)
-motormongo = MongoMotor(tooter, nearest=True)
+mongodb = MongoDB(tooter, caller_name="ms_instances")
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_instances")
 subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
 db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
 

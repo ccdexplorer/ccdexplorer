@@ -15,8 +15,8 @@ from env import RUN_ON_NET
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_metadata")
+mongodb = MongoDB(tooter, caller_name="ms_metadata")
 
 token_addresses: List[str] = ["<9484,0>-7e2efe07"]
 
@@ -44,8 +44,8 @@ async def main() -> None:
     # Same dependencies as the worker
     grpcclient = GRPCClient()
     tooter = Tooter()
-    motormongo = MongoMotor(tooter, nearest=True)
-    mongodb = MongoDB(tooter)
+    motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_metadata")
+    mongodb = MongoDB(tooter, caller_name="ms_metadata")
 
     subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
     await subscriber.init_sessions()

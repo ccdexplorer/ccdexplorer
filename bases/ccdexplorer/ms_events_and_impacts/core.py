@@ -25,8 +25,8 @@ warnings.simplefilter("ignore", CPendingDeprecationWarning)
 logger = get_task_logger(__name__)
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_events_and_impacts")
+mongodb = MongoDB(tooter, caller_name="ms_events_and_impacts")
 subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
 subscriber.redis = Redis.from_url(REDIS_URL, db=0, decode_responses=False)  # type: ignore
 #################################################

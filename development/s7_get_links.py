@@ -18,7 +18,7 @@ def _():
     from optparse import OptionParser
     import requests
     import inspect
-    mongodb = MongoDB(None)
+    mongodb = MongoDB(None, caller_name=__name__)
     grpc_client = GRPCClient()
     cis = CIS(grpc_client)
     from rich import print

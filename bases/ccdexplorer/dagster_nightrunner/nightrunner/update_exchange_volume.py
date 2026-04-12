@@ -4,9 +4,6 @@ import requests
 from dateutil import parser
 from ..nightrunner.utils import AnalysisType, write_queue_to_collection
 
-# tooter: Tooter = Tooter()
-# mongodb: MongoDB = MongoDB(tooter, nearest=True)
-
 
 def perform_data_for_exchange_volume(context, d_date: str, mongodb: MongoDB) -> dict:
     """Fetch CCD exchange volume from CoinGecko and store it in MongoDB."""

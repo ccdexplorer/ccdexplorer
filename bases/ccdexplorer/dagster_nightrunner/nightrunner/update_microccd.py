@@ -7,9 +7,6 @@ from ..nightrunner.utils import (
     write_queue_to_collection,
 )
 
-# tooter: Tooter = Tooter()
-# mongodb: MongoDB = MongoDB(tooter, nearest=True)
-
 
 def get_hash_from_date(date: str, mongodb: MongoDB) -> str:
     result = mongodb.mainnet[Collections.blocks_per_day].find_one({"date": date})

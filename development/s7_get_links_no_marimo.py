@@ -27,7 +27,7 @@ for i in erc_1155_v1_contracts:
     s7_contract_to_erc_version[i] = "erc1155_v1"
 
 
-mongodb = MongoDB(None)  # type: ignore
+mongodb = MongoDB(None, caller_name=__name__)  # type: ignore
 grpc_client = GRPCClient()
 cis = CIS(grpc_client)
 

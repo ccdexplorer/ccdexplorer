@@ -36,8 +36,8 @@ def _build_heartbeat(net: str):
 
     grpcclient = GRPCClient()
     tooter = Tooter()
-    mongodb = MongoDB(tooter)
-    motormongo = MongoMotor(tooter)
+    mongodb = MongoDB(tooter, caller_name="heartbeat")
+    motormongo = MongoMotor(tooter, caller_name="heartbeat")
     return Heartbeat(grpcclient, tooter, mongodb, motormongo, net)
 
 

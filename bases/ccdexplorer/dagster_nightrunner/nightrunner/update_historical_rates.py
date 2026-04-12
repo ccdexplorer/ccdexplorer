@@ -11,7 +11,7 @@ from ccdexplorer.tooter import Tooter
 from pymongo import ReplaceOne
 
 tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True)
+mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="historical_rates")
 
 
 async def get_token_translations_from_mongo() -> dict[str, str]:

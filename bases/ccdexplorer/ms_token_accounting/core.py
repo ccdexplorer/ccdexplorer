@@ -24,8 +24,8 @@ warnings.simplefilter("ignore", CPendingDeprecationWarning)
 logger = get_task_logger(__name__)
 grpcclient = GRPCClient()
 tooter = Tooter()
-motormongo = MongoMotor(tooter, nearest=True)
-mongodb = MongoDB(tooter)
+motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_token_accounting")
+mongodb = MongoDB(tooter, caller_name="ms_token_accounting")
 heartbeat = Heartbeat(grpcclient, tooter, mongodb, motormongo, RUN_ON_NET)  # type: ignore
 #################################################
 processor_for_consumer = "token_accounting"

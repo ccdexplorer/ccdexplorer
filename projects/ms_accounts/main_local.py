@@ -22,8 +22,8 @@ async def main() -> None:
     # Reuse the same dependencies your worker uses
     grpcclient = GRPCClient()
     tooter = Tooter()
-    motormongo = MongoMotor(tooter, nearest=True)
-    mongodb = MongoDB(tooter)
+    motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_accounts")
+    mongodb = MongoDB(tooter, caller_name="ms_accounts")
 
     subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
 

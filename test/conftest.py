@@ -45,13 +45,13 @@ def tooter() -> Tooter:
 @pytest.fixture(scope="session")
 def motormongo(tooter) -> MongoMotor:
     """Provide a MongoMotor using the Tooter."""
-    return MongoMotor(tooter, nearest=True)
+    return MongoMotor(tooter, nearest=True, caller_name=__name__)
 
 
 @pytest.fixture(scope="session")
 def mongodb(tooter) -> MongoDB:
     """Provide a MongoDB instance using the Tooter."""
-    return MongoDB(tooter)
+    return MongoDB(tooter, caller_name=__name__)
 
 
 @pytest.fixture(scope="session")
@@ -109,10 +109,10 @@ def build_test_app(
 @pytest.fixture
 def test_app(mongodb, motormongo, grpcclient, tooter):
     def mongo_factory():
-        return MongoDB(Tooter())  # each test gets its own fresh instances
+        return MongoDB(Tooter(), caller_name=__name__)  # each test gets its own fresh instances
 
     def motor_factory():
-        return MongoMotor(Tooter(), nearest=True)
+        return MongoMotor(Tooter(), nearest=True, caller_name=__name__)
 
     def grpc_factory():
         return GRPCClient()

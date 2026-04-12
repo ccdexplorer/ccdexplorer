@@ -18,7 +18,7 @@ def _():
     import requests
     import inspect
 
-    mongodb = MongoDB(None)
+    mongodb = MongoDB(None, caller_name=__name__)
     grpc_client = GRPCClient()
     cis = CIS(grpc_client)
     return (

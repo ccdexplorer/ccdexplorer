@@ -16,8 +16,8 @@ from ccdexplorer.env import ON_SERVER
 
 grpcclient = GRPCClient()
 tooter = Tooter()
-mongodb = MongoDB(tooter)
-motormongo = MongoMotor(tooter)
+mongodb = MongoDB(tooter, caller_name="accounts_retrieval")
+motormongo = MongoMotor(tooter, caller_name="accounts_retrieval")
 
 
 if __name__ == "__main__":

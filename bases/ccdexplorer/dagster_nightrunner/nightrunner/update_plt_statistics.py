@@ -176,13 +176,3 @@ def perform_plt_statistics_update(
     write_queue_to_collection(mongodb, queue, analysis)
     context.log.info(f"info: {contents}")
     return {"dct": contents}
-
-
-# tooter: Tooter = Tooter()
-# mongodb: MongoDB = MongoDB(tooter, nearest=True)
-# grpcclient: GRPCClient = GRPCClient()
-
-
-# if __name__ == "__main__":
-#     d_date = "2025-12-10"  # (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-#     perform_plt_statistics_update(None, d_date, mongodb, grpcclient)

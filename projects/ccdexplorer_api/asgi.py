@@ -10,8 +10,8 @@ HERE = Path(__file__).resolve().parent
 grpcclient = GRPCClient()
 tooter = Tooter()
 
-mongodb = MongoDB(tooter, nearest=True)
-motormongo = MongoMotor(tooter)
+mongodb = MongoDB(tooter, nearest=True, caller_name="api")
+motormongo = MongoMotor(tooter, caller_name="api")
 app_settings = AppSettings(
     static_dir=HERE / "static",
     templates_dir=HERE / "templates",
