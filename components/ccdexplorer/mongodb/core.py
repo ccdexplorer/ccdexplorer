@@ -28,11 +28,9 @@ def _resolve_caller_name(caller_name: str | None) -> str:
         del frame
 
 
-def _build_connection_error_message(
-    client_name: str, caller_name: str, error: Exception
-) -> str:
+def _build_connection_error_message(client_name: str, caller_name: str, error: Exception) -> str:
     return (
-        "BOT ERROR! Cannot connect to MongoDB, "
+        "Cannot connect to MongoDB, "
         f"caller_name={caller_name}, client={client_name}, with error: {error}"
     )
 
