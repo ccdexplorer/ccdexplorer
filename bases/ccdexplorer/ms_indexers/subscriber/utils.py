@@ -57,15 +57,17 @@ class Utils:
     def get_sum_amount_from_scheduled_transfer(
         self,
         schedule: list[CCD_NewRelease],
-    ) -> int:
+    ) -> int | str:
         total = 0
+        found_str_amount = False
 
         for release in schedule:
             amount = release.amount
 
             if isinstance(amount, str):
+                found_str_amount = True
                 amount = int(amount)
 
             total += amount
 
-        return total
+        return str(total) if found_str_amount else total

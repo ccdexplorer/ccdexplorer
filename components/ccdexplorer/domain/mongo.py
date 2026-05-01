@@ -467,7 +467,7 @@ class AccountStatementTransferType(BaseModel):
         counterparty (str): The counterparty involved in the transfer.
     """
 
-    amount: microCCD
+    amount: microCCD | str
     counterparty: str
 
 

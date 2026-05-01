@@ -117,13 +117,13 @@ class ImpactedAddresses(Utils):
         self,
         tx: CCD_BlockItemSummary,
         impacted_addresses_in_tx: dict[str, MongoImpactedAddress],
-        amount: microCCD,
+        amount: microCCD | str,
         sender: str,
         receiver: str,
         plt_token_id: str | None = None,
     ):
         # first add to sender balance_movement
-        if amount > 0:
+        if int(amount) > 0:
             balance_movement = AccountStatementEntryType(
                 transfer_out=[
                     AccountStatementTransferType(
@@ -140,7 +140,7 @@ class ImpactedAddresses(Utils):
         )
 
         # then to the receiver balance_movement
-        if amount > 0:
+        if int(amount) > 0:
             balance_movement = AccountStatementEntryType(
                 transfer_in=[
                     AccountStatementTransferType(

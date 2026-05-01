@@ -35,7 +35,7 @@ class ClassificationResult:
         self.tx_hash: Optional[str] = None
         self.memo: Optional[str] = None
         self.contract: Optional[str] = None
-        self.amount: Optional[int] = None
+        self.amount: Optional[int | str] = None
         self.type: Optional[CCD_TransactionType | None] = None
         self.contents: Optional[str] = None
         self.accounts_involved_all: bool = False
