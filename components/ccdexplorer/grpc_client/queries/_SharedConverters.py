@@ -254,6 +254,11 @@ class Mixin(Protocol):
     def convertType(self, value) -> Any:
         # these types have a property `value` that we need to return unmodified
         if type(value) in self.value_property_types:
+            if type(value) is Amount:
+                MONGO_INT64_MAX = 9_223_372_036_854_775_807
+                if value.value > MONGO_INT64_MAX:
+                    return str(value.value)
+
             return value.value
 
         if isinstance(value, bytes):
@@ -1124,7 +1129,7 @@ class Mixin(Protocol):
 
         return CCD_TokenModuleRejectReason(**result)
 
-    def convertRejectReason(self, message) -> CCD_RejectReason:
+    def convertRejectReason(self, message) -> tuple[dict, str]:
         result = {}
         _type = None
         for field, value in message.ListFields():
@@ -1262,6 +1267,21 @@ class Mixin(Protocol):
                 result[key] = self.convertDuplicateCredIds(value)
         return result, _type
 
+    # def stringify_large_amount(self, d: dict) -> dict:
+    #     MONGO_INT64_MAX = 9_223_372_036_854_775_807
+    #     if not d:
+    #         return d
+
+    #     inner = next(iter(d.values()))
+
+    #     if isinstance(inner, dict):
+    #         amount = inner.get("amount")
+
+    #         if isinstance(amount, int) and amount > MONGO_INT64_MAX:
+    #             inner["amount"] = str(amount)
+
+    #     return d
+
     def convertRejectReasonNone(self, message) -> CCD_AccountTransactionEffects_None:
         result = {}
         _type = None
@@ -1272,6 +1292,9 @@ class Mixin(Protocol):
                 result[key] = self.convertType(value)
 
             elif type(value) is RejectReason:
-                result[key], _type = self.convertRejectReason(value)
+                intermediate_result, _type = self.convertRejectReason(value)
+                # intermediate_result = self.stringify_large_amount(intermediate_result)
+
+                result[key] = intermediate_result
 
         return CCD_AccountTransactionEffects_None(**result), _type

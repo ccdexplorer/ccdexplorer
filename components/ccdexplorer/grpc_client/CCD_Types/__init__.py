@@ -621,7 +621,9 @@ class CCD_RejectReason_AmountTooLarge(BaseModel):
     """
 
     address: CCD_Address
-    amount: microCCD
+    amount: (
+        microCCD | str
+    )  # this is microCCD, but if the amount is too large, we get 8-bit error in MongoDB
 
 
 class CCD_RejectReason_RejectedInit(BaseModel):
@@ -822,7 +824,7 @@ class CCD_StakePendingChange_Reduce(BaseModel):
         effective_time (CCD_TimeStamp): The time at which the reduction takes effect.
     """
 
-    new_stake: microCCD
+    new_stake: microCCD | str
     effective_time: CCD_TimeStamp
 
 
@@ -850,7 +852,7 @@ class CCD_BakerStakePendingChange_Reduce(BaseModel):
         effective_time (CCD_TimeStamp): The time at which the reduction takes effect.
     """
 
-    reduced_equity_capital: microCCD
+    reduced_equity_capital: microCCD | str
     effective_time: CCD_TimeStamp
 
 
@@ -892,7 +894,7 @@ class CCD_DelegatorInfo(BaseModel):
     """
 
     account: CCD_AccountAddress
-    stake: microCCD
+    stake: microCCD | str
     pending_change: Optional[CCD_StakePendingChange] = None
 
 
@@ -907,7 +909,7 @@ class CCD_DelegatorRewardPeriodInfo(BaseModel):
     """
 
     account: CCD_AccountAddress
-    stake: microCCD
+    stake: microCCD | str
 
 
 class CCD_CurrentPaydayStatus(BaseModel):
@@ -927,13 +929,13 @@ class CCD_CurrentPaydayStatus(BaseModel):
         missed_rounds (Optional[int]): Number of rounds missed by the validator.
     """
 
-    baker_equity_capital: microCCD
+    baker_equity_capital: microCCD | str
     blocks_baked: int
-    delegated_capital: microCCD
-    effective_stake: microCCD
+    delegated_capital: microCCD | str
+    effective_stake: microCCD | str
     finalization_live: bool
     lottery_power: float
-    transaction_fees_earned: microCCD
+    transaction_fees_earned: microCCD | str
     is_primed_for_suspension: Optional[bool] = None
     missed_rounds: Optional[int] = None
 
@@ -969,10 +971,10 @@ class CCD_BakerRewardPeriodInfo(BaseModel):
     """
 
     baker: CCD_BakerInfo
-    effective_stake: microCCD
+    effective_stake: microCCD | str
     commission_rates: CCD_CommissionRates
-    equity_capital: microCCD
-    delegated_capital: microCCD
+    equity_capital: microCCD | str
+    delegated_capital: microCCD | str
     is_finalizer: bool
 
 
@@ -1010,7 +1012,7 @@ class CCD_PoolInfo(BaseModel):
         is_suspended (Optional[bool]): Whether the pool is suspended.
     """
 
-    all_pool_total_capital: microCCD
+    all_pool_total_capital: microCCD | str
     address: CCD_AccountAddress
     equity_capital: Optional[microCCD] = None
     baker: int
@@ -1036,10 +1038,10 @@ class CCD_PassiveDelegationInfo(BaseModel):
         commission_rates (CCD_CommissionRates): The commission rates charged by the passive delegation pool.
     """
 
-    all_pool_total_capital: microCCD
-    delegated_capital: microCCD
-    current_payday_transaction_fees_earned: microCCD
-    current_payday_delegated_capital: microCCD
+    all_pool_total_capital: microCCD | str
+    delegated_capital: microCCD | str
+    current_payday_transaction_fees_earned: microCCD | str
+    current_payday_delegated_capital: microCCD | str
     commission_rates: CCD_CommissionRates
 
 
@@ -1156,7 +1158,7 @@ class CCD_ContractInitializedEvent(BaseModel):
     contract_version: int
     origin_ref: CCD_ModuleRef
     address: CCD_ContractAddress
-    amount: microCCD = 0
+    amount: microCCD | str = 0
     init_name: str
     events: list[CCD_ContractEvent]
     parameter: Optional[CCD_Parameter] = None
@@ -1181,7 +1183,7 @@ class CCD_InstanceUpdatedEvent(BaseModel):
     contract_version: int
     address: CCD_ContractAddress
     instigator: CCD_Address
-    amount: microCCD
+    amount: microCCD | str
     parameter: CCD_Parameter
     receive_name: CCD_ReceiveName
     events: Optional[list[CCD_ContractEvent]] = None
@@ -1227,7 +1229,7 @@ class CCD_ContractTraceElement_Transferred(BaseModel):
     """
 
     sender: CCD_ContractAddress
-    amount: microCCD
+    amount: microCCD | str
     receiver: CCD_AccountAddress
 
 
@@ -1346,7 +1348,7 @@ class CCD_EncryptedSelfAmountAddedEvent(BaseModel):
 
     account: CCD_AccountAddress
     new_amount: CCD_EncryptedAmount
-    amount: microCCD
+    amount: microCCD | str
 
 
 class CCD_AccountTransactionEffects_TransferredToPublic(BaseModel):
@@ -1360,7 +1362,7 @@ class CCD_AccountTransactionEffects_TransferredToPublic(BaseModel):
     """
 
     removed: CCD_EncryptedAmountRemovedEvent
-    amount: microCCD
+    amount: microCCD | str
 
 
 class CCD_AccountTransactionEffects_CredentialsUpdated(BaseModel):
@@ -1411,7 +1413,7 @@ class CCD_BakerAdded(BaseModel):
     """
 
     keys_event: CCD_BakerKeysEvent
-    stake: microCCD
+    stake: microCCD | str
     restake_earnings: bool
 
 
@@ -1438,7 +1440,7 @@ class CCD_AccountTransfer(BaseModel):
         memo (Optional[CCD_Memo]): An optional memo attached to the transfer.
     """
 
-    amount: microCCD = 0
+    amount: microCCD | str = 0
     receiver: CCD_AccountAddress
     memo: Optional[CCD_Memo] = None
 
@@ -1454,7 +1456,7 @@ class CCD_NewRelease(BaseModel):
     """
 
     timestamp: CCD_TimeStamp
-    amount: microCCD
+    amount: microCCD | str | str
 
 
 class CCD_TransferredWithSchedule(BaseModel):
@@ -1485,7 +1487,7 @@ class CCD_BakerStakeUpdatedData(BaseModel):
     """
 
     baker_id: CCD_BakerId
-    new_stake: microCCD
+    new_stake: microCCD | str
     increased: bool
 
 
@@ -1512,7 +1514,7 @@ class CCD_BakerStakeIncreased(BaseModel):
     """
 
     baker_id: CCD_BakerId
-    new_stake: microCCD
+    new_stake: microCCD | str
 
 
 class CCD_BakerStakeDecreased(BaseModel):
@@ -1526,7 +1528,7 @@ class CCD_BakerStakeDecreased(BaseModel):
     """
 
     baker_id: CCD_BakerId
-    new_stake: microCCD
+    new_stake: microCCD | str
 
 
 class CCD_BakerRestakeEarningsUpdated(BaseModel):
@@ -1676,7 +1678,7 @@ class CCD_DelegationStakeIncreased(BaseModel):
     """
 
     delegator_id: CCD_DelegatorId
-    new_stake: microCCD
+    new_stake: microCCD | str
 
 
 class CCD_DelegationStakeDecreased(BaseModel):
@@ -1690,7 +1692,7 @@ class CCD_DelegationStakeDecreased(BaseModel):
     """
 
     delegator_id: CCD_DelegatorId
-    new_stake: microCCD
+    new_stake: microCCD | str
 
 
 class CCD_DelegationSetRestakeEarnings(BaseModel):
@@ -1846,7 +1848,7 @@ class CCD_SponsorDetails(BaseModel):
         sponsor (CCD_AccountAddress): The sponsor of the transaction.
     """
 
-    cost: microCCD
+    cost: microCCD | str
     sponsor: CCD_AccountAddress
 
 
@@ -1862,7 +1864,7 @@ class CCD_AccountTransactionDetails(BaseModel):
         sponsor (Optional[CCD_SponsorDetails]): The optional sponsor details of the transaction.
     """
 
-    cost: microCCD
+    cost: microCCD | str
     sender: CCD_AccountAddress
     outcome: str
     effects: CCD_AccountTransactionEffects
@@ -2245,7 +2247,7 @@ class CCD_PoolParametersCpv1(BaseModel):
     passive_baking_commission: CCD_AmountFraction
     passive_transaction_commission: CCD_AmountFraction
     commission_bounds: CCD_CommissionRanges
-    minimum_equity_capital: microCCD
+    minimum_equity_capital: microCCD | str
     capital_bound: CCD_CapitalBound
     leverage_bound: CCD_LeverageFactor
 
@@ -2299,7 +2301,7 @@ class CCD_BakerStakeThreshold(BaseModel):
         baker_stake_threshold (Amount): Minimum threshold required for registering as a validator.
     """
 
-    baker_stake_threshold: microCCD
+    baker_stake_threshold: microCCD | str
 
 
 class CCD_TransactionType(BaseModel):
@@ -2473,7 +2475,7 @@ class CCD_Release(BaseModel):
     """
 
     timestamp: CCD_TimeStamp
-    amount: microCCD
+    amount: microCCD | str
     transactions: list[CCD_TransactionHash]
 
 
@@ -2509,7 +2511,7 @@ class CCD_AccountStakingInfo_Baker(BaseModel):
     pool_info: CCD_BakerPoolInfo
     pending_change: CCD_StakePendingChange
     restake_earnings: bool
-    staked_amount: microCCD
+    staked_amount: microCCD | str
     is_suspended: Optional[bool] = None
 
 
@@ -2533,7 +2535,7 @@ class CCD_AccountStakingInfo_Delegator(BaseModel):
     target: CCD_DelegationTarget
     pending_change: CCD_StakePendingChange
     restake_earnings: bool
-    staked_amount: microCCD
+    staked_amount: microCCD | str
 
 
 class CCD_AccountStakingInfo(BaseModel):
@@ -2766,7 +2768,7 @@ class CCD_Cooldown(BaseModel):
     """
 
     end_time: CCD_TimeStamp
-    amount: microCCD
+    amount: microCCD | str
     status: CoolDownStatus
 
 
@@ -2791,7 +2793,7 @@ class CCD_AccountInfo(BaseModel):
     """
 
     address: str
-    amount: microCCD
+    amount: microCCD | str
     stake: Optional[CCD_AccountStakingInfo] = None
     credentials: dict[str, CCD_AccountCredential]
     encrypted_balance: CCD_EncryptedBalance
@@ -2819,11 +2821,11 @@ class CCD_TokenomicsInfo_V0(BaseModel):
         protocol_version (int): The protocol version.
     """
 
-    total_amount: microCCD
-    total_encrypted_amount: microCCD
-    baking_reward_account: microCCD
-    finalization_reward_account: microCCD
-    gas_account: microCCD
+    total_amount: microCCD | str
+    total_encrypted_amount: microCCD | str
+    baking_reward_account: microCCD | str
+    finalization_reward_account: microCCD | str
+    gas_account: microCCD | str
     protocol_version: int
 
 
@@ -2845,15 +2847,15 @@ class CCD_TokenomicsInfo_V1(BaseModel):
         protocol_version (ProtocolVersion): The protocol version.
     """
 
-    total_amount: microCCD
-    total_encrypted_amount: microCCD
-    baking_reward_account: microCCD
-    finalization_reward_account: microCCD
-    gas_account: microCCD
-    foundation_transaction_rewards: microCCD
+    total_amount: microCCD | str
+    total_encrypted_amount: microCCD | str
+    baking_reward_account: microCCD | str
+    finalization_reward_account: microCCD | str
+    gas_account: microCCD | str
+    foundation_transaction_rewards: microCCD | str
     next_payday_time: CCD_TimeStamp
     next_payday_mint_rate: CCD_MintRate
-    total_staked_capital: microCCD
+    total_staked_capital: microCCD | str
     protocol_version: int
 
 
@@ -2887,7 +2889,7 @@ class CCD_InstanceInfo_V0(BaseModel):
 
     model: CCD_ContractStateV0
     owner: CCD_AccountAddress
-    amount: microCCD
+    amount: microCCD | str
     methods: list[CCD_ReceiveName]
     name: CCD_InitName
     source_module: CCD_ModuleRef
@@ -2907,7 +2909,7 @@ class CCD_InstanceInfo_V1(BaseModel):
     """
 
     owner: CCD_AccountAddress
-    amount: microCCD
+    amount: microCCD | str
     methods: list[CCD_ReceiveName]
     name: CCD_InitName
     source_module: CCD_ModuleRef
@@ -2952,9 +2954,9 @@ class CCD_BlockSpecialEvent_PaydayPoolReward(BaseModel):
     """
 
     pool_owner: Optional[CCD_BakerId] = None
-    transaction_fees: microCCD
-    baker_reward: microCCD
-    finalization_reward: microCCD
+    transaction_fees: microCCD | str
+    baker_reward: microCCD | str
+    finalization_reward: microCCD | str
 
 
 class CCD_BlockSpecialEvent_BlockAccrueReward(BaseModel):
@@ -2972,12 +2974,12 @@ class CCD_BlockSpecialEvent_BlockAccrueReward(BaseModel):
         validator (CCD_BakerId): The validator of the block, who will receive the award.
     """
 
-    transaction_fees: microCCD
-    old_gas_account: microCCD
-    new_gas_account: microCCD
-    baker_reward: microCCD
-    passive_reward: microCCD
-    foundation_charge: microCCD
+    transaction_fees: microCCD | str
+    old_gas_account: microCCD | str
+    new_gas_account: microCCD | str
+    baker_reward: microCCD | str
+    passive_reward: microCCD | str
+    foundation_charge: microCCD | str
     baker: CCD_BakerId
 
 
@@ -2994,9 +2996,9 @@ class CCD_BlockSpecialEvent_PaydayAccountReward(BaseModel):
     """
 
     account: CCD_AccountAddress
-    transaction_fees: microCCD
-    baker_reward: microCCD
-    finalization_reward: microCCD
+    transaction_fees: microCCD | str
+    baker_reward: microCCD | str
+    finalization_reward: microCCD | str
 
 
 class CCD_BlockSpecialEvent_PaydayFoundationReward(BaseModel):
@@ -3010,7 +3012,7 @@ class CCD_BlockSpecialEvent_PaydayFoundationReward(BaseModel):
     """
 
     foundation_account: CCD_AccountAddress
-    development_charge: microCCD
+    development_charge: microCCD | str
 
 
 class CCD_BlockSpecialEvent_BlockReward(BaseModel):
@@ -3029,11 +3031,11 @@ class CCD_BlockSpecialEvent_BlockReward(BaseModel):
         foundation_account (CCD_AccountAddress): The foundation account.
     """
 
-    transaction_fees: microCCD
-    old_gas_account: microCCD
-    new_gas_account: microCCD
-    baker_reward: microCCD
-    foundation_charge: microCCD
+    transaction_fees: microCCD | str
+    old_gas_account: microCCD | str
+    new_gas_account: microCCD | str
+    baker_reward: microCCD | str
+    foundation_charge: microCCD | str
     foundation_account: CCD_AccountAddress
     baker: CCD_AccountAddress
 
@@ -3049,7 +3051,7 @@ class CCD_BlockSpecialEvent_AccountAmounts_Entry(BaseModel):
     """
 
     account: CCD_AccountAddress
-    amount: microCCD
+    amount: microCCD | str
 
 
 class CCD_BlockSpecialEvent_AccountAmounts(BaseModel):
@@ -3075,7 +3077,7 @@ class CCD_BlockSpecialEvent_FinalizationRewards(BaseModel):
     """
 
     finalization_rewards: CCD_BlockSpecialEvent_AccountAmounts
-    remainder: microCCD
+    remainder: microCCD | str
 
 
 class CCD_BlockSpecialEvent_BakingRewards(BaseModel):
@@ -3089,7 +3091,7 @@ class CCD_BlockSpecialEvent_BakingRewards(BaseModel):
     """
 
     baker_rewards: CCD_BlockSpecialEvent_AccountAmounts
-    remainder: microCCD
+    remainder: microCCD | str
 
 
 class CCD_BlockSpecialEvent_Mint(BaseModel):
@@ -3104,9 +3106,9 @@ class CCD_BlockSpecialEvent_Mint(BaseModel):
         foundation_account (CCD_AccountAddress): The account to which the platform development charge is paid.
     """
 
-    mint_baking_reward: microCCD
-    mint_finalization_reward: microCCD
-    mint_platform_development_charge: microCCD
+    mint_baking_reward: microCCD | str
+    mint_finalization_reward: microCCD | str
+    mint_platform_development_charge: microCCD | str
     foundation_account: CCD_AccountAddress
 
 
@@ -3437,7 +3439,7 @@ class CCD_ChainParametersV0(BaseModel):
     transaction_fee_distribution: CCD_TransactionFeeDistribution
     gas_rewards: CCD_GasRewards
     foundation_account: CCD_AccountAddress
-    minimum_threshold_for_baking: microCCD
+    minimum_threshold_for_baking: microCCD | str
     root_keys: CCD_HigherLevelKeys
     level1_keys: CCD_HigherLevelKeys
     level2_keys: CCD_AuthorizationsV0
@@ -3937,7 +3939,7 @@ class CCD_FullBakerInfo(BaseModel):
     election_verify_key: CCD_BakerElectionVerifyKey
     signature_verify_key: CCD_BakerSignatureVerifyKey
     aggregation_verify_key: CCD_BakerAggregationVerifyKey
-    stake: microCCD
+    stake: microCCD | str
 
 
 class CCD_BakersAndFinalizers(BaseModel):
@@ -3955,8 +3957,8 @@ class CCD_BakersAndFinalizers(BaseModel):
 
     bakers: list[CCD_FullBakerInfo]
     finalizers: list[CCD_BakerId]
-    baker_total_stake: microCCD
-    finalizer_total_stake: microCCD
+    baker_total_stake: microCCD | str
+    finalizer_total_stake: microCCD | str
     finalization_committee_hash: CCD_FinalizationCommitteeHash
 
 
@@ -4007,7 +4009,7 @@ class CCD_AggregatedSignatures(BaseModel):
     """
 
     signed_block: CCD_BlockHash
-    signature_weight: microCCD
+    signature_weight: microCCD | str
     aggregate_signature: CCD_QuorumSignature
     signatories: list[CCD_FinalizerIndex]
 
