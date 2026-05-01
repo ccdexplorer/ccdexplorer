@@ -54,8 +54,18 @@ class Utils:
             notifier_type=TooterType.INFO,
         )
 
-    def get_sum_amount_from_scheduled_transfer(self, schedule: list[CCD_NewRelease]):
-        sum = 0
+    def get_sum_amount_from_scheduled_transfer(
+        self,
+        schedule: list[CCD_NewRelease],
+    ) -> int:
+        total = 0
+
         for release in schedule:
-            sum += release.amount
-        return sum
+            amount = release.amount
+
+            if isinstance(amount, str):
+                amount = int(amount)
+
+            total += amount
+
+        return total
