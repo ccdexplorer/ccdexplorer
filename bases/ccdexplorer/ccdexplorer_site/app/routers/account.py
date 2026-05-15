@@ -833,6 +833,10 @@ async def request_sankey(
 
     await sankey.cross_the_streams(user, tags, account_ids_to_lookup)
 
+    node_count = len(sankey.tagged_labels)
+
+    sankey_height = max(650, min(1400, node_count * 18))
+
     fig = go.Figure(
         data=[
             go.Sankey(
@@ -857,6 +861,7 @@ async def request_sankey(
         template=ccdexplorer_plotly_template(theme),
         title_text=f"Flow diagram for account for token {token}",
         font_size=10,
+        height=sankey_height,
     )
 
     sankey_html = fig.to_html(
