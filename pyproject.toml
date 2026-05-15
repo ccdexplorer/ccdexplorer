@@ -57,6 +57,7 @@ dependencies = [
     "plotly>=6.4.0",
     "kaleido>=1.2.0",
     "prometheus-client>=0.22.0",
+    "fastapi-mcp>=0.4.0",
 ]
 
 

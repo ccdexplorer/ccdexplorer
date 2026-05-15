@@ -91,7 +91,11 @@ def get_owner_history_for_provenance(
     return ci.viewOwnerHistoryResponse(result)
 
 
-@router.get("/{net}/token/tag/{tag}/info", response_class=JSONResponse)
+@router.get(
+    "/{net}/token/tag/{tag}/info",
+    response_class=JSONResponse,
+    operation_id="get_token_based_on_token_id_for_token_tag",
+)
 @router.get(
     "/{net}/token/tag/{tag}/token-id/{token_id}/info",
     response_class=JSONResponse,
@@ -788,7 +792,7 @@ async def add_token_address_to_metadata_refresh_queue(
     "/{net}/token/tag/{tag}",
     response_class=JSONResponse,
 )
-async def get_instance_tag_information(
+async def get_token_tag_information(
     request: Request,
     net: str,
     tag: str,

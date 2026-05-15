@@ -1,23 +1,26 @@
 # ruff: noqa: F403, F405, E402, E501, E722, F401
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import importlib
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
 import httpx
-import importlib
 import humanize
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
 from ccdexplorer.mongodb.core import CollectionsUtilities
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi_mcp import FastApiMCP
 from httpx import ASGITransport
+
 _prometheus_client = importlib.import_module("prometheus_client")
 _prometheus_multiprocess = importlib.import_module("prometheus_client.multiprocess")
 CONTENT_TYPE_LATEST = _prometheus_client.CONTENT_TYPE_LATEST
@@ -216,6 +219,19 @@ class AppSettings(BaseModel):
     api_url: str | None = None
 
 
+def use_route_names_as_operation_ids(app: FastAPI) -> None:
+    """
+    Simplify operation IDs so that generated API clients have simpler function
+    names.
+
+    Should be called only after all routes have been added.
+    """
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            if not route.operation_id:
+                route.operation_id = route.name  # in this case, 'read_items'
+
+
 def create_app(app_settings: AppSettings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -308,17 +324,28 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.state.templates = app.state.templates
     app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
 
-    # mcp = FastApiMCP(
-    #     app,
-    #     name="CCDexplorer.io MCP Server",
-    #     description="The CCDExplorer.io API MCP server",
-    # )
-    # # Mount the MCP server directly to your FastAPI app
-    # mcp.mount()
+    # Create an MCP server based on this app
+    mcp = FastApiMCP(
+        fastapi=app,
+        name="CCDexplorer.io MCP Server",
+        description="The CCDExplorer.io API MCP server",
+    )
+
+    @app.get("/mcp/health", include_in_schema=False)
+    async def mcp_health():
+        return JSONResponse({"status": "ok"})
+
+    # Mount the MCP server directly to your app
+    mcp.mount_http()
 
     origins = [
         "http://127.0.0.1:7000",
         "https://127.0.0.1:7000",
+        # MCP Inspector
+        "http://127.0.0.1:6274",
+        "http://localhost:6274",
+        "http://127.0.0.1:6277",
+        "http://localhost:6277",
         "http://api.ccdexplorer.io",
         "https://api.ccdexplorer.io",
         "http://dev-api.ccdexplorer.io",
@@ -328,8 +355,15 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         CORSMiddleware,
         allow_origins=origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=[
+            "content-type",
+            "authorization",
+            "x-ccdexplorer-key",
+            "mcp-session-id",
+            "mcp-protocol-version",
+            "x-mcp-proxy-auth",
+        ],
     )
     if app_settings.motor_factory is not None:
         app.add_middleware(UsageMiddleware, mongomotor=app_settings.motor_factory())
@@ -345,6 +379,22 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         config={r"^/v2": rate_limit_rules},
     )
     Instrumentator().instrument(app)
+
+    # @app.middleware("http")
+    # async def log_cors_origin(request, call_next):
+    #     if request.method == "OPTIONS":
+    #         print(
+    #             "OPTIONS",
+    #             request.url.path,
+    #             "Origin:",
+    #             request.headers.get("origin"),
+    #             "ACR-Method:",
+    #             request.headers.get("access-control-request-method"),
+    #             "ACR-Headers:",
+    #             request.headers.get("access-control-request-headers"),
+    #         )
+
+    #     return await call_next(request)
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
@@ -392,4 +442,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     app.state.templates.env.filters["humanize_timedelta"] = humanize_timedelta
 
+    use_route_names_as_operation_ids(app)
+    mcp.setup_server()
     return app

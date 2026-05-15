@@ -187,7 +187,7 @@ async def get_last_transactions(
 
 
 @router.get("/{net}/transactions/newer/than/{since}", response_class=JSONResponse)
-async def get_last_blocks_newer_than(
+async def get_last_transactions_newer_than(
     request: Request,
     net: str,
     since: int,
@@ -233,7 +233,11 @@ async def get_last_blocks_newer_than(
 
 
 @router.get("/{net}/transactions/{count}/{skip}/{filter}", response_class=JSONResponse)
-@router.get("/{net}/transactions/{count}/{skip}/{filter}/{collection}", response_class=JSONResponse)
+@router.get(
+    "/{net}/transactions/{count}/{skip}/{filter}/{collection}",
+    response_class=JSONResponse,
+    operation_id="get_transactions_with_filter_for_collection",
+)
 async def get_transactions_with_filter(
     request: Request,
     net: str,

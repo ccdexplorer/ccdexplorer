@@ -127,7 +127,9 @@ async def convert_account_fungible_tokens_value_to_USD(
 
 
 @router.get(
-    "/{net}/account/{account_address}/tokens-available/{alias}", response_class=JSONResponse
+    "/{net}/account/{account_address}/tokens-available/{alias}",
+    response_class=JSONResponse,
+    operation_id="get_account_tokens_available_for_alias",
 )
 @router.get("/{net}/account/{account_address}/tokens-available", response_class=JSONResponse)
 async def get_account_tokens_available(
@@ -442,6 +444,7 @@ async def get_account_plt_symbols_for_flow(
 @router.get(
     "/{net}/account/{account_address}/plt/{skip}/{limit}/{alias}",
     response_class=JSONResponse,
+    operation_id="get_paginated_account_plt_tokens_for_alias",
 )
 @router.get(
     "/{net}/account/{account_address}/plt/{skip}/{limit}",
@@ -537,6 +540,7 @@ async def get_paginated_account_plt_tokens(
 @router.get(
     "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified/{alias}",
     response_class=JSONResponse,
+    operation_id="get_account_fungible_tokens_verified_for_alias",
 )
 @router.get(
     "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified",
@@ -684,6 +688,7 @@ async def get_account_fungible_tokens_verified(
 @router.get(
     "/{net}/account/{account_address}/non-fungible-tokens/{skip}/{limit}/verified/{alias}",
     response_class=JSONResponse,
+    operation_id="get_account_non_fungible_tokens_verified_for_alias",
 )
 @router.get(
     "/{net}/account/{account_address}/non-fungible-tokens/{skip}/{limit}/verified",
@@ -801,6 +806,7 @@ async def get_account_non_fungible_tokens_verified(
 @router.get(
     "/{net}/account/{account_address}/tokens/{skip}/{limit}/unverified/{alias}",
     response_class=JSONResponse,
+    operation_id="get_account_tokens_unverified_for_alias",
 )
 @router.get(
     "/{net}/account/{account_address}/tokens/{skip}/{limit}/unverified",
