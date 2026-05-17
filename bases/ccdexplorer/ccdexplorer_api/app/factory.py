@@ -12,13 +12,13 @@ import humanize
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
 from ccdexplorer.mongodb.core import CollectionsUtilities
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi_mcp import FastApiMCP
+from fastapi_mcp import AuthConfig, FastApiMCP
 from httpx import ASGITransport
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -81,7 +81,13 @@ from ratelimit import RateLimitMiddleware
 from ratelimit.backends.redis import RedisBackend
 from redis.asyncio import StrictRedis
 
-from .ratelimiting import AUTH_FUNCTION, handle_429, handle_auth_error
+from .ratelimiting import (
+    AUTH_FUNCTION,
+    handle_429,
+    handle_auth_error,
+    require_api_auth,
+)
+from ccdexplorer.env import API_KEY_HEADER
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
@@ -157,6 +163,36 @@ class UsageMiddleware(BaseHTTPMiddleware):
             )
 
         return response
+
+
+class BearerTokenApiKeyMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = list(scope.get("headers") or [])
+        header_names = {name.lower() for name, _ in headers}
+        api_key_header = API_KEY_HEADER.encode()
+
+        if api_key_header not in header_names:
+            authorization = None
+            for name, value in headers:
+                if name.lower() == b"authorization":
+                    authorization = value.decode()
+                    break
+
+            if authorization:
+                scheme, _, credentials = authorization.partition(" ")
+                credentials = credentials.strip()
+                if scheme.lower() == "bearer" and credentials:
+                    headers.append((api_key_header, credentials.encode()))
+                    scope = {**scope, "headers": headers}
+
+        await self.app(scope, receive, send)
 
 
 async def _aclose(resource) -> None:
@@ -329,6 +365,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         fastapi=app,
         name="CCDexplorer.io MCP Server",
         description="The CCDExplorer.io API MCP server",
+        auth_config=AuthConfig(dependencies=[Depends(require_api_auth)]),
+        headers=["authorization", API_KEY_HEADER],
     )
 
     @app.get("/mcp/health", include_in_schema=False)
@@ -378,6 +416,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         on_blocked=handle_429,
         config={r"^/v2": rate_limit_rules},
     )
+    app.add_middleware(BearerTokenApiKeyMiddleware)
     Instrumentator().instrument(app)
 
     # @app.middleware("http")
