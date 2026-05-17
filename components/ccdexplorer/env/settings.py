@@ -23,6 +23,7 @@ API_NET = os.environ.get("API_NET", "mainnet")
 API_URL = os.environ.get("API_URL")
 LOGIN_SECRET = os.environ.get("LOGIN_SECRET")
 API_KEY_HEADER = "x-ccdexplorer-key"
+API_CODEX_KEY = os.environ.get("API_CODEX_KEY")
 API_ACCOUNT_TESTNET = "4NkwL9zPsZF6Y8VDztVtBv38fmgoY8GneDsGZ6zRpTZJgyX29E"
 API_ACCOUNT_MAINNET = "3GjqwYXv5sGY1QZdhx3uBdNz1LWUofQAn4tyV6wQu8cg9592Ur"
 if not os.environ.get("GRPC_MAINNET"):
