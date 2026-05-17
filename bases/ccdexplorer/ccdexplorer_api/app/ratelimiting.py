@@ -1,6 +1,8 @@
 import json
-from typing import Tuple
+from typing import Mapping, Tuple
 
+from ccdexplorer.env import API_KEY_HEADER
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from ratelimit.auths import EmptyInformation
 from ratelimit.types import ASGIApp, Receive, Scope, Send
@@ -30,10 +32,24 @@ def handle_429(retry_after: int):
     return inside_yourself_429
 
 
-async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
-    """
-    To gain access to v2 API
-    """
+def api_key_from_headers(headers: Mapping[str, str]) -> str | None:
+    api_key = headers.get(API_KEY_HEADER)
+    if api_key:
+        return api_key
+
+    authorization = headers.get("authorization")
+    if not authorization:
+        return None
+
+    scheme, _, credentials = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+
+    credentials = credentials.strip()
+    return credentials or None
+
+
+async def resolve_api_auth(scope: Scope) -> Tuple[str, str]:
     app = scope["app"]
     # if not app.api_keys:
     api_keys: dict = await app.state.get_api_keys_fn(
@@ -46,8 +62,8 @@ async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
 
     headers: list[Tuple[bytes, bytes]] = scope["headers"]
     try:
-        headers_decoded = {x[0].decode(): x[1].decode() for x in headers}
-        api_key = headers_decoded.get("x-ccdexplorer-key")
+        headers_decoded = {x[0].decode().lower(): x[1].decode() for x in headers}
+        api_key = api_key_from_headers(headers_decoded)
     except:  # noqa: E722
         api_key = None
 
@@ -63,3 +79,17 @@ async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
     else:
         raise EmptyInformation(scope)
     return api_account_id, group_name
+
+
+async def AUTH_FUNCTION(scope: Scope) -> Tuple[str, str]:
+    """
+    To gain access to v2 API.
+    """
+    return await resolve_api_auth(scope)
+
+
+async def require_api_auth(request: Request) -> Tuple[str, str]:
+    try:
+        return await resolve_api_auth(request.scope)
+    except EmptyInformation as exc:
+        raise HTTPException(status_code=401, detail="Unauthorized access.") from exc
