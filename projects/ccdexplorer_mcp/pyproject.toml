@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling", "hatch-polylith-bricks"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ccdexplorer_mcp"
+version = "0.1.0"
+
+
+
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastmcp>=2.14.5",
+    "httpx",
+    "python-dotenv",
+    "uvicorn>=0.35.0",
+]
+
+[tool.hatch.build.hooks.polylith-bricks]
+
+[tool.polylith.bricks]
+"../../bases/ccdexplorer/ccdexplorer_mcp" = "ccdexplorer/ccdexplorer_mcp"
