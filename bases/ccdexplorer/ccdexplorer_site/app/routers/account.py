@@ -1134,7 +1134,7 @@ async def get_account_tx_sent_latest_first(
         f"{request.app.api_url}/v2/{net}/account/{account_address}/transactions/sent/latest_first",
         httpx_client,
     )
-    latest_first: list | None = api_result.return_value if api_result.ok else []
+    latest_first: dict | None = api_result.return_value if api_result.ok else {}
     if latest_first:
         if len(latest_first) > 0:
             html = request.app.templates.get_template(

@@ -88,7 +88,7 @@ async def get_transaction_types(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -143,7 +143,7 @@ async def get_last_transactions(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -155,7 +155,7 @@ async def get_last_transactions(
         filter = reversed_type_contents_dict.get(filter, None)
         if not filter:
             raise HTTPException(
-                status_code=404,
+                status_code=422,
                 detail="Invalid filter provided. Please use one of the following: "
                 + ", ".join(reversed_type_contents_dict.keys()),
             )
@@ -180,10 +180,7 @@ async def get_last_transactions(
         last_txs = [CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in result]
         return last_txs
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving last {count} transactions on {net}, {error}.",  # type: ignore
-        )
+        return []
 
 
 @router.get("/{net}/transactions/newer/than/{since}", response_class=JSONResponse)
@@ -212,7 +209,7 @@ async def get_last_transactions_newer_than(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -267,7 +264,7 @@ async def get_transactions_with_filter(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -364,7 +361,7 @@ async def post_transactions_with_filter(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -455,7 +452,7 @@ async def get_transactions_tps(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -503,7 +500,7 @@ async def get_transactions_count_estimate(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -554,7 +551,7 @@ async def get_transactions_from_data_registered(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -648,7 +645,7 @@ async def get_transactions_from_transfers(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 

@@ -73,7 +73,7 @@ async def get_all_plt_tokens_from_node(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -117,7 +117,7 @@ async def get_all_plt_tokens(
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -143,7 +143,7 @@ async def get_all_plt_tokens_at_block(
 ) -> list[CCD_TokenId]:
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -201,7 +201,7 @@ async def get_all_plt_statistics_per_day_or_month(
     """
     if net != "mainnet":
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Only available on mainnet.",
         )
     analysis = "statistics_plt"

@@ -93,7 +93,7 @@ async def get_all_public_keys_for_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -146,7 +146,7 @@ async def get_smart_wallet_details_from_public_key(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -210,7 +210,7 @@ async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -303,17 +303,11 @@ async def get_tx_count_for_public_key_from_smart_wallet_contract(
     ]
     result = list(db_to_use[Collections.tokens_logged_events_v2].aggregate(pipeline))
     tx_count = result[0]["tx_count"] if len(result) > 0 else 0
-    if tx_count > 0:
-        return {
-            "public_key": public_key,
-            "contract": wallet_contract_address,
-            "tx_count": tx_count,
-        }
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No transactions found for requested public key {public_key} for smart wallet {wallet_contract_address_index} on {net}.",
-        )
+    return {
+        "public_key": public_key,
+        "contract": wallet_contract_address,
+        "tx_count": tx_count,
+    }
 
 
 @router.get(
@@ -352,7 +346,7 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -445,7 +439,7 @@ async def get_ccd_balances_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -522,7 +516,7 @@ async def get_tokens_available_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -584,7 +578,7 @@ async def get_cis2_tokens_list_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
     if skip < 0:
@@ -720,7 +714,7 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -890,7 +884,7 @@ async def get_all_cis2_contracts_for_public_key_from_smart_wallet_contract(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 

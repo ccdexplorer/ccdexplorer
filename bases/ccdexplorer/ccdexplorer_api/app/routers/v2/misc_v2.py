@@ -75,7 +75,7 @@ async def get_tx_data_for_project(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -107,7 +107,7 @@ async def get_today_in_data(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -222,7 +222,7 @@ async def get_bictory_cns_domain(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -252,7 +252,7 @@ async def get_credential_issuers(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -283,7 +283,7 @@ async def get_spot_exchange_rates(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -304,7 +304,7 @@ async def get_protocol_updates(
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -329,7 +329,7 @@ async def get_identity_providers(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -349,7 +349,7 @@ async def get_anonymity_revokers(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -372,7 +372,7 @@ async def get_labeled_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -423,7 +423,7 @@ async def get_community_labeled_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -544,7 +544,7 @@ async def get_data_for_chain_analysis(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -578,7 +578,7 @@ async def get_data_for_analysis(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -586,7 +586,7 @@ async def get_data_for_analysis(
         dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
     except:  # noqa: E722
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="No valid date(s) given.",
         )
 
@@ -615,7 +615,7 @@ async def get_nodes_count(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -646,7 +646,7 @@ async def get_node_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -673,7 +673,7 @@ async def get_all_project_ids(
 ) -> dict:
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -698,7 +698,7 @@ async def get_project_id(
 ) -> Any | None:
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -720,7 +720,7 @@ async def get_project_addresses(
 ) -> list:
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -764,7 +764,7 @@ async def get_consensus_detailed_status(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -833,7 +833,7 @@ async def get_sellers_and_buyers_for_period(
         period = ExchangePeriod[period]
     except KeyError:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Invalid period given.",
         )
 
@@ -949,7 +949,7 @@ async def get_winning_bakers_epoch(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 

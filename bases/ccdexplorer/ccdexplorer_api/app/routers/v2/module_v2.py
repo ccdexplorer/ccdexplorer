@@ -58,7 +58,7 @@ async def get_module_deployment_tx(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -100,7 +100,7 @@ async def get_module_schema(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -149,7 +149,7 @@ async def get_module_instances(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -219,7 +219,7 @@ async def get_module_usage(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -268,7 +268,7 @@ async def get_module(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 

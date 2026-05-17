@@ -237,7 +237,7 @@ async def ajax_business_accounts_tabulator(
         f"{request.app.api_url}/v2/{net}/accounts/business/{skip}/{size}/{sort_key}/{direction}",
         httpx_client,
     )
-    accounts = api_result.return_value if api_result.ok else []
+    accounts = api_result.return_value if api_result.ok else {}
 
     tb_made_up_rows = []
     for x in accounts["results"]:

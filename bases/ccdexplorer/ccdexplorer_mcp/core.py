@@ -13,7 +13,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 
-OPENAPI_HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head", "trace"}
+OPENAPI_HTTP_METHODS = {"get"}
 DEFAULT_DENIED_PATH_PREFIXES = (
     "/account",
     "/auth",

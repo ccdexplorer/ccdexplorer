@@ -50,7 +50,7 @@ async def get_last_blocks(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -157,13 +157,13 @@ async def get_last_blocks_newer_than(
 
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
     if since == 0:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="`Since` parameter cannot be zero.",
         )
 

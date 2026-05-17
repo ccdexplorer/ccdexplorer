@@ -107,7 +107,11 @@ async def request_ajax_source_module(
 
     df.columns = ["date", "transaction_count"]
     df["date"] = pd.to_datetime(df["date"])
-    df = df.groupby([pd.Grouper(key="date", freq="W-MON", label="left", closed="left")]).sum().reset_index()
+    df = (
+        df.groupby([pd.Grouper(key="date", freq="W-MON", label="left", closed="left")])
+        .sum()
+        .reset_index()
+    )
 
     rng = [
         "#AE7CF7",
@@ -551,9 +555,7 @@ async def module_module_address(
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/module/{module_ref}/schema", httpx_client
     )
-    schema_result: Schema | None = (
-        api_result.return_value if api_result.ok else None
-    )
+    schema_result: Schema | None = api_result.return_value if api_result.ok else None
 
     if not schema_result:
         error = {
@@ -762,7 +764,7 @@ async def smart_contract_page(
 ):
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
     request.state.api_calls = {}

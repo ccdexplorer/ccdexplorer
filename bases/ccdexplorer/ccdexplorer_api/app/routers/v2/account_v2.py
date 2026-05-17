@@ -147,7 +147,7 @@ async def get_account_tokens_available(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -187,7 +187,7 @@ async def get_account_rewards_available(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -223,7 +223,7 @@ async def get_account_plt_tokens_value_in_USD(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
@@ -239,10 +239,7 @@ async def get_account_plt_tokens_value_in_USD(
         )
         return tokens_value_USD
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested account ({account_address}) has no tokens on {net}",
-        )
+        return 0.0
 
 
 @router.get("/{net}/account/{account_address}/fungible-tokens/USD", response_class=JSONResponse)
@@ -262,7 +259,7 @@ async def get_account_fungible_tokens_value_in_USD(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -322,10 +319,7 @@ async def get_account_fungible_tokens_value_in_USD(
         )
         return tokens_value_USD
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested account ({account_address}) has no tokens on {net}",
-        )
+        0.0
 
 
 @router.get(
@@ -395,10 +389,7 @@ async def get_account_token_symbols_for_flow(
             ]
         )
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested account ({account_address}) has no tokens on {net}",
-        )
+        return []
 
 
 @router.get(
@@ -468,7 +459,7 @@ async def get_paginated_account_plt_tokens(
 
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -570,7 +561,7 @@ async def get_account_fungible_tokens_verified(
 
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -711,7 +702,7 @@ async def get_account_non_fungible_tokens_verified(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -829,7 +820,7 @@ async def get_account_tokens_unverified(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -930,7 +921,7 @@ async def get_account_balance_at_block(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -964,7 +955,7 @@ async def get_account_balance_in_USD(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -997,7 +988,7 @@ async def get_account_balance(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1049,7 +1040,7 @@ async def get_account_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1112,7 +1103,7 @@ async def get_validator_earliest_win_time(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1156,7 +1147,7 @@ async def get_validator_current_payday_stats(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1208,7 +1199,7 @@ async def get_validator_pool_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1243,7 +1234,7 @@ async def get_staking_rewards_bucketed(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1280,7 +1271,7 @@ async def get_staking_rewards_for_year_month(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1341,7 +1332,7 @@ async def get_validator_performance(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1377,7 +1368,7 @@ async def get_validator_inactive(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1416,7 +1407,7 @@ async def get_paginated_account_rewards(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1453,7 +1444,7 @@ async def get_bool_account_rewards_available(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1491,7 +1482,7 @@ async def get_validator_tally(
 
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1577,7 +1568,7 @@ async def get_account_pool_delegators(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1659,7 +1650,7 @@ async def get_account_apy_data_v2(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1727,7 +1718,7 @@ async def get_account_validator_node(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1763,7 +1754,7 @@ async def get_staking_rewards_object(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1801,7 +1792,7 @@ async def get_indicator_for_account_tx_count(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1847,7 +1838,7 @@ async def get_account_txs_sent_latest_first(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1886,10 +1877,7 @@ async def get_account_txs_sent_latest_first(
     )
 
     if len(first_tx) == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No transactions found for account {account_id} on {net}.",
-        )
+        return {"first_tx": None, "last_tx": None}
 
     first_tx = await db_to_use[Collections.transactions].find_one({"_id": first_tx[0]["tx_hash"]})
     last_tx = await db_to_use[Collections.transactions].find_one({"_id": last_tx[0]["tx_hash"]})
@@ -1921,7 +1909,7 @@ async def get_account_txs_with_filter(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2048,7 +2036,7 @@ async def get_account_txs(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2163,7 +2151,7 @@ async def get_account_validator_txs(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2255,7 +2243,7 @@ async def get_account_transactions_for_flow_graph(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2321,7 +2309,7 @@ async def get_account_plt_transactions_for_flow_graph(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2388,7 +2376,7 @@ async def get_account_token_transactions_for_flow_graph(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2456,7 +2444,7 @@ async def get_account_rewards_for_flow_graph(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2554,7 +2542,7 @@ async def get_account_deployment_tx(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2591,7 +2579,7 @@ async def get_aliases_in_use_for_account(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -2640,13 +2628,13 @@ async def get_account_graph(
     """
     if net not in ["mainnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="We only support mainnet for this graph.",
         )
 
     if coin != "CCD":
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Only works for CCD.",
         )
 

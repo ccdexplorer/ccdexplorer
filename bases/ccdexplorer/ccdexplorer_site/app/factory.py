@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, Request
+
 _prometheus_client = importlib.import_module("prometheus_client")
 _prometheus_multiprocess = importlib.import_module("prometheus_client.multiprocess")
 CONTENT_TYPE_LATEST = _prometheus_client.CONTENT_TYPE_LATEST
@@ -354,7 +355,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             api_result = await get_url_from_api(
                 f"{app.api_url}/v2/{net}/transactions/last/50", app.httpx_client
             )
-            app.transactions_cache[net] = api_result.return_value if api_result.ok else None
+            app.transactions_cache[net] = api_result.return_value if api_result.ok else []
 
     @scheduler.scheduled_job("interval", seconds=20, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):

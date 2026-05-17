@@ -72,7 +72,7 @@ async def get_last_accounts_newer_than(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -160,7 +160,7 @@ async def get_accounts_count_estimate(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -211,7 +211,7 @@ async def get_account_indexes(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -324,7 +324,7 @@ async def get_account_addresses(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -378,7 +378,7 @@ async def get_current_payday_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -414,7 +414,7 @@ async def get_last_payday_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -444,7 +444,7 @@ async def get_last_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -512,7 +512,7 @@ async def get_business_accounts(
     """
     if net not in ["mainnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="This endpoint only supports mainnet.",
         )
 
@@ -565,11 +565,7 @@ async def get_business_accounts(
 
         return {"results": enriched_results, "total_rows": total_rows}
     else:
-        error = None
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving business accounts on {net}, {error}.",
-        )
+        return {"results": [], "total_rows": 0}
 
 
 @router.get("/{net}/accounts/nodes-validators", response_class=JSONResponse)
@@ -585,7 +581,7 @@ async def get_nodes_and_validators(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -675,7 +671,7 @@ async def get_validator_primed_suspended_information(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -755,7 +751,7 @@ async def get_payday_pools(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -915,7 +911,7 @@ async def get_paydays(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -963,7 +959,7 @@ async def get_payday_passive_info(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -988,7 +984,7 @@ async def get_payday_passive_delegators(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1054,7 +1050,7 @@ async def get_paginated_scheduled_release_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1104,7 +1100,7 @@ async def get_scheduled_release_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1133,7 +1129,7 @@ async def get_cooldown_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1175,7 +1171,7 @@ async def get_pre_cooldown_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1202,7 +1198,7 @@ async def get_pre_pre_cooldown_accounts(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
 
@@ -1319,7 +1315,7 @@ async def get_credential_commitment_attributes_summary(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
@@ -1368,7 +1364,7 @@ async def get_credential_ip_usage_summary(
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(
-            status_code=404,
+            status_code=422,
             detail="Don't be silly. We only support mainnet and testnet.",
         )
     db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
