@@ -26,7 +26,6 @@ CollectorRegistry = _prometheus_client.CollectorRegistry
 generate_latest = _prometheus_client.generate_latest
 multiprocess = _prometheus_multiprocess
 
-# from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 

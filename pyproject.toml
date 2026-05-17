@@ -57,7 +57,7 @@ dependencies = [
     "plotly>=6.4.0",
     "kaleido>=1.2.0",
     "prometheus-client>=0.22.0",
-    "fastapi-mcp>=0.4.0",
+    "fastmcp>=2.14.5",
 ]
 
 
@@ -117,6 +117,7 @@ dev-mode-dirs = [ "components", "bases", "development", "." ]
 "bases/ccdexplorer/ms_metadata"           = "ccdexplorer/ms_metadata"
 "bases/ccdexplorer/ms_modules"            = "ccdexplorer/ms_modules"
 "bases/ccdexplorer/ms_plt"                = "ccdexplorer/ms_plt"
+"bases/ccdexplorer/ccdexplorer_mcp"       = "ccdexplorer/ccdexplorer_mcp"
 
 
 [tool.ruff]

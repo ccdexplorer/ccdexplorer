@@ -18,7 +18,6 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi_mcp import AuthConfig, FastApiMCP
 from httpx import ASGITransport
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -28,7 +27,6 @@ CollectorRegistry = _prometheus_client.CollectorRegistry
 generate_latest = _prometheus_client.generate_latest
 multiprocess = _prometheus_multiprocess
 
-# from fastapi_mcp import FastApiMCP
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from pymongo import AsyncMongoClient
@@ -85,7 +83,6 @@ from .ratelimiting import (
     AUTH_FUNCTION,
     handle_429,
     handle_auth_error,
-    require_api_auth,
 )
 from ccdexplorer.env import API_KEY_HEADER
 
@@ -360,22 +357,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.state.templates = app.state.templates
     app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
 
-    # Create an MCP server based on this app
-    mcp = FastApiMCP(
-        fastapi=app,
-        name="CCDexplorer.io MCP Server",
-        description="The CCDExplorer.io API MCP server",
-        auth_config=AuthConfig(dependencies=[Depends(require_api_auth)]),
-        headers=["authorization", API_KEY_HEADER],
-    )
-
-    @app.get("/mcp/health", include_in_schema=False)
-    async def mcp_health():
-        return JSONResponse({"status": "ok"})
-
-    # Mount the MCP server directly to your app
-    mcp.mount_http()
-
     origins = [
         "http://127.0.0.1:7000",
         "https://127.0.0.1:7000",
@@ -482,5 +463,4 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.state.templates.env.filters["humanize_timedelta"] = humanize_timedelta
 
     use_route_names_as_operation_ids(app)
-    mcp.setup_server()
     return app
