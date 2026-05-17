@@ -319,7 +319,7 @@ async def get_account_fungible_tokens_value_in_USD(
         )
         return tokens_value_USD
     else:
-        0.0
+        return 0.0
 
 
 @router.get(
