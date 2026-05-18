@@ -223,9 +223,11 @@ async def watch_loop(stop: Shutdown):
                             "transaction_count", 0
                         )
                         payload = {}
-                        if transaction_count == 0:
-                            print(f"{height:,.0f} - skip")
-                            continue
+                        # we need to always inspect and run indexers, as this looks as special events (oa primed/suspended)
+                        # otherwise we are missing payday blocks without transactions.
+                        # if transaction_count == 0:
+                        #     print(f"{height:,.0f} - skip")
+                        #     continue
 
                         slot_time = change.get("fullDocument", {}).get("slot_time")
                         if not slot_time:
