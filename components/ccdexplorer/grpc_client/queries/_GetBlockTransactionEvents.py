@@ -784,7 +784,7 @@ class Mixin(_SharedConverters):
 
         tx_list = []
         if not grpc_return_value:
-            raise ValueError(f"None returned for GetBlockTransactionEvents for {block_input}.")
+            return CCD_Block(**{"transaction_summaries": []})
 
         for tx in list(grpc_return_value):
             result = {}
