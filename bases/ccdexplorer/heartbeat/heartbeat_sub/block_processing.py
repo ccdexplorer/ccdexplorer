@@ -102,7 +102,7 @@ class BlockProcessing:
                     "$match": {"date": new_payday_date_string},
                 }
             )
-            if len(payday_info_in_collection) == 0:
+            if len(list(payday_info_in_collection)) == 0:
                 self.db[Collections.helpers].replace_one(query, dd, upsert=True)
 
                 console.log(f"Payday {current_block_to_process.slot_time:%Y-%m-%d} found!")
