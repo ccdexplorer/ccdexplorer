@@ -97,12 +97,12 @@ class BlockProcessing:
             }
 
             # check if payday info is already complete.
-            payday_info_in_collection = self.db[Collections.paydays_v2].find(
-                filter={
-                    "$match": {"date": new_payday_date_string},
-                }
+            payday_exists = (
+                self.db[Collections.paydays_v2].find_one({"date": new_payday_date_string})
+                is not None
             )
-            if len(list(payday_info_in_collection)) == 0:
+
+            if not payday_exists:
                 self.db[Collections.helpers].replace_one(query, dd, upsert=True)
 
                 console.log(f"Payday {current_block_to_process.slot_time:%Y-%m-%d} found!")
