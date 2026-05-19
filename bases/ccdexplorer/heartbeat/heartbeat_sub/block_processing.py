@@ -88,24 +88,33 @@ class BlockProcessing:
             new_payday_date_string = f"{current_block_to_process.slot_time:%Y-%m-%d}"
 
             query = {"_id": "last_known_payday"}
+
             dd = {
                 "_id": "last_known_payday",
                 "date": new_payday_date_string,
                 "hash": current_block_to_process.hash,
                 "height": current_block_to_process.height,
             }
-            self.db[Collections.helpers].replace_one(query, dd, upsert=True)
 
-            console.log(f"Payday {current_block_to_process.slot_time:%Y-%m-%d} found!")
-            payday_information_entry = {
-                "_id": current_block_to_process.hash,
-                "date": new_payday_date_string,
-            }
-            query = {"_id": current_block_to_process.hash}
-
-            _ = self.db[Collections.paydays_v2].replace_one(
-                query, payday_information_entry, upsert=True
+            # check if payday info is already complete.
+            payday_info_in_collection = self.db[Collections.paydays_v2].find(
+                filter={
+                    "$match": {"date": new_payday_date_string},
+                }
             )
+            if len(payday_info_in_collection) == 0:
+                self.db[Collections.helpers].replace_one(query, dd, upsert=True)
+
+                console.log(f"Payday {current_block_to_process.slot_time:%Y-%m-%d} found!")
+                payday_information_entry = {
+                    "_id": current_block_to_process.hash,
+                    "date": new_payday_date_string,
+                }
+                query = {"_id": current_block_to_process.hash}
+
+                _ = self.db[Collections.paydays_v2].replace_one(
+                    query, payday_information_entry, upsert=True
+                )
 
     def add_block_and_txs_to_queue(
         self,
