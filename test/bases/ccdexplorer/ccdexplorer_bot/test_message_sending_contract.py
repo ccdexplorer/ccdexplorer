@@ -40,7 +40,9 @@ def read_block_information_v3(
         transaction_summaries = [transaction_summaries[tx_index]]
     special_events = grpcclient.get_block_special_events(block_info.hash, NET(net))
 
-    result = db_to_use[Collections.tokens_logged_events].find({"block_height": block_height})
+    result = db_to_use[Collections.tokens_logged_events_v2].find(
+        {"tx_info.block_height": block_height}
+    )
 
     ### Logged Events
     if result:

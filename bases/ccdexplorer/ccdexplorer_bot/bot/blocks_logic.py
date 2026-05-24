@@ -207,7 +207,25 @@ class Mixin(Utils):
                 )
                 self.add_notification_event_to_queue(notification_event)
             if plt_event.transfer_event:
-                impacted_addresses = [
+                receiver_impacted_addresses = [
+                    ImpactedAddress(
+                        address=self.complete_address(plt_event.transfer_event.to.account),
+                        address_type=AddressType.receiver,
+                    ),
+                    ImpactedAddress(
+                        address=self.complete_address(plt_event.transfer_event.from_.account),
+                        address_type=AddressType.sender,
+                    ),
+                ]
+                notification_event = self.prepare_notification_event(
+                    EventType(account=event_account),
+                    tx_hash=tx.hash,
+                    block_info=block.block_info,
+                    impacted_addresses=receiver_impacted_addresses,
+                )
+                self.add_notification_event_to_queue(notification_event)
+
+                sender_impacted_addresses = [
                     ImpactedAddress(
                         address=self.complete_address(plt_event.transfer_event.from_.account),
                         address_type=AddressType.sender,
@@ -221,7 +239,7 @@ class Mixin(Utils):
                     EventType(account=event_account),
                     tx_hash=tx.hash,
                     block_info=block.block_info,
-                    impacted_addresses=impacted_addresses,
+                    impacted_addresses=sender_impacted_addresses,
                 )
                 self.add_notification_event_to_queue(notification_event)
             if plt_event.module_event:

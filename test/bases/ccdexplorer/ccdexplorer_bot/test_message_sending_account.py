@@ -46,7 +46,9 @@ def read_block_information_v3(
         transaction_summaries = [transaction_summaries[tx_index]]
     special_events = grpcclient.get_block_special_events(block_info.hash, NET(net))
 
-    result = db_to_use[Collections.tokens_logged_events].find({"block_height": block_height})
+    result = db_to_use[Collections.tokens_logged_events_v2].find(
+        {"tx_info.block_height": block_height}
+    )
 
     ### Logged Events
     if result:
@@ -480,3 +482,118 @@ async def test_message_account_plt_event_mint(bot: Bot, grpcclient: GRPCClient, 
         if SEND_MESSAGES:
             await bot.send_notification_queue()
         # bot.connections.tooter.async_relay.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_message_account_plt_event_update(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB):
+    bot.event_queue.clear()
+    original_users = bot.users
+
+    sender_user = SiteUser(
+        token="plt_real_tx_sender_user",
+        telegram_chat_id=123456789,
+        accounts={
+            "104222": AccountForUser(
+                account_index=104222,
+                account_id="3hsmxHrpDxJoKrHUJsutYwYSEzJUixBvfuzhardK55g59A13ta",
+                label="USDR sender",
+                account_notification_preferences=AccountNotificationPreferences(
+                    token_update_effect=NotificationPreferences(
+                        telegram=NotificationService(enabled=True),
+                        email=NotificationService(enabled=False),
+                    )
+                ),
+            )
+        },
+    )
+    receiver_user = SiteUser(
+        token="plt_real_tx_receiver_user",
+        telegram_chat_id=987654321,
+        accounts={
+            "85597": AccountForUser(
+                account_index=85597,
+                account_id="4hGN68SeYn9ZPSABU3uhS8nh8Tkv13DW2AmdZCneBzVkzeZ5Zp",
+                label="USDR receiver",
+                account_notification_preferences=AccountNotificationPreferences(
+                    token_update_effect=NotificationPreferences(
+                        telegram=NotificationService(enabled=True),
+                        email=NotificationService(enabled=False),
+                    )
+                ),
+            )
+        },
+    )
+    bot.users = {
+        sender_user.token: sender_user,
+        receiver_user.token: receiver_user,
+    }
+
+    block = read_block_information_v3(46764448, 0, grpcclient, mongodb, net="mainnet")
+
+    try:
+        await bot.find_events_in_block_transactions(block)
+
+        assert len(bot.event_queue) == 2
+        receiver_notification_event = bot.event_queue[0]
+        sender_notification_event = bot.event_queue[1]
+        assert receiver_notification_event.tx_hash == (
+            "50a1f6b57fc1a2b2146dea85552d0cb3c76887676e26510fc82f5f5dfc609c8d"
+        )
+        assert sender_notification_event.tx_hash == receiver_notification_event.tx_hash
+        assert receiver_notification_event.event_type.account is not None
+        assert receiver_notification_event.event_type.account.token_update_effect is not None
+        assert sender_notification_event.event_type.account is not None
+        assert sender_notification_event.event_type.account.token_update_effect is not None
+        assert receiver_notification_event.impacted_addresses is not None
+        assert sender_notification_event.impacted_addresses is not None
+        assert receiver_notification_event.impacted_addresses[0].address is not None
+        assert receiver_notification_event.impacted_addresses[0].address.account is not None
+        assert receiver_notification_event.impacted_addresses[0].address.account.index == 85597
+        assert receiver_notification_event.impacted_addresses[1].address is not None
+        assert receiver_notification_event.impacted_addresses[1].address.account is not None
+        assert receiver_notification_event.impacted_addresses[1].address.account.index == 104222
+        assert sender_notification_event.impacted_addresses[0].address is not None
+        assert sender_notification_event.impacted_addresses[0].address.account is not None
+        assert sender_notification_event.impacted_addresses[0].address.account.index == 104222
+        assert sender_notification_event.impacted_addresses[1].address is not None
+        assert sender_notification_event.impacted_addresses[1].address.account is not None
+        assert sender_notification_event.impacted_addresses[1].address.account.index == 85597
+
+        (
+            receiver_message_response,
+            receiver_notification_services_to_send,
+        ) = await bot.determine_if_user_should_be_notified_of_event(
+            receiver_user, receiver_notification_event
+        )
+        (
+            sender_message_response,
+            sender_notification_services_to_send,
+        ) = await bot.determine_if_user_should_be_notified_of_event(
+            sender_user, sender_notification_event
+        )
+
+        assert receiver_message_response is not None
+        assert receiver_notification_services_to_send[NotificationServices.telegram] is True
+        assert receiver_notification_services_to_send[NotificationServices.email] is False
+        assert sender_message_response is not None
+        assert sender_notification_services_to_send[NotificationServices.telegram] is True
+        assert sender_notification_services_to_send[NotificationServices.email] is False
+
+        publish_mock = AsyncMock(return_value=None)
+        with patch.object(bot, "publish_to_celery", publish_mock):
+            await bot.send_notification_queue()
+
+        assert publish_mock.await_count == 2
+        notified_user_tokens = {call.kwargs["user"].token for call in publish_mock.await_args_list}
+        assert notified_user_tokens == {sender_user.token, receiver_user.token}
+        assert all(
+            call.kwargs["service"] == NotificationServices.telegram
+            for call in publish_mock.await_args_list
+        )
+        assert all(
+            call.kwargs["message_response"] is not None
+            for call in publish_mock.await_args_list
+        )
+    finally:
+        bot.users = original_users
+        bot.event_queue.clear()
