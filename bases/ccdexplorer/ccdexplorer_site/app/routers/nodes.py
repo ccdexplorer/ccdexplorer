@@ -38,10 +38,10 @@ async def nodes(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Nodes and Validators"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_nodes_and_validators_v2__net__accounts_nodes_validators_get"
+        f"{request.app.api_url}/docs#/Accounts/get_nodes_and_validators"
     )
     request.state.api_calls["Last Payday Info"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_last_payday_info_v2__net__accounts_last_payday_block_info_get"
+        f"{request.app.api_url}/docs#/Accounts/get_last_payday_info"
     )
     return request.app.templates.TemplateResponse(
         "/nodes/nodes.html",

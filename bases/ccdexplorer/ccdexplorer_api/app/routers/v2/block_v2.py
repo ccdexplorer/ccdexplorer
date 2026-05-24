@@ -542,6 +542,8 @@ async def get_last_finalized_block(
 ) -> CCD_FinalizedBlockInfo:
     """Retrieve the latest finalized block from the node.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request used to read app limits (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.

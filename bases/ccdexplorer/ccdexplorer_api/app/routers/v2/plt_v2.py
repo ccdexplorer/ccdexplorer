@@ -90,6 +90,8 @@ async def get_plt_token_info_at_block(
 ) -> CCD_TokenInfo:
     """Return historical PLT token info from a specific block hash.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.

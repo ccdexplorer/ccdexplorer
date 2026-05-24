@@ -77,6 +77,8 @@ async def get_all_public_keys_for_smart_wallet_contract(
 ) -> list[str]:
     """List every public key registered against a smart-wallet contract.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.
@@ -557,6 +559,8 @@ async def get_cis2_tokens_list_for_public_key_from_smart_wallet_contract(
 ) -> dict:
     """Return metadata about CIS-2 tokens linked to the public key.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context providing pagination limits.
         net: Network identifier, must be ``mainnet`` or ``testnet``.
@@ -866,6 +870,8 @@ async def get_all_cis2_contracts_for_public_key_from_smart_wallet_contract(
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[str]:
     """List distinct CIS-2 contract addresses linked to a wallet public key.
+
+    Currently not in use.
 
     Args:
         request: FastAPI request context (unused but required).

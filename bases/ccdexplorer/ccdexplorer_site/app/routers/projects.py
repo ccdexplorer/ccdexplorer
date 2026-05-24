@@ -37,6 +37,13 @@ async def get_project_route(
         httpx_client,
     )
     mainnet_project_addresses = api_result.return_value if api_result.ok else []
+    request.state.api_calls = {}
+    request.state.api_calls["Project Info"] = (
+        f"{request.app.api_url}/docs#/Misc/get_project_id"
+    )
+    request.state.api_calls["Project Addresses"] = (
+        f"{request.app.api_url}/docs#/Misc/get_project_addresses"
+    )
 
     mainnet_accounts = [x for x in mainnet_project_addresses if x["type"] == "account_address"]
     mainnet_contracts = [x for x in mainnet_project_addresses if x["type"] == "contract_address"]

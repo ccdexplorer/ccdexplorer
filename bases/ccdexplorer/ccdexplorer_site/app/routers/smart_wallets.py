@@ -238,6 +238,21 @@ async def get_public_key_page(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["CCD Balance"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallet/get_ccd_balances_for_public_key_from_smart_wallet_contract"
+    )
+    request.state.api_calls["Tokens Available"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallet/get_tokens_available_for_public_key_from_smart_wallet_contract"
+    )
+    request.state.api_calls["Deployed Tx"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallet/get_deployed_tx_for_public_key_from_smart_wallet_contract"
+    )
+    request.state.api_calls["Transaction Count"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallet/get_tx_count_for_public_key_from_smart_wallet_contract"
+    )
+    request.state.api_calls["Smart Wallets Overview"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallets/get_all_smart_wallet_contracts"
+    )
     user: SiteUser | None = await get_user_detailsv2(request)
     wallet_contract_address = CCD_ContractAddress.from_index(index, subindex).to_str()
 
@@ -342,6 +357,12 @@ async def get_smart_wallets_overview_with_txs(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Smart Wallets Overview"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallets/get_all_smart_wallet_contracts_info"
+    )
+    request.state.api_calls["Smart Wallet Transactions"] = (
+        f"{request.app.api_url}/docs#/Smart%20Wallets/get_paginated_smart_wallets_txs"
+    )
 
     user: SiteUser | None = await get_user_detailsv2(request)
     # api_result = await get_url_from_api(

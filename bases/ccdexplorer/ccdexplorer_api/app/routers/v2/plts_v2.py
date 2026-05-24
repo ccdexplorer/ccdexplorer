@@ -183,6 +183,8 @@ async def get_all_plt_statistics_per_day_or_month(
 ):
     """Aggregate PLT statistics for a given day or month.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context providing the internal API URL.
         net: Network identifier (only ``mainnet`` supported).

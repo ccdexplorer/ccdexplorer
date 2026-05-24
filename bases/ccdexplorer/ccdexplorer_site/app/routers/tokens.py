@@ -152,10 +152,13 @@ async def slash_tokens(
         non_fungible_tokens_verified = api_result.return_value if api_result.ok else None
     request.state.api_calls = {}
     request.state.api_calls["Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Tokens/get_fungible_tokens_verified_v2__net__tokens_fungible_tokens_verified_get"
+        f"{request.app.api_url}/docs#/Tokens/get_fungible_tokens_verified"
     )
     request.state.api_calls["Non-Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Tokens/get_non_fungible_tokens_verified_v2__net__tokens_non_fungible_tokens_verified_get"
+        f"{request.app.api_url}/docs#/Tokens/get_non_fungible_tokens_verified"
+    )
+    request.state.api_calls["Protocol-Level Tokens"] = (
+        f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
     )
     return request.app.templates.TemplateResponse(
         "tokens/tokens.html",
@@ -304,10 +307,13 @@ async def show_token_address(
     tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None
     request.state.api_calls = {}
     request.state.api_calls["Token Info"] = (
-        f"{request.app.api_url}/docs#/Token/get_info_for_token_address_v2__net__token__contract_index___contract_subindex___token_id__info_get"
+        f"{request.app.api_url}/docs#/Token/get_info_for_token_address"
     )
     request.state.api_calls["Token Mint Tx"] = (
-        f"{request.app.api_url}/docs#/Transaction/get_transaction_v2__net__transaction__tx_hash__get"
+        f"{request.app.api_url}/docs#/Transaction/get_transaction"
+    )
+    request.state.api_calls["CIS-2 Compliance"] = (
+        f"{request.app.api_url}/docs#/Token/get_token_cis_2_compliance"
     )
     template_dict = {
         "env": request.app.env,
@@ -524,6 +530,10 @@ async def show_plt(
     )
     plt_info = api_result.return_value if api_result.ok else None
     plt_info = CCD_TokenInfo(**plt_info) if plt_info else None
+    request.state.api_calls = {}
+    request.state.api_calls["PLT Info"] = (
+        f"{request.app.api_url}/docs#/Protocol-Level%20Token/get_plt_token_info"
+    )
 
     template_dict = {
         "env": request.app.env,
@@ -575,6 +585,22 @@ async def tokens_tag_token_id(
     token_id_or_address: Optional[str] = None,
     tags: dict = Depends(get_labeled_accounts),
 ):
+    request.state.api_calls = {}
+    request.state.api_calls["PLT Token IDs"] = (
+        f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens_from_node"
+    )
+    request.state.api_calls["Token Info"] = (
+        f"{request.app.api_url}/docs#/Token/get_info_for_token_address"
+    )
+    request.state.api_calls["Token Tag Info"] = (
+        f"{request.app.api_url}/docs#/Token/get_info_for_token_tag"
+    )
+    request.state.api_calls["Token by Tag and ID"] = (
+        f"{request.app.api_url}/docs#/Token/get_token_based_on_token_id"
+    )
+    request.state.api_calls["Token by Tag"] = (
+        f"{request.app.api_url}/docs#/Token/get_token_based_on_token_id_for_token_tag"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/plt/list-token-ids",
         request.app.httpx_client,

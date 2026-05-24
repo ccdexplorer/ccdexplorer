@@ -917,6 +917,7 @@ async def get_account_balance_at_block(
     """
     Endpoint to get all CCD balance in microCCD for a given account at the given block.
 
+    Currently not in use.
 
     """
     if net not in ["mainnet", "testnet"]:
@@ -984,6 +985,7 @@ async def get_account_balance(
     """
     Endpoint to get all CCD balance in microCCD for a given account at the last final block.
 
+    Currently not in use.
 
     """
     if net not in ["mainnet", "testnet"]:
@@ -1789,6 +1791,8 @@ async def get_indicator_for_account_tx_count(
 ) -> dict:
     """
     Endpoint to get count and indicator whether account transactions count is above display limit.
+
+    Currently not in use.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

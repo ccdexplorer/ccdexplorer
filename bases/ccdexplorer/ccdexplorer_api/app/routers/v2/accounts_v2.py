@@ -1097,6 +1097,8 @@ async def get_scheduled_release_accounts(
     with the timestamp of the first pending scheduled release
     for that account. (Note, this only identifies accounts by index,
     and only indicates the first pending release for each account.)
+
+    Currently not in use.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

@@ -76,7 +76,7 @@ async def get_transaction(
     )
     tx_with_makeup = classified_tx.dct
     request.state.api_calls["Transaction Info"] = (
-        f"{request.app.api_url}/docs#/Transaction/get_transaction_v2__net__transaction__tx_hash__get"
+        f"{request.app.api_url}/docs#/Transaction/get_transaction"
     )
     return request.app.templates.TemplateResponse(
         "tx/tx.html",

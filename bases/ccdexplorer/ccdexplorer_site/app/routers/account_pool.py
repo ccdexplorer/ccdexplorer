@@ -150,6 +150,9 @@ async def get_account_payday_stats(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Current Payday Stats"] = (
+        f"{request.app.api_url}/docs#/Account/get_validator_current_payday_stats"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/current-payday-stats",
         httpx_client,
@@ -253,6 +256,10 @@ async def get_account_pool_delegators(
     Add {net}.
     """
     user: SiteUser | None = await get_user_detailsv2(request)
+    request.state.api_calls = {}
+    request.state.api_calls["Pool Delegators"] = (
+        f"{request.app.api_url}/docs#/Account/get_account_pool_delegators"
+    )
     skip = (page - 1) * size
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{account_index}/pool/delegators/{skip}/{size}",

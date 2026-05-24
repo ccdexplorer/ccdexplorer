@@ -833,6 +833,8 @@ async def get_contract_txs_count(
 ) -> int:
     """Return the number of transactions that impacted the contract.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.

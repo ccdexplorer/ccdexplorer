@@ -275,6 +275,9 @@ async def get_account_earliest(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Earliest Win Time"] = (
+        f"{request.app.api_url}/docs#/Account/get_validator_earliest_win_time"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/earliest-win-time",
         httpx_client,
@@ -308,6 +311,9 @@ async def get_account_aliases_in_use(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Aliases in Use"] = (
+        f"{request.app.api_url}/docs#/Account/get_aliases_in_use_for_account"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{account_address}/aliases-in-use",
         httpx_client,
@@ -336,6 +342,9 @@ async def get_validator_pool_apy_rewards(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Validator/Account Staking Rewards"] = (
+        f"{request.app.api_url}/docs#/Account/get_staking_rewards_object"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{validator_id}/staking-rewards-object",
         httpx_client,
@@ -361,6 +370,9 @@ async def get_account_payday_stats(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     request.state.api_calls = {}
+    request.state.api_calls["Current Payday Stats"] = (
+        f"{request.app.api_url}/docs#/Account/get_validator_current_payday_stats"
+    )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/current-payday-stats",
         httpx_client,

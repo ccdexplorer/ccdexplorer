@@ -120,24 +120,24 @@ async def redirect_to_mainnet(
 
     if net == "mainnet":
         request.state.api_calls["TPS"] = (
-            f"{request.app.api_url}/docs#/Transactions/get_transactions_tps_v2__net__transactions_info_tps_get"
+            f"{request.app.api_url}/docs#/Transactions/get_transactions_tps"
         )
         request.state.api_calls["Markets Info"] = (
-            f"{request.app.api_url}/docs#/Markets/get_markets_info_v2_markets_info_get"
+            f"{request.app.api_url}/docs#/Markets/get_markets_info"
         )
 
     request.state.api_calls["Tx Count"] = (
-        f"{request.app.api_url}/docs#/Transactions/get_transactions_count_estimate_v2__net__transactions_info_count_get"
+        f"{request.app.api_url}/docs#/Transactions/get_transactions_count_estimate"
     )
 
     request.state.api_calls["Account Count"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_accounts_count_estimate_v2__net__accounts_info_count_get"
+        f"{request.app.api_url}/docs#/Accounts/get_accounts_count_estimate"
     )
     request.state.api_calls["Latest Blocks"] = (
-        f"{request.app.api_url}/docs#/Blocks/get_last_blocks_v2__net__blocks_last__count__get"
+        f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
     )
     request.state.api_calls["Latest Txs"] = (
-        f"{request.app.api_url}/docs#/Transactions/get_last_transactions_v2__net__transactions_last__count__get"
+        f"{request.app.api_url}/docs#/Transactions/get_last_transactions"
     )
     return request.app.templates.TemplateResponse(
         "home/home.html",
@@ -908,7 +908,7 @@ async def transactions_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Latest Txs"] = (
-        f"{request.app.api_url}/docs#/Transactions/get_last_transactions_v2__net__transactions_last__count__get"
+        f"{request.app.api_url}/docs#/Transactions/get_last_transactions"
     )
 
     return request.app.templates.TemplateResponse(
@@ -937,7 +937,7 @@ async def blocks_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Latest Blocks"] = (
-        f"{request.app.api_url}/docs#/Blocks/get_last_blocks_v2__net__blocks_last__count__get"
+        f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
     )
 
     return request.app.templates.TemplateResponse(
@@ -964,7 +964,7 @@ async def accounts_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Latest Accounts"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_last_accounts_v2__net__accounts_last__count__get"
+        f"{request.app.api_url}/docs#/Accounts/get_last_accounts"
     )
     return request.app.templates.TemplateResponse(
         "home/accounts.html",
@@ -1034,7 +1034,7 @@ async def consensus_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Consensus Detailed Status"] = (
-        f"{request.app.api_url}/docs#/Misc/get_consensus_detailed_status_v2__net__misc_consensus_detailed_status_get"
+        f"{request.app.api_url}/docs#/Misc/get_consensus_detailed_status"
     )
     return request.app.templates.TemplateResponse(
         "home/consensus.html",
@@ -1060,7 +1060,7 @@ async def release_notes(
     release_notes = api_result.return_value if api_result.ok else []
     request.state.api_calls = {}
     request.state.api_calls["Release Notes"] = (
-        f"{request.app.api_url}/docs#/Misc/get_release_notes_v2_misc_release_notes_get"
+        f"{request.app.api_url}/docs#/Misc/get_release_notes"
     )
     return request.app.templates.TemplateResponse(
         "base/release_notes.html",

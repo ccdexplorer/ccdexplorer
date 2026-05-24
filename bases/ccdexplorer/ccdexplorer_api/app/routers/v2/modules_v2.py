@@ -117,6 +117,8 @@ async def get_modules_list(
 ) -> dict:
     """Page through modules.
 
+    Currently not in use.
+
     Args:
         request: FastAPI request context providing pagination limits.
         net: Network identifier, must be ``mainnet`` or ``testnet``.

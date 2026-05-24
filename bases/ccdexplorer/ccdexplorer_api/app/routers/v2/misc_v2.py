@@ -815,6 +815,9 @@ async def get_sellers_and_buyers_for_period(
 ):
     """
     This endpoint retrieves sellers and buyers to known exchange accounts.
+
+    Currently not in use.
+
     Possible values for period (in hours):
     h1 = 1
     d1 = 24
@@ -946,6 +949,8 @@ async def get_winning_bakers_epoch(
 ) -> dict:
     """
     Endpoint to get a summary of winning bakers for a given epoch and genesis index.
+
+    Currently not in use.
     """
     if net not in ["mainnet", "testnet"]:
         raise HTTPException(

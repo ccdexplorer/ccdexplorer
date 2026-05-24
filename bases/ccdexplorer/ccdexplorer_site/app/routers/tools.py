@@ -173,6 +173,10 @@ async def get_projects_overview(
     net: str,
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    request.state.api_calls = {}
+    request.state.api_calls["Project IDs"] = (
+        f"{request.app.api_url}/docs#/Misc/get_all_project_ids"
+    )
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/mainnet/misc/projects/all-ids",
@@ -203,6 +207,9 @@ async def business_accounts_page(
 
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
+    request.state.api_calls["Business Accounts"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_business_accounts"
+    )
 
     return request.app.templates.TemplateResponse(
         "tools/business-accounts.html",
@@ -273,6 +280,10 @@ async def get_validators_failed_rounds(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
     tags: dict = Depends(get_labeled_accounts),
 ):
+    request.state.api_calls = {}
+    request.state.api_calls["Validators Failed Rounds"] = (
+        f"{request.app.api_url}/docs#/Misc/get_validators_failed_rounds"
+    )
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/mainnet/misc/validators-failed-rounds",
@@ -299,6 +310,16 @@ async def chain_information(
     net: str,
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    request.state.api_calls = {}
+    request.state.api_calls["Identity Providers"] = (
+        f"{request.app.api_url}/docs#/Misc/get_identity_providers"
+    )
+    request.state.api_calls["Anonymity Revokers"] = (
+        f"{request.app.api_url}/docs#/Misc/get_anonymity_revokers"
+    )
+    request.state.api_calls["Credential IP Usage"] = (
+        f"{request.app.api_url}/docs#/Accounts/get_credential_ip_usage_summary"
+    )
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/misc/identity-providers",
@@ -400,6 +421,10 @@ async def labeled_accounts(
     # tags_community: dict = Depends(get_community_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
+    request.state.api_calls = {}
+    request.state.api_calls["Project IDs"] = (
+        f"{request.app.api_url}/docs#/Misc/get_all_project_ids"
+    )
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/misc/projects/all-ids",
@@ -728,7 +753,10 @@ async def transactions_by_type_page(
     tx_type_counts = {x["_id"]: x["count"] for x in tx_type_counts}  # type: ignore
     request.state.api_calls = {}
     request.state.api_calls["Latest Txs"] = (
-        f"{request.app.api_url}/docs#/Transactions/get_last_transactions_v2__net__transactions_last__count__get"
+        f"{request.app.api_url}/docs#/Transactions/get_last_transactions"
+    )
+    request.state.api_calls["Transaction Types"] = (
+        f"{request.app.api_url}/docs#/Transactions/get_transaction_types"
     )
 
     return request.app.templates.TemplateResponse(
@@ -967,7 +995,7 @@ async def accounts_scheduled_release(
 
     request.state.api_calls = {}
     request.state.api_calls["Accounts Scheduled Release"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_scheduled_release_accounts_v2__net__accounts_scheduled_release_get"
+        f"{request.app.api_url}/docs#/Accounts/get_scheduled_release_accounts"
     )
 
     return request.app.templates.TemplateResponse(
@@ -1059,13 +1087,13 @@ async def accounts_cooldown(
 
     request.state.api_calls = {}
     request.state.api_calls["Accounts Cooldown"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_cooldown_accounts_v2__net__accounts_cooldown_get"
+        f"{request.app.api_url}/docs#/Accounts/get_cooldown_accounts"
     )
     request.state.api_calls["Accounts Pre Cooldown"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_pre_cooldown_accounts_v2__net__accounts_pre_cooldown_get"
+        f"{request.app.api_url}/docs#/Accounts/get_pre_cooldown_accounts"
     )
     request.state.api_calls["Accounts Pre Pre Cooldown"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_pre_pre_cooldown_accounts_v2__net__accounts_pre_pre_cooldown_get"
+        f"{request.app.api_url}/docs#/Accounts/get_pre_pre_cooldown_accounts"
     )
     return request.app.templates.TemplateResponse(
         "tools/accounts-cooldown.html",
