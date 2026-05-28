@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import datetime as dt
 import os
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 import httpx
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
+from pymongo import AsyncMongoClient
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -29,7 +31,9 @@ DEFAULT_DENIED_PATH_PREFIXES = (
 class Settings:
     api_base_url: str
     api_key: str
-    mcp_auth_token: str | None
+    api_key_scope: str
+    mongo_uri: str
+    api_key_cache_ttl: float
     request_timeout: float
 
 
@@ -40,6 +44,10 @@ def load_settings() -> Settings:
     if not api_key:
         raise RuntimeError("Set API_CODEX_KEY or CCDEXPLORER_API_KEY for CCDExplorer MCP.")
 
+    mongo_uri = os.environ.get("MONGO_URI")
+    if not mongo_uri:
+        raise RuntimeError("Set MONGO_URI for CCDExplorer MCP API key validation.")
+
     api_base_url = os.environ.get("CCDEXPLORER_API_BASE_URL", "https://api.ccdexplorer.io").rstrip(
         "/"
     )
@@ -47,7 +55,9 @@ def load_settings() -> Settings:
     return Settings(
         api_base_url=api_base_url,
         api_key=api_key,
-        mcp_auth_token=os.environ.get("CCDEXPLORER_MCP_AUTH_TOKEN", api_key),
+        api_key_scope=os.environ.get("CCDEXPLORER_API_KEY_SCOPE", api_base_url),
+        mongo_uri=mongo_uri,
+        api_key_cache_ttl=float(os.environ.get("CCDEXPLORER_MCP_API_KEY_CACHE_TTL", "5")),
         request_timeout=float(os.environ.get("CCDEXPLORER_MCP_REQUEST_TIMEOUT", "20")),
     )
 
@@ -145,22 +155,83 @@ def create_mcp(settings: Settings | None = None) -> FastMCP:
     return mcp
 
 
-class BearerTokenMiddleware:
-    def __init__(self, app, token: str | None):
+def api_key_from_headers(headers: Mapping[bytes, bytes]) -> str | None:
+    api_key = headers.get(b"x-ccdexplorer-key", b"").decode().strip()
+    if api_key:
+        return api_key
+
+    authorization = headers.get(b"authorization", b"").decode()
+    if not authorization:
+        return None
+
+    scheme, _, credentials = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+
+    credentials = credentials.strip()
+    return credentials or None
+
+
+class ApiKeyValidator:
+    def __init__(self, mongo_uri: str, scope: str, cache_ttl: float):
+        self.mongo_uri = mongo_uri
+        self.scope = scope
+        self.cache_ttl = cache_ttl
+        self.client = AsyncMongoClient(mongo_uri)
+        self.api_keys: dict[str, dict[str, Any]] = {}
+        self.api_keys_last_requested = dt.datetime.min.replace(tzinfo=dt.UTC)
+
+    async def get_api_keys(self) -> dict[str, dict[str, Any]]:
+        now = dt.datetime.now().astimezone(dt.UTC)
+        if (
+            self.api_keys
+            and (now - self.api_keys_last_requested).total_seconds() < self.cache_ttl
+        ):
+            return self.api_keys
+
+        pipeline = [
+            {"$match": {"scope": self.scope}},
+            {"$match": {"api_key_end_date": {"$gte": now}}},
+        ]
+        coll = self.client["concordium_utilities"]["api_api_keys"]
+
+        keys = {}
+        cursor = await coll.aggregate(pipeline)
+        async for document in cursor:
+            keys[document["_id"]] = document
+
+        self.api_keys = keys
+        self.api_keys_last_requested = now
+        return keys
+
+    async def is_valid(self, api_key: str | None) -> bool:
+        if not api_key:
+            return False
+
+        api_keys = await self.get_api_keys()
+        return api_key in api_keys
+
+    async def aclose(self) -> None:
+        close = getattr(self.client, "close", None)
+        if close is not None:
+            result = close()
+            if hasattr(result, "__await__"):
+                await result
+
+
+class ApiKeyAuthMiddleware:
+    def __init__(self, app, validator: ApiKeyValidator):
         self.app = app
-        self.token = token
+        self.validator = validator
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or self.token is None or scope.get("path") == "/health":
+        if scope["type"] != "http" or scope.get("path") == "/health":
             await self.app(scope, receive, send)
             return
 
         headers = {name.lower(): value for name, value in scope.get("headers", [])}
-        authorization = headers.get(b"authorization", b"").decode()
-        api_key = headers.get(b"x-ccdexplorer-key", b"").decode()
-        expected_bearer = f"Bearer {self.token}"
-
-        if authorization == expected_bearer or api_key == self.token:
+        api_key = api_key_from_headers(headers)
+        if await self.validator.is_valid(api_key):
             await self.app(scope, receive, send)
             return
 
@@ -171,7 +242,11 @@ class BearerTokenMiddleware:
 def create_app(settings: Settings | None = None):
     settings = settings or load_settings()
     mcp = create_mcp(settings)
-    return BearerTokenMiddleware(
+    return ApiKeyAuthMiddleware(
         mcp.http_app(path="/mcp", stateless_http=True),
-        settings.mcp_auth_token,
+        ApiKeyValidator(
+            mongo_uri=settings.mongo_uri,
+            scope=settings.api_key_scope,
+            cache_ttl=settings.api_key_cache_ttl,
+        ),
     )

@@ -12,9 +12,12 @@ NGINX and does not need to be duplicated in this service.
   the CCDExplorer API.
 - `CCDEXPLORER_API_BASE_URL`: stable API base URL. Defaults to
   `https://api.ccdexplorer.io`.
-- `CCDEXPLORER_MCP_AUTH_TOKEN`: optional token accepted by `/mcp` as either
-  `Authorization: Bearer <token>` or `x-ccdexplorer-key: <token>`. Defaults to the
-  API key above.
+- `MONGO_URI`: MongoDB connection string used to validate incoming MCP API keys
+  against `concordium_utilities.api_api_keys`.
+- `CCDEXPLORER_API_KEY_SCOPE`: API key scope used for incoming MCP authentication.
+  Defaults to `CCDEXPLORER_API_BASE_URL`.
+- `CCDEXPLORER_MCP_API_KEY_CACHE_TTL`: seconds to cache valid API keys from MongoDB.
+  Defaults to `5`.
 - `CCDEXPLORER_MCP_REQUEST_TIMEOUT`: outbound API request timeout in seconds.
   Defaults to `20`.
 
