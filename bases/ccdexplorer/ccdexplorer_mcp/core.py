@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import os
+import uuid
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -152,6 +154,67 @@ def create_mcp(settings: Settings | None = None) -> FastMCP:
     async def health_check(request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
+    @mcp.custom_route("/mcp/.well-known/oauth-protected-resource", methods=["GET"])
+    async def oauth_protected_resource(request: Request) -> JSONResponse:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
+        base = f"https://{host}/mcp"
+        return JSONResponse({
+            "resource": base,
+            "authorization_servers": [base],
+            "bearer_methods_supported": ["header"],
+            "scopes_supported": ["mcp"],
+        })
+
+    @mcp.custom_route("/mcp/.well-known/oauth-authorization-server", methods=["GET"])
+    async def oauth_authorization_server(request: Request) -> JSONResponse:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
+        issuer = f"https://{host}/mcp"
+        return JSONResponse({
+            "issuer": issuer,
+            "token_endpoint": f"{issuer}/oauth/token",
+            "registration_endpoint": f"{issuer}/oauth/register",
+            "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+            "grant_types_supported": ["client_credentials"],
+            "response_types_supported": [],
+            "scopes_supported": ["mcp"],
+        })
+
+    @mcp.custom_route("/mcp/oauth/register", methods=["POST"])
+    async def oauth_register(request: Request) -> JSONResponse:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        return JSONResponse(
+            {
+                "client_id": body.get("client_id") or str(uuid.uuid4()),
+                "client_secret": body.get("client_secret", ""),
+                "client_secret_expires_at": 0,
+                "token_endpoint_auth_method": "client_secret_post",
+                "grant_types": ["client_credentials"],
+            },
+            status_code=201,
+        )
+
+    @mcp.custom_route("/mcp/oauth/token", methods=["POST"])
+    async def oauth_token(request: Request) -> JSONResponse:
+        client_secret = ""
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("basic "):
+            try:
+                _, _, client_secret = base64.b64decode(auth[6:]).decode().partition(":")
+            except Exception:
+                pass
+        if not client_secret:
+            form = await request.form()
+            client_secret = form.get("client_secret", "")
+        return JSONResponse({
+            "access_token": client_secret,
+            "token_type": "Bearer",
+            "expires_in": 86400,
+            "scope": "mcp",
+        })
+
     return mcp
 
 
@@ -219,13 +282,22 @@ class ApiKeyValidator:
                 await result
 
 
+_UNAUTHED_PATHS = frozenset({
+    "/health",
+    "/mcp/.well-known/oauth-protected-resource",
+    "/mcp/.well-known/oauth-authorization-server",
+    "/mcp/oauth/register",
+    "/mcp/oauth/token",
+})
+
+
 class ApiKeyAuthMiddleware:
     def __init__(self, app, validator: ApiKeyValidator):
         self.app = app
         self.validator = validator
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] != "http" or scope.get("path") == "/health":
+        if scope["type"] != "http" or scope.get("path") in _UNAUTHED_PATHS:
             await self.app(scope, receive, send)
             return
 
@@ -235,7 +307,16 @@ class ApiKeyAuthMiddleware:
             await self.app(scope, receive, send)
             return
 
-        response = JSONResponse({"detail": "Unauthorized access."}, status_code=401)
+        host = headers.get(b"host", b"api.ccdexplorer.io").decode()
+        www_auth = (
+            f'Bearer realm="https://{host}/mcp",'
+            f' resource_metadata="https://{host}/mcp/.well-known/oauth-protected-resource"'
+        )
+        response = JSONResponse(
+            {"detail": "Unauthorized access."},
+            status_code=401,
+            headers={"WWW-Authenticate": www_auth},
+        )
         await response(scope, receive, send)
 
 

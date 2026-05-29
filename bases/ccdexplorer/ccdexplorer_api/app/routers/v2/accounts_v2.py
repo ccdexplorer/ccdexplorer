@@ -576,7 +576,7 @@ async def get_nodes_and_validators(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """
-    Endpoint to get nodes and validators.
+    Endpoint to get nodes and validators. Note: validator information is updated once a day at the payday moment.
 
     """
     if net not in ["mainnet", "testnet"]:
