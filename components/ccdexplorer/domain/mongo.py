@@ -35,6 +35,15 @@ from ccdexplorer.domain.cis import (
     withdrawCCDEvent,
     withdrawCIS2TokensEvent,
     fiveStarsRegisterAccessEvent,
+    externalKeyRegisteredEvent,
+    externalKeyRevokedEvent,
+    updateMetadataEventCIS8,
+    agentRegisteredEvent,
+    agentURIUpdatedEvent,
+    agentExternalReferenceSetEvent,
+    agentMetadataSetEvent,
+    agentRevokedEvent,
+    agentWalletSetEvent,
 )
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -119,6 +128,13 @@ class LoggedEvents(Enum):
     recovation_key_event = 244
     item_created_event = 237
     item_status_changed = 236
+    external_key_registered = 231
+    external_key_revoked = 232
+    update_metadata_cis8 = 233
+    agent_registered = 240
+    agent_uri_updated = 241
+    agent_external_reference_set = 242
+    agent_metadata_set = 243
 
 
 class LEEventInfo(BaseModel):
@@ -207,6 +223,15 @@ class MongoTypeLoggedEventV2(BaseModel):
         | withdrawCCDEvent
         | withdrawCIS2TokensEvent
         | fiveStarsRegisterAccessEvent
+        | externalKeyRegisteredEvent
+        | externalKeyRevokedEvent
+        | updateMetadataEventCIS8
+        | agentRegisteredEvent
+        | agentURIUpdatedEvent
+        | agentExternalReferenceSetEvent
+        | agentMetadataSetEvent
+        | agentRevokedEvent
+        | agentWalletSetEvent
     ] = None
     to_address_canonical: Optional[str] = None
     from_address_canonical: Optional[str] = None

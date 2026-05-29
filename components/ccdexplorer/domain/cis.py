@@ -456,3 +456,197 @@ class fiveStarsRegisterAccessEvent(BaseModel):
     tag: int
     public_key: Optional[str] = None
     timestamp: Optional[int] = None
+
+
+# CIS-8 External Key Registry
+
+
+class ExternalKeyId(BaseModel):
+    """An external key identifier from CIS-8.
+
+    Attributes:
+        namespace (str): The namespace of the external key.
+        key_type (str): The type of the external key.
+        public_key (str): The public key bytes as hex.
+    """
+
+    namespace: str
+    key_type: str
+    public_key: str  # hex
+
+
+class externalKeyRegisteredEvent(BaseModel):
+    """An external key registered event from a CIS-8 compliant smart contract.
+
+    See: [ExternalKeyRegistered](http://proposals.concordium.com/CIS/cis-8.html)
+
+    Attributes:
+        tag (int): The event tag (231).
+        owner (str): The Concordium account address that owns this registration.
+        external_key (ExternalKeyId): The registered external key.
+    """
+
+    tag: int
+    owner: str
+    external_key: ExternalKeyId
+
+
+class externalKeyRevokedEvent(BaseModel):
+    """An external key revoked event from a CIS-8 compliant smart contract.
+
+    See: [ExternalKeyRevoked](http://proposals.concordium.com/CIS/cis-8.html)
+
+    Attributes:
+        tag (int): The event tag (232).
+        owner (str): The Concordium account address that owned this registration.
+        external_key (ExternalKeyId): The revoked external key.
+    """
+
+    tag: int
+    owner: str
+    external_key: ExternalKeyId
+
+
+class updateMetadataEventCIS8(BaseModel):
+    """A metadata update event from a CIS-8 compliant smart contract.
+
+    See: [UpdateMetadata](http://proposals.concordium.com/CIS/cis-8.html)
+
+    Attributes:
+        tag (int): The event tag (233).
+        owner (str): The Concordium account address that owns the registration.
+        external_key (ExternalKeyId): The external key whose metadata was updated.
+        metadata (list[dict]): List of key/value metadata entries.
+    """
+
+    tag: int
+    owner: str
+    external_key: ExternalKeyId
+    metadata: list[dict]
+
+
+# CIS-8004 Agent Registry
+
+
+class AgentExternalReference(BaseModel):
+    """An external reference to a CIS-8 registry entry, used in CIS-8004.
+
+    Attributes:
+        contract_index (int): The contract index of the CIS-8 registry.
+        contract_subindex (int): The contract subindex of the CIS-8 registry.
+        kind (str): Always "Cis8".
+        external_key (ExternalKeyId): The referenced external key.
+    """
+
+    contract_index: int
+    contract_subindex: int
+    kind: str
+    external_key: ExternalKeyId
+
+
+class agentRegisteredEvent(BaseModel):
+    """An agent registered event from a CIS-8004 compliant smart contract.
+
+    See: [Registered](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (240).
+        agent_token_id (str): The agent NFT token id (8 bytes as hex).
+        owner (str): The account address of the agent owner.
+        agent_uri (Optional[str]): Optional URI for the agent.
+        external_reference (Optional[AgentExternalReference]): Optional CIS-8 external reference.
+        metadata_hash (Optional[str]): Optional 32-byte SHA-256 hash of the URI content as hex.
+    """
+
+    tag: int
+    agent_token_id: str
+    owner: str
+    agent_uri: Optional[str] = None
+    external_reference: Optional[AgentExternalReference] = None
+    metadata_hash: Optional[str] = None
+
+
+class agentURIUpdatedEvent(BaseModel):
+    """An agent URI updated event from a CIS-8004 compliant smart contract.
+
+    See: [URIUpdated](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (241).
+        agent_token_id (str): The agent NFT token id.
+        agent_uri (Optional[str]): The new URI, or None if cleared.
+        metadata_hash (Optional[str]): Optional 32-byte SHA-256 hash of the URI content as hex.
+    """
+
+    tag: int
+    agent_token_id: str
+    agent_uri: Optional[str] = None
+    metadata_hash: Optional[str] = None
+
+
+class agentExternalReferenceSetEvent(BaseModel):
+    """An agent external reference set event from a CIS-8004 compliant smart contract.
+
+    See: [ExternalReferenceSet](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (242).
+        agent_token_id (str): The agent NFT token id.
+        external_reference (Optional[AgentExternalReference]): The new reference, or None if cleared.
+    """
+
+    tag: int
+    agent_token_id: str
+    external_reference: Optional[AgentExternalReference] = None
+
+
+class agentMetadataSetEvent(BaseModel):
+    """An agent metadata set event from a CIS-8004 compliant smart contract.
+
+    See: [MetadataSet](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (243).
+        agent_token_id (str): The agent NFT token id.
+        key (str): The metadata key.
+        value (str): The metadata value bytes as hex.
+    """
+
+    tag: int
+    agent_token_id: str
+    key: str
+    value: str  # hex of bytestring value
+
+
+class agentRevokedEvent(BaseModel):
+    """An agent revoked event from a CIS-8004 compliant smart contract.
+
+    See: [Revoked](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (244).
+        agent_token_id (str): The agent NFT token id.
+        owner (str): The account address of the agent owner.
+        reason (Optional[str]): Optional revocation reason string.
+    """
+
+    tag: int
+    agent_token_id: str
+    owner: str
+    reason: Optional[str] = None
+
+
+class agentWalletSetEvent(BaseModel):
+    """An agent wallet set event from a CIS-8004 compliant smart contract.
+
+    See: [AgentWalletSet](http://proposals.concordium.com/CIS/cis-8004.html)
+
+    Attributes:
+        tag (int): The event tag (245).
+        agent_token_id (str): The agent NFT token id.
+        wallet (Optional[str]): The new wallet account address, or None if cleared.
+    """
+
+    tag: int
+    agent_token_id: str
+    wallet: Optional[str] = None
