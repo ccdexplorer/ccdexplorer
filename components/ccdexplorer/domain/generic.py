@@ -39,6 +39,8 @@ class StandardIdentifiers(Enum):
     CIS_4 = "CIS-4"
     CIS_5 = "CIS-5"
     CIS_6 = "CIS-6"
+    CIS_8 = "CIS-8"
+    CIS_8004 = "CIS-8004"
 
 
 class CredentialShort(BaseModel):
