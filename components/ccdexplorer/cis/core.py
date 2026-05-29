@@ -26,6 +26,8 @@ import leb128
 from ccdexplorer.domain.cis import (
     MetadataUrl,
     SchemaRef,
+    ExternalKeyId,
+    AgentExternalReference,
     burnEvent,
     credentialMetadataEvent,
     credentialSchemaRefEvent,
@@ -48,6 +50,15 @@ from ccdexplorer.domain.cis import (
     updateOperatorEvent,
     withdrawCCDEvent,
     withdrawCIS2TokensEvent,
+    externalKeyRegisteredEvent,
+    externalKeyRevokedEvent,
+    updateMetadataEventCIS8,
+    agentRegisteredEvent,
+    agentURIUpdatedEvent,
+    agentExternalReferenceSetEvent,
+    agentMetadataSetEvent,
+    agentRevokedEvent,
+    agentWalletSetEvent,
 )
 from ccdexplorer.domain.generic import StandardIdentifiers
 from ccdexplorer.domain.mongo import (
@@ -1948,6 +1959,185 @@ class CIS:
             }
         )
 
+    # -------------------------------------------------------------------------
+    # CIS-8 / CIS-8004 helpers
+    # -------------------------------------------------------------------------
+
+    def _read_string(self, bs: io.BytesIO) -> str:
+        # Concordium's native String serialization uses a 4-byte (u32) length prefix
+        length = int.from_bytes(bs.read(4), "little")
+        return bs.read(length).decode("utf-8")
+
+    def _read_bytestring(self, bs: io.BytesIO) -> str:
+        length = int.from_bytes(bs.read(2), "little")
+        return bs.read(length).hex()
+
+    def _external_key_id(self, bs: io.BytesIO) -> ExternalKeyId:
+        return ExternalKeyId(
+            namespace=self._read_string(bs),
+            key_type=self._read_string(bs),
+            public_key=self._read_bytestring(bs),
+        )
+
+    def _optional_string(self, bs: io.BytesIO) -> str | None:
+        flag = int.from_bytes(bs.read(1), "little")
+        return self._read_string(bs) if flag == 1 else None
+
+    def _optional_account_address(self, bs: io.BytesIO) -> str | None:
+        flag = int.from_bytes(bs.read(1), "little")
+        return self.account_address(bs) if flag == 1 else None
+
+    def _optional_metadata_hash(self, bs: io.BytesIO) -> str | None:
+        flag = int.from_bytes(bs.read(1), "little")
+        return bs.read(32).hex() if flag == 1 else None
+
+    def _optional_ext_ref(self, bs: io.BytesIO) -> AgentExternalReference | None:
+        flag = int.from_bytes(bs.read(1), "little")
+        if flag == 0:
+            return None
+        contract_index = int.from_bytes(bs.read(8), "little")
+        contract_subindex = int.from_bytes(bs.read(8), "little")
+        _kind_tag = int.from_bytes(bs.read(1), "little")  # always 0 for Cis8
+        eki = self._external_key_id(bs)
+        return AgentExternalReference(
+            contract_index=contract_index,
+            contract_subindex=contract_subindex,
+            kind="Cis8",
+            external_key=eki,
+        )
+
+    # -------------------------------------------------------------------------
+    # CIS-8 event parsers
+    # -------------------------------------------------------------------------
+
+    def cis8ExternalKeyRegisteredEvent(self, hexParameter: str) -> externalKeyRegisteredEvent:
+        """Parse an ExternalKeyRegistered event (tag 231) from CIS-8.
+
+        See: https://proposals.concordium.com/CIS/cis-8.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        owner_ = self.account_address(bs)
+        eki_ = self._external_key_id(bs)
+        return externalKeyRegisteredEvent(tag=tag_, owner=owner_, external_key=eki_)
+
+    def cis8ExternalKeyRevokedEvent(self, hexParameter: str) -> externalKeyRevokedEvent:
+        """Parse an ExternalKeyRevoked event (tag 232) from CIS-8.
+
+        See: https://proposals.concordium.com/CIS/cis-8.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        owner_ = self.account_address(bs)
+        eki_ = self._external_key_id(bs)
+        return externalKeyRevokedEvent(tag=tag_, owner=owner_, external_key=eki_)
+
+    def cis8UpdateMetadataEvent(self, hexParameter: str) -> updateMetadataEventCIS8:
+        """Parse an UpdateMetadata event (tag 233) from CIS-8.
+
+        See: https://proposals.concordium.com/CIS/cis-8.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        owner_ = self.account_address(bs)
+        eki_ = self._external_key_id(bs)
+        count = int.from_bytes(bs.read(2), "little")
+        metadata_ = [
+            {"key": self._read_string(bs), "value": self._read_string(bs)}
+            for _ in range(count)
+        ]
+        return updateMetadataEventCIS8(tag=tag_, owner=owner_, external_key=eki_, metadata=metadata_)
+
+    # -------------------------------------------------------------------------
+    # CIS-8004 event parsers
+    # -------------------------------------------------------------------------
+
+    def cis8004RegisteredEvent(self, hexParameter: str) -> agentRegisteredEvent:
+        """Parse a Registered event (tag 240) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        owner_ = self.account_address(bs)
+        agent_uri_ = self._optional_string(bs)
+        ext_ref_ = self._optional_ext_ref(bs)
+        metadata_hash_ = self._optional_metadata_hash(bs)
+        return agentRegisteredEvent(
+            tag=tag_,
+            agent_token_id=agent_token_id_,
+            owner=owner_,
+            agent_uri=agent_uri_,
+            external_reference=ext_ref_,
+            metadata_hash=metadata_hash_,
+        )
+
+    def cis8004URIUpdatedEvent(self, hexParameter: str) -> agentURIUpdatedEvent:
+        """Parse a URIUpdated event (tag 241) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        agent_uri_ = self._optional_string(bs)
+        metadata_hash_ = self._optional_metadata_hash(bs)
+        return agentURIUpdatedEvent(
+            tag=tag_,
+            agent_token_id=agent_token_id_,
+            agent_uri=agent_uri_,
+            metadata_hash=metadata_hash_,
+        )
+
+    def cis8004ExternalReferenceSetEvent(self, hexParameter: str) -> agentExternalReferenceSetEvent:
+        """Parse an ExternalReferenceSet event (tag 242) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        ext_ref_ = self._optional_ext_ref(bs)
+        return agentExternalReferenceSetEvent(
+            tag=tag_, agent_token_id=agent_token_id_, external_reference=ext_ref_
+        )
+
+    def cis8004MetadataSetEvent(self, hexParameter: str) -> agentMetadataSetEvent:
+        """Parse a MetadataSet event (tag 243) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        key_ = self._read_string(bs)
+        value_ = self._read_bytestring(bs)
+        return agentMetadataSetEvent(tag=tag_, agent_token_id=agent_token_id_, key=key_, value=value_)
+
+    def cis8004RevokedEvent(self, hexParameter: str) -> agentRevokedEvent:
+        """Parse a Revoked event (tag 244) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        owner_ = self.account_address(bs)
+        reason_ = self._optional_string(bs)
+        return agentRevokedEvent(tag=tag_, agent_token_id=agent_token_id_, owner=owner_, reason=reason_)
+
+    def cis8004AgentWalletSetEvent(self, hexParameter: str) -> agentWalletSetEvent:
+        """Parse an AgentWalletSet event (tag 245) from CIS-8004.
+
+        See: https://proposals.concordium.com/CIS/cis-8004.html
+        """
+        bs = io.BytesIO(bytes.fromhex(hexParameter))
+        tag_ = int.from_bytes(bs.read(1), "little")
+        agent_token_id_ = self.token_id(bs)
+        wallet_ = self._optional_account_address(bs)
+        return agentWalletSetEvent(tag=tag_, agent_token_id=agent_token_id_, wallet=wallet_)
+
     def process_log_events(
         self, hexParameter: str
     ) -> (
@@ -2548,6 +2738,111 @@ class CIS:
                     None,
                     None,
                 )
+        elif StandardIdentifiers.CIS_8 in standards:
+            if tag_ == 231:
+                try:
+                    pr_event = self.cis8ExternalKeyRegisteredEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8.external_key_registered",
+                        StandardIdentifiers.CIS_8,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 232:
+                try:
+                    pr_event = self.cis8ExternalKeyRevokedEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8.external_key_revoked",
+                        StandardIdentifiers.CIS_8,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 233:
+                try:
+                    pr_event = self.cis8UpdateMetadataEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8.update_metadata",
+                        StandardIdentifiers.CIS_8,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            else:
+                return tag_, None, None, None
+        elif StandardIdentifiers.CIS_8004 in standards:
+            if tag_ == 240:
+                try:
+                    pr_event = self.cis8004RegisteredEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.registered",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 241:
+                try:
+                    pr_event = self.cis8004URIUpdatedEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.uri_updated",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 242:
+                try:
+                    pr_event = self.cis8004ExternalReferenceSetEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.external_reference_set",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 243:
+                try:
+                    pr_event = self.cis8004MetadataSetEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.metadata_set",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 244:
+                try:
+                    pr_event = self.cis8004RevokedEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.revoked",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            elif tag_ == 245:
+                try:
+                    pr_event = self.cis8004AgentWalletSetEvent(event)
+                    return (
+                        tag_,
+                        pr_event,
+                        "CIS-8004.agent_wallet_set",
+                        StandardIdentifiers.CIS_8004,
+                    )
+                except:  # noqa: E722
+                    return tag_, None, None, None
+            else:
+                return tag_, None, None, None
         # no CIS standard support
         else:
             # 5tars custom event
