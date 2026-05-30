@@ -69,6 +69,22 @@ def process_block(self, processor: str, payload: Dict[str, Any]) -> dict | None:
         store_result_in_mongo(mongodb, task_doc)
         return None
 
+    except grpc.RpcError as e:
+        if isinstance(e, grpc.Call) and e.code() == grpc.StatusCode.NOT_FOUND:
+            raise  # transient block-not-found; autoretry handles it silently
+        tb = traceback.format_exc()
+        print(f"plt task failed at height {block_height}: {e}")
+        task_doc = TaskResult(
+            _id=self.request.id,
+            queue=processor,
+            block_height=block_height,  # type: ignore
+            net=RUN_ON_NET,  # type: ignore
+            status="FAILURE",
+            error=str(e),
+            traceback=tb,
+        )
+        store_result_in_mongo(mongodb, task_doc)
+        raise
     except Exception as e:
         tb = traceback.format_exc()
         print(f"plt task failed at height {block_height}: {e}")
