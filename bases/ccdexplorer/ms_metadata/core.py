@@ -123,12 +123,35 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
         store_result_in_mongo(mongodb, task_doc)
         return None
 
+    except grpc.RpcError as e:
+        if isinstance(e, grpc.Call) and e.code() == grpc.StatusCode.NOT_FOUND:
+            raise  # transient not-found; autoretry handles it silently
+        tb = traceback.format_exc()
+        logger.error(
+            "%s task failed for token %s: %s",
+            processor_for_consumer,
+            token_address,
+            e,
+        )
+        task_doc = TaskResult(
+            _id=self.request.id,
+            queue=processor,
+            block_height=None,  # type: ignore
+            token_address=token_address,  # type: ignore
+            net=RUN_ON_NET,  # type: ignore
+            status="FAILURE",
+            error=str(e),
+            traceback=tb,
+        )
+        store_result_in_mongo(mongodb, task_doc)
+        raise
     except Exception as e:
         tb = traceback.format_exc()
         logger.error(
-            f"{processor_for_consumer} task failed for token %s: %s",
+            "%s task failed for token %s: %s",
+            processor_for_consumer,
             token_address,
-            e,  # type: ignore
+            e,
         )
         task_doc = TaskResult(
             _id=self.request.id,
