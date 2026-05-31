@@ -64,7 +64,7 @@ async def get_user(name: str, session):
 def login_get(request: Request):
     user = get_user_details(request)
     context = {"request": request, "env": environment, "user": user}
-    return request.app.state.templates.TemplateResponse("auth/login.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/login.html", context)
 
 
 @router.get("/register", response_class=HTMLResponse)
@@ -73,7 +73,7 @@ def register_get(request: Request):
         "request": request,
         "env": environment,
     }
-    return request.app.state.templates.TemplateResponse("auth/register.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/register.html", context)
 
 
 @router.post("/login")
@@ -91,12 +91,12 @@ async def login(
     if user is None:
         error = "Can't find user and/or password is wrong. "
         context = {"request": request, "env": environment, "errors": [error]}
-        return request.app.state.templates.TemplateResponse("auth/login.html", context)  # type: ignore
+        return request.app.state.templates.TemplateResponse(request, "auth/login.html", context)  # type: ignore
 
     if not verify_password(form_data.password, user.password):
         error = "Can't find user and/or password is wrong. "
         context = {"request": request, "env": environment, "errors": [error]}
-        return request.app.state.templates.TemplateResponse("auth/login.html", context)  # type: ignore
+        return request.app.state.templates.TemplateResponse(request, "auth/login.html", context)  # type: ignore
 
     response = RedirectResponse(url="/account", status_code=303)
     manager.set_cookie(response, user.token)
@@ -117,7 +117,7 @@ async def forgot_password(
         "request": request,
         "env": environment,
     }
-    return request.app.state.templates.TemplateResponse("auth/forgot_password.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/forgot_password.html", context)
 
 
 @router.get("/reset-password-action/{reset_password_token}")
@@ -140,7 +140,7 @@ async def reset_password_action(
         "env": environment,
         "reset_password_token": reset_password_token,
     }
-    return request.app.state.templates.TemplateResponse("auth/reset_password.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/reset_password.html", context)
 
 
 @router.post("/reset-password")
@@ -181,7 +181,7 @@ async def forgot_password_action(
         "request": request,
         "env": environment,
     }
-    return request.app.state.templates.TemplateResponse("auth/forgot_password_action.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/forgot_password_action.html", context)
 
 
 @router.post("/set-password")
@@ -291,7 +291,7 @@ async def register(
             "env": environment,
             "errors": ["email address already registered."],
         }
-    return request.app.state.templates.TemplateResponse("auth/register.html", context)
+    return request.app.state.templates.TemplateResponse(request, "auth/register.html", context)
 
 
 @router.get("/logout")

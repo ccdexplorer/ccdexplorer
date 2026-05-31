@@ -32,7 +32,7 @@ async def home_route(
         "plans_for_display": plans_for_display,
         "eur_plts": eur_plts,
     }
-    return request.app.state.templates.TemplateResponse("plans/home.html", context)
+    return request.app.state.templates.TemplateResponse(request, "plans/home.html", context)
 
 
 @router.get("/live_port")

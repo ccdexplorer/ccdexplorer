@@ -184,7 +184,7 @@ async def account_home(
         "plan_daily_fee": plan_daily_fee,
         "net": API_NET,
     }
-    return request.app.state.templates.TemplateResponse("account/home.html", context)
+    return request.app.state.templates.TemplateResponse(request, "account/home.html", context)
 
 
 @router.get("/account/keys")
@@ -209,7 +209,7 @@ async def account_keys(request: Request):
         "user": user,
         "user_api_keys": user_api_keys,
     }
-    return request.app.state.templates.TemplateResponse("account/keys.html", context)
+    return request.app.state.templates.TemplateResponse(request, "account/keys.html", context)
 
 
 @router.post(
