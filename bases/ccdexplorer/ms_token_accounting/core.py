@@ -71,7 +71,7 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
 
     except grpc.RpcError as e:
         if isinstance(e, grpc.Call) and e.code() == grpc.StatusCode.NOT_FOUND:
-            raise  # transient block-not-found; autoretry handles it silently
+            raise ConnectionError("block not found (transient)") from None
         tb = traceback.format_exc()
         logger.error("%s task failed at height %s: %s", processor_for_consumer, block_height, e)
         task_doc = TaskResult(

@@ -125,7 +125,7 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
 
     except grpc.RpcError as e:
         if isinstance(e, grpc.Call) and e.code() == grpc.StatusCode.NOT_FOUND:
-            raise  # transient not-found; autoretry handles it silently
+            raise ConnectionError("not found (transient)") from None
         tb = traceback.format_exc()
         logger.error(
             "%s task failed for token %s: %s",
