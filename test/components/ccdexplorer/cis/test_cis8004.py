@@ -41,6 +41,20 @@ def test_cis8004_uri_updated_event(cis: CIS):
     )
 
 
+def test_cis8004_registered_event_with_metadata_hash(cis: CIS):
+    # physid.ai agent — metadata_hash present, ext_ref absent
+    # field order: uri → metadata_hash → ext_ref (implementation adds hash before spec ext_ref)
+    hex = "f00811000000000000007afb28bbd5b5ce42efdcd00b536235d6a6517d2055b39f8b403999f88a422937013200000068747470733a2f2f7068797369642e61692f2e77656c6c2d6b6e6f776e2f6167656e74732f72656769737472792e6a736f6e011b2d2bbb830014910b9549bc224edbd7ccf95e48250f40ea40ab37284e4cdf5c00dbbb017d9e010000"
+    parsed_result = cis.cis8004RegisteredEvent(hex)
+    assert parsed_result.tag == 240
+    assert parsed_result.agent_token_id == "1100000000000000"
+    assert parsed_result.agent_uri == "https://physid.ai/.well-known/agents/registry.json"
+    assert parsed_result.metadata_hash == (
+        "1b2d2bbb830014910b9549bc224edbd7ccf95e48250f40ea40ab37284e4cdf5c"
+    )
+    assert parsed_result.external_reference is None
+
+
 def test_cis8004_registered_event(cis: CIS):
     # from tx hash 68eec1a04f0dc80733c3d9e24f37e809fafdcc5acd5dcda04ab93b63093ed8a2 MAINNET
     # contract 10082/0, events[1], receive_name CIS-8004.register
