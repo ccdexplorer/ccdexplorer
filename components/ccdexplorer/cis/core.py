@@ -1995,8 +1995,7 @@ class CIS:
         flag = int.from_bytes(bs.read(1), "little")
         if flag == 0:
             return None
-        contract_index = int.from_bytes(bs.read(8), "little")
-        contract_subindex = int.from_bytes(bs.read(8), "little")
+        (contract_index, contract_subindex) = self.contract_address(bs)
         _kind_tag = int.from_bytes(bs.read(1), "little")  # always 0 for Cis8
         eki = self._external_key_id(bs)
         return AgentExternalReference(
@@ -2043,10 +2042,11 @@ class CIS:
         eki_ = self._external_key_id(bs)
         count = int.from_bytes(bs.read(2), "little")
         metadata_ = [
-            {"key": self._read_string(bs), "value": self._read_string(bs)}
-            for _ in range(count)
+            {"key": self._read_string(bs), "value": self._read_string(bs)} for _ in range(count)
         ]
-        return updateMetadataEventCIS8(tag=tag_, owner=owner_, external_key=eki_, metadata=metadata_)
+        return updateMetadataEventCIS8(
+            tag=tag_, owner=owner_, external_key=eki_, metadata=metadata_
+        )
 
     # -------------------------------------------------------------------------
     # CIS-8004 event parsers
@@ -2062,8 +2062,9 @@ class CIS:
         agent_token_id_ = self.token_id(bs)
         owner_ = self.account_address(bs)
         agent_uri_ = self._optional_string(bs)
-        ext_ref_ = self._optional_ext_ref(bs)
+        # implementation emits metadata_hash before ext_ref (extra fields beyond spec)
         metadata_hash_ = self._optional_metadata_hash(bs)
+        ext_ref_ = self._optional_ext_ref(bs)
         return agentRegisteredEvent(
             tag=tag_,
             agent_token_id=agent_token_id_,
@@ -2113,7 +2114,9 @@ class CIS:
         agent_token_id_ = self.token_id(bs)
         key_ = self._read_string(bs)
         value_ = self._read_bytestring(bs)
-        return agentMetadataSetEvent(tag=tag_, agent_token_id=agent_token_id_, key=key_, value=value_)
+        return agentMetadataSetEvent(
+            tag=tag_, agent_token_id=agent_token_id_, key=key_, value=value_
+        )
 
     def cis8004RevokedEvent(self, hexParameter: str) -> agentRevokedEvent:
         """Parse a Revoked event (tag 244) from CIS-8004.
@@ -2125,7 +2128,9 @@ class CIS:
         agent_token_id_ = self.token_id(bs)
         owner_ = self.account_address(bs)
         reason_ = self._optional_string(bs)
-        return agentRevokedEvent(tag=tag_, agent_token_id=agent_token_id_, owner=owner_, reason=reason_)
+        return agentRevokedEvent(
+            tag=tag_, agent_token_id=agent_token_id_, owner=owner_, reason=reason_
+        )
 
     def cis8004AgentWalletSetEvent(self, hexParameter: str) -> agentWalletSetEvent:
         """Parse an AgentWalletSet event (tag 245) from CIS-8004.
@@ -2497,7 +2502,7 @@ class CIS:
         """
         bs = io.BytesIO(bytes.fromhex(event))
         tag_ = int.from_bytes(bs.read(1), byteorder="little")
-        if StandardIdentifiers.CIS_2 in standards:
+        if StandardIdentifiers.CIS_2 in standards and tag_ in (255, 254, 253, 252, 251):
             if tag_ == 255:
                 try:
                     pr_event = self.transferEvent(event)
@@ -2543,23 +2548,18 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
+        elif StandardIdentifiers.CIS_3 in standards and tag_ == 250:
+            try:
+                pr_event = self.nonceEventCIS3(event)
+                return (
+                    tag_,
+                    pr_event,
+                    "CIS-3.nonce_event",
+                    StandardIdentifiers.CIS_3,
+                )
+            except:  # noqa: E722
                 return tag_, None, None, None
-        elif StandardIdentifiers.CIS_3 in standards:
-            if tag_ == 250:
-                try:
-                    pr_event = self.nonceEventCIS3(event)
-                    return (
-                        tag_,
-                        pr_event,
-                        "CIS-3.nonce_event",
-                        StandardIdentifiers.CIS_3,
-                    )
-                except:  # noqa: E722
-                    return tag_, None, None, None
-            else:
-                return tag_, None, None, None
-        elif StandardIdentifiers.CIS_4 in standards:
+        elif StandardIdentifiers.CIS_4 in standards and tag_ in (249, 248, 247, 246, 245, 244):
             if tag_ == 249:
                 try:
                     pr_event = self.registerCredentialEvent(event)
@@ -2626,9 +2626,7 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
-                return tag_, None, None, None
-        elif StandardIdentifiers.CIS_5 in standards:
+        elif StandardIdentifiers.CIS_5 in standards and tag_ in (250, 249, 248, 247, 246, 245, 244):
             if tag_ == 250:
                 try:
                     pr_event = self.nonceEventCIS5(event)
@@ -2706,9 +2704,7 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
-                return tag_, None, None, None
-        elif StandardIdentifiers.CIS_6 in standards:
+        elif StandardIdentifiers.CIS_6 in standards and tag_ in (237, 236):
             if tag_ == 237:
                 try:
                     pr_event = self.itemCreatedEvent(event)
@@ -2731,14 +2727,7 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
-                return (
-                    tag_,
-                    None,
-                    None,
-                    None,
-                )
-        elif StandardIdentifiers.CIS_8 in standards:
+        elif StandardIdentifiers.CIS_8 in standards and tag_ in (231, 232, 233):
             if tag_ == 231:
                 try:
                     pr_event = self.cis8ExternalKeyRegisteredEvent(event)
@@ -2772,9 +2761,7 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
-                return tag_, None, None, None
-        elif StandardIdentifiers.CIS_8004 in standards:
+        elif StandardIdentifiers.CIS_8004 in standards and tag_ in (240, 241, 242, 243, 244, 245):
             if tag_ == 240:
                 try:
                     pr_event = self.cis8004RegisteredEvent(event)
@@ -2841,21 +2828,16 @@ class CIS:
                     )
                 except:  # noqa: E722
                     return tag_, None, None, None
-            else:
+        # 5tars custom event (no CIS standard)
+        elif (contract_name == "five-stars-transaction") and (tag_ == 0):
+            try:
+                pr_event = self.fiveStarsRegisterAccess(event)
+                return (
+                    tag_,
+                    pr_event,
+                    "five_stars_register_access_event",
+                    None,
+                )
+            except:  # noqa: E722
                 return tag_, None, None, None
-        # no CIS standard support
-        else:
-            # 5tars custom event
-            if (contract_name == "five-stars-transaction") and (tag_ == 0):
-                try:
-                    pr_event = self.fiveStarsRegisterAccess(event)
-                    return (
-                        tag_,
-                        pr_event,
-                        "five_stars_register_access_event",
-                        None,
-                    )
-                except:  # noqa: E722
-                    return tag_, None, None, None
-            else:
-                return tag_, None, None, None
+        return tag_, None, None, None

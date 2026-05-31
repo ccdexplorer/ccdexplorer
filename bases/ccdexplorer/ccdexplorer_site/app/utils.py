@@ -1513,6 +1513,25 @@ async def process_event_for_makeup(req: ProcessEventRequest):
                 ),
                 None,
             )
+        elif standard == "CIS-8004":
+            token_address_as_class = await get_token_info_from_collection(
+                req,
+                CCD_ContractAddress.from_str(event_info.contract),  # type: ignore
+            )
+            return EventType(
+                f"{event_type}",
+                req.app.templates.get_template("tx/logged_events/cis-8004.html").render(
+                    {
+                        "result": result,
+                        "request": req,
+                        "token_address_as_class": token_address_as_class,
+                        "net": req.net,
+                        "tags": req.tags,
+                        "user": req.user,
+                    },
+                ),
+                None,
+            )
         elif standard == "CIS-5":
             if isinstance(
                 result,
@@ -1673,14 +1692,17 @@ async def get_token_info_from_collection(
 ):
     if not req.logged_event_from_collection.recognized_event:  # type: ignore
         return None
-    if "token_id" not in req.logged_event_from_collection.recognized_event.model_fields_set:  # type: ignore
+
+    recognized_event = req.logged_event_from_collection.recognized_event  # type: ignore
+    fields = recognized_event.model_fields_set
+    if "token_id" in fields:
+        raw_token_id = recognized_event.token_id  # type: ignore
+    elif "agent_token_id" in fields:
+        raw_token_id = recognized_event.agent_token_id  # type: ignore
+    else:
         return None
 
-    token_id = (
-        "_"
-        if req.logged_event_from_collection.recognized_event.token_id == ""  # type: ignore
-        else req.logged_event_from_collection.recognized_event.token_id  # type: ignore
-    )
+    token_id = "_" if raw_token_id == "" else raw_token_id
     api_result = await get_url_from_api(
         f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
         req.httpx_client,

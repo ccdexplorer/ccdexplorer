@@ -1,0 +1,30 @@
+{% set ai = token_address_as_class %}
+<table class="table table-borderless">
+    <!-- {% if "tag" in result.model_fields_set %}<tr class=" ">
+        <td class='text-secondary-emphasis'>Tag</td>
+        <td><span class='text-secondary-emphasis'>{{result.tag}}</span></td></tr>{% endif %} -->
+    {% if 'agent_token_id' in result.model_fields_set %}
+    <tr class="table-row-line-height ">
+        <td class='text-secondary-emphasis'>Agent Token</td>
+        <td><span class='text-secondary-emphasis '>    <a class="ccd text-break" href="/{{net}}/token/{{ai.contract|split_contract_into_url_slug_and_token_id(result.agent_token_id)}}">
+           {% if ai.token_metadata %} 
+                {{ai.token_metadata.name}}
+            {% else %}
+                {{result.agent_token_id}}
+            {% endif %}
+        </a></span></td>
+    {% endif %}
+    {% if result.owner %}<tr class="table-row-line-height">
+        <td class='text-secondary-emphasis'>Agent Owner</td>
+        <td><span class='text-secondary-emphasis'>{{result.owner|account_link(net, user, tags, app=request.app)|safe}}</span></td>
+    </tr>{% endif %}
+    {% if "agent_uri" in result.model_fields_set %}<tr class=" ">
+        <td class='text-secondary-emphasis'>Agent URI</td>
+        <td><span class='text-break text-secondary-emphasis'><a href='{{result.agent_uri}}'>{{result.agent_uri|shorten_address( address=True)}}</span></td></tr>{% endif %}
+    {% if "external_reference" in result.model_fields_set and result.external_reference is not none %}<tr class=" ">
+        <td class='text-secondary-emphasis'>Metadata Url</td>
+        <td><span class='text-break text-secondary-emphasis'>{{result.external_reference}}</span></td></tr>{% endif %}
+    {% if "metadata_hash" in result.model_fields_set %}<tr class=" ">
+        <td class='text-secondary-emphasis'>Metadata</td>
+        <td><span class='text-break text-secondary-emphasis'>{{result.metadata_hash}}</span></td></tr>{% endif %}
+</table>
