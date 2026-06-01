@@ -73,6 +73,7 @@ async def transactions_search(
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "transactions_search/start.html",
         {"request": request, "env": request.app.env, "user": user, "net": net},
     )

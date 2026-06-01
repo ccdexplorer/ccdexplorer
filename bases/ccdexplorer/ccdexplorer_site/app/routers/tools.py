@@ -185,6 +185,7 @@ async def get_projects_overview(
     projects = api_result.return_value if api_result.ok else []
 
     return request.app.templates.TemplateResponse(
+        request,
         "projects/projects.html",
         {
             "env": request.app.env,
@@ -212,6 +213,7 @@ async def business_accounts_page(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "tools/business-accounts.html",
         {
             "env": request.app.env,
@@ -292,6 +294,7 @@ async def get_validators_failed_rounds(
     validators_missed = api_result.return_value if api_result.ok else []
 
     return request.app.templates.TemplateResponse(
+        request,
         "tools/validators-missed.html",
         {
             "env": request.app.env,
@@ -341,6 +344,7 @@ async def chain_information(
     ip_counts = credential_summary.get("ip_identity_counts", {})
 
     return request.app.templates.TemplateResponse(
+        request,
         "tools/chain-information.html",
         {
             "env": request.app.env,
@@ -433,6 +437,7 @@ async def labeled_accounts(
     projects = api_result.return_value if api_result.ok else []
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "/tools/labeled-accounts.html",
             {
                 "env": environment,
@@ -473,6 +478,7 @@ async def ajax_today_in(
 
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "/tools/today_in_day.html",
             {
                 "env": environment,
@@ -497,6 +503,7 @@ async def today_in(
     yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "/tools/today_in.html",
             {
                 "env": environment,
@@ -613,6 +620,7 @@ async def search_temp(
 ):
     user: SiteUser = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "tools/temp_data.html",
         {
             "env": request.app.env,
@@ -701,6 +709,7 @@ async def transactions_search(
     chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
     date_start = dt.date(2025, 1, 1).strftime("%Y-%m-%d")
     return request.app.templates.TemplateResponse(
+        request,
         "/tools/transactions_search_home.html",
         {
             "env": environment,
@@ -723,6 +732,7 @@ async def exchange_rates(
 ):
     user: SiteUser = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "tools/exchange_rates.html",
         {
             "env": request.app.env,
@@ -760,6 +770,7 @@ async def transactions_by_type_page(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "tools/transactions_by_type2.html",
         {
             "env": request.app.env,
@@ -860,6 +871,7 @@ async def get_account_transactions_for_tabulator(
     if not latest_txs_result:
         error = f"Request error getting the most recent transactions on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -999,6 +1011,7 @@ async def accounts_scheduled_release(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "tools/accounts-scheduled-release-content.html",
         {
             "env": request.app.env,
@@ -1031,6 +1044,7 @@ async def ajax_accounts_scheduled_release(
     if not accounts:
         error = f"Request error getting scheduled release accounts on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -1096,6 +1110,7 @@ async def accounts_cooldown(
         f"{request.app.api_url}/docs#/Accounts/get_pre_pre_cooldown_accounts"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "tools/accounts-cooldown.html",
         {
             "env": request.app.env,
@@ -1147,6 +1162,7 @@ async def ajax_accounts_cooldown(
         "count": sum([x["count"] for x in summary]),
     }
     return request.app.templates.TemplateResponse(
+        request,
         "/tools/accounts-cooldown-content.html",
         {
             "env": environment,
@@ -1181,6 +1197,7 @@ async def ajax_accounts_pre_cooldown(
     # if accounts:
     #     accounts = [CCD_AccountPending(**x) for x in accounts]
     return request.app.templates.TemplateResponse(
+        request,
         "/tools/accounts-pre-cooldown-content.html",
         {
             "env": environment,
@@ -1213,6 +1230,7 @@ async def ajax_accounts_pre_pre_cooldown(
     # if accounts:
     #     accounts = [CCD_AccountPending(**x) for x in accounts]
     return request.app.templates.TemplateResponse(
+        request,
         "/tools/accounts-pre-pre-cooldown-content.html",
         {
             "env": environment,
@@ -1231,6 +1249,7 @@ async def api_direct(
     tags: dict = Depends(get_labeled_accounts),
 ):
     return request.app.templates.TemplateResponse(
+        request,
         "/tools/api_direct.html",
         {
             "env": environment,

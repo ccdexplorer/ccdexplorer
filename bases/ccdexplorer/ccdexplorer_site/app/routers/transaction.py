@@ -51,6 +51,7 @@ async def get_transaction(
     if not result:
         error = f"Can't find the transaction at {tx_hash} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -79,6 +80,7 @@ async def get_transaction(
         f"{request.app.api_url}/docs#/Transaction/get_transaction"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "tx/tx.html",
         {
             "request": request,

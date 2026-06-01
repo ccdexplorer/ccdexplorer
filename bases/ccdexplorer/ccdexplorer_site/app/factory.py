@@ -323,6 +323,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     @app.exception_handler(404)
     async def exception_handler_404(request: Request, exc: Exception):
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "env": request.app.env,
@@ -334,6 +335,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     @app.exception_handler(500)
     async def exception_handler_500(request: Request, exc: Exception):
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "env": request.app.env,

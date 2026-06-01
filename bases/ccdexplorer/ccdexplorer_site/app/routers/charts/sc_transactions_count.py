@@ -46,6 +46,7 @@ async def get_sc_transactions_count(
         f"/tmp/transactions-types - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "charts/sc_transactions_count.html",
         {
             "request": request,
@@ -83,6 +84,7 @@ async def ajax_transaction_types_reporting(
     theme = post_data.theme
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -297,6 +299,7 @@ async def statistics_network_summary_accounts_per_day_standalone(
     analysis = "statistics_network_summary"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,

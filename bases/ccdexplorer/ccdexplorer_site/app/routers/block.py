@@ -55,6 +55,7 @@ async def request_block(
     if not block_info:
         error = f"Can't find the block at {height_or_hash} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -73,6 +74,7 @@ async def request_block(
     if not payday_info:
         error = f"Request error for block at {height_or_hash} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -105,6 +107,7 @@ async def request_block(
         )
 
     return request.app.templates.TemplateResponse(
+        request,
         "block/block.html",
         {
             "request": request,
@@ -148,6 +151,7 @@ async def get_ajax_chain_parameters_html_v2(
     if not chain_parameters:
         error = f"Request error getting chain parameters for block at {height} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -193,6 +197,7 @@ async def get_ajax_special_events_html_v2(
     if not isinstance(special_events, list):
         error = f"Request error getting special events for block at {height} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -345,6 +350,7 @@ async def get_block_transactions_for_tabulator(
     if not tx_result:
         error = f"Request error getting transactions for block at {height} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

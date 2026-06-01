@@ -272,6 +272,7 @@ async def ajax_source_module_reporting(
     # )
     error = "Not implemented yet."
     return request.app.templates.TemplateResponse(
+        request,
         "base/error.html",
         {
             "request": request,
@@ -319,6 +320,7 @@ async def smart_contracts_overview(
     if the_dict:
         the_dict = {k: v["modules"] for k, v in the_dict.items()}
     return request.app.templates.TemplateResponse(
+        request,
         "smart_contracts/smart_contracts.html",
         {
             "env": request.app.env,
@@ -340,6 +342,7 @@ async def smart_contracts_overview_list(
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "smart_contracts/tabulator-list.html",
         {
             "env": request.app.env,
@@ -375,6 +378,7 @@ async def get_paginated_smart_contracts(
     if not instances:
         error = f"Request error getting smart contracts for {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -427,6 +431,7 @@ async def smart_contracts_reporting(
     # )
     error = "Not implemented yet."
     return request.app.templates.TemplateResponse(
+        request,
         "base/error.html",
         {
             "request": request,
@@ -446,6 +451,7 @@ async def smart_contracts_usage(
     user: SiteUser | None = await get_user_detailsv2(request)
     error = "Not implemented yet."
     return request.app.templates.TemplateResponse(
+        request,
         "base/error.html",
         {
             "request": request,
@@ -492,6 +498,7 @@ async def get_module_instances_tabulator(
     if not instances_result:
         error = f"Request error getting instances for module {module_ref} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -542,6 +549,7 @@ async def module_module_address(
     if not result:
         error = f"Can't find the module at {module_ref} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -627,6 +635,7 @@ async def module_module_address(
         f"{request.app.api_url}/docs#/Module/get_module_usage"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "smart_contracts/smart_module.html",
         {
             "env": request.app.env,
@@ -680,6 +689,7 @@ async def get_contract_transactions_for_tabulator(
     if not tx_result:
         error = f"Request error getting transactions for contract at {instance_address} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -864,6 +874,7 @@ async def smart_contract_page(
             error = None
             # dressed_up_contract = contracts_with_tag_info.get(contract.id)
             return request.app.templates.TemplateResponse(
+                request,
                 "smart_contracts/smart_contract.html",
                 {
                     "env": request.app.env,
@@ -900,6 +911,7 @@ async def smart_contract_page(
             }
         contract = None
         return request.app.templates.TemplateResponse(
+            request,
             "smart_contracts/smart_contract.html",
             {
                 "env": request.app.env,

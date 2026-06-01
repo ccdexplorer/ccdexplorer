@@ -25,6 +25,7 @@ async def get_charts_home(
 
     user: SiteUser | None = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "charts/charts_home.html",
         {
             "request": request,
@@ -47,6 +48,7 @@ async def get_plt_charts_home(
 
     user: SiteUser | None = await get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "charts/plt_home.html",
         {
             "request": request,

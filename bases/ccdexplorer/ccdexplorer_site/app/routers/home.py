@@ -140,6 +140,7 @@ async def redirect_to_mainnet(
         f"{request.app.api_url}/docs#/Transactions/get_last_transactions"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "home/home.html",
         {
             "env": request.app.env,
@@ -216,6 +217,7 @@ async def ajax_market_cap_table(
     if "last_requests" not in request.state._state:
         request.state.last_requests = {}
     html = request.app.templates.TemplateResponse(
+        request,
         "home/crypto_dashboard.html",
         {
             "request": request,
@@ -320,6 +322,7 @@ async def search_all(
         return RedirectResponse(url=single_urls[list(single_urls.keys())[0]], status_code=302)  # type: ignore
 
     html = request.app.templates.TemplateResponse(
+        request,
         "home/search_all.html",
         {
             "request": request,
@@ -473,6 +476,7 @@ async def home_tx_graph(
     if not all_data:
         error = "Request error getting tx data.."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -542,6 +546,7 @@ async def ajax_last_blocks(
     if not latest_blocks:
         error = f"Request error getting the most recent blocks on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -555,6 +560,7 @@ async def ajax_last_blocks(
     if "last_requests" not in request.state._state:
         request.state.last_requests = {}
     html = request.app.templates.TemplateResponse(
+        request,
         "home/last_blocks_table.html",
         {
             "request": request,
@@ -587,6 +593,7 @@ async def ajax_last_txs(
     if not latest_txs:
         error = f"Request error getting the most recent transactions on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -600,6 +607,7 @@ async def ajax_last_txs(
     if "last_requests" not in request.state._state:
         request.state.last_requests = {}
     html = request.app.templates.TemplateResponse(
+        request,
         "home/last_txs_table.html",
         {
             "request": request,
@@ -637,6 +645,7 @@ async def ajax_last_txs_own_page(
     if not latest_txs:
         error = f"Request error getting the most recent transactions on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -703,6 +712,7 @@ async def ajax_last_blocks_own_page(
     if not blocks_result:
         error = f"Request error getting the most recent blocks on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -744,6 +754,7 @@ async def ajax_last_blocks_since(
     if not blocks_result:
         error = f"Request error getting the most recent blocks on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -777,6 +788,7 @@ async def ajax_last_accounts_since(
     if not api_result.ok:
         error = f"Request error getting the most recent accounts on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -814,6 +826,7 @@ async def ajax_last_transactions_since(
     if not api_result.ok:
         error = f"Request error getting the most recent blocks on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -873,6 +886,7 @@ async def ajax_last_accounts_own_page(
     if not accounts_result:
         error = f"Request error getting the most recent accounts on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -912,6 +926,7 @@ async def transactions_page(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "home/transactions.html",
         {
             "env": request.app.env,
@@ -941,6 +956,7 @@ async def blocks_page(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "home/blocks.html",
         {
             "env": request.app.env,
@@ -967,6 +983,7 @@ async def accounts_page(
         f"{request.app.api_url}/docs#/Accounts/get_last_accounts"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "home/accounts.html",
         {
             "env": request.app.env,
@@ -997,6 +1014,7 @@ async def ajax_consensus_own_page(
     if not latest_consensus:
         error = f"Request error getting the most recent consensus detailed status on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -1009,6 +1027,7 @@ async def ajax_consensus_own_page(
     if "last_requests" not in request.state._state:
         request.state.last_requests = {}
     html = request.app.templates.TemplateResponse(
+        request,
         "home/last_consensus_own_page.html",
         {
             "request": request,
@@ -1037,6 +1056,7 @@ async def consensus_page(
         f"{request.app.api_url}/docs#/Misc/get_consensus_detailed_status"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "home/consensus.html",
         {
             "env": request.app.env,
@@ -1063,6 +1083,7 @@ async def release_notes(
         f"{request.app.api_url}/docs#/Misc/get_release_notes"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "base/release_notes.html",
         {"env": request.app.env, "request": request, "release_notes": release_notes},
     )
@@ -1076,6 +1097,7 @@ async def privacy_policy(
     request.state.api_calls = {}
     request.state.api_calls["None"] = ""
     return request.app.templates.TemplateResponse(
+        request,
         "base/privacy_policy.html",
         {"env": request.app.env, "request": request},
     )
@@ -1089,6 +1111,7 @@ async def support_explorer(
     request.state.api_calls = {}
     request.state.api_calls["None"] = ""
     return request.app.templates.TemplateResponse(
+        request,
         "base/support.html",
         {
             "env": request.app.env,

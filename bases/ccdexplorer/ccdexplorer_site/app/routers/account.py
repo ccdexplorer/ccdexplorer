@@ -77,6 +77,7 @@ async def get_paginated_account_rewards(
     if not rewards_result:
         error = f"Request error getting staking rewards for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -385,6 +386,7 @@ async def get_account(
         if not public_key_info:
             error = f"Can't find the account at {index_or_hash} on {net}."
             return request.app.templates.TemplateResponse(
+                request,
                 "base/error.html",
                 {
                     "request": request,
@@ -664,6 +666,7 @@ async def get_account(
     exchange_rates = {"CCD": {"rate": 1}}
     if not alias_portion:
         return request.app.templates.TemplateResponse(
+            request,
             "account/account_account.html",
             {
                 "env": request.app.env,
@@ -704,6 +707,7 @@ async def get_account(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "account/account_account_alias.html",
             {
                 "env": request.app.env,
@@ -886,6 +890,7 @@ async def request_sankey(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "account/account_graph_table.html",
         {
             "env": request.app.env,
@@ -937,6 +942,7 @@ async def get_account_transactions_for_tabulator(
     if not tx_result:
         error = f"Request error getting transactions for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

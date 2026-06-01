@@ -45,6 +45,7 @@ async def get_node(
     )
 
     return request.app.templates.TemplateResponse(
+        request,
         "node/node.html",
         {
             "request": request,
@@ -98,6 +99,7 @@ async def get_ajax_node(
     else:
         error = None
     return request.app.templates.TemplateResponse(
+        request,
         "node/node_info.html",
         {
             "request": request,
