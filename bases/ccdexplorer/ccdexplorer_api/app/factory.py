@@ -496,7 +496,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 </body>
 </html>""")
 
-    @app.post("/authorize", include_in_schema=False)
+    @app.post("/authorize", include_in_schema=False, response_model=None)
     async def mcp_authorize_post(request: Request) -> RedirectResponse | HTMLResponse:
         form = await request.form()
         api_key = str(form.get("api_key", ""))
