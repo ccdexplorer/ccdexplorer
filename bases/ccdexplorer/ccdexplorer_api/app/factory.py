@@ -1,7 +1,13 @@
 # ruff: noqa: F403, F405, E402, E501, E722, F401
 # pyright: reportAttributeAccessIssue=false
+import base64
 import datetime as dt
+import hashlib
+import hmac as _hmac
+import html as _html
 import importlib
+import json
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -14,7 +20,7 @@ from ccdexplorer.mongodb import MongoDB, MongoMotor
 from ccdexplorer.mongodb.core import CollectionsUtilities
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -92,6 +98,13 @@ if environment["SITE_URL"] != "http://127.0.0.1:8000":
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )
+
+
+def _make_auth_code(api_key: str, code_challenge: str, signing_key: str) -> str:
+    payload = json.dumps({"k": api_key, "cc": code_challenge, "exp": int(time.time()) + 300}, separators=(",", ":"))
+    b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    sig = _hmac.new(signing_key.encode(), b64.encode(), hashlib.sha256).hexdigest()
+    return f"{b64}.{sig}"
 
 
 def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, None]:
@@ -416,6 +429,11 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     #     return await call_next(request)
 
+    signing_key = (
+        environment.get("CCDEXPLORER_MCP_SIGNING_KEY")
+        or environment.get("CCDEXPLORER_API_KEY", "")
+    )
+
     @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
     async def mcp_oauth_protected_resource(request: Request) -> JSONResponse:
         host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
@@ -433,13 +451,62 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         issuer = f"https://{host}/mcp"
         return JSONResponse({
             "issuer": issuer,
+            "authorization_endpoint": f"https://{host}/authorize",
             "token_endpoint": f"{issuer}/oauth/token",
             "registration_endpoint": f"{issuer}/oauth/register",
             "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
-            "grant_types_supported": ["client_credentials"],
-            "response_types_supported": [],
+            "grant_types_supported": ["client_credentials", "authorization_code"],
+            "response_types_supported": ["code"],
             "scopes_supported": ["mcp"],
+            "code_challenge_methods_supported": ["S256"],
         })
+
+    @app.get("/authorize", include_in_schema=False)
+    async def mcp_authorize(request: Request) -> HTMLResponse:
+        p = request.query_params
+        def esc(v: str | None) -> str:
+            return _html.escape(v or "")
+        return HTMLResponse(f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CCDExplorer — Authorize</title>
+  <style>
+    body{{font-family:system-ui,sans-serif;max-width:400px;margin:80px auto;padding:0 20px;color:#1a1a1a}}
+    h2{{margin-bottom:.25rem}}
+    p{{color:#555;font-size:.9rem;margin-bottom:1.5rem}}
+    label{{display:block;font-size:.875rem;font-weight:500;margin-bottom:.4rem}}
+    input[type=password]{{width:100%;padding:.5rem .75rem;border:1px solid #ccc;border-radius:6px;font-size:1rem;box-sizing:border-box;margin-bottom:1rem}}
+    button{{background:#0f172a;color:#fff;border:none;padding:.6rem 1.5rem;border-radius:6px;font-size:1rem;cursor:pointer;width:100%}}
+    button:hover{{background:#1e293b}}
+  </style>
+</head>
+<body>
+  <h2>CCDExplorer — Authorize Claude</h2>
+  <p>Enter your CCDExplorer API key to grant Claude access to the MCP tools.</p>
+  <form method="post">
+    <input type="hidden" name="redirect_uri" value="{esc(p.get('redirect_uri'))}">
+    <input type="hidden" name="code_challenge" value="{esc(p.get('code_challenge'))}">
+    <input type="hidden" name="code_challenge_method" value="{esc(p.get('code_challenge_method','S256'))}">
+    <input type="hidden" name="state" value="{esc(p.get('state'))}">
+    <label for="k">API Key</label>
+    <input type="password" id="k" name="api_key" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autofocus>
+    <button type="submit">Authorize</button>
+  </form>
+</body>
+</html>""")
+
+    @app.post("/authorize", include_in_schema=False)
+    async def mcp_authorize_post(request: Request) -> RedirectResponse | HTMLResponse:
+        form = await request.form()
+        api_key = str(form.get("api_key", ""))
+        redirect_uri = str(form.get("redirect_uri", ""))
+        code_challenge = str(form.get("code_challenge", ""))
+        state = str(form.get("state", ""))
+        if not api_key or not redirect_uri or not code_challenge:
+            return HTMLResponse("Missing required parameters", status_code=400)
+        code = _make_auth_code(api_key, code_challenge, signing_key)
+        return RedirectResponse(url=f"{redirect_uri}?code={code}&state={state}", status_code=302)
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
