@@ -161,6 +161,7 @@ async def get_account_payday_stats(
     if not stats:
         error = f"Can't get current payday stats for validator {index} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -269,6 +270,7 @@ async def get_account_pool_delegators(
     if not delegator_dict:
         error = f"Request error getting pool delegators for account at {account_index} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

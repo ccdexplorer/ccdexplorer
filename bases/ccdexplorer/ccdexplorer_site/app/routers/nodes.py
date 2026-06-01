@@ -44,6 +44,7 @@ async def nodes(
         f"{request.app.api_url}/docs#/Accounts/get_last_payday_info"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "/nodes/nodes.html",
         {
             "env": environment,
@@ -87,6 +88,7 @@ async def get_ajax_nodes_v2(
     len_reporting_validators = len(nodes_validators["validator_nodes_by_account_id"])
     len_non_validator_nodes = len(nodes_validators["non_validator_nodes_by_node_id"])
     return request.app.templates.TemplateResponse(
+        request,
         "/nodes/nodes_ajax.html",
         {
             "env": environment,

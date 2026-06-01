@@ -101,6 +101,7 @@ async def get_public_key_events(
     if not logged_events:
         error = f"Request error getting logged events for account at {public_key} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -183,6 +184,7 @@ async def get_public_key_tokens(
     if not tokens_list:
         error = f"Request error getting logged events for account at {public_key} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -290,6 +292,7 @@ async def get_public_key_page(
 
     if not tx_deployed:
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -299,6 +302,7 @@ async def get_public_key_page(
             },
         )
     return request.app.templates.TemplateResponse(
+        request,
         "smart_wallets/sw_public_key_page.html",
         {
             "request": request,
@@ -371,6 +375,7 @@ async def get_smart_wallets_overview_with_txs(
     # )
     # smart_wallets = api_result.return_value if api_result.ok else None
     return request.app.templates.TemplateResponse(
+        request,
         "smart_wallets/sw_overview_with_txs.html",
         {
             "request": request,
@@ -409,6 +414,7 @@ async def ajax_last_txs_for_smart_wallets(
     if not api_result.ok:
         error = f"Request error getting the most recent transactions for smart wallets on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -487,6 +493,7 @@ async def ajax_last_txs_for_smart_wallets_since(
     if not api_result.ok:
         error = f"Request error getting the most recent transactions for smart wallets on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

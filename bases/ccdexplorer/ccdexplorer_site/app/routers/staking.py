@@ -92,6 +92,7 @@ async def staking(
             )
 
         return request.app.templates.TemplateResponse(
+            request,
             "staking/staking_tabs.html",
             {
                 "env": request.app.env,
@@ -109,6 +110,7 @@ async def staking(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -141,6 +143,7 @@ async def get_ajax_payday_passive(
     if not passive_info:
         error = "Request error getting passive info on mainnet."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -213,6 +216,7 @@ async def get_ajax_paydays_tabulator(
         if return_dict == {}:
             error = "Request error getting paydays on mainnet."
             return request.app.templates.TemplateResponse(
+                request,
                 "base/error-request.html",
                 {
                     "request": request,

@@ -46,6 +46,7 @@ async def get_plt_transfers(
             f"/tmp/plt-transfers - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
         )
         return request.app.templates.TemplateResponse(
+            request,
             "charts/sc_plt_transfers.html",
             {
                 "env": request.app.env,
@@ -69,6 +70,7 @@ async def get_plt_transfers(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -131,6 +133,7 @@ async def statistics_plt_transfers(
     analysis = "statistics_plt"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,

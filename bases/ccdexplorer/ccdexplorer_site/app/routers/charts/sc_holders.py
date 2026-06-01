@@ -30,6 +30,7 @@ async def get_accounts_growth(
         )
         filename = f"/tmp/holders - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
         return request.app.templates.TemplateResponse(
+            request,
             "charts/sc_holders.html",
             {
                 "env": request.app.env,
@@ -42,6 +43,7 @@ async def get_accounts_growth(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -83,6 +85,7 @@ async def statistics_holders(
     analysis = "statistics_daily_holders"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,

@@ -206,6 +206,7 @@ async def statistics(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain.html",
             {
                 "env": request.app.env,
@@ -215,6 +216,7 @@ async def statistics(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -231,6 +233,7 @@ async def statistics_accounts(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-accounts.html",
             {
                 "env": request.app.env,
@@ -240,6 +243,7 @@ async def statistics_accounts(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -256,6 +260,7 @@ async def statistics_chain(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-chain.html",
             {
                 "env": request.app.env,
@@ -265,6 +270,7 @@ async def statistics_chain(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -281,6 +287,7 @@ async def statistics_exchanges(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-exchanges.html",
             {
                 "env": request.app.env,
@@ -290,6 +297,7 @@ async def statistics_exchanges(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -306,6 +314,7 @@ async def statistics_staking(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-staking.html",
             {
                 "env": request.app.env,
@@ -315,6 +324,7 @@ async def statistics_staking(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -331,6 +341,7 @@ async def statistics_validators(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-validators.html",
             {
                 "env": request.app.env,
@@ -340,6 +351,7 @@ async def statistics_validators(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -356,6 +368,7 @@ async def statistics_plt(
 ):
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/statistics-chain-plt.html",
             {
                 "env": request.app.env,
@@ -365,6 +378,7 @@ async def statistics_plt(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -385,6 +399,7 @@ async def statistics_standalone(
             "%Y-%m-%d"
         )
         return request.app.templates.TemplateResponse(
+            request,
             "statistics/standalone/account_growth.html",
             {
                 "env": request.app.env,
@@ -396,6 +411,7 @@ async def statistics_standalone(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -444,6 +460,7 @@ async def statistics_reporting_subject(
 ):
     error = "Not implemented yet."
     return request.app.templates.TemplateResponse(
+        request,
         "base/error.html",
         {
             "request": request,
@@ -484,6 +501,7 @@ async def statistics_daily_holders_plotly(
     analysis = "statistics_daily_holders"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -540,6 +558,7 @@ async def statistics_daily_limits_plotly(
     analysis = "statistics_daily_limits"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -616,6 +635,7 @@ async def statistics_network_summary_validator_count_plotly(
     analysis = "statistics_network_summary"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -694,6 +714,7 @@ async def statistics_network_summary_accounts_per_day_plotly(
     analysis = "statistics_network_summary"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -790,6 +811,7 @@ async def statistics_classified_pools_open_pool_count_plotly(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -818,6 +840,7 @@ async def statistics_classified_pools_delegator_count_plotly(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -846,6 +869,7 @@ async def statistics_classified_pools_avg_count_per_pool_plotly(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -874,6 +898,7 @@ async def statistics_classified_pools_avg_stake_plotly(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -965,6 +990,7 @@ async def statistics_rewards_explained(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1056,6 +1082,7 @@ async def statistics_restaked_rewards(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1120,6 +1147,7 @@ async def statistics_microccd_plotly(
     analysis = "statistics_microccd"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1185,6 +1213,7 @@ async def statistics_validator_staking_plotly(
     theme = await get_theme_from_request(request)
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1275,6 +1304,7 @@ async def statistics_ccd_on_exchanges_plotly(
     analysis = "statistics_ccd_classified"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1377,6 +1407,7 @@ async def statistics_ccd_classified_plotly(
     analysis = "statistics_ccd_classified"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1472,6 +1503,7 @@ async def statistics_percentage_staked_plotly(
     analysis = "statistics_ccd_classified"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1536,6 +1568,7 @@ async def statistics_network_activity_tps_plotly(
     analysis = "statistics_mongo_transactions"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1643,6 +1676,7 @@ async def statistics_transaction_details_histogram_python(
     analysis = "statistics_mongo_transactions"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1738,6 +1772,7 @@ async def statistics_exchange_wallets_plotly(
     analysis = "statistics_exchange_wallets"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1812,6 +1847,7 @@ async def statistics_transaction_fees_plotly(
     analysis = "statistics_transaction_fees"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1874,6 +1910,7 @@ async def statistics_realized_prices_plotly(
     analysis = "statistics_realized_prices"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -1952,6 +1989,7 @@ async def statistics_unique_addresses_plotly(
     analysis = "statistics_unique_addresses_weekly"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -2019,6 +2057,7 @@ async def statistics_plt_stablecoin_dominance_plotly(
     analysis = "statistics_plt"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,

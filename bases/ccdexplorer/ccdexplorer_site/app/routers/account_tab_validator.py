@@ -62,6 +62,7 @@ async def validator_tab_content(
     if account_info is None:
         error = f"Request error getting account info for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -81,6 +82,7 @@ async def validator_tab_content(
     if not validator_id:
         error = f"Account {account_id} is not a validator on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -286,6 +288,7 @@ async def get_account_earliest(
     if not earliest_win_time:
         error = f"Can't get earliest win time for validator {index} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -382,6 +385,7 @@ async def get_account_payday_stats(
     if not stats:
         error = f"Can't get current payday stats for validator {index} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -425,6 +429,7 @@ async def get_account_validator_transactions(
             f"Request error getting validator transactions for account at {account_id} on {net}."
         )
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -499,6 +504,7 @@ async def get_validator_tally(
     if not tally:
         error = f"Request error getting validator tally for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

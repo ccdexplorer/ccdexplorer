@@ -416,6 +416,31 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     #     return await call_next(request)
 
+    @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
+    async def mcp_oauth_protected_resource(request: Request) -> JSONResponse:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
+        mcp_base = f"https://{host}/mcp"
+        return JSONResponse({
+            "resource": mcp_base,
+            "authorization_servers": [mcp_base],
+            "bearer_methods_supported": ["header"],
+            "scopes_supported": ["mcp"],
+        })
+
+    @app.get("/.well-known/oauth-authorization-server", include_in_schema=False)
+    async def mcp_oauth_authorization_server(request: Request) -> JSONResponse:
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
+        issuer = f"https://{host}/mcp"
+        return JSONResponse({
+            "issuer": issuer,
+            "token_endpoint": f"{issuer}/oauth/token",
+            "registration_endpoint": f"{issuer}/oauth/register",
+            "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+            "grant_types_supported": ["client_credentials"],
+            "response_types_supported": [],
+            "scopes_supported": ["mcp"],
+        })
+
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
         # Create a registry that reads from PROMETHEUS_MULTIPROC_DIR

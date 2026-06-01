@@ -49,6 +49,7 @@ async def get_project_route(
     mainnet_contracts = [x for x in mainnet_project_addresses if x["type"] == "contract_address"]
     if project:
         return request.app.templates.TemplateResponse(
+            request,
             "projects/project_overview.html",
             {
                 "request": request,

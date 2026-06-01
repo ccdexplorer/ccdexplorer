@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 import httpx
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from fastmcp import FastMCP
 from fastmcp.server.providers.openapi import MCPType, RouteMap
 from pymongo import AsyncMongoClient
@@ -34,21 +34,19 @@ class Settings:
     api_base_url: str
     api_key: str
     api_key_scope: str
-    mongo_uri: str
+    mongo_uri: str | None
     api_key_cache_ttl: float
     request_timeout: float
 
 
 def load_settings() -> Settings:
-    load_dotenv()
+    load_dotenv(find_dotenv())
 
     api_key = os.environ.get("API_CODEX_KEY") or os.environ.get("CCDEXPLORER_API_KEY")
     if not api_key:
         raise RuntimeError("Set API_CODEX_KEY or CCDEXPLORER_API_KEY for CCDExplorer MCP.")
 
-    mongo_uri = os.environ.get("MONGO_URI")
-    if not mongo_uri:
-        raise RuntimeError("Set MONGO_URI for CCDExplorer MCP API key validation.")
+    mongo_uri = os.environ.get("MONGO_URI")  # optional; only required for HTTP server auth
 
     api_base_url = os.environ.get("CCDEXPLORER_API_BASE_URL", "https://api.ccdexplorer.io").rstrip(
         "/"
@@ -322,6 +320,8 @@ class ApiKeyAuthMiddleware:
 
 def create_app(settings: Settings | None = None):
     settings = settings or load_settings()
+    if not settings.mongo_uri:
+        raise RuntimeError("Set MONGO_URI for CCDExplorer MCP HTTP server.")
     mcp = create_mcp(settings)
     return ApiKeyAuthMiddleware(
         mcp.http_app(path="/mcp", stateless_http=True),

@@ -584,6 +584,7 @@ def return_plot_response(fig: go.Figure, request: Request, title: str):
             if figure_key == "ccd_balance_usd_value":
                 page_url += request.url.path.split("/")[-2]
             return request.app.templates.TemplateResponse(
+                request,
                 "base/plots_og.html",
                 {
                     "request": request,

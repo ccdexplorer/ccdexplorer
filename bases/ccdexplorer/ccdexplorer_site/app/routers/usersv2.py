@@ -101,6 +101,7 @@ async def user_settings_all(
     else:
         html = None
     return request.app.templates.TemplateResponse(
+        request,
         "userv2/user_settings_all.html",
         {
             "env": request.app.env,
@@ -120,6 +121,7 @@ async def cancel_edit_email_address_response(
     if not isinstance(user, SiteUser):
         user = SiteUser(**user)
     return request.app.templates.TemplateResponse(
+        request,
         "userv2/user_email_address_start.html",
         {
             "env": request.app.env,
@@ -138,6 +140,7 @@ async def cancel_edit_other_notification_preferences_response(
     if not isinstance(user, SiteUser):
         user = SiteUser(**user)
     return request.app.templates.TemplateResponse(
+        request,
         "userv2/other_notification_preferences_start.html",
         {
             "env": request.app.env,
@@ -162,6 +165,7 @@ async def cancel_edit_contract_response(
         contract = user.contracts[str(contract_index)]
 
     return request.app.templates.TemplateResponse(
+        request,
         "userv2/user_contract_start.html",
         {
             "env": request.app.env,
@@ -188,6 +192,7 @@ async def cancel_edit_user_account_response(
         user_account = user.accounts[str(account_index)]
 
     return request.app.templates.TemplateResponse(
+        request,
         "userv2/user_account_start.html",
         {
             "env": request.app.env,
@@ -247,6 +252,7 @@ async def save_new_account_response(
 
     if not account_info:
         return request.app.templates.TemplateResponse(
+            request,
             "userv2/user_new_account_start.html",
             {
                 "env": request.app.env,
@@ -373,6 +379,7 @@ async def save_new_contract_response(
 
     if lookup_failed:
         return request.app.templates.TemplateResponse(
+            request,
             "userv2/user_new_contract_start.html",
             {
                 "env": request.app.env,

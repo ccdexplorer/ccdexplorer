@@ -103,6 +103,7 @@ async def tokens_fungible_tvl(
 ):
     user: SiteUser = get_user_detailsv2(request)
     return request.app.templates.TemplateResponse(
+        request,
         "tokens/tokens_tvl.html",
         {
             "env": request.app.env,
@@ -161,6 +162,7 @@ async def slash_tokens(
         f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
     )
     return request.app.templates.TemplateResponse(
+        request,
         "tokens/tokens.html",
         {
             "env": request.app.env,
@@ -202,6 +204,7 @@ async def get_paginated_cis2_nft_tokens(
     if not nft_tokens_result:
         error = f"Request error getting NFT tokens for tag {tag} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -282,6 +285,7 @@ async def show_token_address(
     if not stored_token_address:
         error = f"Can't find the token at {contract_index}/{contract_subindex}/{token_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error.html",
             {
                 "request": request,
@@ -335,6 +339,7 @@ async def show_token_address(
     }
 
     return request.app.templates.TemplateResponse(
+        request,
         "tokens/generic/token_address_display.html", template_dict
     )
 
@@ -363,6 +368,7 @@ async def get_plt_token_holders_paginated(
     if not holders:
         error = f"Request error getting holders for token at {token_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -465,6 +471,7 @@ async def get_plt_transactions_for_tabulator(
     if not tx_result:
         error = f"Request error getting transactions for plt at {token_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -548,7 +555,7 @@ async def show_plt(
         # "owner_history_list": owner_history_list,
     }
 
-    return request.app.templates.TemplateResponse("tokens/plt/plt_display.html", template_dict)
+    return request.app.templates.TemplateResponse(request, "tokens/plt/plt_display.html", template_dict)
 
 
 async def show_nft_tag(request: Request, net: str, tag_result: dict):
@@ -572,6 +579,7 @@ async def show_nft_tag(request: Request, net: str, tag_result: dict):
     }
 
     return request.app.templates.TemplateResponse(
+        request,
         "tokens/nft_tag/nft_tag_display.html", template_dict
     )
 
@@ -676,6 +684,7 @@ async def tokens_tag_token_id(
                 else:
                     error = f"Can't find the token at {tag}-{token_id_or_address} on {net}."
                 return request.app.templates.TemplateResponse(
+                    request,
                     "base/error.html",
                     {
                         "request": request,
@@ -730,6 +739,7 @@ async def get_cis2_token_holders_paginated(
     if current_holders_with_ids is None and not api_result.ok:
         error = f"Request error getting holders for token at {token_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

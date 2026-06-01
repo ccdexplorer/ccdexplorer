@@ -116,6 +116,7 @@ async def get_account_transactions_with_filter_for_tabulator(
     if not tx_result:
         error = f"Request error getting transactions for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

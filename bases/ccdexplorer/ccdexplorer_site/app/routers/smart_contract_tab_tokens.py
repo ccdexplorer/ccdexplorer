@@ -92,6 +92,7 @@ async def get_ajax_tokens_fungible_verified(
     if not api_return_result:
         error = f"Request error getting tokens for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -147,6 +148,7 @@ async def get_ajax_tokens_non_fungible_verified(
     if not api_return_result:
         error = f"Request error getting tokens for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,
@@ -202,6 +204,7 @@ async def get_ajax_tokens_unverified(
     if not api_return_result:
         error = f"Request error getting tokens for account at {account_id} on {net}."
         return request.app.templates.TemplateResponse(
+            request,
             "base/error-request.html",
             {
                 "request": request,

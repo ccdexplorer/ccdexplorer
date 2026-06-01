@@ -44,6 +44,7 @@ async def get_accounts_growth(
             f"/tmp/accounts-growth - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
         )
         return request.app.templates.TemplateResponse(
+            request,
             "charts/sc_accounts_growth.html",
             {
                 "env": request.app.env,
@@ -56,6 +57,7 @@ async def get_accounts_growth(
         )
     else:
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
@@ -98,6 +100,7 @@ async def statistics_network_summary_accounts_per_day_standalone(
     analysis = "statistics_network_summary"
     if net != "mainnet":
         return request.app.templates.TemplateResponse(
+            request,
             "testnet/not-available.html",
             {
                 "env": request.app.env,
