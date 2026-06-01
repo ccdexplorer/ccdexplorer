@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import base64
 import datetime as dt
+import hashlib
+import hmac as _hmac
+import json
 import os
+import time
 import uuid
 from copy import deepcopy
 from dataclasses import dataclass
@@ -37,6 +41,7 @@ class Settings:
     mongo_uri: str | None
     api_key_cache_ttl: float
     request_timeout: float
+    signing_key: str
 
 
 def load_settings() -> Settings:
@@ -51,6 +56,11 @@ def load_settings() -> Settings:
     api_base_url = os.environ.get("CCDEXPLORER_API_BASE_URL", "https://api.ccdexplorer.io").rstrip(
         "/"
     )
+    signing_key = (
+        os.environ.get("CCDEXPLORER_MCP_SIGNING_KEY")
+        or os.environ.get("CCDEXPLORER_API_KEY")
+        or api_key
+    )
 
     return Settings(
         api_base_url=api_base_url,
@@ -59,6 +69,7 @@ def load_settings() -> Settings:
         mongo_uri=mongo_uri,
         api_key_cache_ttl=float(os.environ.get("CCDEXPLORER_MCP_API_KEY_CACHE_TTL", "5")),
         request_timeout=float(os.environ.get("CCDEXPLORER_MCP_REQUEST_TIMEOUT", "20")),
+        signing_key=signing_key,
     )
 
 
@@ -132,6 +143,37 @@ def _load_openapi_spec(settings: Settings) -> dict[str, Any]:
         return response.json()
 
 
+def _make_auth_code(api_key: str, code_challenge: str, signing_key: str) -> str:
+    payload = json.dumps({"k": api_key, "cc": code_challenge, "exp": int(time.time()) + 300}, separators=(",", ":"))
+    b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
+    sig = _hmac.new(signing_key.encode(), b64.encode(), hashlib.sha256).hexdigest()
+    return f"{b64}.{sig}"
+
+
+def _decode_auth_code(code: str, signing_key: str) -> dict[str, Any] | None:
+    try:
+        b64, sig = code.rsplit(".", 1)
+    except ValueError:
+        return None
+    expected = _hmac.new(signing_key.encode(), b64.encode(), hashlib.sha256).hexdigest()
+    if not _hmac.compare_digest(sig, expected):
+        return None
+    try:
+        data = json.loads(base64.urlsafe_b64decode(b64 + "=="))
+    except Exception:
+        return None
+    if data.get("exp", 0) < time.time():
+        return None
+    return data
+
+
+def _verify_pkce_s256(code_verifier: str, code_challenge: str) -> bool:
+    computed = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode("ascii")).digest()
+    ).rstrip(b"=").decode("ascii")
+    return _hmac.compare_digest(computed, code_challenge)
+
+
 def create_mcp(settings: Settings | None = None) -> FastMCP:
     settings = settings or load_settings()
     openapi_spec = _filter_openapi_spec(_load_openapi_spec(settings), settings)
@@ -169,12 +211,14 @@ def create_mcp(settings: Settings | None = None) -> FastMCP:
         issuer = f"https://{host}/mcp"
         return JSONResponse({
             "issuer": issuer,
+            "authorization_endpoint": f"https://{host}/authorize",
             "token_endpoint": f"{issuer}/oauth/token",
             "registration_endpoint": f"{issuer}/oauth/register",
             "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
-            "grant_types_supported": ["client_credentials"],
-            "response_types_supported": [],
+            "grant_types_supported": ["client_credentials", "authorization_code"],
+            "response_types_supported": ["code"],
             "scopes_supported": ["mcp"],
+            "code_challenge_methods_supported": ["S256"],
         })
 
     @mcp.custom_route("/mcp/oauth/register", methods=["POST"])
@@ -196,6 +240,25 @@ def create_mcp(settings: Settings | None = None) -> FastMCP:
 
     @mcp.custom_route("/mcp/oauth/token", methods=["POST"])
     async def oauth_token(request: Request) -> JSONResponse:
+        form = await request.form()
+        grant_type = str(form.get("grant_type", "client_credentials"))
+
+        if grant_type == "authorization_code":
+            code = str(form.get("code", ""))
+            code_verifier = str(form.get("code_verifier", ""))
+            data = _decode_auth_code(code, settings.signing_key)
+            if data is None:
+                return JSONResponse({"error": "invalid_grant"}, status_code=400)
+            if not _verify_pkce_s256(code_verifier, data["cc"]):
+                return JSONResponse({"error": "invalid_grant"}, status_code=400)
+            return JSONResponse({
+                "access_token": data["k"],
+                "token_type": "Bearer",
+                "expires_in": 86400,
+                "scope": "mcp",
+            })
+
+        # client_credentials flow
         client_secret = ""
         auth = request.headers.get("authorization", "")
         if auth.lower().startswith("basic "):
@@ -204,8 +267,7 @@ def create_mcp(settings: Settings | None = None) -> FastMCP:
             except Exception:
                 pass
         if not client_secret:
-            form = await request.form()
-            client_secret = form.get("client_secret", "")
+            client_secret = str(form.get("client_secret", ""))
         return JSONResponse({
             "access_token": client_secret,
             "token_type": "Bearer",
