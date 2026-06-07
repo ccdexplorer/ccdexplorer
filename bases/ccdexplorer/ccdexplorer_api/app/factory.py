@@ -605,6 +605,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     use_route_names_as_operation_ids(app)
 
     # ── MCP server (fastapi-mcp) ───────────────────────────────────────────
+    host = environment.get("CCDEXPLORER_API_BASE_URL", "https://api.ccdexplorer.io").rstrip("/")
+
     async def verify_mcp_key(request: Request) -> None:
         api_key = request.headers.get("x-ccdexplorer-key", "").strip()
         if not api_key:
@@ -612,15 +614,12 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             scheme, _, creds = auth.partition(" ")
             if scheme.lower() == "bearer":
                 api_key = creds.strip()
-        if not api_key:
-            raise HTTPException(status_code=401, detail="API key required")
-        keys = await request.app.state.get_api_keys_fn(
-            motormongo=request.app.motormongo, app=request.app, for_="mcp_auth"
-        )
-        if api_key not in keys:
-            raise HTTPException(status_code=401, detail="Invalid API key")
-
-    host = environment.get("CCDEXPLORER_API_BASE_URL", "https://api.ccdexplorer.io").rstrip("/")
+        if not api_key or api_key not in request.app.api_keys:
+            raise HTTPException(
+                status_code=401,
+                detail="API key required",
+                headers={"WWW-Authenticate": f'Bearer resource_metadata="{host}/.well-known/oauth-protected-resource"'},
+            )
     mcp = FastApiMCP(
         app,
         name="CCDExplorer MCP",
