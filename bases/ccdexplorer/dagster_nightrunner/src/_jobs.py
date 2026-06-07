@@ -8,8 +8,15 @@ from ._partitions import (
     partitions_def_grouping_from_genesis,
     partitions_def_tokens,
     partitions_def_from_plts,
+    partitions_def_from_agent_registry,
 )
 
+job_from_agent_registry = define_asset_job(
+    name="j_from_agent_registry",
+    partitions_def=partitions_def_from_agent_registry,
+    selection=AssetSelection.assets("agent_registry_statistics"),
+    executor_def=dg.in_process_executor,
+)
 
 job_from_plts = define_asset_job(
     name="j_from_plts",
@@ -93,5 +100,6 @@ defs = dg.Definitions(
         job_updated_sender_ids,
         job_forex,
         job_from_plts,
+        job_from_agent_registry,
     ]
 )

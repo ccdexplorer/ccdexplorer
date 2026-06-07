@@ -24,6 +24,7 @@ partitions_def_from_genesis = dg.DailyPartitionsDefinition(start_date="2021-06-0
 partitions_def_from_trading = dg.DailyPartitionsDefinition(start_date="2022-02-10")
 partitions_def_from_staking = dg.DailyPartitionsDefinition(start_date="2022-06-23")
 partitions_def_from_plts = dg.DailyPartitionsDefinition(start_date="2025-09-22")
+partitions_def_from_agent_registry = dg.DailyPartitionsDefinition(start_date="2026-05-27")
 partitions_def_grouping = dg.StaticPartitionsDefinition(["daily", "weekly", "monthly"])
 
 
