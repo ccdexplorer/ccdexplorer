@@ -1,0 +1,8 @@
+{% extends "base/base.html" %}
+{% block content %}
+    {% set hx_post_url = '/' ~ net ~ '/ajax_statistics_standalone/agent_registries' %}
+    {% set include_dropdown_fancy = False %}
+    {% set include_trace_selection = False %}
+    {% include 'charts/standalone_chart.html' %}
+    {% include 'charts/download_link.html' %}
+{% endblock %}

@@ -64,6 +64,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_holders,
     sc_plt_transfers,
     sc_transactions_count,
+    sc_agent_registries,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
 from ccdexplorer.env import environment
@@ -319,6 +320,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(sc_active_addresses.router)
     app.include_router(sc_holders.router)
     app.include_router(sc_plt_transfers.router)
+    app.include_router(sc_agent_registries.router)
 
     @app.exception_handler(404)
     async def exception_handler_404(request: Request, exc: Exception):

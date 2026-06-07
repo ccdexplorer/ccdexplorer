@@ -58,3 +58,26 @@ async def get_plt_charts_home(
             "env": environment,
         },
     )
+
+
+@router.get("/{net}/charts-agents", response_class=HTMLResponse)
+async def get_agents_charts_home(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    request.state.api_calls = {}
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    return request.app.templates.TemplateResponse(
+        request,
+        "charts/agents_home.html",
+        {
+            "request": request,
+            "net": net,
+            "tags": tags,
+            "user": user,
+            "env": environment,
+        },
+    )

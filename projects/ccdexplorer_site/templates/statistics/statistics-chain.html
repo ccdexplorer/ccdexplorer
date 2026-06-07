@@ -10,7 +10,7 @@
 <div class="container my-4">
   {% set title= "Statistics / Charts" %}{% include 'base/box_title.html' %}
   <div class="row">
-    {% for name in ['Chain', 'Accounts', 'Exchanges', 'Staking', 'Validators', "PLT", "Miscellaneous"] %}
+    {% for name in ['Chain', 'Accounts', 'Exchanges', 'Staking', 'Validators', "PLT", "Agents", "Miscellaneous"] %}
     <div class="col-md-4 col-sm-6">
       <div class="card text-center  border-dark" >
               <div class="card-body text-center">
@@ -19,6 +19,8 @@
                     <a class="stretched-link" href="/mainnet/charts"></a>
                   {% elif name == "PLT" %}
                   <a class="stretched-link" href="/mainnet/charts-plt"></a>
+                  {% elif name == "Agents" %}
+                  <a class="stretched-link" href="/mainnet/charts-agents"></a>
                     
                   {% else %}
                     <a class="stretched-link" href="/mainnet/statistics/{{name|lower}}"></a>  
