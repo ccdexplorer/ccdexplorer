@@ -21,7 +21,6 @@ from ccdexplorer.mongodb.core import CollectionsUtilities
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from fastapi_mcp import AuthConfig, FastApiMCP, OAuthMetadata
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -102,7 +101,9 @@ if environment["SITE_URL"] != "http://127.0.0.1:8000":
 
 
 def _make_auth_code(api_key: str, code_challenge: str, signing_key: str) -> str:
-    payload = json.dumps({"k": api_key, "cc": code_challenge, "exp": int(time.time()) + 300}, separators=(",", ":"))
+    payload = json.dumps(
+        {"k": api_key, "cc": code_challenge, "exp": int(time.time()) + 300}, separators=(",", ":")
+    )
     b64 = base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
     sig = _hmac.new(signing_key.encode(), b64.encode(), hashlib.sha256).hexdigest()
     return f"{b64}.{sig}"
@@ -126,9 +127,11 @@ def _decode_auth_code(code: str, signing_key: str) -> dict | None:
 
 
 def _verify_pkce_s256(code_verifier: str, code_challenge: str) -> bool:
-    computed = base64.urlsafe_b64encode(
-        hashlib.sha256(code_verifier.encode("ascii")).digest()
-    ).rstrip(b"=").decode("ascii")
+    computed = (
+        base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode("ascii")).digest())
+        .rstrip(b"=")
+        .decode("ascii")
+    )
     return _hmac.compare_digest(computed, code_challenge)
 
 
@@ -454,29 +457,34 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     #     return await call_next(request)
 
-    signing_key = (
-        environment.get("CCDEXPLORER_MCP_SIGNING_KEY")
-        or environment.get("CCDEXPLORER_API_KEY", "")
+    signing_key = environment.get("CCDEXPLORER_MCP_SIGNING_KEY") or environment.get(
+        "CCDEXPLORER_API_KEY", ""
     )
 
     # ── OAuth discovery ──────────────────────────────────────────────────────
     @app.get("/.well-known/oauth-protected-resource", include_in_schema=False)
     async def mcp_oauth_protected_resource(request: Request) -> JSONResponse:
-        host = request.headers.get("x-forwarded-host") or request.headers.get("host", "api.ccdexplorer.io")
+        host = request.headers.get("x-forwarded-host") or request.headers.get(
+            "host", "api.ccdexplorer.io"
+        )
         base = f"https://{host}"
-        return JSONResponse({
-            "resource": f"{base}/mcp",
-            "authorization_servers": [base],
-            "bearer_methods_supported": ["header"],
-            "scopes_supported": ["mcp"],
-        })
+        return JSONResponse(
+            {
+                "resource": f"{base}/mcp",
+                "authorization_servers": [base],
+                "bearer_methods_supported": ["header"],
+                "scopes_supported": ["mcp"],
+            }
+        )
 
     # ── Authorize page (Authorization Code + PKCE) ───────────────────────────
     @app.get("/authorize", include_in_schema=False)
     async def mcp_authorize(request: Request) -> HTMLResponse:
         p = request.query_params
+
         def esc(v: str | None) -> str:
             return _html.escape(v or "")
+
         return HTMLResponse(f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -496,10 +504,10 @@ def create_app(app_settings: AppSettings) -> FastAPI:
   <h2>CCDExplorer — Authorize Claude</h2>
   <p>Enter your CCDExplorer MCP API key (<code>API_CODEX_KEY</code>) to grant access.</p>
   <form method="post">
-    <input type="hidden" name="redirect_uri" value="{esc(p.get('redirect_uri'))}">
-    <input type="hidden" name="code_challenge" value="{esc(p.get('code_challenge'))}">
-    <input type="hidden" name="code_challenge_method" value="{esc(p.get('code_challenge_method','S256'))}">
-    <input type="hidden" name="state" value="{esc(p.get('state'))}">
+    <input type="hidden" name="redirect_uri" value="{esc(p.get("redirect_uri"))}">
+    <input type="hidden" name="code_challenge" value="{esc(p.get("code_challenge"))}">
+    <input type="hidden" name="code_challenge_method" value="{esc(p.get("code_challenge_method", "S256"))}">
+    <input type="hidden" name="state" value="{esc(p.get("state"))}">
     <label for="k">MCP API Key</label>
     <input type="password" id="k" name="api_key" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autofocus>
     <button type="submit">Authorize</button>
@@ -533,12 +541,14 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             return JSONResponse({"error": "invalid_grant"}, status_code=400)
         if not _verify_pkce_s256(code_verifier, data["cc"]):
             return JSONResponse({"error": "invalid_grant"}, status_code=400)
-        return JSONResponse({
-            "access_token": data["k"],
-            "token_type": "Bearer",
-            "expires_in": 86400,
-            "scope": "mcp",
-        })
+        return JSONResponse(
+            {
+                "access_token": data["k"],
+                "token_type": "Bearer",
+                "expires_in": 86400,
+                "scope": "mcp",
+            }
+        )
 
     # ── Fake dynamic client registration ─────────────────────────────────────
     @app.post("/oauth/register", include_in_schema=False, status_code=201)
@@ -547,14 +557,17 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             body = await request.json()
         except Exception:
             body = {}
-        return JSONResponse({
-            "client_id": body.get("client_name", "mcp-client"),
-            "client_id_issued_at": int(time.time()),
-            "redirect_uris": body.get("redirect_uris", []),
-            "grant_types": ["authorization_code"],
-            "token_endpoint_auth_method": "none",
-            "client_name": body.get("client_name", "MCP Client"),
-        }, status_code=201)
+        return JSONResponse(
+            {
+                "client_id": body.get("client_name", "mcp-client"),
+                "client_id_issued_at": int(time.time()),
+                "redirect_uris": body.get("redirect_uris", []),
+                "grant_types": ["authorization_code"],
+                "token_endpoint_auth_method": "none",
+                "client_name": body.get("client_name", "MCP Client"),
+            },
+            status_code=201,
+        )
 
     @app.get("/metrics", include_in_schema=False)
     def metrics() -> Response:
@@ -618,37 +631,49 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             raise HTTPException(
                 status_code=401,
                 detail="API key required",
-                headers={"WWW-Authenticate": f'Bearer resource_metadata="{host}/.well-known/oauth-protected-resource"'},
+                headers={
+                    "WWW-Authenticate": f'Bearer resource_metadata="{host}/.well-known/oauth-protected-resource"'
+                },
             )
-    mcp = FastApiMCP(
-        app,
-        name="CCDExplorer MCP",
-        include_tags=[
-            "Account", "Accounts",
-            "Transaction", "Transactions",
-            "Token", "Tokens",
-            "Block", "Blocks",
-            "Contract", "Contracts",
-            "Module", "Modules",
-            "Smart Wallet", "Smart Wallets",
-            "Protocol-Level Token", "Protocol-Level Tokens",
-            "Misc", "Markets",
-        ],
-        auth_config=AuthConfig(
-            dependencies=[Depends(verify_mcp_key)],
-            custom_oauth_metadata=OAuthMetadata(
-                issuer=host,
-                authorization_endpoint=f"{host}/authorize",
-                token_endpoint=f"{host}/oauth/token",
-                registration_endpoint=f"{host}/oauth/register",
-                grant_types_supported=["authorization_code"],
-                response_types_supported=["code"],
-                scopes_supported=["mcp"],
-                code_challenge_methods_supported=["S256"],
-                token_endpoint_auth_methods_supported=["none"],
-            ),
-        ),
-    )
-    mcp.mount_http()
+
+    # mcp = FastApiMCP(
+    #     app,
+    #     name="CCDExplorer MCP",
+    #     include_tags=[
+    #         "Account",
+    #         "Accounts",
+    #         "Transaction",
+    #         "Transactions",
+    #         "Token",
+    #         "Tokens",
+    #         "Block",
+    #         "Blocks",
+    #         "Contract",
+    #         "Contracts",
+    #         "Module",
+    #         "Modules",
+    #         "Smart Wallet",
+    #         "Smart Wallets",
+    #         "Protocol-Level Token",
+    #         "Protocol-Level Tokens",
+    #         "Misc",
+    #         "Markets",
+    #     ],
+    #     auth_config=AuthConfig(
+    #         dependencies=[Depends(verify_mcp_key)],
+    #         custom_oauth_metadata=OAuthMetadata(
+    #             issuer=host,
+    #             authorization_endpoint=f"{host}/authorize",
+    #             token_endpoint=f"{host}/oauth/token",
+    #             registration_endpoint=f"{host}/oauth/register",
+    #             grant_types_supported=["authorization_code"],
+    #             response_types_supported=["code"],
+    #             scopes_supported=["mcp"],
+    #             code_challenge_methods_supported=["S256"],
+    #             token_endpoint_auth_methods_supported=["none"],
+    #         ),
+    #     ),
+    # )
+    # mcp.mount_http()
 
     return app
