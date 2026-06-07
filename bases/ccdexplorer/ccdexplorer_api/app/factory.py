@@ -153,6 +153,10 @@ def classify_endpoint(request: Request) -> tuple[str, str] | tuple[None, None]:
     net = parts[1]
     resource = parts[2]
 
+    # MongoDB field paths cannot contain dots; skip tracking for invalid segments
+    if "." in resource:
+        return None, None
+
     return net, resource
 
 

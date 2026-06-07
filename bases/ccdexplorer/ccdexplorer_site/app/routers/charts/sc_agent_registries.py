@@ -139,6 +139,7 @@ async def statistics_agent_registries(
     )
 
     fig.update_xaxes(type="date")
+    fig.update_layout(dragmode="pan")
 
     fig.update_layout(
         barmode="stack",
