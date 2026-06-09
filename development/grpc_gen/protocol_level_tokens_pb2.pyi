@@ -19,6 +19,16 @@ class TokenId(_message.Message):
     value: str
     def __init__(self, value: _Optional[str] = ...) -> None: ...
 
+class LockId(_message.Message):
+    __slots__ = ("account_index", "sequence_number", "creation_order")
+    ACCOUNT_INDEX_FIELD_NUMBER: _ClassVar[int]
+    SEQUENCE_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    CREATION_ORDER_FIELD_NUMBER: _ClassVar[int]
+    account_index: int
+    sequence_number: int
+    creation_order: int
+    def __init__(self, account_index: _Optional[int] = ..., sequence_number: _Optional[int] = ..., creation_order: _Optional[int] = ...) -> None: ...
+
 class TokenModuleRef(_message.Message):
     __slots__ = ("value",)
     VALUE_FIELD_NUMBER: _ClassVar[int]
@@ -54,12 +64,14 @@ class TokenAccountState(_message.Message):
     def __init__(self, balance: _Optional[_Union[TokenAmount, _Mapping]] = ..., module_state: _Optional[_Union[Cbor, _Mapping]] = ...) -> None: ...
 
 class TokenModuleEvent(_message.Message):
-    __slots__ = ("type", "details")
+    __slots__ = ("type", "details", "token_id")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     DETAILS_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
     type: str
     details: Cbor
-    def __init__(self, type: _Optional[str] = ..., details: _Optional[_Union[Cbor, _Mapping]] = ...) -> None: ...
+    token_id: TokenId
+    def __init__(self, type: _Optional[str] = ..., details: _Optional[_Union[Cbor, _Mapping]] = ..., token_id: _Optional[_Union[TokenId, _Mapping]] = ...) -> None: ...
 
 class TokenHolder(_message.Message):
     __slots__ = ("account",)
@@ -68,23 +80,31 @@ class TokenHolder(_message.Message):
     def __init__(self, account: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ...) -> None: ...
 
 class TokenTransferEvent(_message.Message):
-    __slots__ = ("to", "amount", "memo")
+    __slots__ = ("to", "amount", "memo", "from_lock", "to_lock", "token_id")
     FROM_FIELD_NUMBER: _ClassVar[int]
     TO_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
     MEMO_FIELD_NUMBER: _ClassVar[int]
+    FROM_LOCK_FIELD_NUMBER: _ClassVar[int]
+    TO_LOCK_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
     to: TokenHolder
     amount: TokenAmount
     memo: _kernel_pb2.Memo
-    def __init__(self, to: _Optional[_Union[TokenHolder, _Mapping]] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., memo: _Optional[_Union[_kernel_pb2.Memo, _Mapping]] = ..., **kwargs) -> None: ...
+    from_lock: LockId
+    to_lock: LockId
+    token_id: TokenId
+    def __init__(self, to: _Optional[_Union[TokenHolder, _Mapping]] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., memo: _Optional[_Union[_kernel_pb2.Memo, _Mapping]] = ..., from_lock: _Optional[_Union[LockId, _Mapping]] = ..., to_lock: _Optional[_Union[LockId, _Mapping]] = ..., token_id: _Optional[_Union[TokenId, _Mapping]] = ..., **kwargs) -> None: ...
 
 class TokenSupplyUpdateEvent(_message.Message):
-    __slots__ = ("target", "amount")
+    __slots__ = ("target", "amount", "token_id")
     TARGET_FIELD_NUMBER: _ClassVar[int]
     AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
     target: TokenHolder
     amount: TokenAmount
-    def __init__(self, target: _Optional[_Union[TokenHolder, _Mapping]] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ...) -> None: ...
+    token_id: TokenId
+    def __init__(self, target: _Optional[_Union[TokenHolder, _Mapping]] = ..., amount: _Optional[_Union[TokenAmount, _Mapping]] = ..., token_id: _Optional[_Union[TokenId, _Mapping]] = ...) -> None: ...
 
 class TokenEvent(_message.Message):
     __slots__ = ("token_id", "module_event", "transfer_event", "mint_event", "burn_event")
@@ -105,6 +125,42 @@ class TokenEffect(_message.Message):
     EVENTS_FIELD_NUMBER: _ClassVar[int]
     events: _containers.RepeatedCompositeFieldContainer[TokenEvent]
     def __init__(self, events: _Optional[_Iterable[_Union[TokenEvent, _Mapping]]] = ...) -> None: ...
+
+class LockCreateEvent(_message.Message):
+    __slots__ = ("lock_id", "lock_config")
+    LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+    LOCK_CONFIG_FIELD_NUMBER: _ClassVar[int]
+    lock_id: LockId
+    lock_config: Cbor
+    def __init__(self, lock_id: _Optional[_Union[LockId, _Mapping]] = ..., lock_config: _Optional[_Union[Cbor, _Mapping]] = ...) -> None: ...
+
+class LockDestroyEvent(_message.Message):
+    __slots__ = ("lock_id",)
+    LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+    lock_id: LockId
+    def __init__(self, lock_id: _Optional[_Union[LockId, _Mapping]] = ...) -> None: ...
+
+class MetaEvent(_message.Message):
+    __slots__ = ("module_event", "transfer_event", "mint_event", "burn_event", "lock_create_event", "lock_destroy_event")
+    MODULE_EVENT_FIELD_NUMBER: _ClassVar[int]
+    TRANSFER_EVENT_FIELD_NUMBER: _ClassVar[int]
+    MINT_EVENT_FIELD_NUMBER: _ClassVar[int]
+    BURN_EVENT_FIELD_NUMBER: _ClassVar[int]
+    LOCK_CREATE_EVENT_FIELD_NUMBER: _ClassVar[int]
+    LOCK_DESTROY_EVENT_FIELD_NUMBER: _ClassVar[int]
+    module_event: TokenModuleEvent
+    transfer_event: TokenTransferEvent
+    mint_event: TokenSupplyUpdateEvent
+    burn_event: TokenSupplyUpdateEvent
+    lock_create_event: LockCreateEvent
+    lock_destroy_event: LockDestroyEvent
+    def __init__(self, module_event: _Optional[_Union[TokenModuleEvent, _Mapping]] = ..., transfer_event: _Optional[_Union[TokenTransferEvent, _Mapping]] = ..., mint_event: _Optional[_Union[TokenSupplyUpdateEvent, _Mapping]] = ..., burn_event: _Optional[_Union[TokenSupplyUpdateEvent, _Mapping]] = ..., lock_create_event: _Optional[_Union[LockCreateEvent, _Mapping]] = ..., lock_destroy_event: _Optional[_Union[LockDestroyEvent, _Mapping]] = ...) -> None: ...
+
+class MetaEffect(_message.Message):
+    __slots__ = ("events",)
+    EVENTS_FIELD_NUMBER: _ClassVar[int]
+    events: _containers.RepeatedCompositeFieldContainer[MetaEvent]
+    def __init__(self, events: _Optional[_Iterable[_Union[MetaEvent, _Mapping]]] = ...) -> None: ...
 
 class TokenModuleRejectReason(_message.Message):
     __slots__ = ("token_id", "type", "details")
@@ -135,3 +191,11 @@ class TokenCreationDetails(_message.Message):
     create_plt: CreatePLT
     events: _containers.RepeatedCompositeFieldContainer[TokenEvent]
     def __init__(self, create_plt: _Optional[_Union[CreatePLT, _Mapping]] = ..., events: _Optional[_Iterable[_Union[TokenEvent, _Mapping]]] = ...) -> None: ...
+
+class TokenAuthorizations(_message.Message):
+    __slots__ = ("token_id", "details")
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
+    DETAILS_FIELD_NUMBER: _ClassVar[int]
+    token_id: TokenId
+    details: Cbor
+    def __init__(self, token_id: _Optional[_Union[TokenId, _Mapping]] = ..., details: _Optional[_Union[Cbor, _Mapping]] = ...) -> None: ...

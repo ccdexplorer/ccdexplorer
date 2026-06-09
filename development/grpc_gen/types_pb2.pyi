@@ -74,6 +74,7 @@ class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     CONFIGURE_BAKER: _ClassVar[TransactionType]
     CONFIGURE_DELEGATION: _ClassVar[TransactionType]
     TOKEN_UPDATE: _ClassVar[TransactionType]
+    META_UPDATE: _ClassVar[TransactionType]
 
 class ProtocolVersion(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -87,6 +88,7 @@ class ProtocolVersion(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     PROTOCOL_VERSION_8: _ClassVar[ProtocolVersion]
     PROTOCOL_VERSION_9: _ClassVar[ProtocolVersion]
     PROTOCOL_VERSION_10: _ClassVar[ProtocolVersion]
+    PROTOCOL_VERSION_11: _ClassVar[ProtocolVersion]
 OPEN_STATUS_OPEN_FOR_ALL: OpenStatus
 OPEN_STATUS_CLOSED_FOR_NEW: OpenStatus
 OPEN_STATUS_CLOSED_FOR_ALL: OpenStatus
@@ -138,6 +140,7 @@ TRANSFER_WITH_SCHEDULE_AND_MEMO: TransactionType
 CONFIGURE_BAKER: TransactionType
 CONFIGURE_DELEGATION: TransactionType
 TOKEN_UPDATE: TransactionType
+META_UPDATE: TransactionType
 PROTOCOL_VERSION_1: ProtocolVersion
 PROTOCOL_VERSION_2: ProtocolVersion
 PROTOCOL_VERSION_3: ProtocolVersion
@@ -148,6 +151,7 @@ PROTOCOL_VERSION_7: ProtocolVersion
 PROTOCOL_VERSION_8: ProtocolVersion
 PROTOCOL_VERSION_9: ProtocolVersion
 PROTOCOL_VERSION_10: ProtocolVersion
+PROTOCOL_VERSION_11: ProtocolVersion
 
 class Empty(_message.Message):
     __slots__ = ()
@@ -716,6 +720,20 @@ class TokenInfoRequest(_message.Message):
     token_id: _protocol_level_tokens_pb2.TokenId
     def __init__(self, block_hash: _Optional[_Union[BlockHashInput, _Mapping]] = ..., token_id: _Optional[_Union[_protocol_level_tokens_pb2.TokenId, _Mapping]] = ...) -> None: ...
 
+class LockInfoRequest(_message.Message):
+    __slots__ = ("block_hash", "lock_id")
+    BLOCK_HASH_FIELD_NUMBER: _ClassVar[int]
+    LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+    block_hash: BlockHashInput
+    lock_id: _protocol_level_tokens_pb2.LockId
+    def __init__(self, block_hash: _Optional[_Union[BlockHashInput, _Mapping]] = ..., lock_id: _Optional[_Union[_protocol_level_tokens_pb2.LockId, _Mapping]] = ...) -> None: ...
+
+class LockInfo(_message.Message):
+    __slots__ = ("lock_info",)
+    LOCK_INFO_FIELD_NUMBER: _ClassVar[int]
+    lock_info: _protocol_level_tokens_pb2.Cbor
+    def __init__(self, lock_info: _Optional[_Union[_protocol_level_tokens_pb2.Cbor, _Mapping]] = ...) -> None: ...
+
 class FinalizedBlockInfo(_message.Message):
     __slots__ = ("hash", "height")
     HASH_FIELD_NUMBER: _ClassVar[int]
@@ -895,7 +913,7 @@ class Duration(_message.Message):
     def __init__(self, value: _Optional[int] = ...) -> None: ...
 
 class RejectReason(_message.Message):
-    __slots__ = ("module_not_wf", "module_hash_already_exists", "invalid_account_reference", "invalid_init_method", "invalid_receive_method", "invalid_module_reference", "invalid_contract_address", "runtime_failure", "amount_too_large", "serialization_failure", "out_of_energy", "rejected_init", "rejected_receive", "invalid_proof", "already_a_baker", "not_a_baker", "insufficient_balance_for_baker_stake", "stake_under_minimum_threshold_for_baking", "baker_in_cooldown", "duplicate_aggregation_key", "non_existent_credential_id", "key_index_already_in_use", "invalid_account_threshold", "invalid_credential_key_sign_threshold", "invalid_encrypted_amount_transfer_proof", "invalid_transfer_to_public_proof", "encrypted_amount_self_transfer", "invalid_index_on_encrypted_transfer", "zero_scheduledAmount", "non_increasing_schedule", "first_scheduled_release_expired", "scheduled_self_transfer", "invalid_credentials", "duplicate_cred_ids", "non_existent_cred_ids", "remove_first_credential", "credential_holder_did_not_sign", "not_allowed_multiple_credentials", "not_allowed_to_receive_encrypted", "not_allowed_to_handle_encrypted", "missing_baker_add_parameters", "finalization_reward_commission_not_in_range", "baking_reward_commission_not_in_range", "transaction_fee_commission_not_in_range", "already_a_delegator", "insufficient_balance_for_delegation_stake", "missing_delegation_add_parameters", "insufficient_delegation_stake", "delegator_in_cooldown", "not_a_delegator", "delegation_target_not_a_baker", "stake_over_maximum_threshold_for_pool", "pool_would_become_over_delegated", "pool_closed", "non_existent_token_id", "token_update_transaction_failed")
+    __slots__ = ("module_not_wf", "module_hash_already_exists", "invalid_account_reference", "invalid_init_method", "invalid_receive_method", "invalid_module_reference", "invalid_contract_address", "runtime_failure", "amount_too_large", "serialization_failure", "out_of_energy", "rejected_init", "rejected_receive", "invalid_proof", "already_a_baker", "not_a_baker", "insufficient_balance_for_baker_stake", "stake_under_minimum_threshold_for_baking", "baker_in_cooldown", "duplicate_aggregation_key", "non_existent_credential_id", "key_index_already_in_use", "invalid_account_threshold", "invalid_credential_key_sign_threshold", "invalid_encrypted_amount_transfer_proof", "invalid_transfer_to_public_proof", "encrypted_amount_self_transfer", "invalid_index_on_encrypted_transfer", "zero_scheduledAmount", "non_increasing_schedule", "first_scheduled_release_expired", "scheduled_self_transfer", "invalid_credentials", "duplicate_cred_ids", "non_existent_cred_ids", "remove_first_credential", "credential_holder_did_not_sign", "not_allowed_multiple_credentials", "not_allowed_to_receive_encrypted", "not_allowed_to_handle_encrypted", "missing_baker_add_parameters", "finalization_reward_commission_not_in_range", "baking_reward_commission_not_in_range", "transaction_fee_commission_not_in_range", "already_a_delegator", "insufficient_balance_for_delegation_stake", "missing_delegation_add_parameters", "insufficient_delegation_stake", "delegator_in_cooldown", "not_a_delegator", "delegation_target_not_a_baker", "stake_over_maximum_threshold_for_pool", "pool_would_become_over_delegated", "pool_closed", "non_existent_token_id", "token_update_transaction_failed", "non_existent_lock_id", "lock_expired", "lock_fund_not_authorized", "lock_send_not_authorized", "lock_return_not_authorized", "lock_cancel_not_authorized", "lock_token_not_permitted", "lock_recipient_not_permitted")
     class InvalidInitMethod(_message.Message):
         __slots__ = ("module_ref", "init_name")
         MODULE_REF_FIELD_NUMBER: _ClassVar[int]
@@ -943,6 +961,20 @@ class RejectReason(_message.Message):
         IDS_FIELD_NUMBER: _ClassVar[int]
         ids: _containers.RepeatedCompositeFieldContainer[CredentialRegistrationId]
         def __init__(self, ids: _Optional[_Iterable[_Union[CredentialRegistrationId, _Mapping]]] = ...) -> None: ...
+    class LockOperationNotAuthorized(_message.Message):
+        __slots__ = ("lock_id", "account")
+        LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+        ACCOUNT_FIELD_NUMBER: _ClassVar[int]
+        lock_id: _protocol_level_tokens_pb2.LockId
+        account: _kernel_pb2.AccountAddress
+        def __init__(self, lock_id: _Optional[_Union[_protocol_level_tokens_pb2.LockId, _Mapping]] = ..., account: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ...) -> None: ...
+    class LockTokenNotPermitted(_message.Message):
+        __slots__ = ("lock_id", "token_id")
+        LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+        TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
+        lock_id: _protocol_level_tokens_pb2.LockId
+        token_id: _protocol_level_tokens_pb2.TokenId
+        def __init__(self, lock_id: _Optional[_Union[_protocol_level_tokens_pb2.LockId, _Mapping]] = ..., token_id: _Optional[_Union[_protocol_level_tokens_pb2.TokenId, _Mapping]] = ...) -> None: ...
     MODULE_NOT_WF_FIELD_NUMBER: _ClassVar[int]
     MODULE_HASH_ALREADY_EXISTS_FIELD_NUMBER: _ClassVar[int]
     INVALID_ACCOUNT_REFERENCE_FIELD_NUMBER: _ClassVar[int]
@@ -999,6 +1031,14 @@ class RejectReason(_message.Message):
     POOL_CLOSED_FIELD_NUMBER: _ClassVar[int]
     NON_EXISTENT_TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
     TOKEN_UPDATE_TRANSACTION_FAILED_FIELD_NUMBER: _ClassVar[int]
+    NON_EXISTENT_LOCK_ID_FIELD_NUMBER: _ClassVar[int]
+    LOCK_EXPIRED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_FUND_NOT_AUTHORIZED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_SEND_NOT_AUTHORIZED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_RETURN_NOT_AUTHORIZED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_CANCEL_NOT_AUTHORIZED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_TOKEN_NOT_PERMITTED_FIELD_NUMBER: _ClassVar[int]
+    LOCK_RECIPIENT_NOT_PERMITTED_FIELD_NUMBER: _ClassVar[int]
     module_not_wf: Empty
     module_hash_already_exists: ModuleRef
     invalid_account_reference: _kernel_pb2.AccountAddress
@@ -1055,7 +1095,15 @@ class RejectReason(_message.Message):
     pool_closed: Empty
     non_existent_token_id: _protocol_level_tokens_pb2.TokenId
     token_update_transaction_failed: _protocol_level_tokens_pb2.TokenModuleRejectReason
-    def __init__(self, module_not_wf: _Optional[_Union[Empty, _Mapping]] = ..., module_hash_already_exists: _Optional[_Union[ModuleRef, _Mapping]] = ..., invalid_account_reference: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_init_method: _Optional[_Union[RejectReason.InvalidInitMethod, _Mapping]] = ..., invalid_receive_method: _Optional[_Union[RejectReason.InvalidReceiveMethod, _Mapping]] = ..., invalid_module_reference: _Optional[_Union[ModuleRef, _Mapping]] = ..., invalid_contract_address: _Optional[_Union[ContractAddress, _Mapping]] = ..., runtime_failure: _Optional[_Union[Empty, _Mapping]] = ..., amount_too_large: _Optional[_Union[RejectReason.AmountTooLarge, _Mapping]] = ..., serialization_failure: _Optional[_Union[Empty, _Mapping]] = ..., out_of_energy: _Optional[_Union[Empty, _Mapping]] = ..., rejected_init: _Optional[_Union[RejectReason.RejectedInit, _Mapping]] = ..., rejected_receive: _Optional[_Union[RejectReason.RejectedReceive, _Mapping]] = ..., invalid_proof: _Optional[_Union[Empty, _Mapping]] = ..., already_a_baker: _Optional[_Union[BakerId, _Mapping]] = ..., not_a_baker: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., insufficient_balance_for_baker_stake: _Optional[_Union[Empty, _Mapping]] = ..., stake_under_minimum_threshold_for_baking: _Optional[_Union[Empty, _Mapping]] = ..., baker_in_cooldown: _Optional[_Union[Empty, _Mapping]] = ..., duplicate_aggregation_key: _Optional[_Union[BakerAggregationVerifyKey, _Mapping]] = ..., non_existent_credential_id: _Optional[_Union[Empty, _Mapping]] = ..., key_index_already_in_use: _Optional[_Union[Empty, _Mapping]] = ..., invalid_account_threshold: _Optional[_Union[Empty, _Mapping]] = ..., invalid_credential_key_sign_threshold: _Optional[_Union[Empty, _Mapping]] = ..., invalid_encrypted_amount_transfer_proof: _Optional[_Union[Empty, _Mapping]] = ..., invalid_transfer_to_public_proof: _Optional[_Union[Empty, _Mapping]] = ..., encrypted_amount_self_transfer: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_index_on_encrypted_transfer: _Optional[_Union[Empty, _Mapping]] = ..., zero_scheduledAmount: _Optional[_Union[Empty, _Mapping]] = ..., non_increasing_schedule: _Optional[_Union[Empty, _Mapping]] = ..., first_scheduled_release_expired: _Optional[_Union[Empty, _Mapping]] = ..., scheduled_self_transfer: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_credentials: _Optional[_Union[Empty, _Mapping]] = ..., duplicate_cred_ids: _Optional[_Union[RejectReason.DuplicateCredIds, _Mapping]] = ..., non_existent_cred_ids: _Optional[_Union[RejectReason.NonExistentCredIds, _Mapping]] = ..., remove_first_credential: _Optional[_Union[Empty, _Mapping]] = ..., credential_holder_did_not_sign: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_multiple_credentials: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_to_receive_encrypted: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_to_handle_encrypted: _Optional[_Union[Empty, _Mapping]] = ..., missing_baker_add_parameters: _Optional[_Union[Empty, _Mapping]] = ..., finalization_reward_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., baking_reward_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., transaction_fee_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., already_a_delegator: _Optional[_Union[Empty, _Mapping]] = ..., insufficient_balance_for_delegation_stake: _Optional[_Union[Empty, _Mapping]] = ..., missing_delegation_add_parameters: _Optional[_Union[Empty, _Mapping]] = ..., insufficient_delegation_stake: _Optional[_Union[Empty, _Mapping]] = ..., delegator_in_cooldown: _Optional[_Union[Empty, _Mapping]] = ..., not_a_delegator: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., delegation_target_not_a_baker: _Optional[_Union[BakerId, _Mapping]] = ..., stake_over_maximum_threshold_for_pool: _Optional[_Union[Empty, _Mapping]] = ..., pool_would_become_over_delegated: _Optional[_Union[Empty, _Mapping]] = ..., pool_closed: _Optional[_Union[Empty, _Mapping]] = ..., non_existent_token_id: _Optional[_Union[_protocol_level_tokens_pb2.TokenId, _Mapping]] = ..., token_update_transaction_failed: _Optional[_Union[_protocol_level_tokens_pb2.TokenModuleRejectReason, _Mapping]] = ...) -> None: ...
+    non_existent_lock_id: _protocol_level_tokens_pb2.LockId
+    lock_expired: _protocol_level_tokens_pb2.LockId
+    lock_fund_not_authorized: RejectReason.LockOperationNotAuthorized
+    lock_send_not_authorized: RejectReason.LockOperationNotAuthorized
+    lock_return_not_authorized: RejectReason.LockOperationNotAuthorized
+    lock_cancel_not_authorized: RejectReason.LockOperationNotAuthorized
+    lock_token_not_permitted: RejectReason.LockTokenNotPermitted
+    lock_recipient_not_permitted: RejectReason.LockOperationNotAuthorized
+    def __init__(self, module_not_wf: _Optional[_Union[Empty, _Mapping]] = ..., module_hash_already_exists: _Optional[_Union[ModuleRef, _Mapping]] = ..., invalid_account_reference: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_init_method: _Optional[_Union[RejectReason.InvalidInitMethod, _Mapping]] = ..., invalid_receive_method: _Optional[_Union[RejectReason.InvalidReceiveMethod, _Mapping]] = ..., invalid_module_reference: _Optional[_Union[ModuleRef, _Mapping]] = ..., invalid_contract_address: _Optional[_Union[ContractAddress, _Mapping]] = ..., runtime_failure: _Optional[_Union[Empty, _Mapping]] = ..., amount_too_large: _Optional[_Union[RejectReason.AmountTooLarge, _Mapping]] = ..., serialization_failure: _Optional[_Union[Empty, _Mapping]] = ..., out_of_energy: _Optional[_Union[Empty, _Mapping]] = ..., rejected_init: _Optional[_Union[RejectReason.RejectedInit, _Mapping]] = ..., rejected_receive: _Optional[_Union[RejectReason.RejectedReceive, _Mapping]] = ..., invalid_proof: _Optional[_Union[Empty, _Mapping]] = ..., already_a_baker: _Optional[_Union[BakerId, _Mapping]] = ..., not_a_baker: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., insufficient_balance_for_baker_stake: _Optional[_Union[Empty, _Mapping]] = ..., stake_under_minimum_threshold_for_baking: _Optional[_Union[Empty, _Mapping]] = ..., baker_in_cooldown: _Optional[_Union[Empty, _Mapping]] = ..., duplicate_aggregation_key: _Optional[_Union[BakerAggregationVerifyKey, _Mapping]] = ..., non_existent_credential_id: _Optional[_Union[Empty, _Mapping]] = ..., key_index_already_in_use: _Optional[_Union[Empty, _Mapping]] = ..., invalid_account_threshold: _Optional[_Union[Empty, _Mapping]] = ..., invalid_credential_key_sign_threshold: _Optional[_Union[Empty, _Mapping]] = ..., invalid_encrypted_amount_transfer_proof: _Optional[_Union[Empty, _Mapping]] = ..., invalid_transfer_to_public_proof: _Optional[_Union[Empty, _Mapping]] = ..., encrypted_amount_self_transfer: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_index_on_encrypted_transfer: _Optional[_Union[Empty, _Mapping]] = ..., zero_scheduledAmount: _Optional[_Union[Empty, _Mapping]] = ..., non_increasing_schedule: _Optional[_Union[Empty, _Mapping]] = ..., first_scheduled_release_expired: _Optional[_Union[Empty, _Mapping]] = ..., scheduled_self_transfer: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., invalid_credentials: _Optional[_Union[Empty, _Mapping]] = ..., duplicate_cred_ids: _Optional[_Union[RejectReason.DuplicateCredIds, _Mapping]] = ..., non_existent_cred_ids: _Optional[_Union[RejectReason.NonExistentCredIds, _Mapping]] = ..., remove_first_credential: _Optional[_Union[Empty, _Mapping]] = ..., credential_holder_did_not_sign: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_multiple_credentials: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_to_receive_encrypted: _Optional[_Union[Empty, _Mapping]] = ..., not_allowed_to_handle_encrypted: _Optional[_Union[Empty, _Mapping]] = ..., missing_baker_add_parameters: _Optional[_Union[Empty, _Mapping]] = ..., finalization_reward_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., baking_reward_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., transaction_fee_commission_not_in_range: _Optional[_Union[Empty, _Mapping]] = ..., already_a_delegator: _Optional[_Union[Empty, _Mapping]] = ..., insufficient_balance_for_delegation_stake: _Optional[_Union[Empty, _Mapping]] = ..., missing_delegation_add_parameters: _Optional[_Union[Empty, _Mapping]] = ..., insufficient_delegation_stake: _Optional[_Union[Empty, _Mapping]] = ..., delegator_in_cooldown: _Optional[_Union[Empty, _Mapping]] = ..., not_a_delegator: _Optional[_Union[_kernel_pb2.AccountAddress, _Mapping]] = ..., delegation_target_not_a_baker: _Optional[_Union[BakerId, _Mapping]] = ..., stake_over_maximum_threshold_for_pool: _Optional[_Union[Empty, _Mapping]] = ..., pool_would_become_over_delegated: _Optional[_Union[Empty, _Mapping]] = ..., pool_closed: _Optional[_Union[Empty, _Mapping]] = ..., non_existent_token_id: _Optional[_Union[_protocol_level_tokens_pb2.TokenId, _Mapping]] = ..., token_update_transaction_failed: _Optional[_Union[_protocol_level_tokens_pb2.TokenModuleRejectReason, _Mapping]] = ..., non_existent_lock_id: _Optional[_Union[_protocol_level_tokens_pb2.LockId, _Mapping]] = ..., lock_expired: _Optional[_Union[_protocol_level_tokens_pb2.LockId, _Mapping]] = ..., lock_fund_not_authorized: _Optional[_Union[RejectReason.LockOperationNotAuthorized, _Mapping]] = ..., lock_send_not_authorized: _Optional[_Union[RejectReason.LockOperationNotAuthorized, _Mapping]] = ..., lock_return_not_authorized: _Optional[_Union[RejectReason.LockOperationNotAuthorized, _Mapping]] = ..., lock_cancel_not_authorized: _Optional[_Union[RejectReason.LockOperationNotAuthorized, _Mapping]] = ..., lock_token_not_permitted: _Optional[_Union[RejectReason.LockTokenNotPermitted, _Mapping]] = ..., lock_recipient_not_permitted: _Optional[_Union[RejectReason.LockOperationNotAuthorized, _Mapping]] = ...) -> None: ...
 
 class ContractInitializedEvent(_message.Message):
     __slots__ = ("contract_version", "origin_ref", "address", "amount", "init_name", "events", "parameter")
@@ -1376,7 +1424,7 @@ class DelegationEvent(_message.Message):
     def __init__(self, delegation_stake_increased: _Optional[_Union[DelegationEvent.DelegationStakeIncreased, _Mapping]] = ..., delegation_stake_decreased: _Optional[_Union[DelegationEvent.DelegationStakeDecreased, _Mapping]] = ..., delegation_set_restake_earnings: _Optional[_Union[DelegationEvent.DelegationSetRestakeEarnings, _Mapping]] = ..., delegation_set_delegation_target: _Optional[_Union[DelegationEvent.DelegationSetDelegationTarget, _Mapping]] = ..., delegation_added: _Optional[_Union[DelegatorId, _Mapping]] = ..., delegation_removed: _Optional[_Union[DelegatorId, _Mapping]] = ..., baker_removed: _Optional[_Union[DelegationEvent.BakerRemoved, _Mapping]] = ...) -> None: ...
 
 class AccountTransactionEffects(_message.Message):
-    __slots__ = ("none", "module_deployed", "contract_initialized", "contract_update_issued", "account_transfer", "baker_added", "baker_removed", "baker_stake_updated", "baker_restake_earnings_updated", "baker_keys_updated", "encrypted_amount_transferred", "transferred_to_encrypted", "transferred_to_public", "transferred_with_schedule", "credential_keys_updated", "credentials_updated", "data_registered", "baker_configured", "delegation_configured", "token_update_effect")
+    __slots__ = ("none", "module_deployed", "contract_initialized", "contract_update_issued", "account_transfer", "baker_added", "baker_removed", "baker_stake_updated", "baker_restake_earnings_updated", "baker_keys_updated", "encrypted_amount_transferred", "transferred_to_encrypted", "transferred_to_public", "transferred_with_schedule", "credential_keys_updated", "credentials_updated", "data_registered", "baker_configured", "delegation_configured", "token_update_effect", "meta_update_effect")
     class None(_message.Message):
         __slots__ = ("transaction_type", "reject_reason")
         TRANSACTION_TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -1467,6 +1515,7 @@ class AccountTransactionEffects(_message.Message):
     BAKER_CONFIGURED_FIELD_NUMBER: _ClassVar[int]
     DELEGATION_CONFIGURED_FIELD_NUMBER: _ClassVar[int]
     TOKEN_UPDATE_EFFECT_FIELD_NUMBER: _ClassVar[int]
+    META_UPDATE_EFFECT_FIELD_NUMBER: _ClassVar[int]
     none: getattr(AccountTransactionEffects, 'None')
     module_deployed: ModuleRef
     contract_initialized: ContractInitializedEvent
@@ -1487,7 +1536,8 @@ class AccountTransactionEffects(_message.Message):
     baker_configured: AccountTransactionEffects.BakerConfigured
     delegation_configured: AccountTransactionEffects.DelegationConfigured
     token_update_effect: _protocol_level_tokens_pb2.TokenEffect
-    def __init__(self, none: _Optional[_Union[getattr(AccountTransactionEffects, 'None'), _Mapping]] = ..., module_deployed: _Optional[_Union[ModuleRef, _Mapping]] = ..., contract_initialized: _Optional[_Union[ContractInitializedEvent, _Mapping]] = ..., contract_update_issued: _Optional[_Union[AccountTransactionEffects.ContractUpdateIssued, _Mapping]] = ..., account_transfer: _Optional[_Union[AccountTransactionEffects.AccountTransfer, _Mapping]] = ..., baker_added: _Optional[_Union[BakerEvent.BakerAdded, _Mapping]] = ..., baker_removed: _Optional[_Union[BakerId, _Mapping]] = ..., baker_stake_updated: _Optional[_Union[AccountTransactionEffects.BakerStakeUpdated, _Mapping]] = ..., baker_restake_earnings_updated: _Optional[_Union[BakerEvent.BakerRestakeEarningsUpdated, _Mapping]] = ..., baker_keys_updated: _Optional[_Union[BakerKeysEvent, _Mapping]] = ..., encrypted_amount_transferred: _Optional[_Union[AccountTransactionEffects.EncryptedAmountTransferred, _Mapping]] = ..., transferred_to_encrypted: _Optional[_Union[EncryptedSelfAmountAddedEvent, _Mapping]] = ..., transferred_to_public: _Optional[_Union[AccountTransactionEffects.TransferredToPublic, _Mapping]] = ..., transferred_with_schedule: _Optional[_Union[AccountTransactionEffects.TransferredWithSchedule, _Mapping]] = ..., credential_keys_updated: _Optional[_Union[CredentialRegistrationId, _Mapping]] = ..., credentials_updated: _Optional[_Union[AccountTransactionEffects.CredentialsUpdated, _Mapping]] = ..., data_registered: _Optional[_Union[RegisteredData, _Mapping]] = ..., baker_configured: _Optional[_Union[AccountTransactionEffects.BakerConfigured, _Mapping]] = ..., delegation_configured: _Optional[_Union[AccountTransactionEffects.DelegationConfigured, _Mapping]] = ..., token_update_effect: _Optional[_Union[_protocol_level_tokens_pb2.TokenEffect, _Mapping]] = ...) -> None: ...
+    meta_update_effect: _protocol_level_tokens_pb2.MetaEffect
+    def __init__(self, none: _Optional[_Union[getattr(AccountTransactionEffects, 'None'), _Mapping]] = ..., module_deployed: _Optional[_Union[ModuleRef, _Mapping]] = ..., contract_initialized: _Optional[_Union[ContractInitializedEvent, _Mapping]] = ..., contract_update_issued: _Optional[_Union[AccountTransactionEffects.ContractUpdateIssued, _Mapping]] = ..., account_transfer: _Optional[_Union[AccountTransactionEffects.AccountTransfer, _Mapping]] = ..., baker_added: _Optional[_Union[BakerEvent.BakerAdded, _Mapping]] = ..., baker_removed: _Optional[_Union[BakerId, _Mapping]] = ..., baker_stake_updated: _Optional[_Union[AccountTransactionEffects.BakerStakeUpdated, _Mapping]] = ..., baker_restake_earnings_updated: _Optional[_Union[BakerEvent.BakerRestakeEarningsUpdated, _Mapping]] = ..., baker_keys_updated: _Optional[_Union[BakerKeysEvent, _Mapping]] = ..., encrypted_amount_transferred: _Optional[_Union[AccountTransactionEffects.EncryptedAmountTransferred, _Mapping]] = ..., transferred_to_encrypted: _Optional[_Union[EncryptedSelfAmountAddedEvent, _Mapping]] = ..., transferred_to_public: _Optional[_Union[AccountTransactionEffects.TransferredToPublic, _Mapping]] = ..., transferred_with_schedule: _Optional[_Union[AccountTransactionEffects.TransferredWithSchedule, _Mapping]] = ..., credential_keys_updated: _Optional[_Union[CredentialRegistrationId, _Mapping]] = ..., credentials_updated: _Optional[_Union[AccountTransactionEffects.CredentialsUpdated, _Mapping]] = ..., data_registered: _Optional[_Union[RegisteredData, _Mapping]] = ..., baker_configured: _Optional[_Union[AccountTransactionEffects.BakerConfigured, _Mapping]] = ..., delegation_configured: _Optional[_Union[AccountTransactionEffects.DelegationConfigured, _Mapping]] = ..., token_update_effect: _Optional[_Union[_protocol_level_tokens_pb2.TokenEffect, _Mapping]] = ..., meta_update_effect: _Optional[_Union[_protocol_level_tokens_pb2.MetaEffect, _Mapping]] = ...) -> None: ...
 
 class ElectionDifficulty(_message.Message):
     __slots__ = ("value",)
@@ -3787,3 +3837,11 @@ class AccountPending(_message.Message):
     account_index: AccountIndex
     first_timestamp: Timestamp
     def __init__(self, account_index: _Optional[_Union[AccountIndex, _Mapping]] = ..., first_timestamp: _Optional[_Union[Timestamp, _Mapping]] = ...) -> None: ...
+
+class TokenAuthorizationsRequest(_message.Message):
+    __slots__ = ("block_hash", "token_id")
+    BLOCK_HASH_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
+    block_hash: BlockHashInput
+    token_id: _protocol_level_tokens_pb2.TokenId
+    def __init__(self, block_hash: _Optional[_Union[BlockHashInput, _Mapping]] = ..., token_id: _Optional[_Union[_protocol_level_tokens_pb2.TokenId, _Mapping]] = ...) -> None: ...

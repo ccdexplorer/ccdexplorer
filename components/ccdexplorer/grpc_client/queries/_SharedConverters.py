@@ -328,6 +328,13 @@ class Mixin(Protocol):
     def convertAccountAddress(self, value: AccountAddress) -> CCD_AccountAddress:
         return base58.b58encode_check(b"\x01" + value.value).decode()
 
+    def convertLockId(self, value: LockId) -> CCD_LockId:
+        return CCD_LockId(
+            account_index=value.account_index,
+            sequence_number=value.sequence_number,
+            creation_order=value.creation_order,
+        )
+
     def convertAmount(self, value: Amount) -> microCCD:
         return value.value
 
@@ -906,6 +913,8 @@ class Mixin(Protocol):
                 result[key] = CCD_TokenAmount(
                     **{"value": str(value.value), "decimals": value.decimals}
                 )
+            elif type(value) is LockId and not self.valueIsEmpty(value):
+                result[key] = self.convertLockId(value)
         return CCD_TokenTransferEvent(**result)
 
     def convertTokenSupplyUpdateEvent(self, message) -> CCD_TokenSupplyUpdateEvent:
@@ -987,6 +996,40 @@ class Mixin(Protocol):
             if entry_dict == {}:
                 pass
             else:
+                events.append(entry_dict)
+
+        return events
+
+    def convertMetaEvents(self, message) -> list:
+        events = []
+
+        for entry in message:
+            entry_dict: dict = {}
+            for descriptor in entry.DESCRIPTOR.fields:
+                key, value = self.get_key_value_from_descriptor(descriptor, entry)
+                if type(value) in self.simple_types:
+                    converted_value = self.convertType(value)
+                    if converted_value:
+                        entry_dict[key] = converted_value
+                elif MessageToDict(value) == {}:
+                    pass
+                elif type(value) is TokenModuleEvent:
+                    entry_dict[key] = self.convertTokenModuleEvent(value)
+                elif type(value) is TokenTransferEvent:
+                    entry_dict[key] = self.convertTokenTransferEvent(value)
+                elif type(value) is TokenSupplyUpdateEvent:
+                    entry_dict[key] = self.convertTokenSupplyUpdateEvent(value)
+                elif type(value) is LockCreateEvent:
+                    entry_dict[key] = CCD_LockCreateEvent(
+                        lock_id=self.convertLockId(value.lock_id),
+                        lock_config=value.lock_config.value.hex(),
+                    )
+                elif type(value) is LockDestroyEvent:
+                    entry_dict[key] = CCD_LockDestroyEvent(
+                        lock_id=self.convertLockId(value.lock_id)
+                    )
+
+            if entry_dict:
                 events.append(entry_dict)
 
         return events
@@ -1245,6 +1288,22 @@ class Mixin(Protocol):
             if key == "pool_would_become_over_delegated":
                 test_me_please = True
             if key == "pool_closed":
+                test_me_please = True
+            if key == "non_existent_lock_id":
+                test_me_please = True
+            if key == "lock_expired":
+                test_me_please = True
+            if key == "lock_fund_not_authorized":
+                test_me_please = True
+            if key == "lock_send_not_authorized":
+                test_me_please = True
+            if key == "lock_return_not_authorized":
+                test_me_please = True
+            if key == "lock_cancel_not_authorized":
+                test_me_please = True
+            if key == "lock_token_not_permitted":
+                test_me_please = True
+            if key == "lock_recipient_not_permitted":
                 test_me_please = True  # noqa: F841
 
             _type = key
@@ -1265,6 +1324,21 @@ class Mixin(Protocol):
 
             elif type(value) is RejectReason.DuplicateCredIds:
                 result[key] = self.convertDuplicateCredIds(value)
+
+            elif type(value) is LockId:
+                result[key] = self.convertLockId(value)
+
+            elif type(value) is RejectReason.LockOperationNotAuthorized:
+                result[key] = CCD_RejectReason_LockOperationNotAuthorized(
+                    lock_id=self.convertLockId(value.lock_id),
+                    account=self.convertAccountAddress(value.account),
+                )
+
+            elif type(value) is RejectReason.LockTokenNotPermitted:
+                result[key] = CCD_RejectReason_LockTokenNotPermitted(
+                    lock_id=self.convertLockId(value.lock_id),
+                    token_id=value.token_id.value,
+                )
         return result, _type
 
     # def stringify_large_amount(self, d: dict) -> dict:

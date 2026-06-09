@@ -56,6 +56,21 @@ class QueriesStub(object):
                 request_serializer=types__pb2.TokenInfoRequest.SerializeToString,
                 response_deserializer=types__pb2.TokenInfo.FromString,
                 _registered_method=True)
+        self.GetTokenAuthorizations = channel.unary_unary(
+                '/concordium.v2.Queries/GetTokenAuthorizations',
+                request_serializer=types__pb2.TokenAuthorizationsRequest.SerializeToString,
+                response_deserializer=protocol__level__tokens__pb2.TokenAuthorizations.FromString,
+                _registered_method=True)
+        self.GetLockInfo = channel.unary_unary(
+                '/concordium.v2.Queries/GetLockInfo',
+                request_serializer=types__pb2.LockInfoRequest.SerializeToString,
+                response_deserializer=types__pb2.LockInfo.FromString,
+                _registered_method=True)
+        self.GetLockList = channel.unary_stream(
+                '/concordium.v2.Queries/GetLockList',
+                request_serializer=types__pb2.BlockHashInput.SerializeToString,
+                response_deserializer=protocol__level__tokens__pb2.LockId.FromString,
+                _registered_method=True)
         self.GetAccountList = channel.unary_stream(
                 '/concordium.v2.Queries/GetAccountList',
                 request_serializer=types__pb2.BlockHashInput.SerializeToString,
@@ -389,6 +404,27 @@ class QueriesServicer(object):
 
     def GetTokenInfo(self, request, context):
         """Retrieve the information about the given token in the given block.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTokenAuthorizations(self, request, context):
+        """Retrieve the authorizations of a given token in the given block.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLockInfo(self, request, context):
+        """Retrieve the information about the given lock in the given block.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLockList(self, request, context):
+        """Retrieve the list of locks that exist in a given block.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1005,6 +1041,21 @@ def add_QueriesServicer_to_server(servicer, server):
                     request_deserializer=types__pb2.TokenInfoRequest.FromString,
                     response_serializer=types__pb2.TokenInfo.SerializeToString,
             ),
+            'GetTokenAuthorizations': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTokenAuthorizations,
+                    request_deserializer=types__pb2.TokenAuthorizationsRequest.FromString,
+                    response_serializer=protocol__level__tokens__pb2.TokenAuthorizations.SerializeToString,
+            ),
+            'GetLockInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetLockInfo,
+                    request_deserializer=types__pb2.LockInfoRequest.FromString,
+                    response_serializer=types__pb2.LockInfo.SerializeToString,
+            ),
+            'GetLockList': grpc.unary_stream_rpc_method_handler(
+                    servicer.GetLockList,
+                    request_deserializer=types__pb2.BlockHashInput.FromString,
+                    response_serializer=protocol__level__tokens__pb2.LockId.SerializeToString,
+            ),
             'GetAccountList': grpc.unary_stream_rpc_method_handler(
                     servicer.GetAccountList,
                     request_deserializer=types__pb2.BlockHashInput.FromString,
@@ -1414,6 +1465,87 @@ class Queries(object):
             '/concordium.v2.Queries/GetTokenInfo',
             types__pb2.TokenInfoRequest.SerializeToString,
             types__pb2.TokenInfo.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTokenAuthorizations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/concordium.v2.Queries/GetTokenAuthorizations',
+            types__pb2.TokenAuthorizationsRequest.SerializeToString,
+            protocol__level__tokens__pb2.TokenAuthorizations.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetLockInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/concordium.v2.Queries/GetLockInfo',
+            types__pb2.LockInfoRequest.SerializeToString,
+            types__pb2.LockInfo.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetLockList(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/concordium.v2.Queries/GetLockList',
+            types__pb2.BlockHashInput.SerializeToString,
+            protocol__level__tokens__pb2.LockId.FromString,
             options,
             channel_credentials,
             insecure,
