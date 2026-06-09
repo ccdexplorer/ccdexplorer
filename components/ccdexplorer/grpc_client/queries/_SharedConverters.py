@@ -328,6 +328,13 @@ class Mixin(Protocol):
     def convertAccountAddress(self, value: AccountAddress) -> CCD_AccountAddress:
         return base58.b58encode_check(b"\x01" + value.value).decode()
 
+    def convertLockId(self, value: LockId) -> CCD_LockId:
+        return CCD_LockId(
+            account_index=value.account_index,
+            sequence_number=value.sequence_number,
+            creation_order=value.creation_order,
+        )
+
     def convertAmount(self, value: Amount) -> microCCD:
         return value.value
 
@@ -906,6 +913,8 @@ class Mixin(Protocol):
                 result[key] = CCD_TokenAmount(
                     **{"value": str(value.value), "decimals": value.decimals}
                 )
+            elif type(value) is LockId and not self.valueIsEmpty(value):
+                result[key] = self.convertLockId(value)
         return CCD_TokenTransferEvent(**result)
 
     def convertTokenSupplyUpdateEvent(self, message) -> CCD_TokenSupplyUpdateEvent:
