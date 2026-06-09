@@ -141,6 +141,18 @@ from .queries._GetTokenList import (
     Mixin as _GetTokenList,
 )
 
+from .queries._GetTokenAuthorizations import (
+    Mixin as _GetTokenAuthorizations,
+)
+
+from .queries._GetLockInfo import (
+    Mixin as _GetLockInfo,
+)
+
+from .queries._GetLockList import (
+    Mixin as _GetLockList,
+)
+
 from .queries._GetWinningBakersEpoch import (
     Mixin as _GetWinningBakersEpoch,
 )
@@ -188,6 +200,9 @@ class GRPCClient(  # type: ignore
     _GetPrePreCooldownAccounts,
     _GetTokenInfo,
     _GetTokenList,
+    _GetTokenAuthorizations,
+    _GetLockInfo,
+    _GetLockList,
     _GetWinningBakersEpoch,
     _GetModuleList,
     _GetBakersRewardPeriod,
