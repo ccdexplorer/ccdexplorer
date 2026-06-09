@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import kernel_pb2 as kernel__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bprotocol-level-tokens.proto\x12\x11\x63oncordium.v2.plt\x1a\x0ckernel.proto\"\x15\n\x04\x43\x62or\x12\r\n\x05value\x18\x01 \x01(\x0c\"\x18\n\x07TokenId\x12\r\n\x05value\x18\x01 \x01(\t\"\x1f\n\x0eTokenModuleRef\x12\r\n\x05value\x18\x01 \x01(\x0c\".\n\x0bTokenAmount\x12\r\n\x05value\x18\x01 \x01(\x04\x12\x10\n\x08\x64\x65\x63imals\x18\x02 \x01(\r\"\xc6\x01\n\nTokenState\x12;\n\x10token_module_ref\x18\x01 \x01(\x0b\x32!.concordium.v2.plt.TokenModuleRef\x12\x10\n\x08\x64\x65\x63imals\x18\x03 \x01(\r\x12\x34\n\x0ctotal_supply\x18\x04 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12-\n\x0cmodule_state\x18\x05 \x01(\x0b\x32\x17.concordium.v2.plt.CborJ\x04\x08\x02\x10\x03\"\x95\x01\n\x11TokenAccountState\x12/\n\x07\x62\x61lance\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12\x32\n\x0cmodule_state\x18\x04 \x01(\x0b\x32\x17.concordium.v2.plt.CborH\x00\x88\x01\x01\x42\x0f\n\r_module_stateJ\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04\"J\n\x10TokenModuleEvent\x12\x0c\n\x04type\x18\x01 \x01(\t\x12(\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32\x17.concordium.v2.plt.Cbor\"J\n\x0bTokenHolder\x12\x30\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32\x1d.concordium.v2.AccountAddressH\x00\x42\t\n\x07\x61\x64\x64ress\"\xcf\x01\n\x12TokenTransferEvent\x12,\n\x04\x66rom\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12*\n\x02to\x18\x02 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12.\n\x06\x61mount\x18\x03 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12&\n\x04memo\x18\x04 \x01(\x0b\x32\x13.concordium.v2.MemoH\x00\x88\x01\x01\x42\x07\n\x05_memo\"x\n\x16TokenSupplyUpdateEvent\x12.\n\x06target\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12.\n\x06\x61mount\x18\x02 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\"\xc3\x02\n\nTokenEvent\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12;\n\x0cmodule_event\x18\x02 \x01(\x0b\x32#.concordium.v2.plt.TokenModuleEventH\x00\x12?\n\x0etransfer_event\x18\x03 \x01(\x0b\x32%.concordium.v2.plt.TokenTransferEventH\x00\x12?\n\nmint_event\x18\x04 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x12?\n\nburn_event\x18\x05 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x42\x07\n\x05\x65vent\"<\n\x0bTokenEffect\x12-\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x1d.concordium.v2.plt.TokenEvent\"\x90\x01\n\x17TokenModuleRejectReason\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12\x0c\n\x04type\x18\x02 \x01(\t\x12-\n\x07\x64\x65tails\x18\x03 \x01(\x0b\x32\x17.concordium.v2.plt.CborH\x00\x88\x01\x01\x42\n\n\x08_details\"\xc6\x01\n\tCreatePLT\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12\x37\n\x0ctoken_module\x18\x02 \x01(\x0b\x32!.concordium.v2.plt.TokenModuleRef\x12\x10\n\x08\x64\x65\x63imals\x18\x04 \x01(\r\x12:\n\x19initialization_parameters\x18\x05 \x01(\x0b\x32\x17.concordium.v2.plt.CborJ\x04\x08\x03\x10\x04\"w\n\x14TokenCreationDetails\x12\x30\n\ncreate_plt\x18\x01 \x01(\x0b\x32\x1c.concordium.v2.plt.CreatePLT\x12-\n\x06\x65vents\x18\x02 \x03(\x0b\x32\x1d.concordium.v2.plt.TokenEventB=\n\x1a\x63om.concordium.grpc.v2.pltP\x01Z\x04./pb\xaa\x02\x16\x43oncordium.Grpc.V2.Pltb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bprotocol-level-tokens.proto\x12\x11\x63oncordium.v2.plt\x1a\x0ckernel.proto\"\x15\n\x04\x43\x62or\x12\r\n\x05value\x18\x01 \x01(\x0c\"\x18\n\x07TokenId\x12\r\n\x05value\x18\x01 \x01(\t\"P\n\x06LockId\x12\x15\n\raccount_index\x18\x01 \x01(\x04\x12\x17\n\x0fsequence_number\x18\x02 \x01(\x04\x12\x16\n\x0e\x63reation_order\x18\x03 \x01(\x04\"\x1f\n\x0eTokenModuleRef\x12\r\n\x05value\x18\x01 \x01(\x0c\".\n\x0bTokenAmount\x12\r\n\x05value\x18\x01 \x01(\x04\x12\x10\n\x08\x64\x65\x63imals\x18\x02 \x01(\r\"\xc6\x01\n\nTokenState\x12;\n\x10token_module_ref\x18\x01 \x01(\x0b\x32!.concordium.v2.plt.TokenModuleRef\x12\x10\n\x08\x64\x65\x63imals\x18\x03 \x01(\r\x12\x34\n\x0ctotal_supply\x18\x04 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12-\n\x0cmodule_state\x18\x05 \x01(\x0b\x32\x17.concordium.v2.plt.CborJ\x04\x08\x02\x10\x03\"\x95\x01\n\x11TokenAccountState\x12/\n\x07\x62\x61lance\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12\x32\n\x0cmodule_state\x18\x04 \x01(\x0b\x32\x17.concordium.v2.plt.CborH\x00\x88\x01\x01\x42\x0f\n\r_module_stateJ\x04\x08\x02\x10\x03J\x04\x08\x03\x10\x04\"\x8a\x01\n\x10TokenModuleEvent\x12\x0c\n\x04type\x18\x01 \x01(\t\x12(\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32\x17.concordium.v2.plt.Cbor\x12\x31\n\x08token_id\x18\x03 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenIdH\x00\x88\x01\x01\x42\x0b\n\t_token_id\"J\n\x0bTokenHolder\x12\x30\n\x07\x61\x63\x63ount\x18\x01 \x01(\x0b\x32\x1d.concordium.v2.AccountAddressH\x00\x42\t\n\x07\x61\x64\x64ress\"\x8d\x03\n\x12TokenTransferEvent\x12,\n\x04\x66rom\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12*\n\x02to\x18\x02 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12.\n\x06\x61mount\x18\x03 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12&\n\x04memo\x18\x04 \x01(\x0b\x32\x13.concordium.v2.MemoH\x00\x88\x01\x01\x12\x31\n\tfrom_lock\x18\x05 \x01(\x0b\x32\x19.concordium.v2.plt.LockIdH\x01\x88\x01\x01\x12/\n\x07to_lock\x18\x06 \x01(\x0b\x32\x19.concordium.v2.plt.LockIdH\x02\x88\x01\x01\x12\x31\n\x08token_id\x18\x07 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenIdH\x03\x88\x01\x01\x42\x07\n\x05_memoB\x0c\n\n_from_lockB\n\n\x08_to_lockB\x0b\n\t_token_id\"\xb8\x01\n\x16TokenSupplyUpdateEvent\x12.\n\x06target\x18\x01 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenHolder\x12.\n\x06\x61mount\x18\x02 \x01(\x0b\x32\x1e.concordium.v2.plt.TokenAmount\x12\x31\n\x08token_id\x18\x03 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenIdH\x00\x88\x01\x01\x42\x0b\n\t_token_id\"\xc3\x02\n\nTokenEvent\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12;\n\x0cmodule_event\x18\x02 \x01(\x0b\x32#.concordium.v2.plt.TokenModuleEventH\x00\x12?\n\x0etransfer_event\x18\x03 \x01(\x0b\x32%.concordium.v2.plt.TokenTransferEventH\x00\x12?\n\nmint_event\x18\x04 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x12?\n\nburn_event\x18\x05 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x42\x07\n\x05\x65vent\"<\n\x0bTokenEffect\x12-\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x1d.concordium.v2.plt.TokenEvent\"k\n\x0fLockCreateEvent\x12*\n\x07lock_id\x18\x01 \x01(\x0b\x32\x19.concordium.v2.plt.LockId\x12,\n\x0block_config\x18\x02 \x01(\x0b\x32\x17.concordium.v2.plt.Cbor\">\n\x10LockDestroyEvent\x12*\n\x07lock_id\x18\x01 \x01(\x0b\x32\x19.concordium.v2.plt.LockId\"\x98\x03\n\tMetaEvent\x12;\n\x0cmodule_event\x18\x02 \x01(\x0b\x32#.concordium.v2.plt.TokenModuleEventH\x00\x12?\n\x0etransfer_event\x18\x03 \x01(\x0b\x32%.concordium.v2.plt.TokenTransferEventH\x00\x12?\n\nmint_event\x18\x04 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x12?\n\nburn_event\x18\x05 \x01(\x0b\x32).concordium.v2.plt.TokenSupplyUpdateEventH\x00\x12?\n\x11lock_create_event\x18\x06 \x01(\x0b\x32\".concordium.v2.plt.LockCreateEventH\x00\x12\x41\n\x12lock_destroy_event\x18\x07 \x01(\x0b\x32#.concordium.v2.plt.LockDestroyEventH\x00\x42\x07\n\x05\x65vent\":\n\nMetaEffect\x12,\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x1c.concordium.v2.plt.MetaEvent\"\x90\x01\n\x17TokenModuleRejectReason\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12\x0c\n\x04type\x18\x02 \x01(\t\x12-\n\x07\x64\x65tails\x18\x03 \x01(\x0b\x32\x17.concordium.v2.plt.CborH\x00\x88\x01\x01\x42\n\n\x08_details\"\xc6\x01\n\tCreatePLT\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12\x37\n\x0ctoken_module\x18\x02 \x01(\x0b\x32!.concordium.v2.plt.TokenModuleRef\x12\x10\n\x08\x64\x65\x63imals\x18\x04 \x01(\r\x12:\n\x19initialization_parameters\x18\x05 \x01(\x0b\x32\x17.concordium.v2.plt.CborJ\x04\x08\x03\x10\x04\"w\n\x14TokenCreationDetails\x12\x30\n\ncreate_plt\x18\x01 \x01(\x0b\x32\x1c.concordium.v2.plt.CreatePLT\x12-\n\x06\x65vents\x18\x02 \x03(\x0b\x32\x1d.concordium.v2.plt.TokenEvent\"m\n\x13TokenAuthorizations\x12,\n\x08token_id\x18\x01 \x01(\x0b\x32\x1a.concordium.v2.plt.TokenId\x12(\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32\x17.concordium.v2.plt.CborB=\n\x1a\x63om.concordium.grpc.v2.pltP\x01Z\x04./pb\xaa\x02\x16\x43oncordium.Grpc.V2.Pltb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -37,30 +37,42 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CBOR']._serialized_end=85
   _globals['_TOKENID']._serialized_start=87
   _globals['_TOKENID']._serialized_end=111
-  _globals['_TOKENMODULEREF']._serialized_start=113
-  _globals['_TOKENMODULEREF']._serialized_end=144
-  _globals['_TOKENAMOUNT']._serialized_start=146
-  _globals['_TOKENAMOUNT']._serialized_end=192
-  _globals['_TOKENSTATE']._serialized_start=195
-  _globals['_TOKENSTATE']._serialized_end=393
-  _globals['_TOKENACCOUNTSTATE']._serialized_start=396
-  _globals['_TOKENACCOUNTSTATE']._serialized_end=545
-  _globals['_TOKENMODULEEVENT']._serialized_start=547
-  _globals['_TOKENMODULEEVENT']._serialized_end=621
-  _globals['_TOKENHOLDER']._serialized_start=623
-  _globals['_TOKENHOLDER']._serialized_end=697
-  _globals['_TOKENTRANSFEREVENT']._serialized_start=700
-  _globals['_TOKENTRANSFEREVENT']._serialized_end=907
-  _globals['_TOKENSUPPLYUPDATEEVENT']._serialized_start=909
-  _globals['_TOKENSUPPLYUPDATEEVENT']._serialized_end=1029
-  _globals['_TOKENEVENT']._serialized_start=1032
-  _globals['_TOKENEVENT']._serialized_end=1355
-  _globals['_TOKENEFFECT']._serialized_start=1357
-  _globals['_TOKENEFFECT']._serialized_end=1417
-  _globals['_TOKENMODULEREJECTREASON']._serialized_start=1420
-  _globals['_TOKENMODULEREJECTREASON']._serialized_end=1564
-  _globals['_CREATEPLT']._serialized_start=1567
-  _globals['_CREATEPLT']._serialized_end=1765
-  _globals['_TOKENCREATIONDETAILS']._serialized_start=1767
-  _globals['_TOKENCREATIONDETAILS']._serialized_end=1886
+  _globals['_LOCKID']._serialized_start=113
+  _globals['_LOCKID']._serialized_end=193
+  _globals['_TOKENMODULEREF']._serialized_start=195
+  _globals['_TOKENMODULEREF']._serialized_end=226
+  _globals['_TOKENAMOUNT']._serialized_start=228
+  _globals['_TOKENAMOUNT']._serialized_end=274
+  _globals['_TOKENSTATE']._serialized_start=277
+  _globals['_TOKENSTATE']._serialized_end=475
+  _globals['_TOKENACCOUNTSTATE']._serialized_start=478
+  _globals['_TOKENACCOUNTSTATE']._serialized_end=627
+  _globals['_TOKENMODULEEVENT']._serialized_start=630
+  _globals['_TOKENMODULEEVENT']._serialized_end=768
+  _globals['_TOKENHOLDER']._serialized_start=770
+  _globals['_TOKENHOLDER']._serialized_end=844
+  _globals['_TOKENTRANSFEREVENT']._serialized_start=847
+  _globals['_TOKENTRANSFEREVENT']._serialized_end=1244
+  _globals['_TOKENSUPPLYUPDATEEVENT']._serialized_start=1247
+  _globals['_TOKENSUPPLYUPDATEEVENT']._serialized_end=1431
+  _globals['_TOKENEVENT']._serialized_start=1434
+  _globals['_TOKENEVENT']._serialized_end=1757
+  _globals['_TOKENEFFECT']._serialized_start=1759
+  _globals['_TOKENEFFECT']._serialized_end=1819
+  _globals['_LOCKCREATEEVENT']._serialized_start=1821
+  _globals['_LOCKCREATEEVENT']._serialized_end=1928
+  _globals['_LOCKDESTROYEVENT']._serialized_start=1930
+  _globals['_LOCKDESTROYEVENT']._serialized_end=1992
+  _globals['_METAEVENT']._serialized_start=1995
+  _globals['_METAEVENT']._serialized_end=2403
+  _globals['_METAEFFECT']._serialized_start=2405
+  _globals['_METAEFFECT']._serialized_end=2463
+  _globals['_TOKENMODULEREJECTREASON']._serialized_start=2466
+  _globals['_TOKENMODULEREJECTREASON']._serialized_end=2610
+  _globals['_CREATEPLT']._serialized_start=2613
+  _globals['_CREATEPLT']._serialized_end=2811
+  _globals['_TOKENCREATIONDETAILS']._serialized_start=2813
+  _globals['_TOKENCREATIONDETAILS']._serialized_end=2932
+  _globals['_TOKENAUTHORIZATIONS']._serialized_start=2934
+  _globals['_TOKENAUTHORIZATIONS']._serialized_end=3043
 # @@protoc_insertion_point(module_scope)
