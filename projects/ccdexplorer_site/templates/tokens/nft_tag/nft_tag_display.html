@@ -82,6 +82,10 @@
     
         try {
             const response = await fetch(mediaUrl);
+            if (!response.ok) {
+                console.error(`Failed to fetch media: ${response.status} ${response.statusText}`, mediaUrl);
+                return;
+            }
             const contentType = response.headers.get('Content-Type');
             // console.log(contentType);
             if (!contentType || contentType.startsWith('text')) {
@@ -90,7 +94,11 @@
                 if (data.trim().startsWith('http')) {
                     // Assume it's a URL
                     load_media(data.trim());
-                } else {
+                } else if (contentType.startsWith('image/') || contentType.startsWith('video/') || contentType.startsWith('audio/')) {
+                // The URL is the media itself, load it directly
+                load_media(mediaUrl);
+                }
+                else {
                     console.error('Invalid media URL:', data);
                 }
             } else if (contentType.startsWith('image') || contentType === 'application/octet-stream') {
