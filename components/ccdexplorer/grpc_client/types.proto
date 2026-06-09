@@ -656,6 +656,20 @@ message TokenInfoRequest {
   plt.TokenId token_id = 2;
 }
 
+// Request for information about a PLT lock.
+message LockInfoRequest {
+  // Block in which to query the lock information.
+  BlockHashInput block_hash = 1;
+  // Identifier or the lock to query.
+  plt.LockId lock_id = 2;
+}
+
+// Information about a PLT lock.
+message LockInfo {
+  // CBOR-encoded lock information.
+  plt.Cbor lock_info = 1;
+}
+
 // Information about a finalized block that is part of the streaming response.
 message FinalizedBlockInfo {
   // Hash of the block.
@@ -883,6 +897,16 @@ message RejectReason {
     repeated CredentialRegistrationId ids = 1;
   }
 
+  message LockOperationNotAuthorized {
+    plt.LockId lock_id = 1;
+    AccountAddress account = 2;
+  }
+
+  message LockTokenNotPermitted {
+    plt.LockId lock_id = 1;
+    plt.TokenId token_id = 2;
+  }
+
   // This field might be extended in future versions of the API.
   oneof reason {
     // Raised while validating a Wasm module that is not well formed.
@@ -1018,6 +1042,23 @@ message RejectReason {
     // The token update transaction failed.
     // Introduced in protocol version 9.
     plt.TokenModuleRejectReason token_update_transaction_failed = 56;
+    // The provided Lock ID does not match a lock that currently exists.
+    // Introduced in protocol version 11.
+    plt.LockId non_existent_lock_id = 57;
+    // The operation could not be compleded because the lock is expired.
+    plt.LockId lock_expired = 58;
+    // The account is not authorized to fund the lock.
+    LockOperationNotAuthorized lock_fund_not_authorized = 59;
+    // The account is not authorized to send funds controlled by the lock.
+    LockOperationNotAuthorized lock_send_not_authorized = 60;
+    // The account is not authorized to return funds controlled by the lock.
+    LockOperationNotAuthorized lock_return_not_authorized = 61;
+    // The account is not authorized to cancel the lock.
+    LockOperationNotAuthorized lock_cancel_not_authorized = 62;
+    // The lock does not allow funding with the particular token.
+    LockTokenNotPermitted lock_token_not_permitted = 63;
+    // The recipient is not permitted to receive funds controlled by the lock.
+    LockOperationNotAuthorized lock_recipient_not_permitted = 64;
   }
 }
 
@@ -1578,6 +1619,8 @@ message AccountTransactionEffects {
     DelegationConfigured delegation_configured = 19;
     // Token update transaction effect.
     plt.TokenEffect token_update_effect = 20;
+    // Meta-update transaction effect.
+    plt.MetaEffect meta_update_effect = 21;
   }
 }
 
@@ -2191,6 +2234,8 @@ enum TransactionType {
   CONFIGURE_DELEGATION = 20;
   // Introduced in protocol version 9.
   TOKEN_UPDATE = 21;
+  // Introduced in protocol version 11.
+  META_UPDATE = 22;
 }
 
 // The different versions of the protocol.
@@ -2207,6 +2252,7 @@ enum ProtocolVersion {
   PROTOCOL_VERSION_8 = 7;
   PROTOCOL_VERSION_9 = 8;
   PROTOCOL_VERSION_10 = 9;
+  PROTOCOL_VERSION_11 = 10;
 }
 
 // The number of chain restarts via a protocol update. An effected
@@ -4393,4 +4439,12 @@ message ConsensusDetailedStatus {
 message AccountPending {
     AccountIndex account_index = 1;
     Timestamp first_timestamp = 2;
+}
+
+// The input for a token authorizations request.
+message TokenAuthorizationsRequest {
+  // Block in which to query the token information.
+  BlockHashInput block_hash = 1;
+  // Specification of the token identifier.
+  plt.TokenId token_id = 2;
 }

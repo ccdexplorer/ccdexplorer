@@ -35,6 +35,23 @@ class TokenId(betterproto.Message):
 
 
 @dataclass(eq=False, repr=False)
+class LockId(betterproto.Message):
+    """Lock ID: a trio of numbers that together uniquely identify a lock."""
+
+    account_index: int = betterproto.uint64_field(1)
+    """The account index of the account that created the lock."""
+
+    sequence_number: int = betterproto.uint64_field(2)
+    """The sequence number of the transaction that created the lock."""
+
+    creation_order: int = betterproto.uint64_field(3)
+    """
+    The 0-based creation order of the lock within the transaction that created
+    it.
+    """
+
+
+@dataclass(eq=False, repr=False)
 class TokenModuleRef(betterproto.Message):
     """A token module reference. This is always 32 bytes long."""
 
@@ -103,6 +120,15 @@ class TokenModuleEvent(betterproto.Message):
     details: "Cbor" = betterproto.message_field(2)
     """The CBOR encoded event details."""
 
+    token_id: Optional["TokenId"] = betterproto.message_field(
+        3, optional=True, group="_token_id"
+    )
+    """
+    The Token ID of the token generating the event. In the context of a
+    `TokenEvent`, this should be absent (as it is already specified). In the
+    context of a `MetaEvent`, this must be present.
+    """
+
 
 @dataclass(eq=False, repr=False)
 class TokenHolder(betterproto.Message):
@@ -140,6 +166,33 @@ class TokenTransferEvent(betterproto.Message):
     transfer.
     """
 
+    from_lock: Optional["LockId"] = betterproto.message_field(
+        5, optional=True, group="_from_lock"
+    )
+    """
+    When the funds originate on the locked balance of an account, the  identity
+    of the lock controlling the funds. Absent when the funds are not on the
+    locked balance of the originating account.
+    """
+
+    to_lock: Optional["LockId"] = betterproto.message_field(
+        6, optional=True, group="_to_lock"
+    )
+    """
+    When the funds are transferred into the control of a lock, the identity of
+    the lock assuming control of the funds. Absent when the funds are sent to
+    the available balance of the receiving account.
+    """
+
+    token_id: Optional["TokenId"] = betterproto.message_field(
+        7, optional=True, group="_token_id"
+    )
+    """
+    The token being transferred. In the context of a `TokenEvent`, which
+    already specifies the token, this is absent. In the context of a
+    `MetaEvent`, it must be present.
+    """
+
 
 @dataclass(eq=False, repr=False)
 class TokenSupplyUpdateEvent(betterproto.Message):
@@ -153,6 +206,15 @@ class TokenSupplyUpdateEvent(betterproto.Message):
 
     amount: "TokenAmount" = betterproto.message_field(2)
     """The balance difference to be applied to the target."""
+
+    token_id: Optional["TokenId"] = betterproto.message_field(
+        3, optional=True, group="_token_id"
+    )
+    """
+    The Token ID of the token generating the event. In the context of a
+    `TokenEvent`, this should be absent (as it is already specified). In the
+    context of a `MetaEvent`, this must be present.
+    """
 
 
 @dataclass(eq=False, repr=False)
@@ -187,6 +249,67 @@ class TokenEffect(betterproto.Message):
 
     events: List["TokenEvent"] = betterproto.message_field(1)
     """Events emitted by the token."""
+
+
+@dataclass(eq=False, repr=False)
+class LockCreateEvent(betterproto.Message):
+    """A new lock was created."""
+
+    lock_id: "LockId" = betterproto.message_field(1)
+    """The Lock ID of the newly-created lock."""
+
+    lock_config: "Cbor" = betterproto.message_field(2)
+    """The CBOR-encoded configuration of the lock."""
+
+
+@dataclass(eq=False, repr=False)
+class LockDestroyEvent(betterproto.Message):
+    """
+    A lock was destroyed. Before this event can occur, the balance controlled
+    by the lock must be zero.
+    """
+
+    lock_id: "LockId" = betterproto.message_field(1)
+    """The Lock ID of the destroyed lock."""
+
+
+@dataclass(eq=False, repr=False)
+class MetaEvent(betterproto.Message):
+    """
+    An event that can occur during execution of a meta-update transaction.
+    """
+
+    module_event: "TokenModuleEvent" = betterproto.message_field(2, group="event")
+    """An event emitted by the token module."""
+
+    transfer_event: "TokenTransferEvent" = betterproto.message_field(3, group="event")
+    """An event emitted when a transfer of tokens is performed."""
+
+    mint_event: "TokenSupplyUpdateEvent" = betterproto.message_field(4, group="event")
+    """
+    An event emitted when the token supply is updated by minting tokens to a
+    token holder.
+    """
+
+    burn_event: "TokenSupplyUpdateEvent" = betterproto.message_field(5, group="event")
+    """
+    An event emitted when the token supply is updated by burning tokens from
+    the balance of a token holder.
+    """
+
+    lock_create_event: "LockCreateEvent" = betterproto.message_field(6, group="event")
+    """A lock creation event."""
+
+    lock_destroy_event: "LockDestroyEvent" = betterproto.message_field(7, group="event")
+    """A lock destruction event."""
+
+
+@dataclass(eq=False, repr=False)
+class MetaEffect(betterproto.Message):
+    """Events originating from a meta-update transaction."""
+
+    events: List["MetaEvent"] = betterproto.message_field(1)
+    """The events."""
 
 
 @dataclass(eq=False, repr=False)
@@ -239,4 +362,21 @@ class TokenCreationDetails(betterproto.Message):
     events: List["TokenEvent"] = betterproto.message_field(2)
     """
     The events generated by the token module during the creation of the token.
+    """
+
+
+@dataclass(eq=False, repr=False)
+class TokenAuthorizations(betterproto.Message):
+    """
+    The authorizations for a token. The actual authorizations are found in the
+    CBOR encoded `details`.
+    """
+
+    token_id: "TokenId" = betterproto.message_field(1)
+    """The canonical token identifier."""
+
+    details: "Cbor" = betterproto.message_field(2)
+    """
+    The CBOR encoded authorizations for the token represented by the
+    `token_id`.
     """
