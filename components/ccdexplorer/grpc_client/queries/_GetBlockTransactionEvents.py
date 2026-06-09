@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union
 
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import (
+    MetaEffect,
     TokenCreationDetails,
     TokenEffect,
 )
@@ -87,6 +88,9 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ExchangeRate,
     CCD_NewRelease,
     CCD_SponsorDetails,
+    CCD_LockCreateEvent,
+    CCD_LockDestroyEvent,
+    CCD_MetaEffect,
     CCD_TokenCreationDetails,
     CCD_TokenEffect,
     CCD_TokenEvent,
@@ -442,6 +446,15 @@ class Mixin(_SharedConverters):
 
         return CCD_TokenEffect(**result)
 
+    def convertEffectMetaUpdate(self, message) -> CCD_MetaEffect:
+        result = {}
+        for descriptor in message.DESCRIPTOR.fields:
+            key, value = self.get_key_value_from_descriptor(descriptor, message)
+            if key == "events":
+                result[key] = self.convertMetaEvents(value)
+
+        return CCD_MetaEffect(**result)
+
     def convertEffectContractInitializedEvent(self, message) -> CCD_ContractInitializedEvent:
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
@@ -614,6 +627,11 @@ class Mixin(_SharedConverters):
                         _type.update(
                             {"additional_data": self.get_plt_token_events_type(result[key])}
                         )
+
+                    elif type(value) is MetaEffect:
+                        _type.update({"contents": key})
+                        result[key] = self.convertEffectMetaUpdate(value)
+
                     elif type(value) in self.simple_types:
                         _type.update({"contents": key})
                         result[key] = self.convertType(value)
@@ -631,7 +649,7 @@ class Mixin(_SharedConverters):
                 result[key] = self.convertType(value)
             if type(value) is SponsorDetails:
                 result[key] = CCD_SponsorDetails(**self.convertTypeWithSingleValues(value))
-            if type(value) in [AccountTransactionEffects, TokenEffect]:
+            if type(value) in [AccountTransactionEffects, TokenEffect, MetaEffect]:
                 (
                     result[key],
                     _type,
