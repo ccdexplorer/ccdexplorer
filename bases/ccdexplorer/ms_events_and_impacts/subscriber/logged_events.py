@@ -607,12 +607,39 @@ class LoggedEvent:
                             [cis5_ia.address_or_public_key],
                         )
 
+                    # Which node answered, for diagnosing stale/empty responses.
+                    node = self.grpc_client.current_node(NET(self.net))
+
                     if ii.failure.used_energy > 0:
-                        print(ii.failure)
+                        console.log(
+                            f"[cis5] balanceOf REVERTED on {node} | "
+                            f"addr={cis5_ia.address_or_public_key} "
+                            f"token={cis5_ia.token_id_or_ccd} | "
+                            f"reason={ii.failure.reason.model_dump(exclude_none=True)}"
+                        )
                         # this indicates that we had a lookup failure
+                        token_amount = -1
+                    elif not rr:
+                        # Empty return value (transport/lookup failure or a node
+                        # without state). NOT a zero balance: previously rr[0]
+                        # raised IndexError; use the failure sentinel so it can
+                        # never turn into a delete.
+                        console.log(
+                            f"[cis5] balanceOf EMPTY result on {node} | "
+                            f"addr={cis5_ia.address_or_public_key} "
+                            f"token={cis5_ia.token_id_or_ccd} | "
+                            f"used_energy={ii.success.used_energy}"
+                        )
                         token_amount = -1
                     else:
                         token_amount = rr[0]
+                        if token_amount == 0:
+                            console.log(
+                                f"[cis5] balanceOf ZERO on {node} | "
+                                f"addr={cis5_ia.address_or_public_key} "
+                                f"token={cis5_ia.token_id_or_ccd} | "
+                                f"rr={rr} used_energy={ii.success.used_energy}"
+                            )
 
                 impact = cis5_ia.model_dump(exclude_none=True)
                 impact.update({"_id": _id})

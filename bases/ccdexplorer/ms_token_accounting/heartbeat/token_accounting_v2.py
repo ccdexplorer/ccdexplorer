@@ -67,54 +67,54 @@ class AddressTypes(Enum):
 
 ########### Token Accounting V3
 class TokenAccountingV2:
-    async def events_process(self):
-        (
-            result,
-            token_accounting_last_processed_block,
-        ) = await self.find_events_to_process()
-        await self.update_token_accounting_v2(
-            result,
-            token_accounting_last_processed_block,  # type: ignore
-        )
+    # async def events_process(self):
+    #     (
+    #         result,
+    #         token_accounting_last_processed_block,
+    #     ) = await self.find_events_to_process()
+    #     await self.update_token_accounting_v2(
+    #         result,
+    #         token_accounting_last_processed_block,  # type: ignore
+    #     )
 
-    async def find_events_to_process(self):
-        self.db: dict[Collections, Collection]
-        # try:
-        while self.sending:  # type: ignore
-            await asyncio.sleep(0.3)
-            print("waiting for sending to finish")
-        # Read token_accounting_last_processed_block
-        int_result = self.db[Collections.helpers].find_one(
-            {"_id": "token_accounting_last_processed_block_v3"}
-        )
-        # If it's not set, set to -1, which leads to resetting
-        # all token addresses and accounts, basically starting
-        # over with token accounting.
-        if int_result:
-            token_accounting_last_processed_block = int_result["height"]
-        else:
-            token_accounting_last_processed_block = -1
+    # async def find_events_to_process(self):
+    #     self.db: dict[Collections, Collection]
+    #     # try:
+    #     while self.sending:  # type: ignore
+    #         await asyncio.sleep(0.3)
+    #         print("waiting for sending to finish")
+    #     # Read token_accounting_last_processed_block
+    #     int_result = self.db[Collections.helpers].find_one(
+    #         {"_id": "token_accounting_last_processed_block_v3"}
+    #     )
+    #     # If it's not set, set to -1, which leads to resetting
+    #     # all token addresses and accounts, basically starting
+    #     # over with token accounting.
+    #     if int_result:
+    #         token_accounting_last_processed_block = int_result["height"]
+    #     else:
+    #         token_accounting_last_processed_block = -1
 
-        # Query the logged events collection for all logged events
-        # after 'token_accounting_last_processed_block'.
-        # Logged events are ordered by block_height, then by
-        # transaction index (tx_index) and finally by event index
-        # (ordering).
-        pipeline = [
-            {"$match": {"event_info.standard": "CIS-2"}},
-            {"$match": {"tx_info.block_height": {"$gt": token_accounting_last_processed_block}}},
-            {
-                "$sort": {
-                    "tx_info.block_height": ASCENDING,
-                }
-            },
-            {"$limit": 1_000},
-        ]
-        result: list[MongoTypeLoggedEventV2] = [
-            MongoTypeLoggedEventV2(**x)
-            for x in self.db[Collections.tokens_logged_events_v2].aggregate(pipeline)
-        ]
-        return result, token_accounting_last_processed_block
+    #     # Query the logged events collection for all logged events
+    #     # after 'token_accounting_last_processed_block'.
+    #     # Logged events are ordered by block_height, then by
+    #     # transaction index (tx_index) and finally by event index
+    #     # (ordering).
+    #     pipeline = [
+    #         {"$match": {"event_info.standard": "CIS-2"}},
+    #         {"$match": {"tx_info.block_height": {"$gt": token_accounting_last_processed_block}}},
+    #         {
+    #             "$sort": {
+    #                 "tx_info.block_height": ASCENDING,
+    #             }
+    #         },
+    #         {"$limit": 1_000},
+    #     ]
+    #     result: list[MongoTypeLoggedEventV2] = [
+    #         MongoTypeLoggedEventV2(**x)
+    #         for x in self.db[Collections.tokens_logged_events_v2].aggregate(pipeline)
+    #     ]
+    #     return result, token_accounting_last_processed_block
 
     async def get_entrypoint(
         self, contract_address: CCD_ContractAddress, net: str, method_name: str
@@ -133,6 +133,7 @@ class TokenAccountingV2:
 
     async def determine_token_amount(
         self,
+        block_hash: str,
         address_or_public_key: str,
         contract_address: CCD_ContractAddress,
         token_id: str,
@@ -150,23 +151,53 @@ class TokenAccountingV2:
             NET(self.net),
         )
         rr, ii = ci.balanceOf(
-            "last_final",
+            block_hash,
             token_id,
             [address_or_public_key],
         )
 
+        # Which node answered this call (best-effort identity of the serving
+        # node; stub_on_net may rotate hosts on failure).
+        node = self.grpc_client.current_node(NET(self.net))
+
         if ii.failure.used_energy > 0:
-            print(ii.failure.reason.model_dump(exclude_none=True))
+            console.log(
+                f"[token_amount] balanceOf REVERTED on {node} | "
+                f"{contract_address.index}/{token_id} addr={address_or_public_key} "
+                f"block={block_hash} | reason={ii.failure.reason.model_dump(exclude_none=True)}"
+            )
             # this indicates that we had a lookup failure
-            token_amount = -1
-        else:
-            token_amount = rr[0]
+            return -1
+
+        if not rr:
+            # Successful-looking response but no balance was parsed (empty
+            # return value → transport/lookup failure, or a node that did not
+            # have state for this block). This is NOT a zero balance; never let
+            # it drive a DeleteOne, so return the failure sentinel instead.
+            console.log(
+                f"[token_amount] balanceOf EMPTY result on {node} | "
+                f"{contract_address.index}/{token_id} addr={address_or_public_key} "
+                f"block={block_hash} | used_energy={ii.success.used_energy}"
+            )
+            return -1
+
+        token_amount = rr[0]
+        if str(token_amount) == "0":
+            # The decisive signal for the "link silently not stored" symptom:
+            # a successful zero balance at a block we believe contains a mint.
+            # Log node + raw result so the next occurrence is unambiguous.
+            console.log(
+                f"[token_amount] balanceOf ZERO on {node} | "
+                f"{contract_address.index}/{token_id} addr={address_or_public_key} "
+                f"block={block_hash} | rr={rr} used_energy={ii.success.used_energy}"
+            )
         return token_amount
 
     async def update_token_accounting_v2(
         self,
         net: str,
         block_height: int,
+        block_hash: str,
         save_process: bool = True,
     ):
         """
@@ -362,6 +393,7 @@ class TokenAccountingV2:
                     # to determine what the actual balance is.
                     # If the token amount is zero, we will remove the link.
                     token_amount = await self.determine_token_amount(
+                        block_hash,
                         address["address"],
                         CCD_ContractAddress.from_str(contract_),
                         token_id_,
@@ -429,10 +461,18 @@ class TokenAccountingV2:
                     del repl_dict["failed_attempt"]
 
             if len(links_to_save) > 0:
+                # Break down what we are about to write so the summary itself
+                # tells whether links were upserted or deleted (a DeleteOne is
+                # how a zero balance silently removes a link).
+                n_replace = sum(1 for op in links_to_save if isinstance(op, ReplaceOne))
+                n_delete = sum(1 for op in links_to_save if isinstance(op, DeleteOne))
                 result2 = self.db[Collections.tokens_links_v3].bulk_write(links_to_save)
                 console.log(
-                    f"TL:  {len(links_to_save):5,.0f} | M {result2.matched_count:5,.0f} | Mod {result2.modified_count:5,.0f} | U {result2.upserted_count:5,.0f}"
+                    f"TL:  {len(links_to_save):5,.0f} (R {n_replace:5,.0f} | Del {n_delete:5,.0f}) | "
+                    f"M {result2.matched_count:5,.0f} | Mod {result2.modified_count:5,.0f} | "
+                    f"U {result2.upserted_count:5,.0f} | D {result2.deleted_count:5,.0f}"
                 )
+                console.log(links_to_save)
                 # if result2.upserted_count > 0:
                 #     console.log(result2.upserted_ids)
             if len(token_addresses_to_save) > 0:
@@ -453,7 +493,7 @@ class TokenAccountingV2:
     ) -> MongoTypeTokenAddressV2:
         instance_address = token_address.split("-")[0]
         token_id = token_address.split("-")[1]
-        token_address = MongoTypeTokenAddressV2(
+        token_address_cls = MongoTypeTokenAddressV2(
             **{
                 "_id": token_address,
                 "contract": instance_address,
@@ -463,7 +503,7 @@ class TokenAccountingV2:
                 "hidden": False,
             }
         )  # type: ignore
-        return token_address
+        return token_address_cls
 
     ########## Token Accounting
 
