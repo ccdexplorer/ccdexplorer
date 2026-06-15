@@ -200,6 +200,13 @@ class Mixin(Protocol):
         elif isinstance(block_input, int):
             absoluteBlockHeight = AbsoluteBlockHeight(value=block_input)
             return BlockHashInput(absolute_height=absoluteBlockHeight)
+        # Anything else (e.g. None) would otherwise return None and produce a
+        # request with an unset block field → opaque gRPC "INVALID_ARGUMENT:
+        # missing field". Fail loudly with the offending value instead.
+        raise ValueError(
+            f"generate_block_hash_input_from: unsupported block_input "
+            f"{block_input!r} (type {type(block_input).__name__})"
+        )
 
     def generate_invoke_instance_request_from(
         self,
