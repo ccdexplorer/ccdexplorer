@@ -49,12 +49,12 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
         return None
 
     logger.info(f"Handling payload: {payload}")
-    block_height = payload.get("height")
     try:
-        height = payload.get("height")
-        assert height is not None
+        block_height = payload.get("height")
+        block_hash = payload.get("block_hash")
+        assert block_height is not None
         asyncio.run(
-            heartbeat.update_token_accounting_v2(RUN_ON_NET, height)  # type: ignore
+            heartbeat.update_token_accounting_v2(RUN_ON_NET, block_height, block_hash)  # type: ignore
         )
         # success
         task_doc = TaskResult(

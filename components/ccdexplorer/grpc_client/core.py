@@ -410,6 +410,21 @@ class GRPCClient(  # type: ignore
     def _current_is_secure(self, net: NET) -> bool:
         return "--secure--" in self.hosts[net][self.host_index[net]]["host"]
 
+    def current_node(self, net: NET) -> str:
+        """Best-effort identity (host:port + pool index) of the gRPC node
+        currently selected for `net`.
+
+        Note: `stub_on_net` rotates hosts on failure, so when read right after a
+        call this reflects the host that ultimately served (or last attempted)
+        the request. Intended for diagnostic logging.
+        """
+        try:
+            idx = self.host_index[net]
+            host = self.hosts[net][idx]
+            return f"{host.get('host')}:{host.get('port')} (idx={idx})"
+        except Exception:
+            return "unknown-node"
+
     def check_connection(
         self, net: NET = NET.MAINNET, *, attempts: int = 2, timeout_s: float = 1.0
     ) -> bool:

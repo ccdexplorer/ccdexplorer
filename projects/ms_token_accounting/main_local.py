@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import asyncio
+import sys
+from typing import List
+
+from ccdexplorer.domain.generic import NET
+from ccdexplorer.grpc_client import GRPCClient
+from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
+from ccdexplorer.tooter import Tooter
+from ccdexplorer.env import RUN_ON_NET
+
+from ccdexplorer.ms_token_accounting.heartbeat import Heartbeat as Heartbeat
+
+block_heights: List[int] = [46983492]
+
+
+async def main() -> None:
+    print(f"[local] Running on {RUN_ON_NET} as ms_token_accounting")
+
+    grpcclient = GRPCClient()
+    tooter = Tooter()
+    motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_token_accounting")
+    mongodb = MongoDB(tooter, caller_name="ms_token_accounting")
+    heartbeat = Heartbeat(grpcclient, tooter, mongodb, motormongo, RUN_ON_NET)
+
+    net = NET(RUN_ON_NET)
+    db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
+
+    pipeline = [
+        {"$match": {"event_info.contract": "<10082,0>"}},
+    ]
+    block_heights = [
+        x["tx_info"]["block_height"]
+        for x in db[Collections.tokens_logged_events_v2].aggregate(pipeline)
+    ]
+
+    block_heights = [47748840]
+    for height in block_heights:
+        block_doc = db[Collections.blocks].find_one({"height": height}, {"hash": 1})
+        if block_doc is None:
+            print(f"[local] block height={height} not found in db, skipping")
+            continue
+        block_hash: str = block_doc["hash"]
+        print(f"[local] processing height={height} hash={block_hash}")
+        await heartbeat.update_token_accounting_v2(RUN_ON_NET, height, block_hash)
+        await asyncio.sleep(0)
+
+    print("[local] done")
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n[local] interrupted", file=sys.stderr)

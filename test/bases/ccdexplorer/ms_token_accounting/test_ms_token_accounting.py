@@ -21,6 +21,7 @@ async def test_token_accounting(
         matched_count=3,
         modified_count=2,
         upserted_count=1,
+        deleted_count=0,
     )
     mock_collection.bulk_write.return_value = mock_result
     with (
@@ -38,7 +39,8 @@ async def test_token_accounting(
         net = "mainnet"
         heartbeat = Heartbeat(grpcclient, tooter, mongodb, motormongo, net)  # type: ignore
         block_height = 36841773
-        await heartbeat.update_token_accounting_v2(net, block_height)  # type: ignore
+        block_hash = "5199e507ffddfcb7db95b45f34ba4751ee9a6e23d68aa70137cac4388ea994ea"
+        await heartbeat.update_token_accounting_v2(net, block_height, block_hash)  # type: ignore
 
         mock_bulk_write.assert_called_once()
         args, _ = mock_bulk_write.call_args
