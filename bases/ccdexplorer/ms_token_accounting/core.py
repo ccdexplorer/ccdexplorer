@@ -54,23 +54,28 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
         block_hash = payload.get("block_hash")
         assert block_height is not None
 
-        # The payload hash must be the hash of `block_height`, or balanceOf is
-        # evaluated against the wrong / no block. Resolve it authoritatively
-        # from the blocks collection (the block is already stored by the time
-        # this task runs, since the producer watches that collection).
+        # Token accounting is fed by two producers: ms_block_analyser (includes
+        # block_hash) and ms_events_and_impacts (height-only, no hash — it only
+        # has block_height). So resolve the hash authoritatively from the blocks
+        # collection by height; balanceOf must run against this exact block.
         db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
         block_doc = db[Collections.blocks].find_one({"height": block_height}, {"hash": 1})
         if block_doc is None:
             # block not yet visible to this worker → let autoretry handle it
             raise ConnectionError(f"block at height {block_height} not yet in db (transient)")
-        if block_hash != block_doc["hash"]:
+        canonical_hash = block_doc["hash"]
+        if block_hash is None:
+            # expected for the height-only producer; resolve quietly
+            block_hash = canonical_hash
+        elif block_hash != canonical_hash:
+            # a hash WAS supplied but disagrees with the height — genuinely odd
             logger.warning(
-                "payload block_hash %r != height %s hash %s; using db hash",
+                "payload block_hash %s != height %s hash %s; using db hash",
                 block_hash,
                 block_height,
-                block_doc["hash"],
+                canonical_hash,
             )
-            block_hash = block_doc["hash"]
+            block_hash = canonical_hash
         asyncio.run(
             heartbeat.update_token_accounting_v2(RUN_ON_NET, block_height, block_hash)  # type: ignore
         )
