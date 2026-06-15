@@ -9,7 +9,7 @@ from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.env.settings import RUN_LOCAL_STR
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import MongoDB, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
 from ccdexplorer.tooter import Tooter
 from celery import shared_task
 from .heartbeat import Heartbeat
@@ -53,6 +53,24 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
         block_height = payload.get("height")
         block_hash = payload.get("block_hash")
         assert block_height is not None
+
+        # The payload hash must be the hash of `block_height`, or balanceOf is
+        # evaluated against the wrong / no block. Resolve it authoritatively
+        # from the blocks collection (the block is already stored by the time
+        # this task runs, since the producer watches that collection).
+        db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
+        block_doc = db[Collections.blocks].find_one({"height": block_height}, {"hash": 1})
+        if block_doc is None:
+            # block not yet visible to this worker → let autoretry handle it
+            raise ConnectionError(f"block at height {block_height} not yet in db (transient)")
+        if block_hash != block_doc["hash"]:
+            logger.warning(
+                "payload block_hash %r != height %s hash %s; using db hash",
+                block_hash,
+                block_height,
+                block_doc["hash"],
+            )
+            block_hash = block_doc["hash"]
         asyncio.run(
             heartbeat.update_token_accounting_v2(RUN_ON_NET, block_height, block_hash)  # type: ignore
         )
