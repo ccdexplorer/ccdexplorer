@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<div class="row mt-4">
+  <div class="col-md-6 offset-md-3 col-sm-12">
+    <div class="border content curved-border">
+      {% set title = "Log in" %}{% include 'base/box_title.html' %}
+
+      {% if error %}
+        <p class="text-danger sm-text">{{ error }}</p>
+      {% endif %}
+
+      <form action="/auth/login" method="post">
+        <div class="mb-3">
+          <label class="form-label sm-text">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ email or '' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label sm-text">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Log in</button>
+      </form>
+
+      <p class="sm-text mt-3">
+        Don't have an account yet? <a href="/auth/register">Register</a><br/>
+        Forgot your password? <a href="/auth/forgot-password">Reset password</a>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,17 @@
+{% extends "base/base.html" %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<div class="row mt-4">
+  <div class="col-md-6 offset-md-3 col-sm-12">
+    <div class="border content curved-border">
+      {% set title = "Check your email" %}{% include 'base/box_title.html' %}
+      <p class="sm-text">
+        We've sent a verification link{% if email %} to <b>{{ email }}</b>{% endif %}.
+        Please click the link in that email to confirm your address and finish logging in.
+      </p>
+      <p class="sm-text">Didn't get it? Check your spam folder, or
+      <a href="/auth/forgot-password">request a new link</a>.</p>
+    </div>
+  </div>
+</div>
+{% endblock content %}

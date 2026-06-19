@@ -385,7 +385,11 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
                 message_response=message_response,
             )
 
-        if notification_services_to_send[NotificationServices.email] and user.email_address:
+        if (
+            notification_services_to_send[NotificationServices.email]
+            and user.email_address
+            and user.email_verified
+        ):
             await self.publish_to_celery(
                 service=NotificationServices.email,
                 user=user,

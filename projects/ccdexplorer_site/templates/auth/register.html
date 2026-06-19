@@ -1,0 +1,32 @@
+{% extends "base/base.html" %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+<div class="row mt-4">
+  <div class="col-md-6 offset-md-3 col-sm-12">
+    <div class="border content curved-border">
+      {% set title = "Register" %}{% include 'base/box_title.html' %}
+
+      {% if error %}
+        <p class="text-danger sm-text">{{ error }}</p>
+      {% endif %}
+
+      <p class="sm-text">Create an account with an email address and password. You can
+      connect Telegram later from your settings.</p>
+
+      <form action="/auth/register" method="post">
+        <div class="mb-3">
+          <label class="form-label sm-text">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ email or '' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label sm-text">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Register</button>
+      </form>
+
+      <p class="sm-text mt-3">Already have an account? <a href="/auth/login">Log in</a></p>
+    </div>
+  </div>
+</div>
+{% endblock content %}

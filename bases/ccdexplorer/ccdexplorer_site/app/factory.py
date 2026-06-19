@@ -56,6 +56,7 @@ from ccdexplorer.ccdexplorer_site.app.routers import (
     tools,
     transaction,
     usersv2,
+    auth,
 )
 from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     charts_home,
@@ -309,6 +310,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(tools.router)
     app.include_router(projects.router)
     app.include_router(usersv2.router)
+    app.include_router(auth.router)
     app.include_router(statistics.router)
     app.include_router(tokens.router)
     app.include_router(nodes.router)

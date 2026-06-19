@@ -60,12 +60,24 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
             result.height_for_last_block - result.height_for_first_block + 1
         )
 
+    def users_collection(self):
+        """The users collection in use (dev under pytest, prod otherwise)."""
+        name = (
+            CollectionsUtilities.users_v2_dev
+            if "pytest" in sys.modules
+            else CollectionsUtilities.users_v2_prod
+        )
+        return self.connections.mongodb.utilities[name]
+
     def read_users_from_collection(self):
-        if "pytest" in sys.modules:
-            result = self.connections.mongodb.utilities[CollectionsUtilities.users_v2_dev].find({})
-        else:
-            result = self.connections.mongodb.utilities[CollectionsUtilities.users_v2_prod].find({})
-        self.users = {x["_id"]: SiteUser(**x) for x in list(result)}
+        result = self.users_collection().find({})
+        # Key users by their telegram_chat_id (not _id): email-first accounts have
+        # an ObjectId _id and only appear here once they've linked Telegram.
+        self.users = {
+            str(x["telegram_chat_id"]): SiteUser(**x)
+            for x in list(result)
+            if x.get("telegram_chat_id") is not None
+        }
         for chat_id, user in self.users.items():
             for account_index, user_account in user.accounts.items():  # type: ignore
                 self.users[chat_id].accounts[account_index] = AccountForUser(**user_account)  # type: ignore
