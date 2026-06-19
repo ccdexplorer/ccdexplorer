@@ -6,7 +6,15 @@
         <div class="row">
         <div class="col">
             Email address<br/>
-            
+            {% if user.email_address %}
+                {% if user.email_verified %}
+                    <span class="badge bg-success">verified</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">not verified</span>
+                    <br/><small class="text-secondary-emphasis">Verify your email to enable email notifications.</small>
+                    <br/><button class="btn mt-0 btn-link ms-0 ps-0" hx-post="/auth/resend-verification" hx-target="this" hx-swap="outerHTML">Send verification email</button>
+                {% endif %}
+            {% endif %}
         </div>
         <div class="col me-3">
             {% if user.email_address %}

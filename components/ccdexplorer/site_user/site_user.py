@@ -139,3 +139,8 @@ class SiteUser(BaseModel):
     other_notification_preferences: Optional[OtherNotificationPreferences] = None
     last_modified: Optional[dt.datetime] = None
     last_seen_on_site: Optional[dt.datetime] = None
+    # Email/password login (alternative to telegram-based login).
+    password: Optional[str] = None  # bcrypt hash, set on the API side only
+    reset_password_token: Optional[str] = None  # uuid, added when user requests a reset
+    verification_token: Optional[str] = None  # uuid, added until email is verified
+    email_verified: Optional[bool] = None  # True once the email link is confirmed

@@ -1,0 +1,42 @@
+<hr/>
+<b>Email &amp; password login</b>
+{% if not user.password %}
+  <p class="sm-text">
+    {% if user.email_address %}
+      Set a password so you can also log in with your email address.
+    {% else %}
+      Add an email address and password to log in without Telegram.
+    {% endif %}
+  </p>
+  <form action="/auth/set-password" method="post">
+    {% if not user.email_address %}
+      <div class="mb-2">
+        <label class="form-label sm-text">Email</label>
+        <input type="email" name="email" class="form-control" required>
+      </div>
+    {% endif %}
+    <div class="row">
+    <div class="col  me-3">
+      <label class="form-label sm-text">Password</label>
+      <input type="password" name="password" class="form-control" required>
+    </div>
+    </div>
+    <button type="submit" class="btn btn-link ms-0 ps-0">Set password</button>
+  </form>
+{% else %}
+  <p class="sm-text">
+    Email/password login is enabled{% if not user.email_verified %}
+    &mdash; <span class="text-danger">email not yet verified</span>{% endif %}.
+  </p>
+{% endif %}
+
+{% if not user.telegram_chat_id %}
+  <hr/>
+  <b>Telegram</b>
+  <p class="sm-text">Connect Telegram to receive notifications in chat.</p>
+  {% if env.SITE_URL != 'https://ccdexplorer.io' %}
+    <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/ce_dev_bot?start={{ user.token }}">Connect Telegram</a>
+  {% else %}
+    <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/concordium_explorer_bot?start={{ user.token }}">Connect Telegram</a>
+  {% endif %}
+{% endif %}

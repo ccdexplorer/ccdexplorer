@@ -34,17 +34,32 @@ from ..notification_classes import *
 
 console = Console()
 
+# Base URL for site login links (localhost in dev, ccdexplorer.io in prod).
+SITE_URL = environment["SITE_URL"]
+
 
 class Mixin:
     async def user_login(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Either send login for existing user, or create an account and send login for new user."""
+        """Either send login for existing user, or create an account and send login for new user.
+
+        A deep link (``t.me/<bot>?start=<token>``) delivers an account token in
+        ``context.args``; when present, and this chat isn't already a user, we link
+        Telegram to that existing (email-first) account instead of creating a new one.
+        """
         telegram_user = update.effective_user
         user: SiteUser | None = self.users.get(str(telegram_user.id))
+
+        link_token = context.args[0] if getattr(context, "args", None) else None
+        if link_token and not user:
+            linked = await self.link_telegram_to_account(update, link_token, telegram_user)
+            if linked:
+                return
+
         if user:
             existing_user = user
             console.log("Existing user.")
 
-            mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='https://ccdexplorer.io/token/{existing_user.token}'>link</a> to login on CCDExplorer."
+            mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='{SITE_URL}/token/{existing_user.token}'>link</a> to login on CCDExplorer."
             # console.log(f"{message.from_user.id} | {mess}")
             await update.message.reply_html(mess)
 
@@ -82,11 +97,74 @@ class Mixin:
                 )
             except Exception as e:
                 print(e)
-            mess = f"Hey <b>{new_user.first_name}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='https://ccdexplorer.io/token/{new_user.token}'>link</a> to login on CCDExplorer with your new account."
+            mess = f"Hey <b>{new_user.first_name}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='{SITE_URL}/token/{new_user.token}'>link</a> to login on CCDExplorer with your new account."
             try:
                 await update.message.reply_html(mess)
             except Exception as e:
                 console.log(f"Exception sending message to newly created user: {e}")
+
+    async def link_telegram_to_account(self, update: Update, token: str, telegram_user) -> bool:
+        """Link this Telegram chat to an existing account identified by ``token``.
+
+        Returns True if the deep link was handled (linked, already-linked, or
+        invalid) so the caller skips creating a brand-new account.
+        """
+        result = self.users_collection().find_one({"token": token})
+        if not result:
+            try:
+                await update.message.reply_html(
+                    "That account link is invalid or has expired. Please request a new one from your settings on CCDExplorer."
+                )
+            except Exception as e:
+                console.log(f"Exception replying to invalid link token: {e}")
+            return True
+
+        account = SiteUser(**result)
+        if account.telegram_chat_id is not None:
+            # Already linked. If it's this same chat, just resend the login link;
+            # otherwise refuse to merge two accounts.
+            if str(account.telegram_chat_id) == str(telegram_user.id):
+                mess = f"Your Telegram is already connected. Use this <a href='{SITE_URL}/token/{account.token}'>link</a> to login on CCDExplorer."
+            else:
+                mess = "This account is already connected to a different Telegram user."
+            await update.message.reply_html(mess)
+            return True
+
+        account.telegram_chat_id = telegram_user.id
+        account.first_name = telegram_user.first_name
+        account.username = telegram_user.username
+        account.language_code = telegram_user.language_code
+        account.last_modified = dt.datetime.now().astimezone(tz=dt.timezone.utc)
+        try:
+            self.users_collection().bulk_write(
+                [
+                    ReplaceOne(
+                        {"token": account.token},
+                        account.model_dump(exclude_none=True),
+                        upsert=True,
+                    )
+                ]
+            )
+            # Make it available immediately (also refreshed by the periodic job).
+            self.users[str(account.telegram_chat_id)] = account
+        except Exception as e:
+            console.log(f"Exception linking telegram to account: {e}")
+            return True
+
+        try:
+            self.connections.tooter.relay(
+                channel=TooterChannel.NOTIFIER,
+                title="",
+                chat_id=ADMIN_CHAT_ID,
+                body=f"Telegram '{telegram_user.username}' linked to existing email account.",
+                notifier_type=TooterType.INFO,
+            )
+        except Exception as e:
+            console.log(f"Exception sending notification for linked account: {e}")
+
+        mess = f"Hey <b>{account.first_name}</b>! I've connected this Telegram to your CCDExplorer account. You'll now receive notifications here. Use this <a href='{SITE_URL}/token/{account.token}'>link</a> to login on the site."
+        await update.message.reply_html(mess)
+        return True
 
     async def user_win_time(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Send earliest win time for all validators"""

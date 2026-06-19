@@ -45,6 +45,7 @@ urllib3.disable_warnings()
 
 from ccdexplorer.ccdexplorer_api.app.routers.account import account
 from ccdexplorer.ccdexplorer_api.app.routers.auth import auth
+from ccdexplorer.ccdexplorer_api.app.routers.site_auth import site_auth
 from ccdexplorer.ccdexplorer_api.app.routers.home import home
 from ccdexplorer.ccdexplorer_api.app.routers.plans import plans
 
@@ -604,6 +605,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     # auth, content, key management
     app.include_router(auth.router)
+    app.include_router(site_auth.router)
     app.include_router(home.router)
     app.include_router(account.router)
     app.include_router(plans.router)

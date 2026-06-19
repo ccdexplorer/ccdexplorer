@@ -41,6 +41,7 @@ from ccdexplorer.grpc_client.CCD_Types import *
 from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
     put_url_from_api,
+    post_url_from_api,
     get_url_from_api,
     APIResponseResult,
 )
@@ -205,7 +206,7 @@ async def cancel_edit_user_account_response(
     )
 
 
-@router.put("/settings/userv2/save/email-address", response_class=RedirectResponse)
+@router.put("/settings/userv2/save/email-address", response_class=HTMLResponse)
 async def save_email_address_response(
     request: Request,
     response_form: dict,
@@ -216,15 +217,36 @@ async def save_email_address_response(
 
     response_as_dict = jsonable_encoder(response_form)
     email_address = response_as_dict["email_address"]
-    api_response: APIResponseResult = await put_url_from_api(
-        f"{request.app.api_url}/v2/site_user/{user.token}/save/email-address",
+    # Every email change goes through verification so all addresses end up verified.
+    api_response: APIResponseResult = await post_url_from_api(
+        f"{request.app.api_url}/site-auth/{user.token}/set-email",
         request.app.httpx_client,
-        json_put_content={"email_address": email_address},
+        json_post_content={"email": email_address},
     )
     if api_response.ok:
+        if api_response.return_value.get("needs_verification"):
+            return (
+                '<div hx-target="this" hx-swap="outerHTML">'
+                '<div class="alert alert-info" role="alert">'
+                f"We've sent a verification link to <b>{email_address}</b>. "
+                "Please click the link in that email to verify your address. "
+                "Email notifications become available once your address is verified."
+                "</div></div>"
+            )
+        # Address unchanged and already verified: nothing to do.
         response = RedirectResponse(url="/settings/user/overview", status_code=204)
         response.headers["HX-Refresh"] = "true"
         return response
+
+    error = "Something went wrong. Please try again."
+    if isinstance(api_response.return_value, dict):
+        error = api_response.return_value.get("detail", error)
+    return (
+        '<div hx-target="this" hx-swap="outerHTML">'
+        f'<div class="alert alert-danger" role="alert">{error}</div>'
+        '<button class="btn mt-0 btn-link ms-0 ps-0" hx-get="/settings/userv2/edit/email-address">'
+        "Try again</button></div>"
+    )
 
 
 @router.put(
@@ -462,12 +484,16 @@ async def save_other_notification_preferences_response(
             # this field is set to non-enabled in the UI
             email_limit = None
 
-        current_notification_preference.telegram = NotificationService(
-            enabled=telegram_enabled, limit=telegram_limit
-        )
-        current_notification_preference.email = NotificationService(
-            enabled=email_enabled, limit=email_limit
-        )
+        # Only update a channel that is actually shown in the UI; otherwise the
+        # hidden checkboxes would be read as "disabled" and wipe stored prefs.
+        if user.telegram_chat_id:
+            current_notification_preference.telegram = NotificationService(
+                enabled=telegram_enabled, limit=telegram_limit
+            )
+        if user.email_address and user.email_verified:
+            current_notification_preference.email = NotificationService(
+                enabled=email_enabled, limit=email_limit
+            )
         other_notification_preferences.__setattr__(model_field, current_notification_preference)
 
     # save back to user
@@ -577,8 +603,12 @@ async def save_contract_response(
             # this field is set to non-enabled in the UI
             email_enabled = False
 
-        current_notification_preference.telegram = NotificationService(enabled=telegram_enabled)
-        current_notification_preference.email = NotificationService(enabled=email_enabled)
+        # Only update a channel that is actually shown in the UI; otherwise the
+        # hidden checkboxes would be read as "disabled" and wipe stored prefs.
+        if user.telegram_chat_id:
+            current_notification_preference.telegram = NotificationService(enabled=telegram_enabled)
+        if user.email_address and user.email_verified:
+            current_notification_preference.email = NotificationService(enabled=email_enabled)
         contract_notification_preferences.contract_update_issued[method] = (
             current_notification_preference
         )
@@ -660,12 +690,16 @@ async def save_user_account_response(
             # this field is set to non-enabled in the UI
             email_limit = None
 
-        current_notification_preference.telegram = NotificationService(
-            enabled=telegram_enabled, limit=telegram_limit
-        )
-        current_notification_preference.email = NotificationService(
-            enabled=email_enabled, limit=email_limit
-        )
+        # Only update a channel that is actually shown in the UI; otherwise the
+        # hidden checkboxes would be read as "disabled" and wipe stored prefs.
+        if user.telegram_chat_id:
+            current_notification_preference.telegram = NotificationService(
+                enabled=telegram_enabled, limit=telegram_limit
+            )
+        if user.email_address and user.email_verified:
+            current_notification_preference.email = NotificationService(
+                enabled=email_enabled, limit=email_limit
+            )
         account_notification_preferences.__setattr__(model_field, current_notification_preference)
 
     # validator notification preferences
@@ -694,12 +728,14 @@ async def save_user_account_response(
             # this field is set to non-enabled in the UI
             email_enabled = False
 
-        current_notification_preference.telegram = NotificationService(
-            enabled=telegram_enabled, limit=telegram_limit
-        )
-        current_notification_preference.email = NotificationService(
-            enabled=email_enabled, limit=email_limit
-        )
+        if user.telegram_chat_id:
+            current_notification_preference.telegram = NotificationService(
+                enabled=telegram_enabled, limit=telegram_limit
+            )
+        if user.email_address and user.email_verified:
+            current_notification_preference.email = NotificationService(
+                enabled=email_enabled, limit=email_limit
+            )
         validator_notification_preferences.__setattr__(model_field, current_notification_preference)
 
     # finally set label
