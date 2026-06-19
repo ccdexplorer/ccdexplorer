@@ -37,7 +37,10 @@ dependencies = [
     "httpx",
     "scheduler>=0.8.8",
     "python-telegram-bot[job-queue]>=22.5",
-    "fastapi[uvicorn]>=0.118.2",
+    # Pin <0.119: FastAPI 0.119.0 adds `_IncludedRouter` objects to app.routes,
+    # which prometheus-fastapi-instrumentator 7.1.0 can't handle (no `.path`).
+    # (uvicorn is a direct dep below, so the 0.119-only `[uvicorn]` extra isn't needed.)
+    "fastapi>=0.118.2,<0.119",
     "fastapi-restful>=0.6.0",
     "uvicorn>=0.35.0",
     "sentry-sdk[fastapi]>=2.41.0",
