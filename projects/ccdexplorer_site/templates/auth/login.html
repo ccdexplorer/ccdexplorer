@@ -11,11 +11,11 @@
       {% endif %}
 
       <form action="/auth/login" method="post">
-        <div class="mb-3">
+        <div class="mb-1 me-3">
           <label class="form-label sm-text">Email</label>
           <input type="email" name="email" class="form-control" value="{{ email or '' }}" required>
         </div>
-        <div class="mb-3">
+        <div class="mb-3 me-3 ">
           <label class="form-label sm-text">Password</label>
           <input type="password" name="password" class="form-control" required>
         </div>
