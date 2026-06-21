@@ -1,13 +1,11 @@
 <hr/>
 <b>Email &amp; password login</b>
 {% if not user.password %}
-  <p class="sm-text">
-    {% if user.email_address %}
+  {% if user.email_address %}
+    <p class="sm-text">
       Set a password so you can also log in with your email address.
-    {% else %}
-      Add an email address and password to log in without Telegram.
-    {% endif %}
-  </p>
+    </p>
+  {% endif %}
   <form action="/auth/set-password" method="post">
     {% if not user.email_address %}
       <div class="mb-2">
@@ -30,13 +28,15 @@
   </p>
 {% endif %}
 
+<hr/>
+<b>Telegram</b>
 {% if not user.telegram_chat_id %}
-  <hr/>
-  <b>Telegram</b>
   <p class="sm-text">Connect Telegram to receive notifications in chat.</p>
   {% if env.SITE_URL != 'https://ccdexplorer.io' %}
     <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/ce_dev_bot?start={{ user.token }}">Connect Telegram</a>
   {% else %}
     <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/concordium_explorer_bot?start={{ user.token }}">Connect Telegram</a>
   {% endif %}
+{% else %}
+  <p class="sm-text">Telegram is connected.</p>
 {% endif %}
