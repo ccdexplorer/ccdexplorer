@@ -45,7 +45,7 @@ class Module:
                 if tx.account_transaction.effects.module_deployed:
                     module_ref = tx.account_transaction.effects.module_deployed
                     print(f"Found module_deployed: {module_ref}")
-                    await self.process_new_module(net, module_ref)
+                    await self.process_new_module(net, module_ref, tx)
                     print(f"Processed new module: {module_ref}, now verifying...")
                     await self.verify_module(net, self.concordium_client, module_ref)
                     print(f"Verified module: {module_ref}")
@@ -107,7 +107,7 @@ class Module:
 
         return results
 
-    async def process_new_module(self, net: NET, module_ref: str):
+    async def process_new_module(self, net: NET, module_ref: str, tx: CCD_BlockItemSummary):
         """
         Processes a new module by fetching its metadata and updating the database.
         Args:
@@ -134,7 +134,8 @@ class Module:
         db_to_use = self.mainnet if net == NET.MAINNET else self.testnet
 
         try:
-            results = self.get_module_metadata(net, "last_final", module_ref)
+            assert tx.block_info is not None
+            results = self.get_module_metadata(net, tx.block_info.height, module_ref)
         except Exception as e:
             tooter_message = f"{net.value}: New module failed with error  {e}."
             self.tooter.send_to_tooter(tooter_message)

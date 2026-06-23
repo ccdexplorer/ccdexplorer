@@ -429,7 +429,7 @@ async def ajax_last_txs_for_smart_wallets(
     for source_transaction in smart_wallet_txs.values():
         transaction = CCD_BlockItemSummary(**source_transaction["tx"])
         wallet_contract_address = source_transaction["wallet_contract_address"]
-        public_key = source_transaction["public_key"]
+        public_key = source_transaction.get("public_key")
         makeup_request = MakeUpRequest(
             **{
                 "net": net,

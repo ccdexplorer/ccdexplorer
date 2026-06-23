@@ -139,7 +139,7 @@
           {% if md.display %}
             {% set url = md.display.url %}
             {% if md.display.url[:4] == "ipfs" %}
-                {% set url = "https://ipfs.io/ipfs/"+metadata.display.url[7:] %}
+                {% set url = "https://ipfs.io/ipfs/"+md.display.url[7:] %}
             {% endif %}
               load_media("{{url}}");
             
