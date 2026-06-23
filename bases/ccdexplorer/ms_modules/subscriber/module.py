@@ -135,7 +135,7 @@ class Module:
 
         try:
             assert tx.block_info is not None
-            results = self.get_module_metadata(net, tx.block_info.height, module_ref)
+            results = self.get_module_metadata(net, tx.block_info.hash, module_ref)
         except Exception as e:
             tooter_message = f"{net.value}: New module failed with error  {e}."
             self.tooter.send_to_tooter(tooter_message)
