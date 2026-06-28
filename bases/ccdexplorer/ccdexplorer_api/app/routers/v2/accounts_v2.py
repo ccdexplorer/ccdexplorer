@@ -10,17 +10,23 @@
 import json
 import re
 import asyncio
+from typing import Any
 
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import httpx
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
+    get_blocks_per_day,
     get_grpcclient,
     get_httpx_client,
     get_mongo_motor,
 )
 from ccdexplorer.domain.credential import Identity
 from ccdexplorer.domain.generic import NET
-from ccdexplorer.domain.mongo import MongoTypePaydaysPerformance, MongoTypePaydayV2
+from ccdexplorer.domain.mongo import (
+    MongoTypeBlockPerDay,
+    MongoTypePaydaysPerformance,
+    MongoTypePaydayV2,
+)
 from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
@@ -33,6 +39,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 )
 from ccdexplorer.mongodb import (
     Collections,
+    CollectionsUtilities,
     MongoMotor,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
@@ -1394,3 +1401,280 @@ async def get_credential_ip_usage_summary(
     raw_ip = result[0]["ip_identity_counts"]
     ip_counts = {d["_id"]: d["count"] for d in raw_ip}
     return {"ip_identity_counts": ip_counts}
+
+
+async def _get_labels_lookup(mongomotor: MongoMotor) -> dict[str, dict[str, str]]:
+    """Build a canonical-address -> {label, group} lookup from labeled accounts.
+
+    Labeled accounts only exist on mainnet and live in the utilities database. Keys
+    are stored as full account addresses, so they are truncated to the 29-character
+    canonical form to match the ``involved_accounts_transfer`` collection.
+    """
+    db_utilities = mongomotor.utilities
+    result = await db_utilities[CollectionsUtilities.labeled_accounts].find({}).to_list(length=None)
+    lookup: dict[str, dict[str, str]] = {}
+    for r in result:
+        lookup[r["_id"][:29]] = {"label": r["label"], "group": r["label_group"]}
+    return lookup
+
+
+@router.post("/{net}/accounts/net-transfers", response_class=JSONResponse)
+async def get_net_transfers_for_accounts(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    blocks_per_day: dict[str, MongoTypeBlockPerDay] = Depends(get_blocks_per_day),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Aggregate net CCD transfers for a set of accounts over a date period.
+
+    The request body treats the supplied accounts as a single combined set and
+    reports the net CCD flow in and out of that set, with transfers between members
+    of the set classified as internal. Only plain CCD transfers (the
+    ``involved_accounts_transfer`` collection) are considered; rewards, fees and
+    staking movements are excluded.
+
+    Expected JSON body::
+
+        {
+            "accounts": [42, 1337, 9001],     // account indexes (integers)
+            "from": "2026-03-18",             // inclusive start date (YYYY-MM-DD)
+            "to": "2026-06-28",               // inclusive end date (YYYY-MM-DD)
+            "group_by_counterparty": true,    // include per-counterparty breakdown
+            "collapse_internal_transfers": true,
+            "counterparty_labels": true,      // resolve labels for counterparties
+            "min_hold_days": 14               // accepted but not yet applied
+        }
+
+    Args:
+        request: FastAPI request carrying the JSON body described above.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        mongomotor: Mongo client dependency.
+        blocks_per_day: Mapping of YYYY-MM-DD strings to that day's block range.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with the combined net flow, counterparty grouping and top lists.
+
+    Raises:
+        HTTPException: If the network is unsupported or the body is invalid.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    body = await request.body()
+    if not body or body == b"{}":
+        raise HTTPException(status_code=400, detail="No request body provided.")
+    try:
+        body_dict = json.loads(body.decode("utf-8"))
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body.")
+
+    account_indexes = body_dict.get("accounts") or []
+    if not account_indexes:
+        raise HTTPException(status_code=400, detail="No accounts provided.")
+    from_date = body_dict.get("from")
+    to_date = body_dict.get("to")
+    group_by_counterparty = body_dict.get("group_by_counterparty", True)
+    collapse_internal_transfers = body_dict.get("collapse_internal_transfers", True)
+    counterparty_labels = body_dict.get("counterparty_labels", True)
+    min_hold_days = body_dict.get("min_hold_days")
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    # Resolve account indexes to their canonical (29-char) addresses.
+    address_docs = await await_await(
+        db_to_use,
+        Collections.stable_address_info,
+        [{"$match": {"account_index": {"$in": account_indexes}}}],
+    )
+    index_to_canonical = {x["account_index"]: x["_id"][:29] for x in address_docs}
+    set_canonical = set(index_to_canonical.values())
+    canonical_to_index = {v: k for k, v in index_to_canonical.items()}
+    if not set_canonical:
+        raise HTTPException(
+            status_code=404,
+            detail="None of the provided account indexes could be resolved.",
+        )
+
+    # Map the from/to dates to a block-height window.
+    start_block_doc = blocks_per_day.get(from_date) if from_date else None
+    start_block = start_block_doc.height_for_first_block - 1 if start_block_doc else 0
+    end_block_doc = blocks_per_day.get(to_date) if to_date else None
+    end_block = end_block_doc.height_for_last_block if end_block_doc else 1_000_000_000
+
+    set_list = list(set_canonical)
+    pipeline = [
+        {"$match": {"block_height": {"$gt": start_block, "$lte": end_block}}},
+        {
+            "$match": {
+                "$or": [
+                    {"sender_canonical": {"$in": set_list}},
+                    {"receiver_canonical": {"$in": set_list}},
+                ]
+            }
+        },
+        {"$match": {"amount": {"$ne": None}}},
+    ]
+    txs = await await_await(db_to_use, Collections.involved_accounts_transfer, pipeline)
+
+    labels_lookup = await _get_labels_lookup(mongomotor) if counterparty_labels else {}
+
+    total_in = 0  # microCCD flowing into the set from outside
+    total_out = 0  # microCCD flowing out of the set to outside
+    internal_total = 0  # microCCD moved between members of the set
+    internal_count = 0
+    # counterparty canonical -> aggregate flows
+    counterparties: dict[str, dict] = {}
+
+    for tx in txs:
+        sender = tx.get("sender_canonical")
+        receiver = tx.get("receiver_canonical")
+        amount = tx.get("amount") or 0
+        sender_in = sender in set_canonical
+        receiver_in = receiver in set_canonical
+
+        if sender_in and receiver_in:
+            internal_total += amount
+            internal_count += 1
+            continue
+
+        if receiver_in:
+            # inflow: external counterparty (sender) sends into the set
+            counterparty = sender
+            total_in += amount
+            direction = "inflow"
+        else:
+            # outflow: set sends to external counterparty (receiver)
+            counterparty = receiver
+            total_out += amount
+            direction = "outflow"
+
+        if counterparty is None:
+            continue
+
+        entry = counterparties.setdefault(
+            counterparty,
+            {"inflow": 0, "outflow": 0, "inflow_count": 0, "outflow_count": 0},
+        )
+        entry[direction] += amount
+        entry[f"{direction}_count"] += 1
+
+    def to_ccd(micro: int) -> float:
+        return micro / 1_000_000
+
+    # Resolve counterparty canonical addresses to their account indexes. The `_id`
+    # in stable_address_info may be the full-length address, so match on its 29-char
+    # canonical prefix (the same form stored in involved_accounts_transfer).
+    counterparty_to_index: dict[str, int] = {}
+    if counterparties:
+        index_docs = await await_await(
+            db_to_use,
+            Collections.stable_address_info,
+            [
+                {"$addFields": {"_canonical29": {"$substrBytes": ["$_id", 0, 29]}}},
+                {"$match": {"_canonical29": {"$in": list(counterparties.keys())}}},
+                {"$project": {"_canonical29": 1, "account_index": 1}},
+            ],
+        )
+        counterparty_to_index = {x["_canonical29"]: x["account_index"] for x in index_docs}
+
+    # Build counterparty records with net flow and optional labels.
+    counterparty_records: list[dict[str, Any]] = []
+    for address, flows in counterparties.items():
+        net_flow = flows["inflow"] - flows["outflow"]
+        record = {
+            "address_canonical": address,
+            "address_index": counterparty_to_index.get(address),
+            "inflow": to_ccd(flows["inflow"]),
+            "outflow": to_ccd(flows["outflow"]),
+            "net": to_ccd(net_flow),
+            "inflow_count": flows["inflow_count"],
+            "outflow_count": flows["outflow_count"],
+        }
+        label_info = labels_lookup.get(address) if counterparty_labels else None
+        if label_info:
+            record["label"] = label_info["label"]
+            record["label_group"] = label_info["group"]
+        counterparty_records.append(record)
+
+    # Split into labeled clusters (grouped by label) and unlabeled wallets.
+    labeled_clusters: dict[str, dict[str, Any]] = {}
+    unlabeled_wallets = []
+    for record in counterparty_records:
+        label = record.get("label")
+        if label:
+            cluster = labeled_clusters.setdefault(
+                label,
+                {
+                    "label": label,
+                    "label_group": record.get("label_group"),
+                    "inflow": 0.0,
+                    "outflow": 0.0,
+                    "net": 0.0,
+                    "members": [],
+                },
+            )
+            cluster["inflow"] += record["inflow"]
+            cluster["outflow"] += record["outflow"]
+            cluster["net"] += record["net"]
+            cluster["members"].append(record["address_canonical"])
+        else:
+            unlabeled_wallets.append(record)
+
+    labeled_clusters_list = sorted(
+        labeled_clusters.values(), key=lambda c: abs(c["net"]), reverse=True
+    )
+    unlabeled_wallets = sorted(unlabeled_wallets, key=lambda r: abs(r["net"]), reverse=True)
+
+    # Top inflow sources and outflow destinations across all counterparties.
+    top_inflow_sources = sorted(
+        [r for r in counterparty_records if r["inflow"] > 0],
+        key=lambda r: r["inflow"],
+        reverse=True,
+    )[:10]
+    top_outflow_destinations = sorted(
+        [r for r in counterparty_records if r["outflow"] > 0],
+        key=lambda r: r["outflow"],
+        reverse=True,
+    )[:10]
+
+    response: dict = {
+        "net": {
+            "total_in": to_ccd(total_in),
+            "total_out": to_ccd(total_out),
+            "net_transfer": to_ccd(total_in - total_out),
+            "balance_change_over_period": to_ccd(total_in - total_out),
+        },
+        "internal_transfers": {
+            "total": to_ccd(internal_total),
+            "count": internal_count,
+            "collapsed": bool(collapse_internal_transfers),
+        },
+        "top_inflow_sources": top_inflow_sources,
+        "top_outflow_destinations": top_outflow_destinations,
+        "meta": {
+            "net": net,
+            "from": from_date,
+            "to": to_date,
+            "start_block_exclusive": start_block,
+            "end_block_inclusive": end_block,
+            "requested_accounts": account_indexes,
+            "resolved_accounts": canonical_to_index,
+            "transfer_count": len(txs),
+            # "min_hold_days": min_hold_days,  # accepted, not yet applied
+            "counterparty_labels": bool(counterparty_labels),
+        },
+    }
+
+    if group_by_counterparty:
+        response["counterparties"] = {
+            "labeled_clusters": labeled_clusters_list,
+            "unlabeled_wallets": unlabeled_wallets,
+            # "staking_delegation": [],  # not covered by CCD transfer scope
+        }
+
+    return response
