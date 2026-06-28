@@ -243,6 +243,11 @@ input:focus {
       font-size: 82%;
   }
 
+pre.ccd {
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
 
 .ccd_small {
     font-family: SFMono-Regular, Menlo, Monaco,
