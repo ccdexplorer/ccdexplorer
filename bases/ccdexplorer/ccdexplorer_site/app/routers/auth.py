@@ -7,24 +7,21 @@ endpoints (the site has no DB/email of its own). On success we set the existing
 ``access-token`` cookie, exactly like the Telegram ``/token/{token}`` login.
 """
 
-import datetime as dt
-
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ccdexplorer.ccdexplorer_site.app.utils import post_url_from_api, get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    post_url_from_api,
+    get_url_from_api,
+    set_access_token_cookie,
+)
 
 router = APIRouter()
 
 
-def set_login_cookie(response: Response, token: str) -> None:
-    """Attach the 30-day ``access-token`` cookie used for site login."""
-    expires = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(days=30)
-    response.set_cookie(
-        key="access-token",
-        value=token,
-        expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-    )
+def set_login_cookie(request: Request, response: Response, token: str) -> None:
+    """Attach the hardened ``access-token`` cookie used for site login."""
+    set_access_token_cookie(request, response, token)
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -62,7 +59,7 @@ async def login_post(
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(response, api_response.return_value["token"])
+        set_login_cookie(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request, "auth/login.html", _ctx(request, email=email, error=_error_of(api_response))
@@ -105,7 +102,7 @@ async def verify_email(request: Request, verification_token: str):
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(response, api_response.return_value["token"])
+        set_login_cookie(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request, "auth/login.html", _ctx(request, error=_error_of(api_response))
@@ -157,7 +154,7 @@ async def reset_password_post(
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(response, api_response.return_value["token"])
+        set_login_cookie(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request,

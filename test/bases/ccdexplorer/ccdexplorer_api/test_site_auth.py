@@ -11,6 +11,7 @@ They follow the unit style of ``test_mcp_auth_headers.py`` (call the functions
 directly with in-memory fakes) so they need no live Mongo/Redis.
 """
 
+import datetime as dt
 from types import SimpleNamespace
 
 import pytest
@@ -212,3 +213,80 @@ async def test_register_throttled_returns_429():
     with pytest.raises(HTTPException) as exc:
         await site_auth.register(request=request, body=body, mongomotor=FakeMongo(FakeCollection([])))
     assert exc.value.status_code == 429
+
+
+# --------------------------------------------------------------------------- #
+# Reset / verification token expiry (finding #5)
+# --------------------------------------------------------------------------- #
+def _future():
+    return dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)
+
+
+def _past():
+    return dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)
+
+
+def _user_doc(**overrides):
+    doc = {"token": "tok", "email_address": "u@example.com"}
+    doc.update(overrides)
+    return doc
+
+
+@pytest.mark.asyncio
+async def test_reset_password_accepts_unexpired_token():
+    mongo = FakeMongo(
+        FakeCollection([_user_doc(reset_password_token="rt", reset_password_token_expires=_future())])
+    )
+    result = await site_auth.reset_password(
+        body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-pw"),
+        mongomotor=mongo,
+    )
+    assert result == {"token": "tok"}
+
+
+@pytest.mark.asyncio
+async def test_reset_password_rejects_expired_token():
+    mongo = FakeMongo(
+        FakeCollection([_user_doc(reset_password_token="rt", reset_password_token_expires=_past())])
+    )
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.reset_password(
+            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-pw"),
+            mongomotor=mongo,
+        )
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_reset_password_rejects_token_without_expiry():
+    """Legacy tokens stored before expiry existed must not be usable."""
+    mongo = FakeMongo(FakeCollection([_user_doc(reset_password_token="rt")]))
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.reset_password(
+            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="x"),
+            mongomotor=mongo,
+        )
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_verify_email_accepts_unexpired_token():
+    mongo = FakeMongo(
+        FakeCollection(
+            [_user_doc(verification_token="vt", verification_token_expires=_future(), email_verified=False)]
+        )
+    )
+    result = await site_auth.verify_email(verification_token="vt", mongomotor=mongo)
+    assert result == {"token": "tok"}
+
+
+@pytest.mark.asyncio
+async def test_verify_email_rejects_expired_token():
+    mongo = FakeMongo(
+        FakeCollection(
+            [_user_doc(verification_token="vt", verification_token_expires=_past(), email_verified=False)]
+        )
+    )
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.verify_email(verification_token="vt", mongomotor=mongo)
+    assert exc.value.status_code == 404

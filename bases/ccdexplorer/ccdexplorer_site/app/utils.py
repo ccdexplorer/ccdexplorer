@@ -60,6 +60,48 @@ from rich import print
 
 s7 = SpaceSevenEvents()
 
+# --- Session cookie -------------------------------------------------------- #
+ACCESS_TOKEN_COOKIE = "access-token"
+ACCESS_TOKEN_MAX_AGE = 30 * 24 * 60 * 60  # 30 days, in seconds
+
+
+def _access_cookie_secure(request: Request) -> bool:
+    """Use Secure cookies whenever the site is served over https (not local dev)."""
+    try:
+        return str(request.app.env.get("SITE_URL") or "").startswith("https")
+    except Exception:
+        return False
+
+
+def set_access_token_cookie(request: Request, response: Response, token: str) -> None:
+    """Set the site session cookie with hardened attributes.
+
+    ``HttpOnly`` keeps it out of JavaScript (so XSS can't steal the session),
+    ``Secure`` restricts it to https in production, and ``SameSite=Lax`` still
+    allows the top-level Telegram ``/token/{token}`` login navigation while
+    blocking cross-site subrequests (CSRF).
+    """
+    response.set_cookie(
+        key=ACCESS_TOKEN_COOKIE,
+        value=token,
+        max_age=ACCESS_TOKEN_MAX_AGE,
+        httponly=True,
+        secure=_access_cookie_secure(request),
+        samesite="lax",
+        path="/",
+    )
+
+
+def clear_access_token_cookie(request: Request, response: Response) -> None:
+    """Delete the session cookie using attributes that match how it was set."""
+    response.delete_cookie(
+        key=ACCESS_TOKEN_COOKIE,
+        httponly=True,
+        secure=_access_cookie_secure(request),
+        samesite="lax",
+        path="/",
+    )
+
 
 class TypeContentsCategories(Enum):
     transfer = "Transfers"

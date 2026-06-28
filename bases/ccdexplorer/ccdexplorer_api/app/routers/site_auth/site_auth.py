@@ -118,6 +118,41 @@ class SetEmailRequest(BaseModel):
     email: str
 
 
+# --- Short-lived token lifecycle (reset / email verification) --------------- #
+# These are single-use links emailed to the user; they must expire so a leaked
+# link (mailbox access, logs) can't be replayed indefinitely.
+RESET_TOKEN_TTL = dt.timedelta(hours=1)
+VERIFICATION_TOKEN_TTL = dt.timedelta(hours=24)
+
+
+def _now() -> dt.datetime:
+    return dt.datetime.now().astimezone(dt.timezone.utc)
+
+
+def _issue_reset_token(user: SiteUser) -> None:
+    user.reset_password_token = str(uuid4())
+    user.reset_password_token_expires = _now() + RESET_TOKEN_TTL
+
+
+def _issue_verification_token(user: SiteUser) -> None:
+    user.verification_token = str(uuid4())
+    user.verification_token_expires = _now() + VERIFICATION_TOKEN_TTL
+
+
+def _expiry_ok(expires: Optional[dt.datetime]) -> bool:
+    """True only if `expires` is a future timestamp.
+
+    A missing expiry (token issued before expiry existed) is treated as expired
+    so that no non-expiring link stays usable. Mongo may return naive datetimes;
+    those are assumed to be UTC.
+    """
+    if expires is None:
+        return False
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=dt.timezone.utc)
+    return _now() <= expires
+
+
 async def get_site_user_by_field(field: str, value, mongomotor: MongoMotor) -> Optional[SiteUser]:
     """Return the first SiteUser whose ``field`` equals ``value``, if any."""
     result = await mongomotor.utilities[CollectionsUtilities.users_v2_prod].find_one({field: value})
@@ -175,10 +210,10 @@ async def register(
         token=str(uuid4()),
         email_address=body.email,
         password=hash_password(body.password),
-        verification_token=str(uuid4()),
         email_verified=False,
-        last_modified=dt.datetime.now().astimezone(dt.timezone.utc),
+        last_modified=_now(),
     )
+    _issue_verification_token(user)
     await save_user(user, mongomotor)
     send_verification_email(request, user)
     return {"ok": True, "needs_verification": True}
@@ -215,10 +250,11 @@ async def verify_email(
 ) -> dict:
     """Confirm an email address and return the token so the site can log the user in."""
     user = await get_site_user_by_field("verification_token", verification_token, mongomotor)
-    if user is None:
+    if user is None or not _expiry_ok(user.verification_token_expires):
         raise HTTPException(status_code=404, detail="Invalid or expired verification link.")
     user.email_verified = True
     user.verification_token = None
+    user.verification_token_expires = None
     await save_user(user, mongomotor)
     return {"token": user.token}
 
@@ -238,7 +274,7 @@ async def forgot_password(
     await _record_attempt(request, "forgot", body.email, EMAIL_WINDOW_SECONDS)
     user = await get_site_user_by_field("email_address", body.email, mongomotor)
     if user is not None:
-        user.reset_password_token = str(uuid4())
+        _issue_reset_token(user)
         await save_user(user, mongomotor)
         request.app.tooter.email_api(
             title="CCDExplorer.io - Reset password",
@@ -261,10 +297,11 @@ async def reset_password(
 ) -> dict:
     """Set a new password from a reset token and return the token to log the user in."""
     user = await get_site_user_by_field("reset_password_token", body.reset_password_token, mongomotor)
-    if user is None:
+    if user is None or not _expiry_ok(user.reset_password_token_expires):
         raise HTTPException(status_code=404, detail="Invalid or expired reset link.")
     user.password = hash_password(body.password)
     user.reset_password_token = None
+    user.reset_password_token_expires = None
     await save_user(user, mongomotor)
     return {"token": user.token}
 
@@ -295,7 +332,7 @@ async def set_email(
 
     user.email_address = body.email
     user.email_verified = False
-    user.verification_token = str(uuid4())
+    _issue_verification_token(user)
     await save_user(user, mongomotor)
     send_verification_email(request, user)
     return {"ok": True, "needs_verification": True}
@@ -317,9 +354,10 @@ async def resend_verification(
     if user.email_verified:
         return {"ok": True, "needs_verification": False}
 
-    if not user.verification_token:
-        user.verification_token = str(uuid4())
-        await save_user(user, mongomotor)
+    # Always issue a fresh token so the resent link is valid even if a previous
+    # verification token had already expired.
+    _issue_verification_token(user)
+    await save_user(user, mongomotor)
     send_verification_email(request, user)
     return {"ok": True, "needs_verification": True}
 
@@ -356,7 +394,7 @@ async def set_password(
     # already have an (unverified) email, so confirm ownership before allowing it.
     needs_verification = not user.email_verified
     if needs_verification:
-        user.verification_token = str(uuid4())
+        _issue_verification_token(user)
 
     await save_user(user, mongomotor)
 

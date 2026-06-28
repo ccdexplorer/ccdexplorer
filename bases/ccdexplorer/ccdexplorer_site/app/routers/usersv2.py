@@ -44,6 +44,8 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     post_url_from_api,
     get_url_from_api,
     APIResponseResult,
+    set_access_token_cookie,
+    clear_access_token_cookie,
 )
 import json
 
@@ -70,22 +72,14 @@ async def slash_token(
         user = SiteUser(**user)
     if user:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        expires = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(days=30)
-
-        response.set_cookie(
-            key="access-token",
-            value=token,
-            # secure=True,
-            # httponly=True,
-            expires=expires.strftime("%a, %d %b %Y %H:%M:%S GMT"),
-        )
+        set_access_token_cookie(request, response, token)
         return response
 
 
 @router.get("/settings/user/logout")
 async def logout(request: Request, response: Response):
     response = RedirectResponse(url="/", status_code=302)
-    response.delete_cookie("access-token")
+    clear_access_token_cookie(request, response)
     request.app.user = None
     return response
 

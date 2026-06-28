@@ -142,5 +142,7 @@ class SiteUser(BaseModel):
     # Email/password login (alternative to telegram-based login).
     password: Optional[str] = None  # bcrypt hash, set on the API side only
     reset_password_token: Optional[str] = None  # uuid, added when user requests a reset
+    reset_password_token_expires: Optional[dt.datetime] = None  # when the reset token lapses
     verification_token: Optional[str] = None  # uuid, added until email is verified
+    verification_token_expires: Optional[dt.datetime] = None  # when the verification token lapses
     email_verified: Optional[bool] = None  # True once the email link is confirmed
