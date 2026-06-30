@@ -27,7 +27,7 @@ from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
     MakeUpRequest,
     RequestingRoute,
 )
-from ccdexplorer.ccdexplorer_site.app.classes.sankey import SanKey
+from ccdexplorer.ccdexplorer_site.app.classes.sankey import SanKey, ClusterSanKey
 from ccdexplorer.env import environment
 
 from ccdexplorer.ccdexplorer_site.app.state import (
@@ -41,6 +41,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     ccdexplorer_plotly_template,
     from_address_to_index,
     get_url_from_api,
+    post_url_from_api,
     tx_type_translation_for_js,
     create_dict_for_tabulator_display,
     create_dict_for_tabulator_display_for_rewards,
@@ -901,6 +902,234 @@ async def request_sankey(
             "token": token,
             "sankey_html": sankey_html,
             "graph_dict": sankey.graph_dict,
+            "tags": tags,
+            "app": request.app,
+        },
+    )
+
+
+class CombinedFlowParams(BaseModel):
+    theme: str
+    # Comma-separated list of account indexes (sent as a string to keep json-enc
+    # serialisation clean; arrays get mangled by the extension).
+    accounts: str | list[int] = ""
+    gte: str | int = 0
+    start_date: str = ""
+    end_date: str = ""
+    token: str = "CCD"
+
+    def account_indexes(self) -> list[int]:
+        if isinstance(self.accounts, list):
+            return self.accounts
+        return [int(x) for x in self.accounts.split(",") if x.strip()]
+
+
+@router.post(
+    "/ajax_combined_sankey/{net}",
+    response_class=HTMLResponse,
+)
+async def request_combined_sankey(
+    request: Request,
+    net: str,
+    post_params: CombinedFlowParams,
+    tags: dict = Depends(get_labeled_accounts),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    """Render the cluster flow.
+
+    Uses the same data source (``transactions-for-flow`` + ``rewards-for-flow``,
+    i.e. ``balance_movement``) and the same netting machinery as the single-account
+    Flow tab, so a cluster of one account is identical to that tab. Transfers
+    between cluster members are excluded from the external flows and reported
+    separately as netted internal transfers.
+    """
+    user: SiteUser | None = await get_user_detailsv2(request)
+    theme = post_params.theme
+
+    def _empty(message: str):
+        return request.app.templates.TemplateResponse(
+            request,
+            "account/account_combined_table.html",
+            {
+                "env": request.app.env,
+                "request": request,
+                "user": user,
+                "net": net,
+                "error": message,
+                "tags": tags,
+                "app": request.app,
+            },
+        )
+
+    if net == "testnet":
+        return _empty("Not available on testnet.")
+    accounts = post_params.account_indexes()
+    if not accounts:
+        return _empty("Add at least one account to the cluster.")
+
+    gte = post_params.gte
+    if isinstance(gte, str):
+        gte = int(gte.replace(",", "").replace(".", "") or 0)
+    start_date = post_params.start_date
+    end_date = post_params.end_date
+    token = post_params.token or "CCD"
+
+    # Resolve the cluster's account indexes to their canonical addresses.
+    api_result = await post_url_from_api(
+        f"{request.app.api_url}/v2/{net}/accounts/get-addresses",
+        httpx_client,
+        accounts,
+    )
+    index_to_address = api_result.return_value if api_result.ok else None
+    member_addresses = list(index_to_address.values()) if index_to_address else []
+    if not member_addresses:
+        return _empty("None of the provided accounts could be resolved.")
+    member_canonicals = {a[:29] for a in member_addresses}
+
+    # Single-account cluster: centre the sankey on that account (mirrors Flow).
+    center_label = member_addresses[0] if len(member_addresses) == 1 else None
+    sankey = ClusterSanKey(
+        gte, request.app, net, member_canonicals, token=token, center_label=center_label
+    )
+
+    if token == "CCD":
+        # Same per-account data the Flow tab uses (balance_movement + rewards).
+        all_txs: list = []
+        rewards_total = 0
+        for address in member_addresses:
+            tx_result = await get_url_from_api(
+                f"{request.app.api_url}/v2/{net}/account/{address}/transactions-for-flow/{gte}/{start_date}/{end_date}",
+                httpx_client,
+            )
+            if tx_result.ok and tx_result.return_value:
+                all_txs.extend(tx_result.return_value)
+
+            rewards_result = await get_url_from_api(
+                f"{request.app.api_url}/v2/{net}/account/{address}/rewards-for-flow/{start_date}/{end_date}",
+                httpx_client,
+            )
+            if rewards_result.ok and rewards_result.return_value:
+                rewards_total += rewards_result.return_value
+
+        sankey.add_txs_for_cluster(all_txs, rewards_total)
+    else:
+        # Token flow: PLT if the token has a protocol-level definition, else CIS-2.
+        plt_result = await get_url_from_api(
+            f"{request.app.api_url}/v2/{net}/plt/{token}/info", httpx_client
+        )
+        plt_info = plt_result.return_value if plt_result.ok else None
+
+        if plt_info:
+            governance_account = plt_info["token_state"]["module_state"]["governance_account"][
+                "account"
+            ]
+            all_txs = []
+            for address in member_addresses:
+                tx_result = await get_url_from_api(
+                    f"{request.app.api_url}/v2/{net}/account/{address}/plt-transactions-for-flow/{token}/{gte}/{start_date}/{end_date}",
+                    httpx_client,
+                )
+                if tx_result.ok and tx_result.return_value:
+                    all_txs.extend(tx_result.return_value)
+            sankey.add_plt_txs_for_cluster(all_txs, governance_account)
+        else:
+            info_result = await get_url_from_api(
+                f"{request.app.api_url}/v2/{net}/token/{token}/info", httpx_client
+            )
+            token_tag = (
+                MongoTypeTokensTag(**info_result.return_value)
+                if info_result.ok and info_result.return_value
+                else None
+            )
+            if not token_tag:
+                return _empty(f"Could not resolve token {token}.")
+
+            token_id = (
+                f"{token_tag.contracts[0]}-"
+                if token != "CCDOGE"
+                else f"{token_tag.contracts[0]}-01"
+            )
+            all_events: list = []
+            for address in member_addresses:
+                tx_result = await get_url_from_api(
+                    f"{request.app.api_url}/v2/{net}/account/{address}/token-transactions-for-flow/{token_id}/{gte}/{start_date}/{end_date}",
+                    httpx_client,
+                )
+                if tx_result.ok and tx_result.return_value:
+                    all_events.extend(tx_result.return_value)
+            sankey.add_txs_for_cluster_for_token(
+                all_events, token_tag.decimals, token_tag.display_name
+            )
+
+    account_ids_to_lookup = {
+        x[:29]: from_address_to_index(x[:29], net, request.app)
+        for x in sankey.labels.keys()
+        if len(x) > 28
+    }
+    await sankey.cross_the_streams(user, tags, account_ids_to_lookup)
+
+    node_count = len(sankey.tagged_labels)
+    sankey_height = max(650, min(1400, node_count * 18))
+
+    fig = go.Figure(
+        data=[
+            go.Sankey(
+                node=dict(
+                    pad=25,
+                    thickness=10,
+                    line=dict(color="grey", width=1.0),
+                    label=sankey.tagged_labels,
+                    color=sankey.colors,
+                ),
+                link=dict(
+                    source=sankey.source,
+                    target=sankey.target,
+                    value=sankey.value,
+                    color=sankey.colors,
+                ),
+            )
+        ],
+    )
+    if len(accounts) == 1:
+        # Mirror the Flow tab for a single account.
+        title_text = f"Flow diagram for account {accounts[0]} for token {token}"
+    else:
+        title_text = (
+            f"Flow diagram for cluster consisting of: {', '.join(str(a) for a in sorted(accounts))}"
+        )
+    fig.update_traces(node_hoverlabel_font_shadow="auto", selector=dict(type="sankey"))
+    fig.update_layout(
+        template=ccdexplorer_plotly_template(theme),
+        title_text=title_text,
+        font_size=10,
+        height=sankey_height,
+    )
+    cmb_sankey_html = fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+    amount_received = sankey.graph_dict.get("amount_received", 0.0)
+    amount_sent = sankey.graph_dict.get("amount_sent", 0.0)
+    net_transfer = amount_received - amount_sent
+
+    return request.app.templates.TemplateResponse(
+        request,
+        "account/account_combined_table.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "token": token,
+            "cmb_sankey_html": cmb_sankey_html,
+            "graph_dict": sankey.graph_dict,
+            "n_accounts": len(accounts),
+            "internal_total": sankey.internal_total,
+            "internal_count": sankey.internal_count,
+            "net_transfer_abs": abs(net_transfer),
+            "net_direction": "In" if net_transfer >= 0 else "Out",
             "tags": tags,
             "app": request.app,
         },

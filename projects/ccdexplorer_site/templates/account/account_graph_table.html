@@ -18,8 +18,8 @@
             {% else %}
                 <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_received)|token_value_no_decimals(token)|safe}}</td>
             {% endif %}
-            <td class=" text-end text-secondary-emphasis">{{graph_dict.receiver_txs}}</td>
-            <td class=" text-end text-secondary-emphasis">{{graph_dict.receiver_accounts}}</td>
+            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.receiver_txs}}</td>
+            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.receiver_accounts}}</td>
         </tr>
         <tr class="sm-text">
             <td class=" text-secondary-emphasis">Sent</td>
@@ -29,8 +29,8 @@
                 <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_sent)|token_value_no_decimals(token)|safe}}</td>
             {% endif %}
             
-            <td class=" text-end text-secondary-emphasis">{{graph_dict.sender_txs}}</td>
-            <td class=" text-end text-secondary-emphasis">{{graph_dict.sender_accounts}}</td></tr>
+            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.sender_txs}}</td>
+            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.sender_accounts}}</td></tr>
     </tbody>    
     
 </table>

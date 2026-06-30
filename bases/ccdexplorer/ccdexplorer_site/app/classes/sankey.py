@@ -43,6 +43,16 @@ class NodeColors(Enum):
 
 
 class SanKey:
+    # Pseudo-nodes that are not on-chain accounts and must not be resolved as such.
+    SPECIAL_LABELS = [
+        "<---",
+        "--->",
+        "Transaction Fees",
+        "Rewards",
+        "Encrypted",
+        "Decrypted",
+    ]
+
     def __init__(self, account_id, gte, app, net: str, token: str | None = None):
         self.labels = {}
         self.gte = gte
@@ -206,14 +216,7 @@ class SanKey:
         self.tagged_labels = []
         for l in self.labels:
             if len(l) < 29:
-                if l in [
-                    "<---",
-                    "--->",
-                    "Transaction Fees",
-                    "Rewards",
-                    "Encrypted",
-                    "Decrypted",
-                ]:
+                if l in self.SPECIAL_LABELS:
                     self.tagged_labels.append(l)
                 else:
                     tag_found, tag_label = contract_tag(
@@ -506,3 +509,265 @@ class SanKey:
 
     def __repr__(self):
         return repr(self.__dict__)
+
+
+class ClusterSanKey(SanKey):
+    """SanKey for a cluster of accounts treated as a single entity.
+
+    Uses the exact same data source (``balance_movement``) and netting logic as
+    the single-account ``SanKey``, so for a cluster of one account the result is
+    identical to the Flow tab. Transfers between cluster members are excluded from
+    the external flows and reported separately as netted internal transfers.
+    """
+
+    CENTER_LABEL = "Cluster"
+    SPECIAL_LABELS = SanKey.SPECIAL_LABELS + [CENTER_LABEL]
+
+    def __init__(self, gte, app, net: str, member_canonicals, token: str = "CCD", center_label=None):
+        # 29-char canonical addresses of every account in the cluster.
+        self.member_canonicals = set(member_canonicals)
+        self.internal_total = 0.0
+        self.internal_count = 0
+        # For a single-account cluster, use that account's address as the centre
+        # node so it resolves to the account index/name (mirroring the Flow tab);
+        # for multiple accounts keep the generic "Cluster" label.
+        super().__init__(center_label or self.CENTER_LABEL, gte, app, net, token)
+
+    # -- shared helpers -----------------------------------------------------
+
+    def _accumulate(self, target: dict, key29: str, amount: float, account_id: str):
+        target[key29] = {
+            "amount": target.get(key29, {"amount": 0})["amount"] + amount,
+            "account_id": account_id,
+        }
+
+    def _net_internal(self, internal_flows: dict) -> float:
+        """Net opposing flows between each member pair and sum the absolutes."""
+        total = 0.0
+        seen: set[tuple[str, str]] = set()
+        for (a, b), amt in internal_flows.items():
+            if (a, b) in seen:
+                continue
+            total += abs(amt - internal_flows.get((b, a), 0))
+            seen.add((a, b))
+            seen.add((b, a))
+        return total
+
+    def _finalize_flows(self):
+        """Compute totals and build the sankey nodes/links from the flow dicts."""
+        self.amount_received = sum(x["amount"] for x in self.as_receiver_dict.values())
+        self.amount_sent = sum(x["amount"] for x in self.as_sender_dict.values())
+
+        for v in self.as_receiver_dict.values():
+            self.add_node(v["account_id"], NodeColors.SENDER_TO_ACCOUNT)
+        for v in self.as_receiver_dict.values():
+            self.add_link(v, self.account_id, WhoHasLinkInfo.SOURCE)
+
+        for v in self.as_sender_dict.values():
+            self.add_node(v["account_id"], NodeColors.RECEIVER_FROM_ACCOUNT)
+        for v in self.as_sender_dict.values():
+            self.add_link(self.account_id, v, WhoHasLinkInfo.TARGET)
+
+    # -- CCD ----------------------------------------------------------------
+
+    def add_txs_for_cluster(self, txs_for_members, rewards_total):
+        self.count_txs_as_receiver = 0
+        self.count_txs_as_sender = 0
+        self.as_receiver_dict = {}
+        self.as_sender_dict = {}
+        # ordered (owner29, counterparty29) -> CCD moved between members
+        internal_flows: dict[tuple[str, str], float] = {}
+        internal_count = 0
+
+        # combined rewards across all members
+        self.as_receiver_dict["Rewards"] = {
+            "amount": rewards_total / 1_000_000,
+            "account_id": "Rewards",
+        }
+
+        for ia in txs_for_members:
+            if not isinstance(ia, MongoImpactedAddress):
+                ia = MongoImpactedAddress(**ia)
+            owner = (ia.impacted_address_canonical or ia.impacted_address or "")[:29]
+            if not ia.balance_movement:
+                continue
+            bm = ia.balance_movement
+
+            if bm.transfer_in:
+                external_in = False
+                for ti in bm.transfer_in:
+                    cp29 = ti.counterparty[:29]
+                    if cp29 in self.member_canonicals:
+                        continue  # internal, counted from the sender side below
+                    external_in = True
+                    self._accumulate(
+                        self.as_receiver_dict, cp29, ti.amount / 1_000_000, ti.counterparty
+                    )
+                if external_in:
+                    self.count_txs_as_receiver += 1
+
+            if bm.transfer_out:
+                external_out = False
+                for to in bm.transfer_out:
+                    cp29 = to.counterparty[:29]
+                    if cp29 in self.member_canonicals:
+                        key = (owner, cp29)
+                        internal_flows[key] = internal_flows.get(key, 0) + to.amount / 1_000_000
+                        internal_count += 1
+                        continue
+                    external_out = True
+                    self._accumulate(
+                        self.as_sender_dict, cp29, to.amount / 1_000_000, to.counterparty
+                    )
+                if external_out:
+                    self.count_txs_as_sender += 1
+
+            if bm.transaction_fee:
+                self._accumulate(
+                    self.as_sender_dict,
+                    "Transaction Fees",
+                    bm.transaction_fee / 1_000_000,
+                    "Transaction Fees",
+                )
+            if bm.amount_encrypted:
+                self._accumulate(
+                    self.as_sender_dict, "Encrypted", bm.amount_encrypted / 1_000_000, "Encrypted"
+                )
+            if bm.amount_decrypted:
+                self._accumulate(
+                    self.as_receiver_dict,
+                    "Decrypted",
+                    bm.amount_decrypted / 1_000_000,
+                    "Decrypted",
+                )
+
+        self.internal_total = self._net_internal(internal_flows)
+        self.internal_count = internal_count
+        self._finalize_flows()
+
+    # -- PLT ----------------------------------------------------------------
+
+    def add_plt_txs_for_cluster(self, txs_for_members, governance_account):
+        self.count_txs_as_receiver = 0
+        self.count_txs_as_sender = 0
+        self.as_receiver_dict = {}
+        self.as_sender_dict = {}
+        internal_flows: dict[tuple[str, str], float] = {}
+        internal_count = 0
+
+        for ia in txs_for_members:
+            if not isinstance(ia, MongoImpactedAddress):
+                ia = MongoImpactedAddress(**ia)
+            owner = (ia.impacted_address_canonical or ia.impacted_address or "")[:29]
+            if not ia.balance_movement:
+                continue
+            bm = ia.balance_movement
+
+            if bm.plt_transfer_in:
+                external_in = False
+                for ti in bm.plt_transfer_in:
+                    amt = int(ti.event.amount.value) * (math.pow(10, -ti.event.amount.decimals))
+                    if isinstance(ti.event, CCD_TokenSupplyUpdateEvent):  # mint
+                        external_in = True
+                        self._accumulate(
+                            self.as_receiver_dict,
+                            governance_account[:29],
+                            amt,
+                            governance_account,
+                        )
+                    elif isinstance(ti.event, CCD_TokenTransferEvent):
+                        cp = ti.event.from_.account
+                        cp29 = cp[:29]
+                        if cp29 in self.member_canonicals:
+                            continue  # internal, counted from the sender side below
+                        external_in = True
+                        self._accumulate(self.as_receiver_dict, cp29, amt, cp)
+                if external_in:
+                    self.count_txs_as_receiver += 1
+
+            if bm.plt_transfer_out:
+                external_out = False
+                for to in bm.plt_transfer_out:
+                    amt = int(to.event.amount.value) * (math.pow(10, -to.event.amount.decimals))
+                    if isinstance(to.event, CCD_TokenSupplyUpdateEvent):  # burn
+                        external_out = True
+                        self._accumulate(
+                            self.as_sender_dict, governance_account[:29], amt, governance_account
+                        )
+                    elif isinstance(to.event, CCD_TokenTransferEvent):
+                        cp = to.event.to.account
+                        cp29 = cp[:29]
+                        if cp29 in self.member_canonicals:
+                            key = (owner, cp29)
+                            internal_flows[key] = internal_flows.get(key, 0) + amt
+                            internal_count += 1
+                            continue
+                        external_out = True
+                        self._accumulate(self.as_sender_dict, cp29, amt, cp)
+                if external_out:
+                    self.count_txs_as_sender += 1
+
+        self.internal_total = self._net_internal(internal_flows)
+        self.internal_count = internal_count
+        self._finalize_flows()
+
+    # -- CIS-2 --------------------------------------------------------------
+
+    def add_txs_for_cluster_for_token(self, events_for_members, decimals, display_name):
+        self.count_txs_as_receiver = 0
+        self.count_txs_as_sender = 0
+        self.as_receiver_dict = {}
+        self.as_sender_dict = {}
+        self.display_name = display_name
+        internal_flows: dict[tuple[str, str], float] = {}
+        internal_count = 0
+        # Member<->member transfers appear in both members' event lists; dedupe.
+        seen_ids: set = set()
+
+        for event in events_for_members:
+            if not isinstance(event, MongoTypeLoggedEventV2):
+                event = MongoTypeLoggedEventV2(**event)
+            if event.id in seen_ids:
+                continue
+            seen_ids.add(event.id)
+
+            event_type = event.event_info.event_type
+            amount = int(event.recognized_event.token_amount) * (math.pow(10, -decimals))
+
+            if event_type == "CIS-2.mint_event":
+                self.count_txs_as_receiver += 1
+                self._accumulate(
+                    self.as_receiver_dict,
+                    event.event_info.contract,
+                    amount,
+                    event.event_info.contract,
+                )
+            elif event_type == "CIS-2.burn_event":
+                self.count_txs_as_sender += 1
+                self._accumulate(
+                    self.as_sender_dict,
+                    event.event_info.contract,
+                    amount,
+                    event.event_info.contract,
+                )
+            elif event_type == "CIS-2.transfer_event":
+                from_addr = event.recognized_event.from_address
+                to_addr = event.recognized_event.to_address
+                from29 = from_addr[:29]
+                to29 = to_addr[:29]
+                from_in = from29 in self.member_canonicals
+                to_in = to29 in self.member_canonicals
+                if from_in and to_in:
+                    key = (from29, to29)
+                    internal_flows[key] = internal_flows.get(key, 0) + amount
+                    internal_count += 1
+                elif to_in:
+                    self.count_txs_as_receiver += 1
+                    self._accumulate(self.as_receiver_dict, from29, amount, from_addr)
+                elif from_in:
+                    self.count_txs_as_sender += 1
+                    self._accumulate(self.as_sender_dict, to29, amount, to_addr)
+
+        self.internal_total = self._net_internal(internal_flows)
+        self.internal_count = internal_count
+        self._finalize_flows()

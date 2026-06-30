@@ -1525,8 +1525,9 @@ async def get_net_transfers_for_accounts(
 
     total_in = 0  # microCCD flowing into the set from outside
     total_out = 0  # microCCD flowing out of the set to outside
-    internal_total = 0  # microCCD moved between members of the set
     internal_count = 0
+    # ordered (sender, receiver) -> gross microCCD moved between members of the set
+    internal_flows: dict[tuple[str, str], int] = {}
     # counterparty canonical -> aggregate flows
     counterparties: dict[str, dict] = {}
 
@@ -1538,7 +1539,9 @@ async def get_net_transfers_for_accounts(
         receiver_in = receiver in set_canonical
 
         if sender_in and receiver_in:
-            internal_total += amount
+            internal_flows[(sender, receiver)] = (
+                internal_flows.get((sender, receiver), 0) + amount
+            )
             internal_count += 1
             continue
 
@@ -1565,6 +1568,19 @@ async def get_net_transfers_for_accounts(
 
     def to_ccd(micro: int) -> float:
         return micro / 1_000_000
+
+    # Net internal transfers per member pair so the figure is consistent with the
+    # net-transfer semantics used everywhere else (opposing flows between two
+    # members cancel out instead of being summed gross).
+    internal_total = 0
+    seen_pairs: set[tuple[str, str]] = set()
+    for (sender, receiver), amount in internal_flows.items():
+        if (sender, receiver) in seen_pairs:
+            continue
+        reverse = internal_flows.get((receiver, sender), 0)
+        internal_total += abs(amount - reverse)
+        seen_pairs.add((sender, receiver))
+        seen_pairs.add((receiver, sender))
 
     # Resolve counterparty canonical addresses to their account indexes. The `_id`
     # in stable_address_info may be the full-length address, so match on its 29-char
@@ -1615,12 +1631,16 @@ async def get_net_transfers_for_accounts(
                     "inflow": 0.0,
                     "outflow": 0.0,
                     "net": 0.0,
+                    "inflow_count": 0,
+                    "outflow_count": 0,
                     "members": [],
                 },
             )
             cluster["inflow"] += record["inflow"]
             cluster["outflow"] += record["outflow"]
             cluster["net"] += record["net"]
+            cluster["inflow_count"] += record["inflow_count"]
+            cluster["outflow_count"] += record["outflow_count"]
             cluster["members"].append(record["address_canonical"])
         else:
             unlabeled_wallets.append(record)

@@ -1,0 +1,187 @@
+<script>
+  // Set of account indexes to combine. Seeded with the account being viewed.
+  // The seed account is always part of the set and cannot be removed.
+  let cmbAccounts = [];
+  let cmbSeed = null;
+  (function () {
+    var seed = parseInt("{{ account_index }}");
+    if (!isNaN(seed)) {
+      cmbSeed = seed;
+      cmbAccounts.push(seed);
+    }
+  })();
+
+  window.renderCmbChips = function () {
+    var container = document.getElementById("cmb_chips");
+    if (!container) { return; }
+    container.innerHTML = "";
+    cmbAccounts.slice().sort(function (a, b) { return a - b; }).forEach(function (idx) {
+      var chip = document.createElement("span");
+      chip.className = "badge rounded-pill bg-secondary-subtle text-secondary-emphasis me-2 mb-1 fs-6 fw-normal";
+      if (idx === cmbSeed) {
+        chip.innerHTML = '👤<span class="ccd">' + idx + '</span>';
+      } else {
+        chip.innerHTML =
+          '👤<span class="ccd">' + idx + '</span>' +
+          ' <a href="#" class="text-secondary-emphasis text-decoration-none ms-1" onclick="removeCmbAccount(' +
+          idx + '); return false;">×</a>';
+      }
+      container.appendChild(chip);
+    });
+  };
+
+  window.addCmbAccount = function () {
+    var input = document.getElementById("cmb_add_input");
+    if (!input) { return; }
+    input.value.split(/[\s,]+/).forEach(function (part) {
+      if (/^\d+$/.test(part)) {
+        var idx = parseInt(part);
+        if (cmbAccounts.indexOf(idx) === -1) {
+          cmbAccounts.push(idx);
+        }
+      }
+    });
+    input.value = "";
+    window.renderCmbChips();
+    window.cmbMarkDirty();
+  };
+
+  window.removeCmbAccount = function (idx) {
+    if (idx === cmbSeed) { return; }
+    cmbAccounts = cmbAccounts.filter(function (x) { return x !== idx; });
+    window.renderCmbChips();
+    window.cmbMarkDirty();
+  };
+
+  // Single defensive accessor used by hx-vals. Returns only scalar values
+  // (accounts as a comma-separated string) so json-enc serialises cleanly and
+  // never throws -- a throw here makes htmx silently fall back to form encoding.
+  window.cmbRequestVals = function () {
+    function val(id) { var e = document.getElementById(id); return e ? e.value : ""; }
+    var gte = (val("cmb_gte").split(" ")[0]) || "0";
+    return {
+      theme: document.querySelector("HTML").getAttribute("data-bs-theme"),
+      accounts: cmbAccounts.join(","),
+      gte: gte,
+      start_date: val("cmb_start_date"),
+      end_date: val("cmb_end_date"),
+      token: val("cmb_token") || "CCD"
+    };
+  };
+
+  // Keep the lower-limit field's unit in sync with the selected token.
+  window.cmbUpdateSuffix = function () {
+    var sel = document.getElementById("cmb_token");
+    var token = sel ? sel.value : "CCD";
+    var gte = document.getElementById("cmb_gte");
+    $('#cmb_gte').maskMoney({ allowZero: true, suffix: ' ' + token });
+    if (gte) { gte.value = ""; gte.placeholder = "0 " + token; }
+  };
+
+  // Out-of-sync handling: once a result is shown, any parameter change dims the
+  // result and shows a banner until the user clicks Update again.
+  var cmbHasRendered = false;
+  window.cmbMarkDirty = function () {
+    if (!cmbHasRendered) { return; }
+    var s = document.getElementById("cmb_sankey");
+    if (s) { s.classList.add("cmb-stale"); }
+    var b = document.getElementById("cmb_stale_banner");
+    if (b) { b.style.display = ""; }
+  };
+  window.cmbClearDirty = function () {
+    var s = document.getElementById("cmb_sankey");
+    if (s) { s.classList.remove("cmb-stale"); }
+    var b = document.getElementById("cmb_stale_banner");
+    if (b) { b.style.display = "none"; }
+  };
+  // Fired after every Update request completes (success or error).
+  window.cmbAfterRender = function () {
+    cmbHasRendered = true;
+    window.cmbClearDirty();
+  };
+</script>
+
+<style>
+  #cmb_sankey.cmb-stale { opacity: 0.35; transition: opacity 0.15s ease-in-out; }
+</style>
+<hr>
+<div class="row ps-3 pe-3">
+  <div class="col"><label class="sm-text text-center" for="cmb_token">Select token/coin</label></div>
+  <div class="col text-center">
+    <select class="sm-text text-end" id="cmb_token" onchange="cmbUpdateSuffix(); cmbMarkDirty();">
+      <option value="CCD" selected>CCD</option>
+      {% for token in token_ids_for_flow %}
+        <option  value="{{token}}"><span style="--bs-secondary-color:#9d9b9b;">{{token}}</span></option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col"></div>
+</div>
+<hr>
+<div class="row ps-3 pe-3 mt-1">
+  <div class="col"><label class="sm-text text-end" for="cmb_token">Add accounts</label></br>
+      <div id="cmb_chips" class="mt-2"></div>
+  </div>
+  <div class="col"></div>
+  <!-- <div class="col sm-text text-center"><a href="#" class="btn btn-link " onclick="addCmbAccount(); return false;">Add account</a></div> -->
+  <div class="col">
+    <input type="text" class="sm-text  form-control form-control-sm input-sm mb-1 text-end " style="--bs-secondary-color:#9d9b9b;" id="cmb_add_input" placeholder="Account index" onkeydown="if(event.key==='Enter'){addCmbAccount();return false;}">
+          
+    
+    
+  </div>
+</div>
+
+<hr>
+
+
+<div class="row ps-3 pe-3">
+  <div class="col">
+    <input type="text" class="sm-text dates form-control form-control-sm input-sm mb-1 text-end" data-precision="0" name="cmb_start_date" id="cmb_start_date" placeholder="Start Date"><br>
+  </div>
+  <div class="col sm-text text-center"><span class="ccd">≤ Date ≤</span></div>
+  <div class="col">
+    <input type="text" class="sm-text dates form-control form-control-sm input-sm mb-1 text-end" data-precision="0" name="cmb_end_date" id="cmb_end_date" placeholder="End Date"><br>
+  </div>
+</div>
+
+<div class="row ps-3 pe-3 mt-1">
+  <div class="col">
+    <button hx-trigger="click, {% if account.sequence_number < 1000 %}intersect once, {% endif %}switched-theme from:body"
+      hx-post='/ajax_combined_sankey/{{net}}'
+      hx-ext='json-enc'
+      hx-target="#cmb_sankey"
+      hx-indicator=".cmb-htmx-indicator"
+      hx-on::after-request="cmbAfterRender()"
+      hx-vals='js:{...cmbRequestVals()}' type="button" id="cmb-add-button" class="sm-text ms-3 btn btn-sm btn-primary">Update</button>
+  </div>
+  <div class="col">
+    <p class="text-end text-secondary-emphasis ccd">Lower limit for net transfers</p>
+  </div>
+  <div class="col">
+    <input type="text" class="text-secondary-emphasis number-separator form-control form-control-sm input-sm mb-1 text-end" style="--bs-secondary-color:#9d9b9b;" data-precision="0" name="cmb_gte" id="cmb_gte" placeholder="0 CCD" oninput="cmbMarkDirty()"><br>
+  </div>
+</div>
+
+<div id="cmb_stale_banner" class="alert alert-warning sm-text text-center mx-3" role="alert" style="display:none;">
+  Parameters changed — click <b>Update</b> to refresh the diagram and tables below.
+</div>
+
+<div id="cmb_sankey">
+  <span class="cmb-htmx-indicator htmx-indicator">
+    <img src="/static/misc/bars.svg"/> Loading data...
+  </span>
+  <p class="text-center text-secondary-emphasis">Add accounts and click Update to show the combined net transfers.</p>
+</div>
+
+<script>
+  $(function () {
+    $('#cmb_gte').maskMoney({ allowZero: true, suffix: ' CCD' });
+  });
+  (function () {
+    var now = new Date().toISOString();
+    flatpickr("#cmb_start_date", { defaultDate: "2021-6-09", onChange: window.cmbMarkDirty });
+    flatpickr("#cmb_end_date", { defaultDate: now, onChange: window.cmbMarkDirty });
+    window.renderCmbChips();
+  })();
+</script>
