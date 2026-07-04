@@ -50,9 +50,9 @@ async def main():
 
     schedule = Scheduler()
 
-    schedule.cyclic(dt.timedelta(microseconds=100), heartbeat.get_finalized_blocks)
-    schedule.cyclic(dt.timedelta(microseconds=100), heartbeat.process_blocks)
-    schedule.cyclic(dt.timedelta(microseconds=100), heartbeat.send_to_mongo)
+    schedule.cyclic(dt.timedelta(seconds=0.5), heartbeat.get_finalized_blocks)
+    schedule.cyclic(dt.timedelta(seconds=0.5), heartbeat.process_blocks)
+    schedule.cyclic(dt.timedelta(seconds=0.5), heartbeat.send_to_mongo)
     schedule.cyclic(dt.timedelta(seconds=3), heartbeat.get_special_purpose_blocks)
     schedule.cyclic(dt.timedelta(seconds=3), heartbeat.process_special_purpose_blocks)
     if RUN_ON_NET == "mainnet":
