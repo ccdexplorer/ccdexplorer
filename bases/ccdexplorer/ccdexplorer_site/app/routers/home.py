@@ -133,9 +133,7 @@ async def redirect_to_mainnet(
     request.state.api_calls["Account Count"] = (
         f"{request.app.api_url}/docs#/Accounts/get_accounts_count_estimate"
     )
-    request.state.api_calls["Latest Blocks"] = (
-        f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
-    )
+    request.state.api_calls["Latest Blocks"] = f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
     request.state.api_calls["Latest Txs"] = (
         f"{request.app.api_url}/docs#/Transactions/get_last_transactions"
     )
@@ -951,9 +949,7 @@ async def blocks_page(
 
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
-    request.state.api_calls["Latest Blocks"] = (
-        f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
-    )
+    request.state.api_calls["Latest Blocks"] = f"{request.app.api_url}/docs#/Blocks/get_last_blocks"
 
     return request.app.templates.TemplateResponse(
         request,
@@ -1079,9 +1075,7 @@ async def release_notes(
     )
     release_notes = api_result.return_value if api_result.ok else []
     request.state.api_calls = {}
-    request.state.api_calls["Release Notes"] = (
-        f"{request.app.api_url}/docs#/Misc/get_release_notes"
-    )
+    request.state.api_calls["Release Notes"] = f"{request.app.api_url}/docs#/Misc/get_release_notes"
     return request.app.templates.TemplateResponse(
         request,
         "base/release_notes.html",
@@ -1119,3 +1113,8 @@ async def support_explorer(
             "donations_account_id": "3cunMsEt2M3o9Rwgs2pNdsCWZKB5MkhcVbQheFHrvjjcRLSoGP",
         },
     )
+
+
+@router.get("/health")
+async def health():
+    return {"status": "ok"}
