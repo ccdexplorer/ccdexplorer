@@ -6,9 +6,8 @@
 
 
 <style>
-    .noUi-target {
+[data-bs-theme="dark"] .noUi-target {
   background: #0f0f0f;
-  
 }
 #slider-date-pretty {
     padding: 0 16px;
@@ -18,13 +17,16 @@
 .noUi-tooltip {
 	display: block;
 	position: absolute;
-	border: 1px solid #D9D9D9;
   font-size: smaller;
 	border-radius: 4px;
-	background: #0f0f0f;
-	color: #a7acb1;
 	padding: 5px;
 	text-align: center;
+}
+
+[data-bs-theme="dark"] .noUi-tooltip {
+	border: 1px solid #D9D9D9;
+	background: #0f0f0f;
+	color: #a7acb1;
 }
 </style>
 {% include 'charts/holders_graph_htmx_div.html' %}

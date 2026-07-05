@@ -11868,6 +11868,11 @@ textarea.form-control-lg {
 
 /*# sourceMappingURL=custom_bootstrap.css.map */
 
+/* TODO: everything below this point (Tabulator theming) was hand-added to this
+   compiled output and has no equivalent in custom_scss/custom.scss. Re-running
+   `sass custom_scss/custom.scss app/static/css/custom_bootstrap.css` will wipe
+   it. Move it into the scss source. */
+
 [data-bs-theme="dark"] .tabulator {
   /* border: 1px solid #282828; */
   background-color: #111111;
@@ -11906,9 +11911,12 @@ textarea.form-control-lg {
   border-color: #3FB449;
 }
 
+.tabulator .tabulator-cell {
+  padding: 4px 8px;
+}
+
 [data-bs-theme="dark"] .tabulator .tabulator-cell {
   border-right-color: #393838;
-  padding: 4px 8px;
   color: var(--bs-secondary-text-emphasis);
 }
 
@@ -11945,7 +11953,11 @@ textarea.form-control-lg {
   border-top: 1px solid #393838;
 }
 
-[data-bs-theme="dark"] .tabulator .tabulator-footer .tabulator-page{
+[data-bs-theme="light"] .tabulator .tabulator-footer {
+  background-color: var(--bs-body-bg);
+}
+
+.tabulator .tabulator-footer .tabulator-page{
   padding: 4px 6px;
 }
 [data-bs-theme="dark"] .tabulator .tabulator-footer .tabulator-calcs-holder .tabulator-row {
@@ -11987,11 +11999,15 @@ textarea.form-control-lg {
 .tabulator .tabulator-footer .tabulator-page-size {
   border-radius: 2px !important;
   padding: 4px 8px;
-  background-color: #333;
   color: var(--bs-secondary-text-emphasis);
-  border: 1px solid #555;
   font-size: 13px;
   cursor: pointer;
+}
+
+[data-bs-theme="dark"] .tabulator .tabulator-pagination button,
+[data-bs-theme="dark"] .tabulator .tabulator-footer .tabulator-page-size {
+  background-color: #333;
+  border: 1px solid #555;
 }
 
 .tabulator .tabulator-pagination button.active {
@@ -12000,7 +12016,7 @@ textarea.form-control-lg {
   border-color: #3FB449;
 }
 
-.tabulator .tabulator-pagination button:hover {
+[data-bs-theme="dark"] .tabulator .tabulator-pagination button:hover {
   background-color: #444;
 }
 
@@ -12038,11 +12054,15 @@ textarea.form-control-lg {
   min-height: 25px !important;
 }
 
-.tabulator-row.tabulator-selectable.tabulator-row-odd{
+[data-bs-theme="dark"] .tabulator-row.tabulator-selectable.tabulator-row-odd,
+[data-bs-theme="dark"] .tabulator-row.tabulator-selectable.tabulator-row-even {
   background-color: rgb(10,10,10);
 }
-.tabulator-row.tabulator-selectable.tabulator-row-even {
-  background-color: rgb(10,10,10);
+
+/* Flat rows in light mode too, matching dark (no zebra striping). */
+[data-bs-theme="light"] .tabulator-row.tabulator-selectable.tabulator-row-odd,
+[data-bs-theme="light"] .tabulator-row.tabulator-selectable.tabulator-row-even {
+  background-color: var(--bs-body-bg);
 }
 @media screen and (max-width: 768px) {
   .tabulator-paginator button[data-page="first"],

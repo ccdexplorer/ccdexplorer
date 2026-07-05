@@ -1,7 +1,106 @@
 
+/* Custom theme variables, aliased to Bootstrap's own theme-aware variables
+   so they automatically follow [data-bs-theme="light"/"dark"] without needing
+   separate light/dark blocks here. */
+:root {
+    --border-color-main: var(--bs-border-color);
+    --border-color-secondary: var(--bs-border-color-translucent);
+    --border-color-danger-subtle: var(--bs-danger-border-subtle);
+    --background-color-dropdown-menu: var(--bs-tertiary-bg);
+    --text-color-grey: var(--bs-secondary-color);
+    --search-button-color: var(--bs-tertiary-bg);
+    --stripe-color: var(--bs-tertiary-bg);
+    --th-bg: var(--bs-secondary-bg);
+    --th-color: var(--bs-body-color);
+    --td-color: var(--bs-body-color);
+    --td-on-stripe-color: var(--bs-body-color);
+}
+
+/* base.html unconditionally loads highlight.js's "github-dark-dimmed" theme
+   for code blocks (e.g. module source code), so syntax highlighting is always
+   dark regardless of site theme. Override with the standard light "github"
+   theme's colors when in light mode; dark mode keeps the loaded stylesheet. */
+[data-bs-theme="light"] .hljs {
+    color: #24292e;
+    background: #fff;
+}
+[data-bs-theme="light"] .hljs-doctag,
+[data-bs-theme="light"] .hljs-keyword,
+[data-bs-theme="light"] .hljs-meta .hljs-keyword,
+[data-bs-theme="light"] .hljs-template-tag,
+[data-bs-theme="light"] .hljs-template-variable,
+[data-bs-theme="light"] .hljs-type,
+[data-bs-theme="light"] .hljs-variable.language_ {
+    color: #d73a49;
+}
+[data-bs-theme="light"] .hljs-title,
+[data-bs-theme="light"] .hljs-title.class_,
+[data-bs-theme="light"] .hljs-title.class_.inherited__,
+[data-bs-theme="light"] .hljs-title.function_ {
+    color: #6f42c1;
+}
+[data-bs-theme="light"] .hljs-attr,
+[data-bs-theme="light"] .hljs-attribute,
+[data-bs-theme="light"] .hljs-literal,
+[data-bs-theme="light"] .hljs-meta,
+[data-bs-theme="light"] .hljs-number,
+[data-bs-theme="light"] .hljs-operator,
+[data-bs-theme="light"] .hljs-selector-attr,
+[data-bs-theme="light"] .hljs-selector-class,
+[data-bs-theme="light"] .hljs-selector-id,
+[data-bs-theme="light"] .hljs-variable {
+    color: #005cc5;
+}
+[data-bs-theme="light"] .hljs-meta .hljs-string,
+[data-bs-theme="light"] .hljs-regexp,
+[data-bs-theme="light"] .hljs-string {
+    color: #032f62;
+}
+[data-bs-theme="light"] .hljs-built_in,
+[data-bs-theme="light"] .hljs-symbol {
+    color: #e36209;
+}
+[data-bs-theme="light"] .hljs-code,
+[data-bs-theme="light"] .hljs-comment,
+[data-bs-theme="light"] .hljs-formula {
+    color: #6a737d;
+}
+[data-bs-theme="light"] .hljs-name,
+[data-bs-theme="light"] .hljs-quote,
+[data-bs-theme="light"] .hljs-selector-pseudo,
+[data-bs-theme="light"] .hljs-selector-tag {
+    color: #22863a;
+}
+[data-bs-theme="light"] .hljs-subst {
+    color: #24292e;
+}
+[data-bs-theme="light"] .hljs-section {
+    color: #005cc5;
+    font-weight: 700;
+}
+[data-bs-theme="light"] .hljs-bullet {
+    color: #735c0f;
+}
+[data-bs-theme="light"] .hljs-emphasis {
+    color: #24292e;
+    font-style: italic;
+}
+[data-bs-theme="light"] .hljs-strong {
+    color: #24292e;
+    font-weight: 700;
+}
+[data-bs-theme="light"] .hljs-addition {
+    color: #22863a;
+    background-color: #f0fff4;
+}
+[data-bs-theme="light"] .hljs-deletion {
+    color: #b31d28;
+    background-color: #ffeef0;
+}
+
 body {
     font-family: "Outfit", serif;
-    
+
 }
 .crypto-dashboard {
     border: 1px solid var(--border-color-main);
@@ -176,6 +275,16 @@ input:focus {
     background: var(--search-button-color);
 }
 
+/* The actual search button is Bootstrap's .btn-secondary, which is the same
+   dark gray in both themes. That reads fine on a dark page but too heavy on
+   a light one, so lighten it in light mode only; dark mode is untouched. */
+[data-bs-theme="light"] .search-bar-container .btn-secondary {
+    --bs-btn-bg: var(--bs-secondary-bg);
+    --bs-btn-border-color: var(--bs-secondary-bg);
+    --bs-btn-hover-bg: var(--bs-tertiary-bg);
+    --bs-btn-hover-border-color: var(--bs-tertiary-bg);
+}
+
 .account-row {
     background: var(--border-color-secondary);
     /* border: #1A1A1A solid 1px;
@@ -269,6 +378,24 @@ a {
 }
 button.nav-link.explorer {
     line-height: 60%;
+}
+
+/* .bg-secondary-subtle is white in light mode (see custom.scss), which combines
+   with Bootstrap's white .nav-pills .nav-link.active text to make the active
+   pill invisible. Give the active pill an explicit, slight background in both
+   themes instead of relying on that. */
+[data-bs-theme="light"] .nav-pills .nav-link.active.bg-secondary-subtle {
+    background-color: var(--bs-tertiary-bg) !important;
+    color: var(--bs-emphasis-color) !important;
+}
+
+[data-bs-theme="dark"] .nav-pills .nav-link.active.bg-secondary-subtle {
+    background-color: var(--bs-secondary-bg) !important;
+    color: var(--bs-emphasis-color) !important;
+}
+
+.dark-mode-toggle {
+    cursor: pointer;
 }
 @media (max-width: 575.98px) {
     span.sm-text {
@@ -406,11 +533,6 @@ button.nav-link.explorer {
 }
 
 .sortable {
-  /* --stripe-color: #e4e4e4;
-  --th-color: #fff;
-  --th-bg: #808080;
-  --td-color: #000;
-  --td-on-stripe-color: #000; */
   border-spacing: 0;
 }
 .sortable tbody tr:nth-child(odd) {
@@ -491,3 +613,11 @@ button.link-style:hover {
   border-bottom-width: 1px !important;
   border-bottom-style: solid !important;
   border-bottom-color: rgba(255,255,255,.12) !important;}
+
+/* Tabulator's "waiting for data" overlay (.tabulator-alert) is a
+   rgba(0,0,0,.4) veil, unscoped by theme. That reads fine on a dark table
+   but looks like a dark grey smear on a light one, so lighten it in light
+   mode only; dark mode keeps the vendor default. */
+[data-bs-theme="light"] .tabulator .tabulator-alert {
+  background: rgba(255, 255, 255, 0.6);
+}

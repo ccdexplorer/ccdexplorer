@@ -1,8 +1,14 @@
 <!doctype html>
 <html lang="en" data-bs-theme="dark" prefix="og: https://ogp.me/ns#">
   <head>
+    <script>
+      // Applied synchronously, before any stylesheet loads, so the page never
+      // paints the wrong theme and then flips (FOUC). Keep this as the very
+      // first thing in <head>.
+      document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('bsTheme') || 'dark');
+    </script>
     <title>ccdexplorer.io: The most comprehensive explorer for the Concordium blockchain.</title>
-    <script src="/static/js/net_switcher.js"></script> 
+    <script src="/static/js/net_switcher.js"></script>
     <!-- https://issuetracker.google.com/issues/313466551?pli=1#comment45 -->
     <script>
       if (window.trustedTypes && window.trustedTypes.createPolicy) {
@@ -14,7 +20,6 @@
       }
     </script>
     <link id="favicon" rel="icon" type="image/x-icon" href="/static/logos/favicon.ico">
-    <script>const theme=document.querySelector("HTML").getAttribute("data-bs-theme")</script>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,8 +34,8 @@
       data-mcp="https://mcp.tippingservice.co.uk" />
     <link rel="stylesheet" href="/node/tabulator-tables/dist/css/tabulator_bootstrap5.min.css">  
     <link rel="stylesheet" href="/node/bootstrap-icons/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/static/css/custom_bootstrap.css?v=1.1">
-    <link rel="stylesheet" href="/static/css/custom_ccdexplorer.css?v=1.3">
+    <link rel="stylesheet" href="/static/css/custom_bootstrap.css?v=1.5">
+    <link rel="stylesheet" href="/static/css/custom_ccdexplorer.css?v=1.9">
     <link rel="stylesheet" href="/node/flatpickr/dist/flatpickr.min.css" type="text/css">
     <link rel="stylesheet" href="/node/flatpickr/dist/plugins/monthSelect/style.css" type="text/css">
     <link rel="stylesheet" href="/node/nouislider/dist/nouislider.css" type="text/css">
@@ -87,8 +92,9 @@ html {
     </div>
     
     
+    <script src="/static/js/theme_switcher.js"></script>
     <script src="/node/htmx.org/dist/htmx.js"></script>
-    
+
     <script src="/node/htmx-ext-class-tools/class-tools.js"></script>
     <script src="/node/htmx-ext-json-enc/json-enc.js"></script>
     

@@ -2,7 +2,10 @@
 
 // Look in /node_modules/bootstrap/scss/_variables-dark.scss for inspiration of variable names
 
-// run: sass custom_scss/custom.scss app/static/css/custom_bootstrap.css    
+// run: sass custom_scss/custom.scss app/static/css/custom_bootstrap.css
+// TODO: the Tabulator theming block at the bottom of the compiled
+// custom_bootstrap.css was hand-added there, not here. Running the
+// command above will silently delete it. Move it into this source file.
 
 // $secondary: #666666;
 

@@ -1,43 +1,43 @@
-document.documentElement.setAttribute('data-bs-theme', (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'))
-
-document.addEventListener('DOMContentLoaded', (event) => {
+// The initial theme is applied synchronously by the inline script in
+// base/base.html's <head>, before any CSS loads, to avoid a flash of the
+// wrong theme. This file only wires up the toggle switch once the DOM is
+// ready.
+document.addEventListener('DOMContentLoaded', () => {
     const htmlElement = document.documentElement;
     const switchElement = document.getElementById('darkModeSwitch');
-    
-    const smallLogoTextBlack = '/static/logos/small-logo-black.png';
-    const smallLogoTextWhite = '/static/logos/small-logo-white.png';
+    const themeIcon = document.getElementById('darkModeSwitchIcon');
+    const themeLabel = document.getElementById('darkModeSwitchLabel');
+    const siteLogo = document.getElementById('logo');
 
-    const site_logo_dark = '/static/logos/logo_dark_bg.png';
-    const site_logo_light = '/static/logos/logo_light_bg.png';
-    
-    // Set the default theme to dark if no setting is found in local storage
-    const currentTheme = localStorage.getItem('bsTheme') || 'dark';
-    htmlElement.setAttribute('data-bs-theme', currentTheme);
-    switchElement.checked = currentTheme === 'dark';
-    
-    const light_mode_icon_str = '<i class="bi bi-sun-fill"></i> Light';
-    const dark_mode_icon_str = '<i class="bi-moon-stars-fill"></i> Dark';
+    if (!switchElement) {
+        return;
+    }
 
-    switchElement.addEventListener('click', function () {
-        
-        if (this.innerHTML == light_mode_icon_str) {
-            localStorage.setItem('bsTheme', 'dark');
-            this.innerHTML = dark_mode_icon_str;
-            htmlElement.setAttribute('data-bs-theme', 'dark');
-            const site_logo = document.getElementById('logo');
-            site_logo.src = site_logo_dark;
-            const theme = 'dark';
-            
-        } else {
-            localStorage.setItem('bsTheme', 'light');
-            this.innerHTML = light_mode_icon_str
-            htmlElement.setAttribute('data-bs-theme', 'light');
-            const site_logo = document.getElementById('logo');
-            site_logo.src = site_logo_light;
-            const theme = 'light';
+    const siteLogoDark = '/static/logos/logo_dark.png';
+    const siteLogoLight = '/static/logos/logo_light.png';
+
+    const applyThemeToUI = (theme) => {
+        switchElement.checked = theme === 'dark';
+        if (themeIcon) {
+            themeIcon.className = theme === 'dark' ? 'bi bi-moon-stars-fill' : 'bi bi-sun-fill';
         }
-        // Picked up by HTMX to trigger a reload of plotly graphs
-        document.body.dispatchEvent(new CustomEvent("switched-theme"));
-    });
+        if (themeLabel) {
+            themeLabel.textContent = theme === 'dark' ? 'Dark' : 'Light';
+        }
+        if (siteLogo) {
+            siteLogo.src = theme === 'dark' ? siteLogoDark : siteLogoLight;
+        }
+    };
 
+    // Sync the switch/icon/logo with the theme the head script already applied.
+    applyThemeToUI(htmlElement.getAttribute('data-bs-theme'));
+
+    switchElement.addEventListener('change', () => {
+        const theme = switchElement.checked ? 'dark' : 'light';
+        localStorage.setItem('bsTheme', theme);
+        htmlElement.setAttribute('data-bs-theme', theme);
+        applyThemeToUI(theme);
+        // Picked up by htmx (hx-trigger="switched-theme from:body") to reload plots.
+        document.body.dispatchEvent(new CustomEvent('switched-theme'));
+    });
 });
