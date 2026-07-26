@@ -228,7 +228,7 @@ class GRPCClient(  # type: ignore
         self.hosts[NET.MAINNET] = GRPC_MAINNET
         if devnet:
             self.hosts[NET.MAINNET] = [
-                {"host": "--secure--grpc.devnet-p10-1.concordium.com", "port": 20000}
+                {"host": "--secure--grpc.devnet-p11-2.concordium.com", "port": 20000}
             ]
 
         self.hosts[NET.TESTNET] = GRPC_TESTNET
