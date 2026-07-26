@@ -1,0 +1,40 @@
+{% extends "base/base.html" %}
+{% block ogp %}
+<meta property="og:title" content="{{ogp_title}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ogp_url}}" />
+{% endblock %}
+{% block content %}
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+
+<div class="row row-flex">
+    <div class="col-md-12  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "PLT Locks" %}{% include 'base/box_title.html' %}
+          <div class="row mb-3">
+            <div class="col-md-3 col-sm-6">
+              <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="plt_locks_status_filter_btn" data-bs-toggle="dropdown" aria-expanded="false">
+                  All locks
+                </button>
+                <ul class="dropdown-menu" id="plt_locks_status_filter_menu">
+                  <li><a class="dropdown-item text-secondary-emphasis" href="#" data-value="" data-label="All locks">All locks</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-secondary-emphasis" href="#" data-value="open" data-label="Active">Active <span class="sm-text">(not expired, not cancelled)</span></a></li>
+                  <li><a class="dropdown-item text-secondary-emphasis" href="#" data-value="expired" data-label="Expired">Expired <span class="sm-text">(past expiry, not yet cancelled)</span></a></li>
+                  <li><a class="dropdown-item text-secondary-emphasis" href="#" data-value="cancelled" data-label="Cancelled">Cancelled</a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div id="plt_locks_global_table"></div>
+          {% set ccd_tabulator_table ='plt_locks_global_table'%}
+          {% set tabulator_ajax_url = '/ajax_plt_locks_global/'+net %}
+          {% set filename='plt-locks-'+range(1000,10000)|random|string+'.csv' %}
+          {% include "base/tabulator/tabulator-plt-locks-global.html" %}
+      </div>
+    </div>
+</div>
+
+{% endblock %}

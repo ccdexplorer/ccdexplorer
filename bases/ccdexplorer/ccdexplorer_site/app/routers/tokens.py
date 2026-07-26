@@ -35,9 +35,13 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     create_dict_for_tabulator_display_for_cis2_token_holders,
     create_dict_for_tabulator_display_for_nft_tokens,
     create_dict_for_tabulator_display_for_plt_token_holders,
+    create_dict_for_tabulator_display_for_plt_locks,
+    create_dict_for_tabulator_display_for_plt_locks_global,
+    create_dict_for_tabulator_display_for_plt_lock_transactions,
     create_dict_for_tabulator_display_plt_transactions,
     from_address_to_index,
     get_url_from_api,
+    is_past_datetime,
     pagination_calculator,
     tx_type_translation_for_js,
 )
@@ -339,8 +343,7 @@ async def show_token_address(
     }
 
     return request.app.templates.TemplateResponse(
-        request,
-        "tokens/generic/token_address_display.html", template_dict
+        request, "tokens/generic/token_address_display.html", template_dict
     )
 
 
@@ -407,6 +410,237 @@ async def get_plt_token_holders_paginated(
             )
         )
     total_rows = holders["total_row_count"]  # type: ignore
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
+        {
+            "data": tb_made_up_rows,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
+    )
+
+
+@router.get(
+    "/ajax_plt_locks/{net}/{token_id}",
+    response_class=HTMLResponse,
+)
+async def get_plt_locks_paginated(
+    request: Request,
+    net: str,
+    token_id: str,
+    page: int = Query(),
+    size: int = Query(),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    skip = (page - 1) * size
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/plt/{token_id}/locks/{skip}/{size}",
+        httpx_client,
+    )
+    locks = api_result.return_value if api_result.ok else {}
+    if not locks:
+        error = f"Request error getting locks for token at {token_id} on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    locks_data = locks["data"]
+
+    if token_id in request.app.plt_cache[net]:
+        decimals = request.app.plt_cache[net][token_id].get("decimals", 0)
+    else:
+        api_result = await get_url_from_api(
+            f"{request.app.api_url}/v2/{net}/plt/{token_id}/info",
+            request.app.httpx_client,
+        )
+        plt_info = api_result.return_value if api_result.ok else None
+        plt_info: CCD_TokenInfo | None = CCD_TokenInfo(**plt_info) if plt_info else None
+        decimals = plt_info.token_state.decimals if plt_info else 0
+
+    tb_made_up_rows = [
+        create_dict_for_tabulator_display_for_plt_locks(net, row, token_id, decimals)
+        for row in locks_data
+    ]
+    total_rows = locks["total_row_count"]  # type: ignore
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
+        {
+            "data": tb_made_up_rows,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
+    )
+
+
+@router.get(
+    "/ajax_plt_lock_transactions/{net}/{account_index}/{sequence_number}/{creation_order}",
+    response_class=HTMLResponse,
+)
+async def get_plt_lock_transactions_paginated(
+    request: Request,
+    net: str,
+    account_index: int,
+    sequence_number: int,
+    creation_order: int,
+    page: int = Query(),
+    size: int = Query(),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    skip = (page - 1) * size
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}/transactions/{skip}/{size}",
+        httpx_client,
+    )
+    txs = api_result.return_value if api_result.ok else {}
+    if not txs:
+        error = f"Request error getting transactions for lock {account_index}-{sequence_number}-{creation_order} on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    tb_made_up_rows = [
+        create_dict_for_tabulator_display_for_plt_lock_transactions(net, row) for row in txs["data"]
+    ]
+    total_rows = txs["total_row_count"]  # type: ignore
+    last_page = math.ceil(total_rows / size)
+    return JSONResponse(
+        {
+            "data": tb_made_up_rows,
+            "last_page": max(1, last_page),
+            "last_row": total_rows,
+        }
+    )
+
+
+@router.get("/{net}/tokens/plt/lock/{account_index}/{sequence_number}/{creation_order}")
+async def show_plt_lock(
+    request: Request,
+    net: str,
+    account_index: int,
+    sequence_number: int,
+    creation_order: int,
+    tags: dict = Depends(get_labeled_accounts),
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    lock_id_str = f"{account_index}-{sequence_number}-{creation_order}"
+    og_title = f"PLT lock {lock_id_str} on Concordium {net}"
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}",
+        request.app.httpx_client,
+    )
+    lock_info = api_result.return_value if api_result.ok else None
+    request.state.api_calls = {}
+    request.state.api_calls["Lock Info"] = (
+        f"{request.app.api_url}/docs#/Protocol-Level%20Token/get_lock_detail"
+    )
+
+    if not lock_info:
+        error = f"Lock {lock_id_str} not found on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    lock_info["expired"] = is_past_datetime(lock_info.get("expiry"))
+
+    template_dict = {
+        "env": request.app.env,
+        "request": request,
+        "net": net,
+        "account_index": account_index,
+        "sequence_number": sequence_number,
+        "creation_order": creation_order,
+        "lock_id_str": lock_id_str,
+        "lock_info": lock_info,
+        "tags": tags,
+        "user": user,
+        "ogp_title": og_title,
+        "ogp_url": request.url._url,
+    }
+
+    return request.app.templates.TemplateResponse(
+        request, "tokens/plt/lock_display.html", template_dict
+    )
+
+
+@router.get("/{net}/blockchain/plt-locks")
+async def show_plt_locks_global(
+    request: Request,
+    net: str,
+):
+    user: SiteUser | None = await get_user_detailsv2(request)
+    og_title = f"PLT locks on Concordium {net}"
+
+    template_dict = {
+        "env": request.app.env,
+        "request": request,
+        "net": net,
+        "user": user,
+        "ogp_title": og_title,
+        "ogp_url": request.url._url,
+    }
+
+    return request.app.templates.TemplateResponse(
+        request, "blockchain/plt_locks_display.html", template_dict
+    )
+
+
+@router.get(
+    "/ajax_plt_locks_global/{net}",
+    response_class=HTMLResponse,
+)
+async def get_plt_locks_global_paginated(
+    request: Request,
+    net: str,
+    page: int = Query(),
+    size: int = Query(),
+    status: str | None = Query(default=None),
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    skip = (page - 1) * size
+    url = f"{request.app.api_url}/v2/{net}/plt/locks/{skip}/{size}"
+    if status:
+        url += f"?status={status}"
+    api_result = await get_url_from_api(url, httpx_client)
+    locks = api_result.return_value if api_result.ok else {}
+    if not locks:
+        error = f"Request error getting locks on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    tb_made_up_rows = [
+        create_dict_for_tabulator_display_for_plt_locks_global(net, row) for row in locks["data"]
+    ]
+    total_rows = locks["total_row_count"]  # type: ignore
     last_page = math.ceil(total_rows / size)
     return JSONResponse(
         {
@@ -555,7 +789,9 @@ async def show_plt(
         # "owner_history_list": owner_history_list,
     }
 
-    return request.app.templates.TemplateResponse(request, "tokens/plt/plt_display.html", template_dict)
+    return request.app.templates.TemplateResponse(
+        request, "tokens/plt/plt_display.html", template_dict
+    )
 
 
 async def show_nft_tag(request: Request, net: str, tag_result: dict):
@@ -579,8 +815,7 @@ async def show_nft_tag(request: Request, net: str, tag_result: dict):
     }
 
     return request.app.templates.TemplateResponse(
-        request,
-        "tokens/nft_tag/nft_tag_display.html", template_dict
+        request, "tokens/nft_tag/nft_tag_display.html", template_dict
     )
 
 

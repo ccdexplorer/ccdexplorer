@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% set account_locks_feature_visible = False %}
 
 {% block js %}
 <script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
@@ -34,6 +35,14 @@ document.addEventListener("DOMContentLoaded", () => {
         init_validator_rewards_table?.();
       },
     },
+    {% if account_locks_feature_visible %}
+    {
+      btn: '#pills-locks-tab',
+      containerId: 'account-locks-tab-content',
+      url:   `/account/locks-tab-content/{{net}}/{{account_id}}`,
+      init:  () => init_account_locks_table?.(),
+    },
+    {% endif %}
   ];
 
   tabs.forEach(({ btn, containerId, url, init }) => {
@@ -121,8 +130,15 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="tab-text-large">Tokens (PLT & CIS-2)</span><span class="tab-text-small">Tokens</span>
         </button>
         </li>
-      {% endif %}  
-      
+      {% endif %}
+      {% if account_locks_feature_visible %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link  explorer bg-secondary-subtle" id="pills-locks-tab" data-bs-toggle="pill" data-bs-target="#pills-locks" type="button" role="tab" aria-controls="pills-locks" aria-selected="true">
+            <span class="tab-text-large">Locks</span><span class="tab-text-small">Locks</span>
+        </button>
+        </li>
+      {% endif %}
+
 </ul>
 
 <div class="tab-content" id="pills-tabContent">
@@ -141,12 +157,17 @@ document.addEventListener("DOMContentLoaded", () => {
   
   {% if tokens_available %}
   <div class="tab-pane fade show " id="pills-tokens" role="tabpanel" aria-labelledby="pills-tokens-tab" tabindex="0">
-        <div id="tokens-tab-content">Loading...</div> 
-      
-      
+        <div id="tokens-tab-content">Loading...</div>
+
+
   </div>
   {% endif %}
-  
+  {% if account_locks_feature_visible %}
+  <div class="tab-pane fade show " id="pills-locks" role="tabpanel" aria-labelledby="pills-locks-tab" tabindex="0">
+        <div id="account-locks-tab-content">Loading...</div>
+  </div>
+  {% endif %}
+
 </div>
 
 {% endif %}
@@ -332,5 +353,10 @@ const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-cs
 <!-- Tokens-->
 {% include "base/tabulator/tabulator-plt-tokens.html" %}
 {% include "base/tabulator/tabulator-cis-2-tokens.html" %}
+
+{% if account_locks_feature_visible %}
+<!-- Locks-->
+{% include "base/tabulator/tabulator-plt-account-locks.html" %}
+{% endif %}
 
 {% endblock content %}

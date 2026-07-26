@@ -39,6 +39,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from ccdexplorer.ccdexplorer_site.app.routers import (
     account,
     account_pool,
+    account_tab_locks,
     account_tab_tokens,
     account_tab_transactions,
     account_tab_validator,
@@ -302,6 +303,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(account.router)
     app.include_router(account_tab_transactions.router)
     app.include_router(account_tab_tokens.router)
+    app.include_router(account_tab_locks.router)
     app.include_router(account_tab_validator.router)
     app.include_router(account_pool.router)
     app.include_router(node.router)

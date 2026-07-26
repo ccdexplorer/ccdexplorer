@@ -1,0 +1,120 @@
+{% extends "base/base.html" %}
+{% block ogp %}
+<meta property="og:title" content="{{ogp_title}}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ogp_url}}" />
+{% endblock %}
+{% block content %}
+
+{% include 'base/search_bar_non_home_inclusion.html' %}
+
+<div class="row row-flex">
+    <div class="col-md-12  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Lock " + lock_id_str %}{% include 'base/box_title.html' %}
+          <table class="table table-borderless">
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Status</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% if lock_info.status == "open" %}<span class="badge text-bg-success">Open</span>
+                      {% elif lock_info.status == "cancelled" %}<span class="badge text-bg-secondary">Cancelled</span>
+                      {% else %}<span class="badge text-bg-warning">Unknown</span>{% endif %}
+                  </td>
+              </tr>
+              {% if lock_info.expiry %}
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Expiry</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% if lock_info.expired %}
+                          <span class="badge text-bg-secondary">Expired</span> <span class="text-muted">({{ lock_info.expiry|datetime_regular_parse }})</span>
+                      {% else %}
+                          {{ lock_info.expiry|datetime_regular_parse }}
+                      {% endif %}
+                  </td>
+              </tr>
+              {% endif %}
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Recipients</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% if lock_info.recipients == "any" %}Any
+                      {% else %}
+                          {% for account in lock_info.recipients %}{{ account|account_link(net,user,tags,request.app)|safe }}{% if not loop.last %}, {% endif %}{% endfor %}
+                      {% endif %}
+                  </td>
+              </tr>
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Supported Tokens</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% for supported_token_id in lock_info.controller.tokens %}<a href="/{{net}}/tokens/{{supported_token_id}}"><span class="ccd">{{ supported_token_id }}</span></a>{% if not loop.last %}, {% endif %}{% endfor %}
+                  </td>
+              </tr>
+          </table>
+      </div>
+    </div>
+</div>
+
+<div class="row row-flex">
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Controllers" %}{% include 'base/box_title.html' %}
+          {% set role_badge_colors = {"fund": "text-bg-info", "send": "text-bg-primary", "return": "text-bg-warning text-dark", "cancel": "text-bg-danger"} %}
+          <table class="table table-borderless">
+              <thead>
+                  <tr class="sm-text">
+                      <th class="text-start text-secondary-emphasis">Account</th>
+                      <th class="text-end text-secondary-emphasis">Roles</th>
+                  </tr>
+              </thead>
+              {% for grant in lock_info.controller.grants %}
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">{{ grant.account|account_link(net,user,tags,request.app)|safe }}</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% for role in grant.roles %}<span class="badge {{ role_badge_colors.get(role, 'text-bg-secondary') }} me-1">{{ role }}</span>{% endfor %}
+                  </td>
+              </tr>
+              {% endfor %}
+          </table>
+      </div>
+    </div>
+
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Funds" %}{% include 'base/box_title.html' %}
+          {% if lock_info.funds %}
+          <table class="table table-borderless">
+              <thead>
+                  <tr class="sm-text">
+                      <th class="text-start text-secondary-emphasis">Account</th>
+                      <th class="text-end text-secondary-emphasis">Balance</th>
+                  </tr>
+              </thead>
+              {% for fund in lock_info.funds %}
+                {% for amount in fund.amounts %}
+                <tr class="table-row-line-height sm-text">
+                    <td class="text-start text-secondary-emphasis">{{ fund.account|account_link(net,user,tags,request.app)|safe }}</td>
+                    <td class="text-end text-secondary-emphasis">{{ amount.amount.value|token_amount_using_decimals_rounded(amount.amount.decimals)|safe }} <span class="ccd">{{ amount.token }}</span></td>
+                </tr>
+                {% endfor %}
+              {% endfor %}
+          </table>
+          {% else %}
+          <p class="sm-text text-secondary-emphasis">No funds currently held in this lock.</p>
+          {% endif %}
+      </div>
+    </div>
+</div>
+
+<div class="row row-flex">
+    <div class="col-md-12  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Transactions" %}{% include 'base/box_title.html' %}
+          <div id="plt_lock_txs_table"></div>
+          {% set ccd_tabulator_table ='plt_lock_txs_table'%}
+          {% set tabulator_ajax_url = '/ajax_plt_lock_transactions/'+net+'/'+account_index|string+'/'+sequence_number|string+'/'+creation_order|string %}
+          {% set filename='plt-lock-'+lock_id_str+'-txs-'+range(1000,10000)|random|string+'.csv' %}
+          {% include "base/tabulator/tabulator-plt-lock-txs.html" %}
+      </div>
+    </div>
+</div>
+
+{% endblock %}

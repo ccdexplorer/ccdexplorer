@@ -7,6 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+import datetime as dt
 import grpc
 from ccdexplorer.mongodb import Collections, MongoMotor
 from ccdexplorer.domain.generic import NET
@@ -19,6 +20,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_g
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_TokenInfo,
     CCD_BlockItemSummary,
+    CCD_LockId,
 )
 from pymongo import ASCENDING, DESCENDING
 
@@ -200,6 +202,317 @@ async def get_paginated_token_current_holders(
         raise HTTPException(
             status_code=404,
             detail=f"Can't retrieve current holders for PLT token {token_id} on {net}. {error}",
+        )
+
+
+@router.get(
+    "/{net}/plt/locks/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_paginated_locks(
+    request: Request,
+    net: str,
+    skip: int,
+    limit: int,
+    status: str | None = None,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """List all PLT locks system-wide, most recently updated first.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        skip: Number of locks to skip.
+        limit: Maximum number of locks to return.
+        status: Optional filter, one of ``open``, ``expired``, ``cancelled``. ``expired`` is
+            derived (an "open" lock whose expiry has passed) since the indexer only ever
+            stores ``open``/``cancelled`` based on destroy events.
+        mongomotor: Mongo client dependency used to query ``plts_locks``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with lock entries and the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > request.app.REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
+    now = dt.datetime.now(dt.timezone.utc)
+    if status == "open":
+        match = {"status": "open", "expiry": {"$gte": now}}
+    elif status == "expired":
+        match = {"status": "open", "expiry": {"$lt": now}}
+    elif status == "cancelled":
+        match = {"status": "cancelled"}
+    else:
+        match = {}
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        total_count = await db_to_use[Collections.plts_locks].count_documents(match)
+        pipeline = [
+            {"$match": match},
+            {"$sort": {"last_updated_block_height": DESCENDING}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        locks = await await_await(db_to_use, Collections.plts_locks, pipeline, limit)
+
+        return {
+            "data": locks,
+            "total_row_count": total_count,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve locks on {net}. {error}",
+        )
+
+
+@router.get(
+    "/{net}/plt/{token_id}/locks/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_paginated_token_locks(
+    request: Request,
+    net: str,
+    token_id: str,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """List PLT locks that support this token, most recently updated first.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        token_id: Identifier of the PLT token.
+        skip: Number of locks to skip.
+        limit: Maximum number of locks to return.
+        mongomotor: Mongo client dependency used to query ``plts_locks``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with lock entries and the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > request.app.REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        total_count = await db_to_use[Collections.plts_locks].count_documents(
+            {"token_ids": token_id}
+        )
+        pipeline = [
+            {"$match": {"token_ids": token_id}},
+            {"$sort": {"last_updated_block_height": DESCENDING}},
+            {"$skip": skip},
+            {"$limit": limit},
+        ]
+        locks = await await_await(db_to_use, Collections.plts_locks, pipeline, limit)
+
+        return {
+            "data": locks,
+            "total_row_count": total_count,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve locks for PLT token {token_id} on {net}. {error}",
+        )
+
+
+@router.get("/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}", response_class=JSONResponse)
+async def get_lock_detail(
+    request: Request,
+    net: str,
+    account_index: int,
+    sequence_number: int,
+    creation_order: int,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Return current lock state, merged with indexed status.
+
+    Lock state (recipients/controller/funds) is read live from the node, since it can change
+    on every touching transaction. ``status`` only exists in the indexed ``plts_locks``
+    document. The lock's transaction history is served separately (paginated) by
+    ``get_paginated_lock_transactions``.
+
+    Args:
+        request: FastAPI request context (unused but required).
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_index: The account index that created the lock.
+        sequence_number: The sequence number of the creating transaction.
+        creation_order: The 0-based creation order of the lock within that transaction.
+        grpcclient: gRPC client dependency used to fetch live lock info.
+        mongomotor: Mongo client dependency used to fetch indexed lock metadata.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        Decoded lock state merged with ``status`` and ``touching_txs``.
+
+    Raises:
+        HTTPException: If the network is unsupported or the lock is not found.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    lock_id = CCD_LockId(
+        account_index=account_index,
+        sequence_number=sequence_number,
+        creation_order=creation_order,
+    )
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    mongo_doc = await db_to_use[Collections.plts_locks].find_one({"_id": lock_id.to_str()})
+
+    try:
+        lock_info = grpcclient.get_lock_info("last_final", lock_id, net=NET(net))
+        decoded = grpcclient.decode_lock_info(lock_info.lock_info).model_dump(exclude_none=True)
+    except grpc._channel._InactiveRpcError:  # type: ignore
+        decoded = None
+
+    if not decoded and not mongo_doc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Lock {lock_id.to_str()} not found on {net}.",
+        )
+
+    return {
+        **(decoded or {}),
+        "status": mongo_doc.get("status") if mongo_doc else "unknown",
+    }
+
+
+@router.get(
+    "/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}/transactions/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_paginated_lock_transactions(
+    request: Request,
+    net: str,
+    account_index: int,
+    sequence_number: int,
+    creation_order: int,
+    skip: int,
+    limit: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """List transactions that have touched a lock, most recent first.
+
+    Args:
+        request: FastAPI request context providing pagination limits.
+        net: Network identifier, must be ``mainnet`` or ``testnet``.
+        account_index: The account index that created the lock.
+        sequence_number: The sequence number of the creating transaction.
+        creation_order: The 0-based creation order of the lock within that transaction.
+        skip: Number of transactions to skip.
+        limit: Maximum number of transactions to return.
+        mongomotor: Mongo client dependency used to query ``plts_locks``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A dictionary with transaction entries and the total count.
+
+    Raises:
+        HTTPException: If the network is unsupported or pagination invalid.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > request.app.REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
+    lock_id_str = CCD_LockId(
+        account_index=account_index,
+        sequence_number=sequence_number,
+        creation_order=creation_order,
+    ).to_str()
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    try:
+        count_pipeline = [
+            {"$match": {"_id": lock_id_str}},
+            {"$project": {"total": {"$size": {"$ifNull": ["$touching_txs", []]}}}},
+        ]
+        count_result = await await_await(db_to_use, Collections.plts_locks, count_pipeline, 1)
+        total_count = count_result[0]["total"] if count_result else 0
+
+        pipeline = [
+            {"$match": {"_id": lock_id_str}},
+            {"$project": {"touching_txs": 1}},
+            {"$unwind": "$touching_txs"},
+            {"$sort": {"touching_txs.block_height": DESCENDING}},
+            {"$skip": skip},
+            {"$limit": limit},
+            {"$replaceRoot": {"newRoot": "$touching_txs"}},
+        ]
+        touching_txs = await await_await(db_to_use, Collections.plts_locks, pipeline, limit)
+
+        return {
+            "data": touching_txs,
+            "total_row_count": total_count,
+        }
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Can't retrieve transactions for lock {lock_id_str} on {net}. {error}",
         )
 
 

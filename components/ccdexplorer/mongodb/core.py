@@ -148,6 +148,8 @@ class Collections(Enum):
     # PLT
     plts_links = "plts_links"
     plts_tags = "plts_tags"
+    plts_locks = "plts_locks"
+    plts_locks_links = "plts_locks_links"
     celery_taskmeta = "celery_taskmeta"
     stable_address_info = "stable_address_info"
 

@@ -980,6 +980,68 @@ class Mixin(Protocol):
 
         return CCD_CreatePLT(**result)
 
+    def decode_lock_account(self, tag) -> CCD_AccountAddress:
+        """Decode a CBOR-tagged lock account reference (tag 40307) into a base58 address.
+
+        Mirrors `convert_GovernanceAccount`'s handling of the same tagged account structure
+        found in PLT initialization parameters.
+        """
+        return self.convertAccountAddress(AccountAddress(value=tag.value[3]))
+
+    def decode_lock_controller(self, cbor_decoded: dict) -> CCD_LockController:
+        # `controller` is a versioned union; "simpleV0" is currently the only known variant.
+        simple = cbor_decoded["controller"]["simpleV0"]
+        grants = [
+            CCD_LockControllerGrant(
+                account=self.decode_lock_account(grant["account"]),
+                roles=grant["roles"],
+            )
+            for grant in simple["grants"]
+        ]
+        return CCD_LockController(grants=grants, tokens=simple["tokens"])
+
+    def decode_lock_recipients(self, cbor_decoded: dict) -> str | list[CCD_AccountAddress]:
+        recipients = cbor_decoded["recipients"]
+        if recipients == "any":
+            return "any"
+        return [self.decode_lock_account(account) for account in recipients]
+
+    def decode_lock_config(self, lock_config_hex: str) -> CCD_LockConfig:
+        """Decode a `lock_create_event.lock_config` CBOR blob (hex-encoded)."""
+        cbor_decoded = cbor2.loads(bytes.fromhex(lock_config_hex))
+        return CCD_LockConfig(
+            recipients=self.decode_lock_recipients(cbor_decoded),
+            expiry=cbor_decoded["expiry"],
+            controller=self.decode_lock_controller(cbor_decoded),
+        )
+
+    def decode_lock_info(self, lock_info_hex: str) -> CCD_LockInfoDecoded:
+        """Decode a `GetLockInfo` `lock_info` CBOR blob (hex-encoded)."""
+        cbor_decoded = cbor2.loads(bytes.fromhex(lock_info_hex))
+        lock_tag = cbor_decoded["lock"]
+        lock_id = CCD_LockId(
+            account_index=lock_tag.value[0],
+            sequence_number=lock_tag.value[1],
+            creation_order=lock_tag.value[2],
+        )
+        funds = [
+            CCD_LockFund(
+                account=self.decode_lock_account(fund["account"]),
+                amounts=[
+                    CCD_LockFundEntry(token=entry["token"], amount=self.convertDecimal(entry["amount"]))
+                    for entry in fund["amounts"]
+                ],
+            )
+            for fund in cbor_decoded["funds"]
+        ]
+        return CCD_LockInfoDecoded(
+            lock=lock_id,
+            recipients=self.decode_lock_recipients(cbor_decoded),
+            expiry=cbor_decoded["expiry"],
+            controller=self.decode_lock_controller(cbor_decoded),
+            funds=funds,
+        )
+
     def convertTokenEvents(self, message) -> list:
         events = []
 

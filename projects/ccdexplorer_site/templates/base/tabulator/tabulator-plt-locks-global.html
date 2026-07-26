@@ -1,0 +1,129 @@
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+<script>
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Lock ID", field: "lock_id",
+        minWidth: 120,
+        responsive: 0,
+        accessorDownload: (value, data) => data.lock_id_download,
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+
+      },
+      {
+        title: "Status", field: "status",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      },
+      {
+        title: "Token(s)", field: "tokens",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        accessorDownload: (value, data) => data.tokens_download,
+
+      },
+      {
+        title: "Expiry", field: "expiry",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        accessorDownload: (value, data) => data.expiry_download,
+
+      },
+      {
+        title: "Recipients", field: "recipients",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      },
+      {
+        title: "Controllers", field: "controllers",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      }
+
+    ];
+
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+  window["{{ccd_tabulator_table}}_status_filter"] = "";
+
+  window["{{ccd_tabulator_table}}_table"] = new Tabulator("#{{ccd_tabulator_table}}", {
+      columns: window["{{ccd_tabulator_table}}_columns"],
+      layout: "fitColumns",
+      maxHeight: "400px",
+      heightGrow: false,
+      responsiveLayout: "hide",
+      paginationMode: "remote",
+      filterMode: "remote",
+      paginationSizeSelector: [10, 25, 50, 100, 500],
+      paginationSize: 25,
+      paginationButtonCount: 3,
+      pagination: true,
+      paginationCounter: function(pageSize, currentRow, currentPage, totalRows, totalPages) {
+          function humanize(num) {
+              if (num < 1000) return num.toLocaleString();
+              return new Intl.NumberFormat('en', { notation: 'compact', compactDisplay: 'short', maximumFractionDigits: 1 }).format(num);
+          }
+          const startIdx = (currentPage - 1) * pageSize + 1;
+          const endIdx = Math.min(currentPage * pageSize, totalRows);
+          const range = `${startIdx.toLocaleString()} – ${endIdx.toLocaleString()}`;
+          const totalFmt = totalRows < 5000 ? totalRows.toLocaleString() : humanize(totalRows);
+          return `<span class="ccd">${range} of ${totalFmt}</span>`;
+      },
+      ajaxURL: "{{tabulator_ajax_url}}",
+      ajaxURLGenerator: function (url, config, params) {
+        const page = params.page || 1;
+        const size = params.size || 25;
+        const queryParams = { page, size };
+        if (window["{{ccd_tabulator_table}}_status_filter"]) {
+          queryParams.status = window["{{ccd_tabulator_table}}_status_filter"];
+        }
+        const query = new URLSearchParams(queryParams);
+        return `{{tabulator_ajax_url}}?${query.toString()}`;
+      },
+      rowFormatter: function(row){
+        row.getElement().classList.add("sm-text");
+      },
+      ajaxResponse: function (url, params, resp) {
+        const rows = Array.isArray(resp?.data) ? resp.data : [];
+        const last_page = Math.max(1, Number(resp?.last_page ?? 1));
+        const last_row = Math.max(0, Number(resp?.last_row ?? rows.length));
+        const wrap = document.getElementById("{{ccd_tabulator_table}}_wrapper");
+        const wrap_no_rows = document.getElementById("{{ccd_tabulator_table}}_wrapper_no_rows");
+        const sel = `#${CSS.escape("{{ccd_tabulator_table}}")} .tabulator-paginator`;
+        const pagination = document.querySelector(sel);
+        if (pagination) pagination.style.display = (last_page > 1) ? "" : "none";
+        if (wrap) wrap.style.display = rows.length ? "" : "none";
+        if (wrap_no_rows) wrap_no_rows.style.display = rows.length ? "none" : "";
+        return { data: rows, last_page, last_row };
+      },
+  });
+
+  window["{{ccd_tabulator_table}}_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+</script>
+{% include 'base/tabulator/tabulator-table-download-link.html' %}
+
+<script>
+  document.querySelectorAll("#plt_locks_status_filter_menu .dropdown-item").forEach(function (item) {
+    item.addEventListener("click", function (e) {
+      e.preventDefault();
+      window["{{ccd_tabulator_table}}_status_filter"] = this.dataset.value;
+      document.getElementById("plt_locks_status_filter_btn").textContent = this.dataset.label;
+      window["{{ccd_tabulator_table}}_table"].setData();
+    });
+  });
+</script>

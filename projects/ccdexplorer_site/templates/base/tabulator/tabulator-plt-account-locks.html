@@ -1,0 +1,98 @@
+
+<!-- Account PLT Locks -->
+{% set ccd_tabulator_table ='account_locks_table'%}
+{% set tabulator_ajax_url = '/ajax_account_plt_locks/'+net+'/'+ account_id%}
+{% set filename='plt-locks-'+ account_id+'-'+range(1000,10000)|random|string+'.csv' %}
+
+{% include 'base/tabulator/tabulator-common-options-get.html' %}
+
+<script>
+function init_account_locks_table() {
+  const account_locks_table_columns = [
+      {
+        title: "Role(s)", field: "roles",
+        minWidth: 140,
+        responsive: 0,
+        accessorDownload: (value, data) => data.roles_download,
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+
+      },
+      {
+        title: "Lock ID", field: "lock_id",
+        minWidth: 120,
+        responsive: 0,
+        accessorDownload: (value, data) => data.lock_id_download,
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+
+      },
+      {
+        title: "Token(s)", field: "tokens",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+        accessorDownload: (value, data) => data.tokens_download,
+
+      },
+      {
+        title: "Status", field: "status",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      },
+      {
+        title: "Expiry", field: "expiry",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        accessorDownload: (value, data) => data.expiry_download,
+
+      }
+
+    ];
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+
+  window["account_locks_table"] = new Tabulator("#account_locks_table", {
+    ...commonTabulatorOptionsGET,
+    columns: account_locks_table_columns,
+    ajaxURL: "{{tabulator_ajax_url}}",
+    ajaxRequesting: function(url, params){
+    return true; // must return true to allow the request
+  },ajaxResponse: function (url, params, resp) {
+      const rows = Array.isArray(resp?.data) ? resp.data : [];
+      const last_page = Math.max(1, Number(resp?.last_page ?? 1));
+      const last_row  = Math.max(0, Number(resp?.last_row  ?? rows.length));
+
+      const wrap = document.getElementById("{{ccd_tabulator_table}}_wrapper");
+      if (wrap) wrap.style.display = rows.length ? "" : "none";
+      const sel = `#${CSS.escape("{{ccd_tabulator_table}}")} .tabulator-paginator`;
+      const pagination = document.querySelector(sel);
+      if (pagination) pagination.style.display = (last_page > 1)? "" : "none";
+
+      return { data: rows, last_page, last_row };
+    },
+  });
+
+  window["account_locks_table"].on("renderComplete", function () {
+    document.querySelectorAll(".tabulator-col-title").forEach(el => {
+      el.classList.add("sm-text");
+    });
+  });
+  const btn = document.getElementById("{{ccd_tabulator_table}}-download-csv");
+    if (btn) {
+    btn.addEventListener("click", () => {
+        window["{{ccd_tabulator_table}}_table"]?.download(
+        "csv",
+        window["{{ccd_tabulator_table}}_filename"],
+        { bom: true, downloadDataFormatter: (d) => d }
+        );
+    });
+    }
+}
+</script>
+
+<!-- Account PLT Locks -->

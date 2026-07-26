@@ -16,6 +16,7 @@ from celery.exceptions import CPendingDeprecationWarning
 import grpc
 from ccdexplorer.env import RUN_ON_NET, RUN_LOCAL_STR
 from .update_plts_from_txs import update_plts
+from .update_locks_from_txs import update_locks
 
 warnings.simplefilter("ignore", CPendingDeprecationWarning)
 
@@ -56,6 +57,7 @@ def process_block(self, processor: str, payload: Dict[str, Any]) -> dict | None:
     block_height = payload.get("height")
     try:
         update_plts(mongodb, grpcclient, RUN_ON_NET, block_height)  # type: ignore
+        update_locks(mongodb, grpcclient, RUN_ON_NET, block_height)  # type: ignore
 
         task_doc = TaskResult(
             _id=self.request.id,

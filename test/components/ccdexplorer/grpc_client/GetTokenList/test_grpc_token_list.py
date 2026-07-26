@@ -16,3 +16,16 @@ def test_token_list(grpcclient: GRPCClient):
     assert isinstance(token_list, list)
     assert token_list == ["USDR", "EURR"]
     print(token_list)
+
+
+@pytest.fixture
+def grpcclient_devnet():
+    return GRPCClient(devnet=True)
+
+
+def test_token_list_devnet(grpcclient_devnet: GRPCClient):
+    block_hash = "last_final"
+    token_list = grpcclient_devnet.get_token_list(block_hash)
+    assert isinstance(token_list, list)
+    # assert token_list == ["USDR", "EURR"]
+    print(token_list)

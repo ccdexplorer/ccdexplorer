@@ -529,6 +529,90 @@ async def get_paginated_account_plt_tokens(
 
 
 @router.get(
+    "/{net}/account/{account_address}/plt-locks/{skip}/{limit}/{alias}",
+    response_class=JSONResponse,
+    operation_id="get_paginated_account_plt_locks_for_alias",
+)
+@router.get(
+    "/{net}/account/{account_address}/plt-locks/{skip}/{limit}",
+    response_class=JSONResponse,
+)
+async def get_paginated_account_plt_locks(
+    request: Request,
+    net: str,
+    account_address: str,
+    skip: int,
+    limit: int,
+    alias: str | None = None,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """List PLT locks this account participates in, in any role.
+
+    An account can appear in a lock as its creator (part of the lock id),
+    a controller (granted fund/send/return/cancel permissions), a funder
+    (has contributed tokens), or an explicit recipient. `plts_locks_links` only
+    records that relationship (which accounts, in which roles); lock attributes
+    like status/expiry/token_ids live solely on `plts_locks` and are joined in
+    here after pagination, so they're never stale and never duplicated.
+    """
+    if net not in ["mainnet", "testnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet and testnet.",
+        )
+
+    if skip < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Don't be silly. Skip must be greater than or equal to zero.",
+        )
+
+    if limit > request.app.REQUEST_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail="Limit must be less than or equal to 100.",
+        )
+
+    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+
+    match = {"account_address_canonical": account_address[:29]}
+
+    total_count = await db_to_use[Collections.plts_locks_links].count_documents(match)
+    pipeline = [
+        {"$match": match},
+        {"$sort": {"last_updated_block_height": DESCENDING}},
+        {"$skip": skip},
+        {"$limit": limit},
+        # Join in the lock's own attributes only for this page's rows, not the whole
+        # match set - keeps this cheap even for an account in thousands of locks.
+        {
+            "$lookup": {
+                "from": Collections.plts_locks.value,
+                "localField": "lock_id_str",
+                "foreignField": "_id",
+                "as": "lock",
+            }
+        },
+        {"$unwind": "$lock"},
+        {
+            "$project": {
+                "_id": 1,
+                "lock_id_str": 1,
+                "account_roles": 1,
+                "lock_id": "$lock.lock_id",
+                "token_ids": "$lock.token_ids",
+                "status": "$lock.status",
+                "expiry": "$lock.expiry",
+            }
+        },
+    ]
+    links = await await_await(db_to_use, Collections.plts_locks_links, pipeline, limit)
+
+    return {"data": links, "total_row_count": total_count}
+
+
+@router.get(
     "/{net}/account/{account_address}/fungible-tokens/{skip}/{limit}/verified/{alias}",
     response_class=JSONResponse,
     operation_id="get_account_fungible_tokens_verified_for_alias",

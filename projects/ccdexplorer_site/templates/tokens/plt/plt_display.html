@@ -37,18 +37,71 @@
             {% include "base/tabulator/tabulator-plt-holders.html" %}
     </div>
   </div>
-  </div>  
+  </div>
 
-  <div class="row row-flex">
-    <div class="col-md-12  col-sm-12 ">
-      <div class="border content curved-border " >
-          {% set title= "Transactions" %}{% include 'base/box_title.html' %}
-          <div id="plt_transactions_table"></div>
-          {% set ccd_tabulator_table ='plt_transactions_table'%}
-          {% include 'base/tabulator/tabulator-table-download-link.html' %}
+  {% set plt_locks_feature_visible = False %}
+  <ul class="nav nav-pills mb-3" id="plt-pills-tab" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active explorer bg-secondary-subtle" id="plt-pills-txs-tab" data-bs-toggle="pill" data-bs-target="#plt-pills-txs" type="button" role="tab" aria-controls="plt-pills-txs" aria-selected="true">
+        <span class="tab-text-large">Transactions</span><span class="tab-text-small">Txs</span>
+      </button>
+    </li>
+    {% if plt_locks_feature_visible %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link explorer bg-secondary-subtle" id="plt-pills-locks-tab" data-bs-toggle="pill" data-bs-target="#plt-pills-locks" type="button" role="tab" aria-controls="plt-pills-locks" aria-selected="false">
+        <span class="tab-text-large">Locks</span><span class="tab-text-small">Locks</span>
+      </button>
+    </li>
+    {% endif %}
+  </ul>
+
+  <div class="tab-content" id="plt-pills-tabContent">
+    <div class="tab-pane fade show active" id="plt-pills-txs" role="tabpanel" aria-labelledby="plt-pills-txs-tab" tabindex="0">
+      <div class="row row-flex">
+        <div class="col-md-12  col-sm-12 ">
+          <div class="border content curved-border " >
+              {% set title= "Transactions" %}{% include 'base/box_title.html' %}
+              <div id="plt_transactions_table"></div>
+              {% set ccd_tabulator_table ='plt_transactions_table'%}
+              {% include 'base/tabulator/tabulator-table-download-link.html' %}
+              {% include 'base/tabulator/tabulator-plt-txs.html' %}
+        </div>
+        </div>
+      </div>
     </div>
+    {% if plt_locks_feature_visible %}
+    <div class="tab-pane fade" id="plt-pills-locks" role="tabpanel" aria-labelledby="plt-pills-locks-tab" tabindex="0">
+      <div class="row row-flex">
+        <div class="col-md-12  col-sm-12 ">
+          <div class="border content curved-border " >
+              {% set title= "Locks" %}{% include 'base/box_title.html' %}
+              <div id="plt_locks_table"></div>
+              {% set ccd_tabulator_table ='plt_locks_table'%}
+              {% set tabulator_ajax_url = '/ajax_plt_locks/'+net+'/'+ token_id%}
+              {% set filename='plt-locks-for-'+ token_id+'-'+range(1000,10000)|random|string+'.csv' %}
+                {% include "base/tabulator/tabulator-plt-locks.html" %}
+        </div>
+        </div>
+      </div>
     </div>
-    
+    {% endif %}
+  </div>
+
+  {% if plt_locks_feature_visible %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const locksTab = document.getElementById('plt-pills-locks-tab');
+      if (locksTab) {
+        // The locks table is built while its tab-pane is still display:none, so
+        // Tabulator computes 0-width columns; redraw once the pane becomes visible.
+        locksTab.addEventListener('shown.bs.tab', () => {
+          window['plt_locks_table_table'] && window['plt_locks_table_table'].redraw(true);
+        });
+      }
+    });
+    </script>
+  {% endif %}
+
     <script>
     //   async function load_media(mediaUrl) {
     //     console.log(mediaUrl);
@@ -141,12 +194,6 @@
       // });
 
       </script>
-
-
-
-<!-- PLT transactions-->
-{% include 'base/tabulator/tabulator-plt-txs.html' %}
-<!-- PLT transactions-->
 
 {% endblock %}
 

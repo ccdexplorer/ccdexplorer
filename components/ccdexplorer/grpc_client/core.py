@@ -92,6 +92,9 @@ from .queries._GetPassiveDelegationInfo import (
 from .queries._GetBlockTransactionEvents import (
     Mixin as _GetBlockTransactionEvents,
 )
+from .queries._GetBlockItemStatus import (
+    Mixin as _GetBlockItemStatus,
+)
 from .queries._GetBlockSpecialEvents import (
     Mixin as _GetBlockSpecialEvents,
 )
@@ -184,6 +187,7 @@ class GRPCClient(  # type: ignore
     _GetBlockInfo,
     _GetElectionInfo,
     _GetBlockTransactionEvents,
+    _GetBlockItemStatus,
     _GetBlockSpecialEvents,
     _GetBlockPendingUpdates,
     _GetTokenomicsInfo,
@@ -261,45 +265,6 @@ class GRPCClient(  # type: ignore
                 if self.hosts.get(n):
                     # bounded check; does not loop forever
                     self.check_connection(n, attempts=warmup_attempts, timeout_s=warmup_timeout_s)
-
-        # def connect(self):
-        #     host = self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]["host"]
-        #     port = self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]["port"]
-
-        #     use_secure = "--secure--" in host
-        #     host = host.replace("--secure--", "")
-        #     address = f"{host}:{port}"
-
-        #     if use_secure:
-        #         creds = grpc.ssl_channel_credentials()
-        #         options = [("grpc.ssl_target_name_override", "grpc.devnet-p10-1.concordium.com")]
-        #         self.channel_mainnet = grpc.secure_channel("52.48.67.53:20000", creds, options)
-        #     else:
-        #         self.channel_mainnet = grpc.insecure_channel(address)
-
-        #     try:
-        #         grpc.channel_ready_future(self.channel_mainnet).result(timeout=3)
-        #         console.log(f"GRPCClient for {NET.MAINNET.value} connected on: {address}")
-        #     except grpc.FutureTimeoutError:
-        #         console.log(f"GRPC connection to {address} timed out.")
-
-        #     host = self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]["host"]
-        #     port = self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]["port"]
-        #     self.channel_testnet = grpc.insecure_channel(f"{host}:{port}")
-        #     try:
-        #         grpc.channel_ready_future(self.channel_testnet).result(timeout=1)
-        #         console.log(f"GRPCClient for {NET.TESTNET.value} connected on: {host}:{port}")
-        #     except grpc.FutureTimeoutError:
-        #         pass
-
-        #     self.stub_mainnet = QueriesStub(self.channel_mainnet)
-        #     self.stub_testnet = QueriesStub(self.channel_testnet)
-
-        #     self.channel = grpc.insecure_channel(
-        #         f"{self.hosts[self.net][self.host_index[self.net]]['host']}:{self.hosts[self.net][self.host_index[self.net]]['port']}"
-        #     )
-
-        #     self.stub = QueriesStub(self.channel)
 
     def stub_on_net(
         self,
@@ -499,9 +464,6 @@ class GRPCClient(  # type: ignore
 
         if use_secure:
             creds = grpc.ssl_channel_credentials()
-
-            # Keep your existing override behavior
-            # options.append(("grpc.ssl_target_name_override", "grpc.devnet-plt-beta.concordium.com"))
 
             channel = grpc.secure_channel(address, creds, options=options)
         else:

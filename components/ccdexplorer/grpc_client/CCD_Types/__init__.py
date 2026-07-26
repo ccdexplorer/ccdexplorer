@@ -98,6 +98,8 @@ class ProtocolVersions(Enum):
         PROTOCOL_VERSION_8 (int): Protocol version 8.
         PROTOCOL_VERSION_9 (int): Protocol version 9.
         PROTOCOL_VERSION_10 (int): Protocol version 10.
+        PROTOCOL_VERSION_11 (int): Protocol version 11.
+
     """
 
     PROTOCOL_VERSION_1 = 0
@@ -110,6 +112,7 @@ class ProtocolVersions(Enum):
     PROTOCOL_VERSION_8 = 7
     PROTOCOL_VERSION_9 = 8
     PROTOCOL_VERSION_10 = 9
+    PROTOCOL_VERSION_11 = 10
 
 
 class CCD_OpenStatusTranslation(Enum):
@@ -439,6 +442,10 @@ class CCD_LockId(BaseModel):
     sequence_number: int
     creation_order: int
 
+    def to_str(self) -> str:
+        """Format this `CCD_LockId` as the composite string used as its Mongo `_id`/URL path segments."""
+        return f"{self.account_index}-{self.sequence_number}-{self.creation_order}"
+
 
 class CCD_LockCreateEvent(BaseModel):
     """A new lock was created.
@@ -668,6 +675,106 @@ class CCD_LockInfo(BaseModel):
     """
 
     lock_info: CCD_Cbor
+
+
+class CCD_LockControllerGrant(BaseModel):
+    """A grant of permissions on a lock to a single controller account.
+
+    Not mirrored to an official gRPC class: decoded from the lock's CBOR configuration.
+
+    Attributes:
+        account (CCD_AccountAddress): The account granted these permissions.
+        roles (list[str]): The permissions granted, e.g. "fund", "send", "return", "cancel".
+    """
+
+    account: CCD_AccountAddress
+    roles: list[str]
+
+    model_config = ConfigDict(extra="allow")
+
+
+class CCD_LockController(BaseModel):
+    """Decoded `controller` field of a lock's CBOR configuration (currently versioned as `simpleV0`).
+
+    Not mirrored to an official gRPC class: decoded from the lock's CBOR configuration.
+
+    Attributes:
+        grants (list[CCD_LockControllerGrant]): Per-account permission grants.
+        tokens (list[CCD_TokenId]): Token ids the lock is configured to support.
+    """
+
+    grants: list[CCD_LockControllerGrant]
+    tokens: list[CCD_TokenId]
+
+    model_config = ConfigDict(extra="allow")
+
+
+class CCD_LockConfig(BaseModel):
+    """Decoded CBOR configuration of a lock, as found in `CCD_LockCreateEvent.lock_config`.
+
+    Not mirrored to an official gRPC class: decoded via `cbor2` from the raw CBOR blob.
+
+    Attributes:
+        recipients (str | list[CCD_AccountAddress]): Accounts allowed to receive funds sent out
+            of the lock, or the literal string "any".
+        expiry (dt.datetime): The lock's expiry time.
+        controller (CCD_LockController): Controller permission grants and supported tokens.
+    """
+
+    recipients: str | list[CCD_AccountAddress]
+    expiry: dt.datetime
+    controller: CCD_LockController
+
+    model_config = ConfigDict(extra="allow")
+
+
+class CCD_LockFundEntry(BaseModel):
+    """A single token balance within a `CCD_LockFund`."""
+
+    token: CCD_TokenId
+    amount: CCD_TokenAmount
+
+    model_config = ConfigDict(extra="allow")
+
+
+class CCD_LockFund(BaseModel):
+    """Funds held in a lock, attributed to the account that funded them.
+
+    Not mirrored to an official gRPC class: decoded from the lock's CBOR state.
+
+    Attributes:
+        account (CCD_AccountAddress): The account that funded this balance.
+        amounts (list[CCD_LockFundEntry]): Per-token balances funded by this account.
+    """
+
+    account: CCD_AccountAddress
+    amounts: list[CCD_LockFundEntry]
+
+    model_config = ConfigDict(extra="allow")
+
+
+class CCD_LockInfoDecoded(BaseModel):
+    """Fully decoded lock state, as found in `CCD_LockInfo.lock_info` once CBOR-decoded.
+
+    Not mirrored to an official gRPC class: decoded via `cbor2` from the raw CBOR blob returned
+    by `GetLockInfo`.
+
+    Attributes:
+        lock (CCD_LockId): The lock's id.
+        recipients (str | list[CCD_AccountAddress]): Accounts allowed to receive funds sent out
+            of the lock, or the literal string "any".
+        expiry (dt.datetime): The lock's expiry time.
+        controller (CCD_LockController): Controller permission grants and supported tokens.
+        funds (list[CCD_LockFund]): Funds held in the lock, per funding account.
+    """
+
+    lock: CCD_LockId
+    recipients: str | list[CCD_AccountAddress]
+    expiry: dt.datetime
+    controller: CCD_LockController
+    funds: list[CCD_LockFund]
+
+    model_config = ConfigDict(extra="allow")
 
 
 #### PLT END ###
@@ -2606,6 +2713,37 @@ class CCD_Block(BaseModel):
     """
 
     transaction_summaries: list[CCD_BlockItemSummary]
+
+
+class CCD_BlockItemSummaryInBlock(BaseModel):
+    """A block item summary together with the hash of the block it's in.
+
+    GRPC documentation: [concordium.v2.BlockItemSummaryInBlock](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.BlockItemSummaryInBlock)
+
+    Attributes:
+        block_hash (CCD_BlockHash): The block hash.
+        outcome (CCD_BlockItemSummary): The block item summary.
+    """
+
+    block_hash: CCD_BlockHash
+    outcome: CCD_BlockItemSummary
+
+
+class CCD_BlockItemStatus(BaseModel):
+    """Status of a block item (transaction) known to the node, looked up by transaction hash alone.
+
+    GRPC documentation: [concordium.v2.BlockItemStatus](https://docs.concordium.com/concordium-grpc-api/#concordium.v2.BlockItemStatus)
+
+    Attributes:
+        received (bool): True if the item is received but not yet in any block.
+        committed (Optional[list[CCD_BlockItemSummaryInBlock]]): Outcomes in each block the item
+            is committed to (usually one, but can in principle differ across blocks pre-finalization).
+        finalized (Optional[CCD_BlockItemSummaryInBlock]): The outcome, once finalized in a block.
+    """
+
+    received: bool = False
+    committed: Optional[list[CCD_BlockItemSummaryInBlock]] = None
+    finalized: Optional[CCD_BlockItemSummaryInBlock] = None
 
 
 class CCD_Release(BaseModel):

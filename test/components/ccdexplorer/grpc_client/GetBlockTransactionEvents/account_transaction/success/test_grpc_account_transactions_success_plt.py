@@ -1,7 +1,7 @@
 # ruff: noqa: F403, F405, E402
 # pyright: reportOptionalMemberAccess=false
 import pytest
-
+from rich import print
 
 from ccdexplorer.grpc_client import GRPCClient
 
@@ -17,6 +17,11 @@ def grpcclient_dev():
 @pytest.fixture
 def grpcclient():
     return GRPCClient()
+
+
+@pytest.fixture
+def grpcclient_devnet():
+    return GRPCClient(devnet=True)
 
 
 def tx_at_index_from(
@@ -73,3 +78,10 @@ def test_tx_effect_account_transfer_plt_mint_and_transfer(grpcclient: GRPCClient
     )
     assert tae.token_update_effect.events[0].transfer_event.amount.value == "10000000"
     assert tae.token_update_effect.events[0].transfer_event.amount.decimals == 6
+
+
+def test_tx_plt_create_lock_devnet(grpcclient_devnet: GRPCClient):
+    # tx_hash="1e21c8af2dc081703a775a26cbbeb2f29e27c36f624c4fc3a99553fd6133d440"
+    block_hash = ""
+    tx = tx_at_index_from(0, block_hash, grpcclient_devnet, net=NET.TESTNET)
+    print(tx)

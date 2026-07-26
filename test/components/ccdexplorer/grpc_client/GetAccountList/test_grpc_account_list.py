@@ -1,5 +1,5 @@
 import pytest
-
+from rich import print
 
 from ccdexplorer.grpc_client import GRPCClient
 
@@ -17,3 +17,14 @@ def grpcclient():
 
 #     assert al[0] == "2wkEiDDDhWLset4GT4TPVutLArbvKfTsP7VYhhA776aTmvHcNB"
 #     assert al[1] == "2wkMvqseiVVZQJD6R2EZ9PS6Y23So84mPkzWFyRWJYzoLzyY2d"
+
+
+@pytest.fixture
+def grpcclient_devnet():
+    return GRPCClient(devnet=True)
+
+
+def test_account_list(grpcclient_devnet: GRPCClient):
+    block_hash = "last_final"
+    al = grpcclient_devnet.get_account_list(block_hash)
+    print(al)  # .dict(exclude_none=True))

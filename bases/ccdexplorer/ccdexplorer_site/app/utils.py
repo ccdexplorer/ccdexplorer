@@ -966,6 +966,15 @@ def datetime_delta_format_until(source_value: dt.datetime | str):
         return ""
 
 
+def is_past_datetime(value: str | dt.datetime | None) -> bool:
+    if not value:
+        return False
+    value_parsed = dateutil.parser.parse(value) if isinstance(value, str) else value
+    if value_parsed.tzinfo is None:
+        value_parsed = value_parsed.replace(tzinfo=dt.timezone.utc)
+    return value_parsed < dt.datetime.now(dt.timezone.utc)
+
+
 def tx_hash_link(value: str, net: str):
     value_string = f'<a class="ccd sm-text" href="/{net}/transaction/{value}">{value[:4]}</a>'
 
@@ -2188,6 +2197,119 @@ def create_dict_for_tabulator_display_for_plt_token_holders(
         "account_address": account_address,
         "token_balance_download": f"{row['balance']}",
         "account_download": row["account_address"],
+    }
+
+
+def lock_id_path(row: dict) -> str:
+    lock_id = row.get("lock_id") or {}
+    return f"{lock_id.get('account_index')}/{lock_id.get('sequence_number')}/{lock_id.get('creation_order')}"
+
+
+def lock_status_badge(row: dict) -> str:
+    status = row.get("status", "unknown")
+    return {
+        "open": '<span class="badge text-bg-success">Open</span>',
+        "cancelled": '<span class="badge text-bg-secondary">Cancelled</span>',
+    }.get(status, '<span class="badge text-bg-warning">Unknown</span>')
+
+
+def lock_expiry_display(row: dict) -> str:
+    expiry = row.get("expiry")
+    if not expiry:
+        return ""
+    if is_past_datetime(expiry):
+        return '<span class="badge text-bg-secondary">Expired</span>'
+    return datetime_delta_format_until(expiry)
+
+
+def lock_recipients_display(row: dict) -> str:
+    recipients = row.get("recipients")
+    return "Any" if recipients == "any" else str(len(recipients or []))
+
+
+def create_dict_for_tabulator_display_for_plt_locks(net: str, row: dict, token_id: str, decimals: int):
+    lock_id_str = row.get("_id", "")
+    lock_path = lock_id_path(row)
+
+    balance = 0
+    for fund in row.get("funds") or []:
+        for amount in fund.get("amounts") or []:
+            if amount.get("token") == token_id:
+                balance += int(amount["amount"]["value"])
+
+    return {
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id_download": lock_id_str,
+        "status": lock_status_badge(row),
+        "token_balance": f'<span class="text-secondary-emphasis">{token_amount_using_decimals_rounded(balance, decimals)}</span> <span class="ccd">{token_id}</span>',
+        "token_balance_download": str(balance),
+        "expiry": lock_expiry_display(row),
+        "expiry_download": str(row.get("expiry") or ""),
+        "recipients": lock_recipients_display(row),
+        "controllers": str(len((row.get("controller") or {}).get("grants") or [])),
+    }
+
+
+def create_dict_for_tabulator_display_for_plt_locks_global(net: str, row: dict):
+    lock_id_str = row.get("_id", "")
+    lock_path = lock_id_path(row)
+    token_ids = row.get("token_ids") or []
+    tokens_display = ", ".join(
+        f'<a href="/{net}/tokens/{token_id}"><span class="ccd">{token_id}</span></a>'
+        for token_id in token_ids
+    )
+
+    return {
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id_download": lock_id_str,
+        "status": lock_status_badge(row),
+        "tokens": tokens_display,
+        "tokens_download": ", ".join(token_ids),
+        "expiry": lock_expiry_display(row),
+        "expiry_download": str(row.get("expiry") or ""),
+        "recipients": lock_recipients_display(row),
+        "controllers": str(len((row.get("controller") or {}).get("grants") or [])),
+    }
+
+
+def create_dict_for_tabulator_display_for_account_plt_locks(net: str, row: dict):
+    lock_id_str = row.get("lock_id_str", "")
+    lock_path = lock_id_path(row)
+    token_ids = row.get("token_ids") or []
+    tokens_display = ", ".join(
+        f'<a href="/{net}/tokens/{token_id}"><span class="ccd">{token_id}</span></a>'
+        for token_id in token_ids
+    )
+    role_badge_colors = {
+        "creator": "text-bg-primary",
+        "controller": "text-bg-info",
+        "funder": "text-bg-success",
+        "recipient": "text-bg-warning text-dark",
+    }
+    roles_display = "".join(
+        f'<span class="badge {role_badge_colors.get(role, "text-bg-secondary")} me-1">{role}</span>'
+        for role in row.get("account_roles") or []
+    )
+
+    return {
+        "roles": roles_display,
+        "roles_download": ", ".join(row.get("account_roles") or []),
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id_download": lock_id_str,
+        "status": lock_status_badge(row),
+        "tokens": tokens_display,
+        "tokens_download": ", ".join(token_ids),
+        "expiry": lock_expiry_display(row),
+        "expiry_download": str(row.get("expiry") or ""),
+    }
+
+
+def create_dict_for_tabulator_display_for_plt_lock_transactions(net: str, row: dict):
+    return {
+        "hash": tx_hash_link(row["tx_hash"], net),
+        "hash_download": row["tx_hash"],
+        "block_height": block_height_link(row["block_height"], net),
+        "block_height_download": row["block_height"],
     }
 
 

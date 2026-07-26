@@ -1,0 +1,61 @@
+{% include 'base/tabulator/tabulator-custom-formatters.html' %}
+
+<script>
+  const {{ccd_tabulator_table}}_columns = [
+  {
+        title: "Lock ID", field: "lock_id",
+        minWidth: 120,
+        responsive: 0,
+        accessorDownload: (value, data) => data.lock_id_download,
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+
+      },
+      {
+        title: "Status", field: "status",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      },
+      {
+        title: "Balance", field: "token_balance",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        accessorDownload: (value, data) => data.token_balance_download,
+
+      },
+      {
+        title: "Expiry", field: "expiry",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        accessorDownload: (value, data) => data.expiry_download,
+
+      },
+      {
+        title: "Recipients", field: "recipients",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      },
+      {
+        title: "Controllers", field: "controllers",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "center", headerHozAlign: "center",
+
+      }
+
+    ];
+
+
+
+  window["{{ccd_tabulator_table}}_columns"] = {{ccd_tabulator_table}}_columns;
+  window["{{ccd_tabulator_table}}_filename"] = '{{filename}}';
+</script>
+{% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
+{% include 'base/tabulator/tabulator-table-download-link.html' %}
