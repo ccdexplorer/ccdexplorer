@@ -1,6 +1,8 @@
 import datetime as dt
+from concurrent.futures import ThreadPoolExecutor
 
 import urllib3
+from ccdexplorer.env import HEARTBEAT_FETCH_CONCURRENCY
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo
 from ccdexplorer.mongodb import (
@@ -47,16 +49,31 @@ class Heartbeat(
         self.motormongo = motormongo
 
         self.net = net
-        self.namespace: str = "concordium_mainnet" if net == "mainnet" else "concordium_testnet"
+        self.namespace: str = {
+            "mainnet": "concordium_mainnet",
+            "testnet": "concordium_testnet",
+            "devnet": "concordium_devnet",
+        }[net]
         self.utilities: dict[CollectionsUtilities, Collection] = self.mongodb.utilities
-        self.db: dict[Collections, Collection] = (
-            self.mongodb.mainnet if self.net == "mainnet" else self.mongodb.testnet
-        )
-        self.motordb: dict[Collections, AsyncCollection] = (
-            self.motormongo.testnet if net == "testnet" else self.motormongo.mainnet
-        )
+        self.db: dict[Collections, Collection] = {
+            "mainnet": self.mongodb.mainnet,
+            "testnet": self.mongodb.testnet,
+            "devnet": self.mongodb.devnet,
+        }[net]
+        self.motordb: dict[Collections, AsyncCollection] = {
+            "mainnet": self.motormongo.mainnet,
+            "testnet": self.motormongo.testnet,
+            "devnet": self.motormongo.devnet,
+        }[net]
         self.finalized_block_infos_to_process: list[CCD_BlockInfo] = []
         self.special_purpose_block_infos_to_process: list[CCD_BlockInfo] = []
+
+        # Shared pool for fanning out independent, blocking gRPC calls
+        # (per-block GetBlockInfo / GetBlockSpecialEvents) concurrently
+        # instead of one round trip at a time.
+        self._grpc_executor = ThreadPoolExecutor(
+            max_workers=HEARTBEAT_FETCH_CONCURRENCY, thread_name_prefix="heartbeat-grpc"
+        )
 
         self.queues: dict[Queue, list] = {}
         self.project_addresses = {}

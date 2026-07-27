@@ -9,15 +9,15 @@ import sys
 from scheduler.asyncio import Scheduler
 
 # Only change this value to switch networks.
-NET = "testnet"  # "mainnet" | "testnet"
+NET = "devnet"  # "mainnet" | "testnet"
 
 # If you want heartbeat debug logs, set DEBUG_MODE = True or run with DEBUG=True.
 DEBUG_MODE = False
 
 
 def _validate_net(net: str) -> None:
-    if net not in {"mainnet", "testnet"}:
-        raise ValueError(f"Invalid NET={net!r}. Expected 'mainnet' or 'testnet'.")
+    if net not in {"mainnet", "testnet", "devnet"}:
+        raise ValueError(f"Invalid NET={net!r}. Expected 'mainnet' or 'testnet' or 'devnet'")
 
 
 def _configure_env(net: str) -> None:

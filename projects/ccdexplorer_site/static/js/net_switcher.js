@@ -12,4 +12,8 @@ document.addEventListener('input', function (event) {
     if (selected_net == "testnet") {
         window.location.href = '/testnet';
     }
+
+    if (selected_net == "devnet") {
+        window.location.href = '/devnet';
+    }
 }, false);

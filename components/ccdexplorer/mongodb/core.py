@@ -271,6 +271,11 @@ class MongoMotor:
             for collection in Collections:
                 self.testnet[collection] = self.testnet_db[collection.value]
 
+            self.devnet_db = con["concordium_devnet"]
+            self.devnet: Dict[Collections, AsyncCollection] = {}
+            for collection in Collections:
+                self.devnet[collection] = self.devnet_db[collection.value]
+
             self.utilities_db: AsyncDatabase = con["concordium_utilities"]
             self.utilities: Dict[CollectionsUtilities, AsyncCollection] = {}
             for collection in CollectionsUtilities:
@@ -289,3 +294,14 @@ class MongoMotor:
 
 def build_collection_identifier(namespace: str, collection: Collections):
     return f"{namespace}.{collection.value}"
+
+
+def net_db(container, net):
+    """Pick the per-network collection dict off a MongoDB/MongoMotor container.
+
+    `net` may be a NET enum member or a plain "mainnet"/"testnet"/"devnet" string.
+    """
+    key = net.value if hasattr(net, "value") else net
+    if key not in ("mainnet", "testnet", "devnet"):
+        raise ValueError(f"Unknown net {net!r}")
+    return getattr(container, key)

@@ -80,6 +80,33 @@ mcp:
     
 accounts:
     python -m bases.ccdexplorer.accounts_retrieval
+
+# --- Devnet ---
+
+# Drop and rebuild the concordium_devnet database from scratch (asks for confirmation).
+# Extra flags are passed through, e.g. `just rebuild-devnet --redis-url redis://localhost:6379/0`
+rebuild-devnet *ARGS:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "WARNING: this will DROP the concordium_devnet database and rebuild it from scratch."
+    read -p "Are you sure you want to continue? [y/N] " confirm
+    case "$confirm" in
+        [yY][eE][sS]|[yY])
+            uv run python scripts/rebuild_devnet.py {{ARGS}}
+            ;;
+        *)
+            echo "Aborted."
+            exit 1
+            ;;
+    esac
+
+# Export/apply real MongoDB index definitions between networks (source of truth
+# is the live database, not hand-maintained code).
+# e.g. `just indices export --db concordium_mainnet --out mainnet_indices.json`
+#      `just indices apply --db concordium_devnet --file mainnet_indices.json`
+indices *ARGS:
+    uv run python -m ccdexplorer.mongodb.index_migration {{ARGS}}
+
 # --- Help message ---
 
 help:

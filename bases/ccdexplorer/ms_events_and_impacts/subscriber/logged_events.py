@@ -50,6 +50,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 from ccdexplorer.mongodb import (
     Collections,
+    net_db,
 )
 from ccdexplorer.tooter import Tooter
 from ccdexplorer.schema_parser import Schema
@@ -365,7 +366,7 @@ class LoggedEvent:
     ) -> list[dict]:
         """ """
         all_cis5_impacts: list[dict] = []
-        db_to_use = self.testnet if self.net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, self.net)
         for le in logged_events:
             cis5_impacted: list[CIS5Impacted] = []
             if not le.event_info.standard:
@@ -930,7 +931,7 @@ class LoggedEvent:
         """
         self.block_height = block_height
         self.block_hash = block_hash
-        db_to_use = self.testnet if net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
         # block_transactions = list(
         #     db_to_use[Collections.transactions].find(
         #         {"block_info.height": block_height}
@@ -1121,7 +1122,7 @@ class LoggedEvent:
         self.tooter: Tooter
         self.net = net
 
-        db_to_use = self.testnet if net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
         logged_events_from_tx = LoggedEventsFromTX()
         if not tx.account_transaction:
             return logged_events_from_tx
@@ -1286,9 +1287,7 @@ class LoggedEvent:
 
     def get_source_module_refs_from_instance(self, instance_address: str):
         self.source_module_refs: dict
-        db: dict[Collections, Collection] = (
-            self.mainnet if self.net.value == "mainnet" else self.testnet
-        )
+        db: dict[Collections, Collection] = net_db(self, self.net)
         if not self.source_module_refs.get(instance_address):
             result = db[Collections.instances].find_one({"_id": instance_address})
             if result.get("v0"):  # type: ignore

@@ -1,5 +1,5 @@
 from typing import Optional
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 import datetime as dt
 from ccdexplorer.tooter.core import Tooter, TooterChannel, TooterType
 from pydantic import BaseModel
@@ -32,9 +32,7 @@ def get_failures_last_x_blocks(x: int, net: str, db_to_use: dict[Collections, Co
 
 
 def update_redis_failures(context, mongodb: MongoDB, tooter: Tooter, net: str):
-    db_to_use: dict[Collections, Collection] = (
-        mongodb.mainnet if net == "mainnet" else mongodb.testnet
-    )
+    db_to_use: dict[Collections, Collection] = net_db(mongodb, net)
     failures = get_failures_last_x_blocks(1_000, net, db_to_use)
     blocks_to_retry = set()
     for failure in failures:

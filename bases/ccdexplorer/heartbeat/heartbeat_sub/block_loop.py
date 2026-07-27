@@ -12,10 +12,12 @@ from ccdexplorer.domain.generic import NET
 from ccdexplorer.env import (
     HEARTBEAT_SPECIAL_PURPOSE,
     MAX_BLOCKS_PER_RUN,
+    HEARTBEAT_FETCH_CONCURRENCY,
     DEBUG,
     ADMIN_CHAT_ID,
     HEARTBEAT_PROGRESS_DOCUMENT_ID,
 )
+import asyncio
 import datetime as dt
 import grpc
 
@@ -32,13 +34,39 @@ class BlockLoop(_block_processing):
         self.db: dict[Collections, Collection]
 
         start = dt.datetime.now()
+
+        # Special events (needed for payday detection) used to be fetched one
+        # RPC at a time inside the loop below -- N blocks meant N serial round
+        # trips. Blocks in this batch are independent, so fan the fetches out
+        # over the shared thread pool instead. Exceptions are captured rather
+        # than raised so one block's failure doesn't abort the whole batch's
+        # prefetch; they're re-raised per-block below to keep the existing
+        # per-block error isolation via log_error_in_mongo.
+        net_enum = NET(self.net)
+
+        def _fetch_special_events(block: CCD_BlockInfo):
+            try:
+                return self.grpc_client.get_block_special_events(block.hash, net_enum)
+            except Exception as e:
+                return e
+
+        special_events_by_hash = dict(
+            zip(
+                (b.hash for b in block_list),
+                self._grpc_executor.map(_fetch_special_events, block_list),
+            )
+        )
+
         while len(block_list) > 0:
             current_block_to_process: CCD_BlockInfo = block_list.pop(0)
 
             try:
                 self.add_block_and_txs_to_queue(current_block_to_process)
 
-                self.lookout_for_payday(current_block_to_process)
+                special_events = special_events_by_hash[current_block_to_process.hash]
+                if isinstance(special_events, Exception):
+                    raise special_events
+                self.lookout_for_payday(current_block_to_process, special_events)
                 self.lookout_for_end_of_day(current_block_to_process)
 
                 self.special_purpose_remove_from_helper(special_purpose, current_block_to_process)
@@ -170,67 +198,81 @@ class BlockLoop(_block_processing):
             )
             exit()
 
-        request_counter = 0
         result = self.db[Collections.helpers].find_one({"_id": HEARTBEAT_PROGRESS_DOCUMENT_ID})
         heartbeat_last_processed_block_height = result["height"]  # type: ignore
         if DEBUG:
             console.log(f"{heartbeat_last_processed_block_height=}")
-        last_requested_block_not_finalized = False
-        block_to_request_in_queue = False
 
-        while (
-            not (last_requested_block_not_finalized)
-            and (request_counter < MAX_BLOCKS_PER_RUN)
-            and not block_to_request_in_queue
-        ):
-            request_counter += 1
-            if DEBUG:
-                console.log(
-                    f"{last_requested_block_not_finalized=}, {request_counter=}, {block_to_request_in_queue=}"
+        # Build the contiguous run of heights we still need to request: start
+        # right after the last processed height and stop the moment we reach
+        # a height that's already sitting in the queue (matches the previous
+        # one-at-a-time loop's stop condition).
+        already_queued_heights = {x.height for x in self.finalized_block_infos_to_process}
+        heights_to_request: list[int] = []
+        height = heartbeat_last_processed_block_height
+        while len(heights_to_request) < MAX_BLOCKS_PER_RUN:
+            height += 1
+            if height in already_queued_heights:
+                if DEBUG:
+                    console.log(f"Block already in queue: {height}")
+                break
+            heights_to_request.append(height)
+
+        # Fetch in small concurrent batches instead of one blocking RPC per
+        # height: each get_finalized_block_at_height() call is a network
+        # round trip, and heights are independent until we hit one that
+        # isn't finalized yet. Batching bounds how many "wasted" calls we
+        # make past the chain tip to a single batch width.
+        net_enum = NET(self.net)
+        loop = asyncio.get_running_loop()
+
+        newly_fetched: list[CCD_BlockInfo] = []
+        for batch_start in range(0, len(heights_to_request), HEARTBEAT_FETCH_CONCURRENCY):
+            batch = heights_to_request[batch_start : batch_start + HEARTBEAT_FETCH_CONCURRENCY]
+            try:
+                results = await asyncio.gather(
+                    *(
+                        loop.run_in_executor(
+                            self._grpc_executor,
+                            self.grpc_client.get_finalized_block_at_height,
+                            h,
+                            net_enum,
+                        )
+                        for h in batch
+                    )
                 )
-            # increment the block height to request
-            heartbeat_last_processed_block_height += 1
+            except grpc._channel._InactiveRpcError | ValueError as rpc_error:  # type: ignore
+                self.tooter.relay(
+                    channel=TooterChannel.NOTIFIER,
+                    title="",
+                    chat_id=int(ADMIN_CHAT_ID),  # type: ignore
+                    body=f"Heartbeat on {self.net} received GRPC Error {rpc_error}. Exiting to restart.",
+                    notifier_type=TooterType.REQUESTS_ERROR,
+                )
+                exit()
 
-            # check to see if we haven't finished processing the queue
-            # If so, no need to request and add the same block again.
-            block_to_request_in_queue = heartbeat_last_processed_block_height in [
-                x.height for x in self.finalized_block_infos_to_process
-            ]
-            if DEBUG:
-                console.log(f"{self.finalized_block_infos_to_process=}")
-            # we haven't previously requested this block
-            if not block_to_request_in_queue:
-                try:
-                    finalized_block_info_at_height = self.grpc_client.get_finalized_block_at_height(
-                        heartbeat_last_processed_block_height, NET(self.net)
-                    )
-                except grpc._channel._InactiveRpcError | ValueError as rpc_error:  # type: ignore
-                    self.tooter.relay(
-                        channel=TooterChannel.NOTIFIER,
-                        title="",
-                        chat_id=int(ADMIN_CHAT_ID),  # type: ignore
-                        body=f"Heartbeat on {self.net} received GRPC Error {rpc_error}. Exiting to restart.",
-                        notifier_type=TooterType.REQUESTS_ERROR,
-                    )
-                    exit()
-
+            reached_unfinalized_block = False
+            for finalized_block_info_at_height in results:
                 if finalized_block_info_at_height:
                     self.finalized_block_infos_to_process.append(finalized_block_info_at_height)
+                    newly_fetched.append(finalized_block_info_at_height)
                 else:
-                    last_requested_block_not_finalized = True
-            else:
-                if DEBUG:
-                    console.log(f"Block already in queue: {heartbeat_last_processed_block_height}")
+                    reached_unfinalized_block = True
+                    break
+            if reached_unfinalized_block:
+                break
         if DEBUG:
             console.log(f"{len(self.finalized_block_infos_to_process)=}")
-        if len(self.finalized_block_infos_to_process) > 0:
-            if len(self.finalized_block_infos_to_process) == 1:
-                console.log(
-                    f"Block retrieved: {self.finalized_block_infos_to_process[0].height:,.0f}"
-                )
+        # Only log/announce when this call actually fetched something new --
+        # otherwise a block already sitting in the queue (fetched by an
+        # earlier call, not yet drained by process_blocks) gets re-announced
+        # every time this runs, which can be many times per second.
+        if newly_fetched:
+            if len(newly_fetched) == 1:
+                console.log(f"Block retrieved: {newly_fetched[0].height:,.0f}")
             else:
                 console.log(
-                    f"Blocks retrieved: {self.finalized_block_infos_to_process[0].height:,.0f} - {self.finalized_block_infos_to_process[-1].height:,.0f}"
+                    f"Blocks retrieved: {newly_fetched[0].height:,.0f} - {newly_fetched[-1].height:,.0f}"
                 )
                 if (
                     self.finalized_block_infos_to_process[0].height

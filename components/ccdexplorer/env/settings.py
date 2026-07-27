@@ -16,6 +16,10 @@ CCDEXPLORER_API_KEY = os.environ.get("CCDEXPLORER_API_KEY")
 COIN_MARKET_CAP_API_KEY = os.environ.get("COIN_MARKET_CAP_API_KEY")
 FALLBACK_URI = os.environ.get("FALLBACK_URI")
 MONGO_URI = os.environ.get("MONGO_URI")
+# Optional, narrower-scoped credentials for devnet-only tooling (e.g. rebuild_devnet.py),
+# so a Mongo user restricted to just the concordium_devnet database can be used instead
+# of the shared MONGO_URI that other services need broad mainnet/testnet/devnet access with.
+DEVNET_MONGO_URI = os.environ.get("DEVNET_MONGO_URI", MONGO_URI)
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
@@ -35,6 +39,13 @@ if not os.environ.get("GRPC_TESTNET"):
     GRPC_TESTNET = []
 else:
     GRPC_TESTNET = ast.literal_eval(os.environ["GRPC_TESTNET"])
+
+if not os.environ.get("GRPC_DEVNET"):
+    # Falls back to the last-known devnet host; devnets rotate frequently, so
+    # override via GRPC_DEVNET whenever Concordium spins up a new one.
+    GRPC_DEVNET = [{"host": "--secure--grpc.devnet-p11-2.concordium.com", "port": 20000}]
+else:
+    GRPC_DEVNET = ast.literal_eval(os.environ["GRPC_DEVNET"])
 RUN_ON_NET = os.environ.get("RUN_ON_NET", "mainnet")
 RUN_LOCAL_STR = os.environ.get("RUN_LOCAL_STR", "local")
 REDIS_URL = os.environ.get("REDIS_URL")
@@ -47,6 +58,12 @@ HEARTBEAT_SPECIAL_PURPOSE = os.environ.get(
     "HEARTBEAT_SPECIAL_PURPOSE", "special_purpose_block_request"
 )
 MAX_BLOCKS_PER_RUN = int(os.environ.get("MAX_BLOCKS_PER_RUN", 100))
+# Bounds how many gRPC calls heartbeat fires concurrently when fetching block
+# info / special events for a batch of blocks, instead of one-at-a-time.
+# Kept conservative by default since smaller nodes (e.g. devnet) can return
+# RESOURCE_EXHAUSTED ("Too many concurrent requests") under higher fan-out;
+# bump it via the env var for beefier mainnet/testnet nodes if desired.
+HEARTBEAT_FETCH_CONCURRENCY = int(os.environ.get("HEARTBEAT_FETCH_CONCURRENCY", 20))
 DEBUG = False if os.environ.get("DEBUG", False) == "False" else True
 BLOCK_COUNT_SPECIALS_CHECK = int(os.environ.get("BLOCK_COUNT_SPECIALS_CHECK", 2000))
 TX_REQUEST_LIMIT_DISPLAY = int(os.environ.get("TX_REQUEST_LIMIT_DISPLAY", 4999))

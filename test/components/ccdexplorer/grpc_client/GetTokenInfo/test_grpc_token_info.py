@@ -1,6 +1,7 @@
 import pytest
 
 
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from rich import print
 
@@ -12,7 +13,7 @@ def grpcclient():
 
 @pytest.fixture
 def grpcclient_devnet():
-    return GRPCClient(devnet=True)
+    return GRPCClient(net="devnet")
 
 
 def test_token_info(grpcclient: GRPCClient):
@@ -33,8 +34,10 @@ def test_token_info(grpcclient: GRPCClient):
 
 
 def test_token_info_devnet(grpcclient_devnet: GRPCClient):
-    token_id = "EURtest"
-    block_hash = "a5315892b588ff0dc15716ce72bcc33647cacc8797ff8e125c5c8f5705833ebb"
-    ti = grpcclient_devnet.get_token_info(block_hash, token_id)
+    block_hash = "last_final"
+    token_list = grpcclient_devnet.get_token_list(block_hash, net=NET.DEVNET)
+    assert len(token_list) > 0
+    token_id = token_list[0]
+    ti = grpcclient_devnet.get_token_info(block_hash, token_id, net=NET.DEVNET)
     assert ti.token_id == token_id
     print(ti)

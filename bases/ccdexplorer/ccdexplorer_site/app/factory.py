@@ -137,11 +137,11 @@ async def log_response(response):
 
 def read_addresses_if_available(app):
     print("Start getting addresses to indexes.")
-    app.addresses_to_indexes = {"mainnet": {}, "testnet": {}}
-    app.addresses_to_indexes_complete = {"mainnet": {}, "testnet": {}}
-    app.max_index_known = {"mainnet": 0, "testnet": 0}
+    app.addresses_to_indexes = {"mainnet": {}, "testnet": {}, "devnet": {}}
+    app.addresses_to_indexes_complete = {"mainnet": {}, "testnet": {}, "devnet": {}}
+    app.max_index_known = {"mainnet": 0, "testnet": 0, "devnet": 0}
     try:
-        for net in ["mainnet", "testnet"]:
+        for net in ["mainnet", "testnet", "devnet"]:
             print(f"Start getting addresses to indexes for {net}.")
             with open(
                 f"{app.app_settings.addresses_dir}/{net}_addresses_to_indexes.pickle", "rb"
@@ -201,18 +201,18 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.tags = None
         app.nodes = None
         read_addresses_if_available(app)
-        app.schema_cache = {"mainnet": {}, "testnet": {}}
-        app.token_information_cache = {"mainnet": {}, "testnet": {}}
-        app.schema_cache = {"mainnet": {}, "testnet": {}}
-        app.cns_domain_cache = {"mainnet": {}, "testnet": {}}
-        app.blocks_cache = {"mainnet": [], "testnet": []}
-        app.last_finalized_block = {"mainnet": 0, "testnet": 0}
+        app.schema_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.token_information_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.schema_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.cns_domain_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.blocks_cache = {"mainnet": [], "testnet": [], "devnet": []}
+        app.last_finalized_block = {"mainnet": 0, "testnet": 0, "devnet": 0}
 
-        app.transactions_cache = {"mainnet": [], "testnet": []}
-        app.accounts_cache = {"mainnet": [], "testnet": []}
-        app.identity_providers_cache = {"mainnet": {}, "testnet": {}}
-        app.consensus_cache = {"mainnet": {}, "testnet": {}}
-        app.plt_cache = {"mainnet": {}, "testnet": {}}
+        app.transactions_cache = {"mainnet": [], "testnet": [], "devnet": []}
+        app.accounts_cache = {"mainnet": [], "testnet": [], "devnet": []}
+        app.identity_providers_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.consensus_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.plt_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.primed_suspended_cache = {}
         app.staking_pools_cache = {
             "open_for_all": {},
@@ -352,7 +352,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     @scheduler.scheduled_job("interval", seconds=5, args=[app])
     async def repeated_task_get_blocks_and_transactions(app: FastAPI):
-        for net in ["mainnet", "testnet"]:
+        for net in ["mainnet", "testnet", "devnet"]:
             api_result = await get_url_from_api(
                 f"{app.api_url}/v2/{net}/blocks/last/50", app.httpx_client
             )
@@ -367,8 +367,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     @scheduler.scheduled_job("interval", seconds=20, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):
-        # for net in ["mainnet", "testnet"]:
-        for net in ["mainnet", "testnet"]:
+        # for net in ["mainnet", "testnet", "devnet"]:
+        for net in ["mainnet", "testnet", "devnet"]:
             try:
                 api_result = await get_url_from_api(
                     f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
@@ -392,7 +392,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_accounts_id_providers(app: FastAPI):
-        for net in ["mainnet", "testnet"]:
+        for net in ["mainnet", "testnet", "devnet"]:
             api_result = await get_url_from_api(
                 f"{app.api_url}/v2/{net}/accounts/last/50", app.httpx_client
             )
@@ -423,7 +423,11 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             api_result = await get_url_from_api(
                 f"{app.api_url}/v2/{net}/plts/overview", app.httpx_client
             )
-            app.plt_cache[net] = api_result.return_value if api_result.ok else None
+            # Keep plt_cache[net] a dict even when there's no PLT data yet
+            # (e.g. a 404 "Can't list tokens on {net}" for a net with none
+            # indexed) -- consumers do plt_cache[net].get(...)/`in` checks
+            # and would crash on None.
+            app.plt_cache[net] = api_result.return_value if api_result.ok else {}
             if not api_result.ok:
                 print(f"ERROR: {api_result.return_value}")
 

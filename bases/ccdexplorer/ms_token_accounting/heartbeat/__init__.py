@@ -6,6 +6,7 @@ from ccdexplorer.mongodb import (
     CollectionsUtilities,
     MongoDB,
     MongoMotor,
+    net_db,
 )
 from redis.asyncio import Redis
 from ccdexplorer.tooter import Tooter
@@ -42,12 +43,8 @@ class Heartbeat(_token_accounting_v2):
         self.sending = False
         self.entrypoint_cache = {}
         self.utilities: dict[CollectionsUtilities, Collection] = self.mongodb.utilities
-        self.db: dict[Collections, Collection] = (
-            self.mongodb.mainnet if self.net == "mainnet" else self.mongodb.testnet
-        )
-        self.motordb: dict[Collections, AsyncCollection] = (
-            self.motormongo.testnet if net == "testnet" else self.motormongo.mainnet
-        )
+        self.db: dict[Collections, Collection] = net_db(self.mongodb, self.net)
+        self.motordb: dict[Collections, AsyncCollection] = net_db(self.motormongo, net)
         self.finalized_block_infos_to_process: list[CCD_BlockInfo] = []
         self.special_purpose_block_infos_to_process: list[CCD_BlockInfo] = []
 

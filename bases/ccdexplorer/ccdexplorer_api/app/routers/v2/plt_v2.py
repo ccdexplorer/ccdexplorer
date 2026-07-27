@@ -9,7 +9,7 @@
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import datetime as dt
 import grpc
-from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from ccdexplorer.domain.generic import NET
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -54,11 +54,11 @@ async def get_plt_token_info(
     Raises:
         HTTPException: If the network is unsupported or the token is missing.
     """
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    if net not in ["mainnet", "testnet"]:
+    db_to_use = net_db(mongomotor, net)
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -109,10 +109,10 @@ async def get_plt_token_info_at_block(
     Raises:
         HTTPException: If the network is unsupported or the token is missing.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -161,10 +161,10 @@ async def get_paginated_token_current_holders(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -179,7 +179,7 @@ async def get_paginated_token_current_holders(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         total_count = await db_to_use[Collections.plts_links].count_documents(
             {"token_id": token_id}
@@ -237,10 +237,10 @@ async def get_paginated_locks(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -265,7 +265,7 @@ async def get_paginated_locks(
     else:
         match = {}
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         total_count = await db_to_use[Collections.plts_locks].count_documents(match)
         pipeline = [
@@ -318,10 +318,10 @@ async def get_paginated_token_locks(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -336,7 +336,7 @@ async def get_paginated_token_locks(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         total_count = await db_to_use[Collections.plts_locks].count_documents(
             {"token_ids": token_id}
@@ -395,10 +395,10 @@ async def get_lock_detail(
     Raises:
         HTTPException: If the network is unsupported or the lock is not found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     lock_id = CCD_LockId(
@@ -406,7 +406,7 @@ async def get_lock_detail(
         sequence_number=sequence_number,
         creation_order=creation_order,
     )
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     mongo_doc = await db_to_use[Collections.plts_locks].find_one({"_id": lock_id.to_str()})
 
     try:
@@ -461,10 +461,10 @@ async def get_paginated_lock_transactions(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -484,7 +484,7 @@ async def get_paginated_lock_transactions(
         sequence_number=sequence_number,
         creation_order=creation_order,
     ).to_str()
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         count_pipeline = [
             {"$match": {"_id": lock_id_str}},
@@ -550,10 +550,10 @@ async def get_paginated_plt_transactions(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -568,7 +568,7 @@ async def get_paginated_plt_transactions(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     base_filter = {"plt_token_id": token_id}
     # count unique hashes

@@ -17,6 +17,7 @@ from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
 from ccdexplorer.domain.mongo import ModuleVerification, MongoTypeInstance, MongoTypeModule
 from ccdexplorer.mongodb import (
     Collections,
+    net_db,
 )
 from ccdexplorer.tooter import Tooter
 from dateutil.relativedelta import relativedelta
@@ -131,7 +132,7 @@ class Module:
         self.grpc_client: GRPCClient
         self.tooter: Tooter
 
-        db_to_use = self.mainnet if net == NET.MAINNET else self.testnet
+        db_to_use = net_db(self, net)
 
         try:
             assert tx.block_info is not None
@@ -415,7 +416,7 @@ class Module:
         """
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
-        db_to_use = self.mainnet if net == NET.MAINNET else self.testnet
+        db_to_use = net_db(self, net)
         print(f"{module_ref=}: verified status {verification.verified=}")
         module_from_collection = db_to_use[Collections.modules].find_one({"_id": module_ref})
         assert module_from_collection is not None
@@ -431,7 +432,7 @@ class Module:
     async def save_smart_contracts_overview(self, net: NET):
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
-        db_to_use = self.mainnet if net == NET.MAINNET else self.testnet
+        db_to_use = net_db(self, net)
         modules_dict = {
             x["_id"]: MongoTypeModule(**x) for x in db_to_use[Collections.modules].find()
         }

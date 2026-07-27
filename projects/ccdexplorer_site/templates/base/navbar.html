@@ -17,7 +17,7 @@
                         <li><a class="dropdown-item" href="/{{net}}/accounts">Accounts</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="/{{net}}/tokens">Tokens (PLT & CIS-2)</a></li>
-                        {% if False %}
+                        {% if net == 'devnet' %}
                         <li><a class="dropdown-item" href="/{{net}}/blockchain/plt-locks">PLT Locks</a></li>
                         {% endif %}
 
@@ -108,7 +108,8 @@
         <select class="form-select border-0" aria-label="Net selector" id="net_switcher">
             <option {% if net == "mainnet" %} selected {% endif %} value="mainnet">Mainnet</option>
             <option {% if net == "testnet" %} selected {% endif %}value="testnet">Testnet</option>
-            
+            <option {% if net == "devnet" %} selected {% endif %}value="devnet">Devnet P11</option>
+
           </select>
                 
             

@@ -1,0 +1,1802 @@
+{
+  "nightly_accounts": [
+    {
+      "key": {
+        "index": 1
+      },
+      "options": {
+        "name": "index_1"
+      }
+    }
+  ],
+  "paydays_rewards": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "pool_owner": 1
+      },
+      "options": {
+        "name": "pool_owner_1"
+      }
+    },
+    {
+      "key": {
+        "account_id": 1
+      },
+      "options": {
+        "name": "account_id_1"
+      }
+    },
+    {
+      "key": {
+        "account_id": 1,
+        "date": 1
+      },
+      "options": {
+        "name": "account_id_1_date_1"
+      }
+    },
+    {
+      "key": {
+        "reward.baker_reward": 1
+      },
+      "options": {
+        "name": "reward.baker_reward_1"
+      }
+    },
+    {
+      "key": {
+        "reward.transaction_fees": 1
+      },
+      "options": {
+        "name": "reward.transaction_fees_1"
+      }
+    }
+  ],
+  "tokens_accounts": [
+    {
+      "key": {
+        "tokens": 1
+      },
+      "options": {
+        "name": "tokens_1"
+      }
+    },
+    {
+      "key": {
+        "tokens.token_address": 1
+      },
+      "options": {
+        "name": "tokens.token_address_1"
+      }
+    },
+    {
+      "key": {
+        "account_address_canonical": 1
+      },
+      "options": {
+        "name": "account_address_canonical_1"
+      }
+    }
+  ],
+  "tx_types_count": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1,
+        "hour": 1
+      },
+      "options": {
+        "name": "date_1_hour_1"
+      }
+    }
+  ],
+  "impacted_addresses": [
+    {
+      "key": {
+        "impacted_address_canonical": 1
+      },
+      "options": {
+        "name": "impacted_address_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "balance_movement.transfer_in": 1
+      },
+      "options": {
+        "name": "balance_movement.transfer_in_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "balance_movement.transfer_out": 1
+      },
+      "options": {
+        "name": "balance_movement.transfer_out_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "block_height": 1
+      },
+      "options": {
+        "name": "block_height_1"
+      }
+    },
+    {
+      "key": {
+        "balance_movement.baker_reward": 1
+      },
+      "options": {
+        "name": "balance_movement.baker_reward_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "balance_movement.finalization_reward": 1
+      },
+      "options": {
+        "name": "balance_movement.finalization_reward_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "effect_type": 1
+      },
+      "options": {
+        "name": "effect_type_1"
+      }
+    },
+    {
+      "key": {
+        "balance_movement.transaction_fee_reward": 1
+      },
+      "options": {
+        "name": "balance_movement.transaction_fee_reward_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "balance_movement.foundation_reward": 1
+      },
+      "options": {
+        "name": "balance_movement.foundation_reward_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "balance_movement.amount_encrypted": 1
+      },
+      "options": {
+        "name": "balance_movement.amount_encrypted_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "impacted_address_canonical": 1,
+        "block_height": -1
+      },
+      "options": {
+        "name": "impacted_address_canonical_1_block_height_-1"
+      }
+    },
+    {
+      "key": {
+        "impacted_address_canonical": 1,
+        "effect_type": 1,
+        "block_height": 1
+      },
+      "options": {
+        "name": "impacted_address_canonical_1_effect_type_1_block_height_1"
+      }
+    },
+    {
+      "key": {
+        "balance_movement.amount_decrypted": 1
+      },
+      "options": {
+        "name": "balance_movement.amount_decrypted_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "included_in_flow": 1,
+        "impacted_address_canonical": 1
+      },
+      "options": {
+        "name": "included_in_flow_1_impacted_address_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "impacted_address_canonical": 1,
+        "included_in_flow": 1,
+        "block_height": 1
+      },
+      "options": {
+        "name": "impacted_address_canonical_1_included_in_flow_1_block_height_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1,
+        "effect_type": 1
+      },
+      "options": {
+        "name": "date_1_effect_type_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1,
+        "impacted_address_canonical": 1
+      },
+      "options": {
+        "name": "date_1_impacted_address_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "token_address": 1
+      },
+      "options": {
+        "name": "token_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_type": 1
+      },
+      "options": {
+        "name": "event_type_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "contract": 1
+      },
+      "options": {
+        "name": "contract_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "impacted_address_canonical": 1,
+        "tx_hash": 1
+      },
+      "options": {
+        "name": "impacted_address_canonical_1_tx_hash_1"
+      }
+    },
+    {
+      "key": {
+        "plt_token_id": 1
+      },
+      "options": {
+        "name": "plt_token_id_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "impacted_address": 1
+      },
+      "options": {
+        "name": "impacted_address_1"
+      }
+    }
+  ],
+  "celery_taskmeta": [
+    {
+      "key": {
+        "date_done": 1
+      },
+      "options": {
+        "name": "date_done_1",
+        "background": true
+      }
+    },
+    {
+      "key": {
+        "block_height": -1
+      },
+      "options": {
+        "name": "block_height_-1"
+      }
+    },
+    {
+      "key": {
+        "queue": 1
+      },
+      "options": {
+        "name": "queue_1"
+      }
+    },
+    {
+      "key": {
+        "queue": 1,
+        "block_height": -1
+      },
+      "options": {
+        "name": "queue_1_block_height_-1"
+      }
+    },
+    {
+      "key": {
+        "status": 1
+      },
+      "options": {
+        "name": "status_1"
+      }
+    }
+  ],
+  "involved_accounts_transfer": [
+    {
+      "key": {
+        "block_height": 1
+      },
+      "options": {
+        "name": "block_height_1"
+      }
+    },
+    {
+      "key": {
+        "sender_canonical": 1
+      },
+      "options": {
+        "name": "sender_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "receiver_canonical": 1
+      },
+      "options": {
+        "name": "receiver_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "type.type": 1
+      },
+      "options": {
+        "name": "type.type_1"
+      }
+    },
+    {
+      "key": {
+        "type.contents": 1
+      },
+      "options": {
+        "name": "type.contents_1"
+      }
+    },
+    {
+      "key": {
+        "memo": 1
+      },
+      "options": {
+        "name": "memo_1",
+        "sparse": true
+      }
+    }
+  ],
+  "tokens_logged_events_v2": [
+    {
+      "key": {
+        "event_info.standard": 1
+      },
+      "options": {
+        "name": "event_info.standard_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_info.event_type": 1
+      },
+      "options": {
+        "name": "event_info.event_type_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "tx_info.block_height": 1
+      },
+      "options": {
+        "name": "tx_info.block_height_1"
+      }
+    },
+    {
+      "key": {
+        "tx_info.tx_hash": 1
+      },
+      "options": {
+        "name": "tx_info.tx_hash_1"
+      }
+    },
+    {
+      "key": {
+        "to_address_canonical": 1
+      },
+      "options": {
+        "name": "to_address_canonical_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "from_address_canonical": 1
+      },
+      "options": {
+        "name": "from_address_canonical_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "tx_info.block_height": 1,
+        "tx_info.tx_index": 1,
+        "event_info.effect_index": 1,
+        "event_info.event_index": 1
+      },
+      "options": {
+        "name": "tx_info.block_height_1_tx_info.tx_index_1_event_info.effect_index_1_event_info.event_index_1"
+      }
+    },
+    {
+      "key": {
+        "event_info.standard": 1,
+        "tx_info.block_height": 1
+      },
+      "options": {
+        "name": "event_info.standard_1_tx_info.block_height_1"
+      }
+    },
+    {
+      "key": {
+        "event_info.token_address": 1
+      },
+      "options": {
+        "name": "event_info.token_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_info.contract": 1
+      },
+      "options": {
+        "name": "event_info.contract_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_info.standard": 1,
+        "event_info.contract": 1,
+        "tx_info.block_height": -1
+      },
+      "options": {
+        "name": "event_info.standard_1_event_info.contract_1_tx_info.block_height_-1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_info.contract": 1,
+        "event_info.event_type": 1
+      },
+      "options": {
+        "name": "event_info.contract_1_event_info.event_type_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "tx_info.date": 1
+      },
+      "options": {
+        "name": "tx_info.date_1"
+      }
+    },
+    {
+      "key": {
+        "event_info.event_type": 1,
+        "event_info.token_address": 1
+      },
+      "options": {
+        "name": "event_info.event_type_1_event_info.token_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_info.effect_index": -1
+      },
+      "options": {
+        "name": "event_info.effect_index_-1"
+      }
+    },
+    {
+      "key": {
+        "recognized_event.cis2_token_contract_address": 1
+      },
+      "options": {
+        "name": "recognized_event.cis2_token_contract_address_1",
+        "sparse": true
+      }
+    }
+  ],
+  "transactions": [
+    {
+      "key": {
+        "type.type": 1
+      },
+      "options": {
+        "name": "type.type_1"
+      }
+    },
+    {
+      "key": {
+        "type.contents": 1
+      },
+      "options": {
+        "name": "type.contents_1"
+      }
+    },
+    {
+      "key": {
+        "block_info.height": 1
+      },
+      "options": {
+        "name": "block_info.height_1"
+      }
+    },
+    {
+      "key": {
+        "block_info.slot_time": 1
+      },
+      "options": {
+        "name": "block_info.slot_time_1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.delegation_configured": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.delegation_configured_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.baker_configured": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.baker_configured_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.account_transfer": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.account_transfer_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_creation": 1
+      },
+      "options": {
+        "name": "account_creation_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.module_deployed": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.module_deployed_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.contract_initialized": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.contract_initialized_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.contract_update_issued": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.contract_update_issued_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "index": 1
+      },
+      "options": {
+        "name": "index_1"
+      }
+    },
+    {
+      "key": {
+        "update": 1
+      },
+      "options": {
+        "name": "update_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "update.payload.protocol_update": 1
+      },
+      "options": {
+        "name": "update.payload.protocol_update_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "update.payload.add_identity_provider_update": 1
+      },
+      "options": {
+        "name": "update.payload.add_identity_provider_update_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "update.payload.add_anonymity_revoker_update": 1
+      },
+      "options": {
+        "name": "update.payload.add_anonymity_revoker_update_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.sender": 1
+      },
+      "options": {
+        "name": "account_transaction.sender_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.account_transfer.receiver": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.account_transfer.receiver_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "update.payload.micro_ccd_per_euro_update_1 ": 1
+      },
+      "options": {
+        "name": "update.payload.micro_ccd_per_euro_update_1 _1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "block_info.height": -1
+      },
+      "options": {
+        "name": "block_info.height_-1"
+      }
+    },
+    {
+      "key": {
+        "update": 1,
+        "update.payload.micro_ccd_per_euro_update": 1
+      },
+      "options": {
+        "name": "update_1_update.payload.micro_ccd_per_euro_update_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "block_info.slot_time": -1
+      },
+      "options": {
+        "name": "block_info.slot_time_-1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.contract_initialized.address.index": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.contract_initialized.address.index_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_creation.address": 1
+      },
+      "options": {
+        "name": "account_creation.address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "update.payload": 1
+      },
+      "options": {
+        "name": "update.payload_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transactions.effects": 1
+      },
+      "options": {
+        "name": "account_transactions.effects_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "recognized_sender_id": 1
+      },
+      "options": {
+        "name": "recognized_sender_id_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "block_info.height": -1,
+        "recognized_sender_id": 1
+      },
+      "options": {
+        "name": "block_info.height_-1_recognized_sender_id_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "type.contents": 1,
+        "block_info.height": -1
+      },
+      "options": {
+        "name": "type.contents_1_block_info.height_-1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.data_registered": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.data_registered_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.transferred_with_schedule": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.transferred_with_schedule_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.sender": 1,
+        "block_info.height": 1
+      },
+      "options": {
+        "name": "account_transaction.sender_1_block_info.height_1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.sender": 1,
+        "block_info.height": -1
+      },
+      "options": {
+        "name": "account_transaction.sender_1_block_info.height_-1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.outcome": 1,
+        "type.contents": 1
+      },
+      "options": {
+        "name": "account_transaction.outcome_1_type.contents_1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.token_update_effect": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.token_update_effect_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "token_creation": 1
+      },
+      "options": {
+        "name": "token_creation_1"
+      }
+    },
+    {
+      "key": {
+        "account_transaction.sponsor": 1
+      },
+      "options": {
+        "name": "account_transaction.sponsor_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.contract_update_issued.effects.updated.receive_name": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.contract_update_issued.effects.updated.receive_name_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_transaction.effects.meta_update_effect": 1
+      },
+      "options": {
+        "name": "account_transaction.effects.meta_update_effect_1",
+        "sparse": true
+      }
+    }
+  ],
+  "projects": [
+    {
+      "key": {
+        "project_id": 1
+      },
+      "options": {
+        "name": "project_id_1"
+      }
+    },
+    {
+      "key": {
+        "type": 1
+      },
+      "options": {
+        "name": "type_1"
+      }
+    }
+  ],
+  "paydays_v2_apy": [
+    {
+      "key": {
+        "account_id": 1
+      },
+      "options": {
+        "name": "account_id_1"
+      }
+    },
+    {
+      "key": {
+        "pool_id": 1
+      },
+      "options": {
+        "name": "pool_id_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "type": 1
+      },
+      "options": {
+        "name": "type_1"
+      }
+    },
+    {
+      "key": {
+        "days_in_average": 1
+      },
+      "options": {
+        "name": "days_in_average_1"
+      }
+    },
+    {
+      "key": {
+        "validator_id": 1
+      },
+      "options": {
+        "name": "validator_id_1"
+      }
+    },
+    {
+      "key": {
+        "validator_id": 1,
+        "days_in_average": 1,
+        "date": -1
+      },
+      "options": {
+        "name": "validator_id_1_days_in_average_1_date_-1"
+      }
+    },
+    {
+      "key": {
+        "account_id": 1,
+        "days_in_average": 1,
+        "date": -1
+      },
+      "options": {
+        "name": "account_id_1_days_in_average_1_date_-1"
+      }
+    },
+    {
+      "key": {
+        "type": 1,
+        "validator_id": 1,
+        "date": -1
+      },
+      "options": {
+        "name": "type_1_validator_id_1_date_-1"
+      }
+    },
+    {
+      "key": {
+        "type": 1,
+        "account_id": 1,
+        "date": -1
+      },
+      "options": {
+        "name": "type_1_account_id_1_date_-1"
+      }
+    }
+  ],
+  "paydays_v2_performance": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "baker_id": 1
+      },
+      "options": {
+        "name": "baker_id_1"
+      }
+    }
+  ],
+  "tokens_links_v2": [
+    {
+      "key": {
+        "account_address_canonical": 1
+      },
+      "options": {
+        "name": "account_address_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "account_address": 1
+      },
+      "options": {
+        "name": "account_address_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.token_address": 1
+      },
+      "options": {
+        "name": "token_holding.token_address_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.token_id": 1
+      },
+      "options": {
+        "name": "token_holding.token_id_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.contract": 1
+      },
+      "options": {
+        "name": "token_holding.contract_1"
+      }
+    }
+  ],
+  "plts_links": [
+    {
+      "key": {
+        "token_id": 1
+      },
+      "options": {
+        "name": "token_id_1"
+      }
+    },
+    {
+      "key": {
+        "account_address_canonical": 1
+      },
+      "options": {
+        "name": "account_address_canonical_1"
+      }
+    }
+  ],
+  "tokens_token_addresses_v2": [
+    {
+      "key": {
+        "last_height_processed": -1
+      },
+      "options": {
+        "name": "last_height_processed_-1"
+      }
+    },
+    {
+      "key": {
+        "contract": 1
+      },
+      "options": {
+        "name": "contract_1"
+      }
+    },
+    {
+      "key": {
+        "failed_attempt": 1
+      },
+      "options": {
+        "name": "failed_attempt_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "failed_attempt.do_not_try_before": 1
+      },
+      "options": {
+        "name": "failed_attempt.do_not_try_before_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "token_id": 1
+      },
+      "options": {
+        "name": "token_id_1"
+      }
+    },
+    {
+      "key": {
+        "token_metadata": 1
+      },
+      "options": {
+        "name": "token_metadata_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "metadata_url": 1
+      },
+      "options": {
+        "name": "metadata_url_1",
+        "sparse": true
+      }
+    }
+  ],
+  "paydays_performance": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "baker_id": 1
+      },
+      "options": {
+        "name": "baker_id_1"
+      }
+    }
+  ],
+  "blocks_per_day": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    }
+  ],
+  "tokens_logged_events": [
+    {
+      "key": {
+        "token_address": 1
+      },
+      "options": {
+        "name": "token_address_1"
+      }
+    },
+    {
+      "key": {
+        "block_height": 1
+      },
+      "options": {
+        "name": "block_height_1"
+      }
+    },
+    {
+      "key": {
+        "block_height": 1,
+        "tx_index": 1,
+        "ordering": 1
+      },
+      "options": {
+        "name": "block_height_1_tx_index_1_ordering_1"
+      }
+    },
+    {
+      "key": {
+        "tx_hash": 1
+      },
+      "options": {
+        "name": "tx_hash_1"
+      }
+    },
+    {
+      "key": {
+        "result.to_address": 1
+      },
+      "options": {
+        "name": "result.to_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "result.from_address": 1
+      },
+      "options": {
+        "name": "result.from_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "result.to_address": 1,
+        "result.from_address": 1
+      },
+      "options": {
+        "name": "result.to_address_1_result.from_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "tag": 1
+      },
+      "options": {
+        "name": "tag_1"
+      }
+    },
+    {
+      "key": {
+        "contract": 1
+      },
+      "options": {
+        "name": "contract_1"
+      }
+    },
+    {
+      "key": {
+        "to_address_canonical": 1
+      },
+      "options": {
+        "name": "to_address_canonical_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "from_address_canonical": 1
+      },
+      "options": {
+        "name": "from_address_canonical_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "event_type": 1
+      },
+      "options": {
+        "name": "event_type_1"
+      }
+    }
+  ],
+  "blocks_log": [
+    {
+      "key": {
+        "tokens_logged_events": 1
+      },
+      "options": {
+        "name": "tokens_logged_events_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "impacted_addresses_from_balance_movements": 1
+      },
+      "options": {
+        "name": "impacted_addresses_from_balance_movements_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "error": 1
+      },
+      "options": {
+        "name": "error_1",
+        "sparse": true
+      }
+    }
+  ],
+  "modules": [
+    {
+      "key": {
+        "module_name": 1
+      },
+      "options": {
+        "name": "module_name_1"
+      }
+    }
+  ],
+  "paydays_v2_rewards": [
+    {
+      "key": {
+        "account_id": 1
+      },
+      "options": {
+        "name": "account_id_1"
+      }
+    },
+    {
+      "key": {
+        "account_id": 1,
+        "date": 1
+      },
+      "options": {
+        "name": "account_id_1_date_1"
+      }
+    },
+    {
+      "key": {
+        "pool_owner": 1
+      },
+      "options": {
+        "name": "pool_owner_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    }
+  ],
+  "paydays_v2": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "height_for_last_block": 1
+      },
+      "options": {
+        "name": "height_for_last_block_1"
+      }
+    },
+    {
+      "key": {
+        "height_for_first_block": 1
+      },
+      "options": {
+        "name": "height_for_first_block_1"
+      }
+    }
+  ],
+  "instances": [
+    {
+      "key": {
+        "source_module": 1
+      },
+      "options": {
+        "name": "source_module_1"
+      }
+    },
+    {
+      "key": {
+        "owner": 1
+      },
+      "options": {
+        "name": "owner_1"
+      }
+    }
+  ],
+  "all_account_addresses": [
+    {
+      "key": {
+        "account_address": 1
+      },
+      "options": {
+        "name": "account_address_1"
+      }
+    },
+    {
+      "key": {
+        "account_index": 1
+      },
+      "options": {
+        "name": "account_index_1"
+      }
+    },
+    {
+      "key": {
+        "_fts": "text",
+        "_ftsx": 1
+      },
+      "options": {
+        "name": "_id_text",
+        "weights": {
+          "_id": 1
+        },
+        "default_language": "english",
+        "language_override": "language",
+        "textIndexVersion": 3
+      }
+    }
+  ],
+  "cis5_public_keys_info": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "key": {
+        "baker": 1
+      },
+      "options": {
+        "name": "baker_1"
+      }
+    },
+    {
+      "key": {
+        "slot_time": 1
+      },
+      "options": {
+        "name": "slot_time_1"
+      }
+    },
+    {
+      "key": {
+        "height": -1
+      },
+      "options": {
+        "name": "height_-1"
+      }
+    },
+    {
+      "key": {
+        "transaction_count": 1
+      },
+      "options": {
+        "name": "transaction_count_1"
+      }
+    },
+    {
+      "key": {
+        "_fts": "text",
+        "_ftsx": 1
+      },
+      "options": {
+        "name": "_id_text",
+        "weights": {
+          "_id": 1
+        },
+        "default_language": "english",
+        "language_override": "language",
+        "textIndexVersion": 3
+      }
+    }
+  ],
+  "cis5_public_keys_contracts": [
+    {
+      "key": {
+        "wallet_contract_address": 1
+      },
+      "options": {
+        "name": "wallet_contract_address_1"
+      }
+    },
+    {
+      "key": {
+        "cis2_token_contract_address": 1
+      },
+      "options": {
+        "name": "cis2_token_contract_address_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "token_id_or_ccd": 1
+      },
+      "options": {
+        "name": "token_id_or_ccd_1"
+      }
+    },
+    {
+      "key": {
+        "address_or_public_key": 1
+      },
+      "options": {
+        "name": "address_or_public_key_1"
+      }
+    },
+    {
+      "key": {
+        "address_canonical_or_public_key": 1
+      },
+      "options": {
+        "name": "address_canonical_or_public_key_1"
+      }
+    }
+  ],
+  "tokens_links_v3": [
+    {
+      "key": {
+        "account_address": 1
+      },
+      "options": {
+        "name": "account_address_1"
+      }
+    },
+    {
+      "key": {
+        "account_address_canonical": 1
+      },
+      "options": {
+        "name": "account_address_canonical_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.contract": 1
+      },
+      "options": {
+        "name": "token_holding.contract_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.token_address": 1
+      },
+      "options": {
+        "name": "token_holding.token_address_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.token_id": 1
+      },
+      "options": {
+        "name": "token_holding.token_id_1"
+      }
+    },
+    {
+      "key": {
+        "token_holding.token_amount": 1
+      },
+      "options": {
+        "name": "token_holding.token_amount_1"
+      }
+    }
+  ],
+  "pre_render": [
+    {
+      "key": {
+        "recurring_type": 1
+      },
+      "options": {
+        "name": "recurring_type_1"
+      }
+    }
+  ],
+  "paydays_v2_validators_missed": [
+    {
+      "key": {
+        "epoch": 1
+      },
+      "options": {
+        "name": "epoch_1"
+      }
+    },
+    {
+      "key": {
+        "genesis_index": -1,
+        "epoch": 1
+      },
+      "options": {
+        "name": "genesis_index_-1_epoch_1"
+      }
+    }
+  ],
+  "validator_logs": [
+    {
+      "key": {
+        "baker_id": 1
+      },
+      "options": {
+        "name": "baker_id_1"
+      }
+    },
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    }
+  ],
+  "stable_address_info": [
+    {
+      "key": {
+        "credentials.ip_id": 1
+      },
+      "options": {
+        "name": "credentials.ip_id_1"
+      }
+    },
+    {
+      "key": {
+        "account_address": 1
+      },
+      "options": {
+        "name": "account_address_1"
+      }
+    },
+    {
+      "key": {
+        "account_index": 1
+      },
+      "options": {
+        "name": "account_index_1"
+      }
+    },
+    {
+      "key": {
+        "credentials.policy_attributes.key": 1
+      },
+      "options": {
+        "name": "credentials.policy_attributes.key_1"
+      }
+    },
+    {
+      "key": {
+        "credentials.policy_attributes.value": 1
+      },
+      "options": {
+        "name": "credentials.policy_attributes.value_1"
+      }
+    },
+    {
+      "key": {
+        "credentials.commitment_attributes": 1
+      },
+      "options": {
+        "name": "credentials.commitment_attributes_1"
+      }
+    }
+  ],
+  "paydays": [
+    {
+      "key": {
+        "date": 1
+      },
+      "options": {
+        "name": "date_1"
+      }
+    },
+    {
+      "key": {
+        "height_for_first_block": 1
+      },
+      "options": {
+        "name": "height_for_first_block_1"
+      }
+    },
+    {
+      "key": {
+        "height_for_last_block": 1
+      },
+      "options": {
+        "name": "height_for_last_block_1"
+      }
+    }
+  ],
+  "tokens_token_addresses": [
+    {
+      "key": {
+        "last_height_processed": -1
+      },
+      "options": {
+        "name": "last_height_processed_-1"
+      }
+    },
+    {
+      "key": {
+        "token_metadata.name": 1
+      },
+      "options": {
+        "name": "token_metadata.name_1",
+        "sparse": true
+      }
+    }
+  ],
+  "statistics": [
+    {
+      "key": {
+        "type": 1
+      },
+      "options": {
+        "name": "type_1"
+      }
+    },
+    {
+      "key": {
+        "type": 1,
+        "usecase": 1
+      },
+      "options": {
+        "name": "type_1_usecase_1"
+      }
+    },
+    {
+      "key": {
+        "type": 1,
+        "date": 1
+      },
+      "options": {
+        "name": "type_1_date_1"
+      }
+    },
+    {
+      "key": {
+        "type": 1,
+        "account_address_canonical": 1
+      },
+      "options": {
+        "name": "type_1_account_address_canonical_1",
+        "sparse": true
+      }
+    },
+    {
+      "key": {
+        "account_address_canonical": 1,
+        "date": 1
+      },
+      "options": {
+        "name": "account_address_canonical_1_date_1",
+        "partialFilterExpression": {
+          "type": "account_graph"
+        }
+      }
+    }
+  ],
+  "tokens_tags": [
+    {
+      "key": {
+        "contracts": 1
+      },
+      "options": {
+        "name": "contracts_1"
+      }
+    }
+  ],
+  "dashboard_nodes": [
+    {
+      "key": {
+        "consensusBakerId": 1
+      },
+      "options": {
+        "name": "consensusBakerId_1"
+      }
+    }
+  ]
+}

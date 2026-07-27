@@ -9,8 +9,14 @@
 
 function txTypeFormatter(cell){
   const key = cell.getValue();
-  const map = tx_type_translation[key];
-  if(!map) return ""; 
+  let map = tx_type_translation[key];
+  if (!map && typeof key === "string" && key.includes("-")) {
+    // Unregistered event subtype (e.g. a PLT module event not in the
+    // hardcoded transfer/mint/burn/... list) -- fall back to the base
+    // type instead of rendering an empty cell.
+    map = tx_type_translation[key.split("-")[0]];
+  }
+  if(!map) return "";
   const row = cell.getRow().getData();
 
   let icon = "";
@@ -32,6 +38,9 @@ function txTypeFormatter(cell){
       break;
     case "plt":
       icon = `<i style="color:${map.color}" class="bi bi-wrench-adjustable-circle"></i>`;
+      break;
+    case "meta_update_effect":
+      icon = `<i style="color:${map.color}" class="bi bi-lock-fill"></i>`;
       break;
     case "rejected":
       icon = `<i style="color:${map.color}" class="bi bi-ban"></i>`;

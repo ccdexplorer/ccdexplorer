@@ -14,6 +14,7 @@ from pymongo import ASCENDING
 from ccdexplorer.mongodb import (
     MongoDB,
     Collections,
+    net_db,
 )
 from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
@@ -49,13 +50,13 @@ async def get_transaction_logged_events(
     Raises:
         HTTPException: If the network is unsupported or the transaction hash is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     pipeline = [
         {"$match": {"tx_info.tx_hash": tx_hash}},
     ]
@@ -101,13 +102,13 @@ async def get_transaction(
     Raises:
         HTTPException: If the network is unsupported or the transaction hash is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     result = db_to_use[Collections.transactions].find_one(tx_hash)
     if result:
         result = CCD_BlockItemSummary(**result)

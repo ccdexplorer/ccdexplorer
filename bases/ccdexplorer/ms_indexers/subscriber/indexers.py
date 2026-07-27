@@ -81,9 +81,11 @@ class Indexers(Utils):
         """
         result = ClassificationResult()
         result.type = tx.type
-        self.namespace: str = (
-            "concordium_mainnet" if self.net == "mainnet" else "concordium_testnet"
-        )
+        self.namespace: str = {
+            "mainnet": "concordium_mainnet",
+            "testnet": "concordium_testnet",
+            "devnet": "concordium_devnet",
+        }[self.net]
         assert tx.block_info is not None
         if tx.update:
             pass

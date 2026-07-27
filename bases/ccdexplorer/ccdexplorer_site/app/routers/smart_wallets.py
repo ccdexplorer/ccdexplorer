@@ -402,7 +402,7 @@ async def ajax_last_txs_for_smart_wallets(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     skip = (page - 1) * size
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -481,7 +481,7 @@ async def ajax_last_txs_for_smart_wallets_since(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)

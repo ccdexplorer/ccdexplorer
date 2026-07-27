@@ -9,7 +9,7 @@ from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import MongoDB, MongoMotor
+from ccdexplorer.mongodb import MongoDB, MongoMotor, net_db
 from ccdexplorer.tooter import Tooter
 from celery import shared_task
 from celery.exceptions import CPendingDeprecationWarning
@@ -52,7 +52,7 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
     print(f"Handling payload: {payload}")
     block_height = payload.get("height")
     try:
-        db_to_use = mongodb.testnet if RUN_ON_NET == "testnet" else mongodb.mainnet
+        db_to_use = net_db(mongodb, RUN_ON_NET)
         block_height = payload.get("height")
         assert isinstance(block_height, int)
         net = NET(RUN_ON_NET)

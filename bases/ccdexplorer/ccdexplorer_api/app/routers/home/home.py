@@ -1,6 +1,7 @@
 from ccdexplorer.env.settings import API_NET, LIVE_PORT
 from ccdexplorer.mongodb import (
     MongoMotor,
+    net_db,
 )
 from fastapi import APIRouter, Depends, Request
 from ccdexplorer.env import environment
@@ -19,9 +20,7 @@ async def home_route(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ):
     user: User | None = get_user_details(request)
-    db_to_use = (
-        request.app.motormongo.testnet if API_NET == "testnet" else request.app.motormongo.mainnet
-    )
+    db_to_use = net_db(request.app.motormongo, API_NET)
     eur_plts = await get_plts_that_track_eur(db_to_use)
     faqs = [x for x in await mongomotor.utilities_db["api_faq"].find({}).to_list(length=None)]
     context = {

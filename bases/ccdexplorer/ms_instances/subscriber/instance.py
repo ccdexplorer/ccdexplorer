@@ -4,7 +4,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 )
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections
+from ccdexplorer.mongodb import Collections, net_db
 from ccdexplorer.domain.mongo import MongoTypeInstance
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
 from ccdexplorer.tooter import Tooter
@@ -18,7 +18,7 @@ console = Console()
 
 class Instance:
     async def process_block_for_instances(self, payload, net: NET):
-        db_to_use = self.testnet if net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
         block_height = payload.get("height")
         assert block_height is not None
 
@@ -81,7 +81,7 @@ class Instance:
         self.grpc_client: GRPCClient
         self.tooter: Tooter
 
-        db_to_use = self.testnet if net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
 
         instance_info_grpc = self.grpc_client.get_instance_info(
             instance_as_class.index,
@@ -119,7 +119,7 @@ class Instance:
         self.grpc_client: GRPCClient
         self.tooter: Tooter
 
-        db_to_use = self.testnet if net == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
 
         instance_as_class = db_to_use[Collections.instances].find_one(
             {"_id": upgraded_effect.address.to_str()}

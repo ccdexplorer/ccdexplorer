@@ -38,14 +38,18 @@ class Subscriber(_indexers, _utils):
         self.queues: dict[Enum, list] = {}
         self.mainnet: dict[Collections, Collection] = self.mongodb.mainnet
         self.testnet: dict[Collections, Collection] = self.mongodb.testnet
+        self.devnet: dict[Collections, Collection] = self.mongodb.devnet
         self.motor_mainnet: dict[Collections, AsyncCollection] = self.motormongo.mainnet
         self.motor_testnet: dict[Collections, AsyncCollection] = self.motormongo.testnet
+        self.motor_devnet: dict[Collections, AsyncCollection] = self.motormongo.devnet
         self.motor_utilities: dict[CollectionsUtilities, AsyncCollection] = (
             self.motormongo.utilities
         )
-        self.namespace: str = (
-            "concordium_mainnet" if self.net == "mainnet" else "concordium_testnet"
-        )
+        self.namespace: str = {
+            "mainnet": "concordium_mainnet",
+            "testnet": "concordium_testnet",
+            "devnet": "concordium_devnet",
+        }[self.net]
 
     async def init_sessions(self) -> None:
         quick_timeout = aiohttp.ClientTimeout(total=1, connect=1, sock_read=1)

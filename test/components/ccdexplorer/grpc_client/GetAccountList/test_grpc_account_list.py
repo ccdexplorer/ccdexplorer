@@ -1,6 +1,7 @@
 import pytest
 from rich import print
 
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 
 
@@ -21,10 +22,10 @@ def grpcclient():
 
 @pytest.fixture
 def grpcclient_devnet():
-    return GRPCClient(devnet=True)
+    return GRPCClient(net="devnet")
 
 
 def test_account_list(grpcclient_devnet: GRPCClient):
     block_hash = "last_final"
-    al = grpcclient_devnet.get_account_list(block_hash)
+    al = grpcclient_devnet.get_account_list(block_hash, net=NET.DEVNET)
     print(al)  # .dict(exclude_none=True))

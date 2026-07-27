@@ -111,7 +111,7 @@ async def redirect_to_mainnet(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)  # type: ignore
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
@@ -244,7 +244,7 @@ async def search_all(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)  # type: ignore
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -529,6 +529,7 @@ async def home_tx_graph(
     return html
 
 
+
 @router.get("/{net}/ajax_last_blocks", response_class=HTMLResponse)
 async def ajax_last_blocks(
     request: Request,
@@ -536,12 +537,12 @@ async def ajax_last_blocks(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
     latest_blocks = request.app.blocks_cache.get(net)
-    if not latest_blocks:
+    if latest_blocks is None:
         error = f"Request error getting the most recent blocks on {net}."
         return request.app.templates.TemplateResponse(
             request,
@@ -579,7 +580,7 @@ async def ajax_last_txs(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -630,7 +631,7 @@ async def ajax_last_txs_own_page(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
     skip = (page - 1) * size
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -696,7 +697,7 @@ async def ajax_last_blocks_own_page(
     size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -741,7 +742,7 @@ async def ajax_last_blocks_since(
     since_height: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     api_result = await get_url_from_api(
@@ -775,7 +776,7 @@ async def ajax_last_accounts_since(
     since_index: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     api_result = await get_url_from_api(
@@ -813,7 +814,7 @@ async def ajax_last_transactions_since(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     api_result = await get_url_from_api(
@@ -870,7 +871,7 @@ async def ajax_last_accounts_own_page(
     size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -914,7 +915,7 @@ async def transactions_page(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -944,7 +945,7 @@ async def blocks_page(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -970,7 +971,7 @@ async def accounts_page(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -998,7 +999,7 @@ async def ajax_consensus_own_page(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -1043,7 +1044,7 @@ async def consensus_page(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)

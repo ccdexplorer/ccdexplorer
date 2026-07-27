@@ -16,7 +16,7 @@ from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.env import REDIS_URL, RUN_ON_NET
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from ccdexplorer.mongodb.core import MongoDB
 from ccdexplorer.tooter import Tooter
 from pydantic import BaseModel
@@ -89,6 +89,17 @@ def extract_processors(block_hash: str) -> list[str]:
         ]
     )
 
+    # PLT lock create/destroy events land under meta_update_effect, a
+    # separate effect type from token_update_effect -- without this, a block
+    # containing only a lock create/destroy tx never gets routed to ms_plt.
+    meta_update_effect = any(
+        [
+            tx.account_transaction.effects.meta_update_effect
+            for tx in transactions
+            if tx.account_transaction
+        ]
+    )
+
     module_deployed = any(
         [
             tx.account_transaction.effects.module_deployed
@@ -116,7 +127,7 @@ def extract_processors(block_hash: str) -> list[str]:
     if module_deployed:
         processors.append("module_deployed")
 
-    if token_creation or token_update_effect:
+    if token_creation or token_update_effect or meta_update_effect:
         processors.append("plt")
 
     return processors
@@ -171,9 +182,7 @@ class Shutdown:
 
 async def watch_loop(stop: Shutdown):
     settings = Settings()
-    db: dict[Collections, AsyncCollection] = (
-        settings.motormongo.mainnet if RUN_ON_NET == "mainnet" else settings.motormongo.testnet
-    )
+    db: dict[Collections, AsyncCollection] = net_db(settings.motormongo, RUN_ON_NET)
     while not stop.is_set:
         try:
             r = Redis.from_url(settings.redis_url, decode_responses=False)  # type: ignore

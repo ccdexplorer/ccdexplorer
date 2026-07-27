@@ -15,6 +15,7 @@ from ccdexplorer.mongodb import (
     MongoDB,
     MongoMotor,
     Collections,
+    net_db,
 )
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_motor,
@@ -65,13 +66,13 @@ async def get_tokens_count_estimate(
     Raises:
         HTTPException: If the network is unsupported or the estimate cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongob.testnet if net == "testnet" else mongob.mainnet
+    db_to_use = net_db(mongob, net)
     try:
         result = db_to_use[Collections.tokens_token_addresses_v2].estimated_document_count()
         error = None
@@ -114,13 +115,13 @@ async def get_fungible_tokens_verified(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     pipeline = [
         {
             "$match": {
@@ -188,13 +189,13 @@ async def get_non_fungible_tokens_verified(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     pipeline = [
         {
             "$match": {
@@ -241,7 +242,7 @@ async def search_tokens(
     search_str = str(value).lower()
     regex = re.compile(search_str)
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {"$match": {"$or": [{"hidden": False}, {"hidden": {"$exists": False}}]}},

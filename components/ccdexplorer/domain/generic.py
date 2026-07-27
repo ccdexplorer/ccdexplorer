@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 class NET(Enum):
     MAINNET = "mainnet"
     TESTNET = "testnet"
+    DEVNET = "devnet"
 
 
 class StandardIdentifiers(Enum):

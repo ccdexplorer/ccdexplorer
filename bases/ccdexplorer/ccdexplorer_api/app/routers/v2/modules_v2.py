@@ -13,7 +13,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mo
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers, await_await
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKeyHeader
@@ -44,13 +44,13 @@ async def get_overview_of_all_modules(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     modules_overview = (
         await db_to_use[Collections.statistics]
@@ -87,7 +87,7 @@ async def search_modules(
     """
     search_str = str(value)
     regex = re.compile(search_str, re.IGNORECASE)
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {
@@ -133,10 +133,10 @@ async def get_modules_list(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:

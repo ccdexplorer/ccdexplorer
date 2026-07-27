@@ -44,12 +44,14 @@ class Subscriber(_logged_event, _impacted_addresses_from_tx, _utils):
 
         self.mainnet: dict[Collections, Collection] = self.mongodb.mainnet
         self.testnet: dict[Collections, Collection] = self.mongodb.testnet
+        self.devnet: dict[Collections, Collection] = self.mongodb.devnet
         self.motor_mainnet: dict[Collections, AsyncCollection] = (  # type: ignore
             self.motormongo.mainnet
         )
         self.motor_testnet: dict[Collections, AsyncCollection] = (  # type: ignore
             self.motormongo.testnet
         )
+        self.motor_devnet: dict[Collections, AsyncCollection] = self.motormongo.devnet
         self.motor_utilities: dict[CollectionsUtilities, AsyncCollection] = (
             self.motormongo.utilities
         )

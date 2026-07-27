@@ -4,6 +4,7 @@ from ccdexplorer.site_user import SiteUser
 from ccdexplorer.mongodb import (
     Collections,
     CollectionsUtilities,
+    net_db,
 )
 from ccdexplorer.domain.mongo import (
     MongoTypeBlockPerDay,
@@ -45,11 +46,7 @@ def get_paydays_per_day(
 
     else:
         if "net" in req.path_params:
-            db_to_use = (
-                req.app.mongodb.testnet
-                if req.path_params["net"] == "testnet"
-                else req.app.mongodb.mainnet
-            )
+            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
             req.app.paydays_per_day = None
             req.app.paydays_last_blocks_validated = None
         else:
@@ -80,11 +77,7 @@ def get_blocks_per_day(
 
     else:
         if "net" in req.path_params:
-            db_to_use = (
-                req.app.mongodb.testnet
-                if req.path_params["net"] == "testnet"
-                else req.app.mongodb.mainnet
-            )
+            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
         else:
             db_to_use = req.app.mongodb.mainnet
 

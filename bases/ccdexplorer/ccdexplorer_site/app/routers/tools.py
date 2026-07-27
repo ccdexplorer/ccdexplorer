@@ -203,7 +203,7 @@ async def business_accounts_page(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -568,7 +568,7 @@ async def ajax_tx_search_transfers(
     post_data.lte = int(post_data.lte.split(" ")[0].replace(".", "").replace(",", ""))  # type: ignore
 
     # skip = (post_data.requested_page - 1) * limit
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -652,7 +652,7 @@ async def ajax_tx_search_data(
     limit = 10
     # skip = (post_data.requested_page - 1) * limit
     skip = calculate_skip(requested_page, 0, limit)
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -751,7 +751,7 @@ async def transactions_by_type_page(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)  # type: ignore
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -933,7 +933,7 @@ async def get_account_transactions_for_tabulator(
 # ):
 #     limit = 20
 #     skip = (post_data.requested_page - 1) * limit
-#     if net not in ["mainnet", "testnet"]:
+#     if net not in ["mainnet", "testnet", "devnet"]:
 #         return RedirectResponse(url="/mainnet", status_code=302)
 
 #     user: SiteUser | None = await get_user_detailsv2(request)
@@ -1000,7 +1000,7 @@ async def accounts_scheduled_release(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
@@ -1094,7 +1094,7 @@ async def accounts_cooldown(
     net: str,
     tags: dict = Depends(get_labeled_accounts),
 ) -> HTMLResponse:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
