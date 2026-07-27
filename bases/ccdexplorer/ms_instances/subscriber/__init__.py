@@ -27,6 +27,7 @@ class Subscriber(_instance):
         self.mongodb = mongodb
         self.mainnet: dict[Collections, Collection] = self.mongodb.mainnet
         self.testnet: dict[Collections, Collection] = self.mongodb.testnet
+        self.devnet: dict[Collections, Collection] = self.mongodb.devnet
 
     def exit(self):
         pass

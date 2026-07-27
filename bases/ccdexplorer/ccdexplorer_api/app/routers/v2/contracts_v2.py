@@ -9,7 +9,7 @@
 import re
 
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
-from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -51,7 +51,7 @@ async def search_contracts(
     """
     search_str = str(value)
     regex = re.compile(search_str, re.IGNORECASE)
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {
@@ -98,13 +98,13 @@ async def get_paginated_contracts(
         HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=404,
             detail="Unsupported network. Choose 'mainnet' or 'testnet'.",
         )
 
-    db = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db = net_db(mongomotor, net)
 
     try:
         # total documents for client-side page computations

@@ -704,6 +704,7 @@ async def get_account(
                 "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
                 "alias_portion": alias_portion,
+                "account_locks_feature_visible": net == "devnet",
             },
         )
     else:
@@ -745,6 +746,7 @@ async def get_account(
                 "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
                 "alias_portion": alias_portion,
+                "account_locks_feature_visible": net == "devnet",
             },
         )
 

@@ -20,6 +20,7 @@ from ccdexplorer.mongodb import (
     MongoDB,
     MongoMotor,
     Collections,
+    net_db,
 )
 from redis.asyncio import Redis
 from pydantic import BaseModel
@@ -125,13 +126,13 @@ async def get_token_based_on_token_id(
         HTTPException: If the network is unsupported or the token/tag combination cannot be found.
     """
 
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
 
     if tag_result:
@@ -240,15 +241,15 @@ async def get_info_for_token_address_for_public_keys(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     contract_address = CCD_ContractAddress.from_index(contract_index, contract_subindex)
     token_id = "" if token_id == "_" else token_id
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
 
     fungible = False
@@ -318,14 +319,14 @@ async def get_info_for_token_address(
     Raises:
         HTTPException: If the network is unsupported or the token cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     token_id = "" if token_id == "_" else token_id
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
     token_from_collection = await db_to_use[Collections.tokens_token_addresses_v2].find_one(
         {"_id": token_address}
@@ -467,10 +468,10 @@ async def get_token_current_holders(
     Raises:
         HTTPException: If the network is unsupported or pagination arguments are invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -487,7 +488,7 @@ async def get_token_current_holders(
 
     token_id = "" if token_id == "_" else token_id
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         pipeline = [
             {"$match": {"token_holding.token_address": token_address}},
@@ -605,15 +606,15 @@ async def get_token_cis_2_compliance(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     token_id = "" if token_id == "_" else token_id
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     compliant_contract = True
     try:
         pipeline = [
@@ -658,13 +659,13 @@ async def get_info_for_token_tag(
     Raises:
         HTTPException: If the network is unsupported or the tag is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     result = db_to_use[Collections.tokens_tags].find_one({"_id": tag})
     if result:
         token_tag = MongoTypeTokensTag(**result)
@@ -705,10 +706,10 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     return RedirectResponse(
@@ -762,14 +763,14 @@ async def add_token_address_to_metadata_refresh_queue(
     Raises:
         HTTPException: If the network is unsupported or the token is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     token_id = "" if token_id == "_" else token_id
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     token_address = f"<{contract_index},{contract_subindex}>-{token_id}"
     token_from_collection = db_to_use[Collections.tokens_token_addresses_v2].find_one(
         {"_id": token_address}
@@ -814,13 +815,13 @@ async def get_token_tag_information(
     Raises:
         HTTPException: If the network is unsupported or the tag cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
     if result:
         return result
@@ -865,10 +866,10 @@ async def get_nft_tag_tokens(
     Raises:
         HTTPException: If the network is unsupported, pagination is invalid, or the tag is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -883,7 +884,7 @@ async def get_nft_tag_tokens(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     tag_result = await db_to_use[Collections.tokens_tags].find_one({"_id": tag})
     if not tag_result:
         raise HTTPException(

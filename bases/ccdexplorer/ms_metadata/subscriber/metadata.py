@@ -13,7 +13,7 @@ from ccdexplorer.domain.mongo import (
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import CCD_ContractAddress
-from ccdexplorer.mongodb import Collections
+from ccdexplorer.mongodb import Collections, net_db
 from pydantic import BaseModel, ConfigDict
 from pymongo.collection import Collection
 from rich.console import Console
@@ -89,6 +89,7 @@ class MetaData(Utils):
         db_to_use: dict[Collections, Collection],
         token_address_str: str,
         httpx_client: httpx.Client,
+        net: NET,
     ):
         """
         This method takes as input a typed Token address and, depending on previous attempts,
@@ -112,7 +113,7 @@ class MetaData(Utils):
             if url is None:
                 this_contract = CCD_ContractAddress.from_str(token_address_to_process.contract)
                 request = GetTokenMetadataRequest(
-                    net="mainnet",
+                    net=net.value,
                     contract_address=this_contract,
                     token_id=token_address_to_process.token_id,
                     module_name=self.get_module_name_from_contract_address(
@@ -191,7 +192,5 @@ class MetaData(Utils):
         # console.log(f"{token_address} on {net.value}")
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
-        db_to_use: dict[Collections, Collection] = (
-            self.mainnet if net == NET.MAINNET else self.testnet
-        )
-        _ = self.read_and_store_metadata(db_to_use, token_address, httpx_client)
+        db_to_use: dict[Collections, Collection] = net_db(self, net)
+        _ = self.read_and_store_metadata(db_to_use, token_address, httpx_client, net)

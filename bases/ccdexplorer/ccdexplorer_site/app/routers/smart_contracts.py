@@ -776,10 +776,10 @@ async def smart_contract_page(
     tags: dict = Depends(get_labeled_accounts),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
     request.state.api_calls = {}
     user: SiteUser | None = await get_user_detailsv2(request)

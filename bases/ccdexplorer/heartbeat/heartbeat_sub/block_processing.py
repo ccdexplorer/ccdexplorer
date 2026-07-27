@@ -74,10 +74,7 @@ class BlockProcessing:
                     )
                 console.log(f"End of day found for {previous_block_info.slot_time:%Y-%m-%d}")
 
-    def lookout_for_payday(self, current_block_to_process: CCD_BlockInfo):
-        special_events = self.grpc_client.get_block_special_events(
-            current_block_to_process.hash, NET(self.net)
-        )
+    def lookout_for_payday(self, current_block_to_process: CCD_BlockInfo, special_events: list):
         found = False
         for se in special_events:
             if se.payday_account_reward or se.payday_pool_reward:

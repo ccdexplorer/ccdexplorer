@@ -35,8 +35,10 @@ class Subscriber(_metadata, _utils):
         self.mongodb = mongodb
         self.mainnet: dict[Collections, Collection] = self.mongodb.mainnet
         self.testnet: dict[Collections, Collection] = self.mongodb.testnet
+        self.devnet: dict[Collections, Collection] = self.mongodb.devnet
         self.motor_mainnet: dict[Collections, AsyncCollection] = self.motormongo.mainnet
         self.motor_testnet: dict[Collections, AsyncCollection] = self.motormongo.testnet
+        self.motor_devnet: dict[Collections, AsyncCollection] = self.motormongo.devnet
         self.motor_utilities: dict[CollectionsUtilities, AsyncCollection] = (
             self.motormongo.utilities
         )

@@ -1,12 +1,12 @@
 import datetime as dt
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
 
 
 def update_top_impacted_addresses(context, mongodb: MongoDB, net: str):
     dct = {}
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
 
     # this is the block we last processed making the top list
     last_processed_block_for_top_list = db[Collections.helpers].find_one(

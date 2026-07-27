@@ -1,4 +1,4 @@
-from ccdexplorer.mongodb import Collections, MongoMotor, MongoDB
+from ccdexplorer.mongodb import Collections, MongoMotor, MongoDB, net_db
 from ccdexplorer.tooter import Tooter
 from ccdexplorer.env import *  # noqa: F403
 import asyncio
@@ -10,8 +10,8 @@ mongodb = MongoDB(tooter, caller_name="get_addresses")
 
 
 async def main():
-    for net in ["mainnet", "testnet"]:
-        db_to_use = motormongo.testnet if net == "testnet" else motormongo.mainnet
+    for net in ["mainnet", "testnet", "devnet"]:
+        db_to_use = net_db(motormongo, net)
 
         get_all_addresses = {
             x["_id"]: x["account_index"]

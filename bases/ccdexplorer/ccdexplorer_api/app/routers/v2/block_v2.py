@@ -20,6 +20,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,
+    net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, TX_REQUEST_LIMIT_DISPLAY
@@ -56,10 +57,10 @@ async def get_block_at_height_from_grpc(
     Raises:
         HTTPException: If the network is unsupported or the block cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -117,10 +118,10 @@ async def get_block_txs(
         HTTPException: If parameters are invalid, the block does not exist, or the
             transactions cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -135,7 +136,7 @@ async def get_block_txs(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     block = await db_to_use[Collections.blocks].find_one({"height": height})
     if block:
         block = CCD_BlockInfo(**block)
@@ -207,10 +208,10 @@ async def get_block_payday_true_false(
         HTTPException: If the network is unsupported or an error occurs while
             querying MongoDB.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -298,10 +299,10 @@ async def get_block_payday_pool_rewards(
         HTTPException: If parameters are invalid, the network is unsupported, or
             rewards cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -393,10 +394,10 @@ async def get_block_payday_account_rewards(
         HTTPException: If parameters are invalid, the network is unsupported, or
             rewards cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -477,10 +478,10 @@ async def get_block_special_events(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     special_events = grpcclient.get_block_special_events(height, net=NET(net))
@@ -516,10 +517,10 @@ async def get_block_chain_parameters(
     Raises:
         HTTPException: If the network is unsupported or the parameters cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     chain_parameters = grpcclient.get_block_chain_parameters(height, net=NET(net))
@@ -556,10 +557,10 @@ async def get_last_finalized_block(
     Raises:
         HTTPException: If the network is unsupported or the data cannot be obtained.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     result = grpcclient.get_finalized_blocks()

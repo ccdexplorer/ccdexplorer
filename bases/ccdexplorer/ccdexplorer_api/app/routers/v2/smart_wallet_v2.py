@@ -19,6 +19,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.mongodb import (
     Collections,
     MongoDB,
+    net_db,
 )
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 
@@ -93,16 +94,16 @@ async def get_all_public_keys_for_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
         {"$group": {"_id": "$address_or_public_key"}},
@@ -146,13 +147,13 @@ async def get_smart_wallet_details_from_public_key(
     Raises:
         HTTPException: If the network is unsupported or the key cannot be located.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     result = db_to_use[Collections.cis5_public_keys_info].find({"public_key": public_key})
 
     found = False
@@ -210,16 +211,16 @@ async def get_deployed_tx_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported or the key cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {
@@ -288,7 +289,7 @@ async def get_tx_count_for_public_key_from_smart_wallet_contract(
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {
@@ -346,10 +347,10 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -367,7 +368,7 @@ async def get_logged_events_for_public_key_from_smart_wallet_contract(
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {
@@ -439,16 +440,16 @@ async def get_ccd_balances_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     block_hash = "last_final"
     instance_index = wallet_contract_address_index
@@ -516,16 +517,16 @@ async def get_tokens_available_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
@@ -580,10 +581,10 @@ async def get_cis2_tokens_list_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
     if skip < 0:
         raise HTTPException(
@@ -600,7 +601,7 @@ async def get_cis2_tokens_list_for_public_key_from_smart_wallet_contract(
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
@@ -716,16 +717,16 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
@@ -888,16 +889,16 @@ async def get_all_cis2_contracts_for_public_key_from_smart_wallet_contract(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     wallet_contract_address = CCD_ContractAddress.from_index(
         wallet_contract_address_index, wallet_contract_address_subindex
     ).to_str()
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     pipeline = [
         {"$match": {"wallet_contract_address": wallet_contract_address}},
         {"$match": {"address_or_public_key": public_key}},

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .service_pb2_grpc import QueriesStub
-from ccdexplorer.env import GRPC_MAINNET, GRPC_TESTNET
+from ccdexplorer.env import GRPC_MAINNET, GRPC_TESTNET, GRPC_DEVNET
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 from .types_pb2 import *
 import grpc
@@ -28,6 +28,14 @@ GRPC_NET_UNRESPONSIVE_TOTAL = Counter(
 _RETRYABLE = {
     grpc.StatusCode.UNAVAILABLE,
     grpc.StatusCode.DEADLINE_EXCEEDED,
+}
+# Server is rejecting the call due to load (e.g. a devnet node capping
+# concurrent requests), not because the connection is broken. Worth a
+# backoff-and-retry, but NOT a channel teardown/rebuild -- forcing a fresh
+# TLS handshake on every throttled call just adds more connection load onto
+# a node that's already telling us it's overloaded.
+_THROTTLED = {
+    grpc.StatusCode.RESOURCE_EXHAUSTED,
 }
 
 HOME_IP = os.environ.get("HOME_IP", "")
@@ -215,7 +223,6 @@ class GRPCClient(  # type: ignore
     def __init__(
         self,
         net: str = "mainnet",
-        devnet: bool = False,
         *,
         warmup: bool = True,
         warmup_timeout_s: float = 1.0,
@@ -223,24 +230,21 @@ class GRPCClient(  # type: ignore
         warmup_nets: tuple[NET, ...] | None = None,
     ):
         self.net = NET(net)
-        self._was_ready = {NET.MAINNET: False, NET.TESTNET: False}
-        self.host_index = {NET.MAINNET: 0, NET.TESTNET: 0}
+        self._was_ready = {NET.MAINNET: False, NET.TESTNET: False, NET.DEVNET: False}
+        self.host_index = {NET.MAINNET: 0, NET.TESTNET: 0, NET.DEVNET: 0}
         self.hosts: dict[NET, list[dict]] = {}
         self._down_until: dict[tuple[NET, int], float] = {}
         self._cooldown_s = 30.0
         # Configure hosts
         self.hosts[NET.MAINNET] = GRPC_MAINNET
-        if devnet:
-            self.hosts[NET.MAINNET] = [
-                {"host": "--secure--grpc.devnet-p11-2.concordium.com", "port": 20000}
-            ]
-
         self.hosts[NET.TESTNET] = GRPC_TESTNET
+        self.hosts[NET.DEVNET] = GRPC_DEVNET
 
         # Reconnect locks (single-process stampede protection)
         self._reconnect_lock = {
             NET.MAINNET: threading.Lock(),
             NET.TESTNET: threading.Lock(),
+            NET.DEVNET: threading.Lock(),
         }
 
         # Build channels/stubs if host lists exist
@@ -248,12 +252,12 @@ class GRPCClient(  # type: ignore
         self.stub_mainnet = None
         self.channel_testnet = None
         self.stub_testnet = None
+        self.channel_devnet = None
+        self.stub_devnet = None
 
-        if self.hosts.get(NET.MAINNET):
-            self._connect_net(NET.MAINNET)
-
-        if self.hosts.get(NET.TESTNET):
-            self._connect_net(NET.TESTNET)
+        for n in (NET.MAINNET, NET.TESTNET, NET.DEVNET):
+            if self.hosts.get(n):
+                self._connect_net(n)
 
         # Optional warmup: bounded, never infinite
         if warmup:
@@ -288,26 +292,31 @@ class GRPCClient(  # type: ignore
             if "--secure--" in self.hosts[net][self.host_index[net]]["host"]:
                 rt = max(rt, 2.0)
 
-            # Fast readiness gate (bounded)
-            ok = self.check_connection(net, attempts=1, timeout_s=rt)
-            if not ok:
-                # If the channel is not ready, treat as retryable within our bounded loop
-                if attempt < retries:
-                    if len(self.hosts[net]) > 1:
-                        self._mark_host_down(net)
-                        self._rotate_host(net)
-                    self._reconnect_net(net)
-                    self._backoff(attempt)
-                    continue
+            # Fast readiness gate (bounded). Once a channel has been observed
+            # ready, skip this probe on the hot path -- it costs a real
+            # channel_ready_future()/result() round trip on every single call
+            # otherwise. An actual RPC failure below flips _was_ready back to
+            # False, which re-arms the probe on the next attempt/call.
+            if not self._was_ready[net]:
+                ok = self.check_connection(net, attempts=1, timeout_s=rt)
+                if not ok:
+                    # If the channel is not ready, treat as retryable within our bounded loop
+                    if attempt < retries:
+                        if len(self.hosts[net]) > 1:
+                            self._mark_host_down(net)
+                            self._rotate_host(net)
+                        self._reconnect_net(net)
+                        self._backoff(attempt)
+                        continue
 
-                # All readiness attempts exhausted → net considered unresponsive for this call
-                GRPC_NET_UNRESPONSIVE_TOTAL.labels(
-                    net=net.value,
-                    reason="connect_not_ready",
-                ).inc()
-                raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
+                    # All readiness attempts exhausted → net considered unresponsive for this call
+                    GRPC_NET_UNRESPONSIVE_TOTAL.labels(
+                        net=net.value,
+                        reason="connect_not_ready",
+                    ).inc()
+                    raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
 
-            stub = self.stub_mainnet if net == NET.MAINNET else self.stub_testnet
+            stub = getattr(self, f"stub_{net.value}")
             method = getattr(stub, method_name, None)
             if method is None:
                 raise AttributeError(f"No gRPC method {method_name}")
@@ -325,10 +334,19 @@ class GRPCClient(  # type: ignore
                 return out
 
             except grpc.RpcError as e:
-                retryable = self._is_retryable(e)
+                throttled = self._is_throttled(e)
+                retryable = throttled or self._is_retryable(e)
+
+                if throttled and attempt < retries:
+                    # Server is fine, just overloaded -- retry on the same
+                    # channel. No reconnect/rotate: that would just pile on
+                    # more connection churn against a node under load.
+                    self._backoff(attempt)
+                    continue
 
                 if retryable and attempt < retries:
-                    # Retryable error: mark not-ready, switch host if possible, then retry
+                    # Connection-level failure: mark not-ready, switch host
+                    # if possible, rebuild the channel, then retry.
                     self._was_ready[net] = False
                     if len(self.hosts[net]) > 1:
                         self._mark_host_down(net)
@@ -353,6 +371,12 @@ class GRPCClient(  # type: ignore
     def _is_retryable(self, e: grpc.RpcError) -> bool:
         try:
             return e.code() in _RETRYABLE  # type: ignore[attr-defined]
+        except Exception:
+            return False
+
+    def _is_throttled(self, e: grpc.RpcError) -> bool:
+        try:
+            return e.code() in _THROTTLED  # type: ignore[attr-defined]
         except Exception:
             return False
 
@@ -393,7 +417,7 @@ class GRPCClient(  # type: ignore
     def check_connection(
         self, net: NET = NET.MAINNET, *, attempts: int = 2, timeout_s: float = 1.0
     ) -> bool:
-        channel_to_check = self.channel_mainnet if net == NET.MAINNET else self.channel_testnet
+        channel_to_check = getattr(self, f"channel_{net.value}")
 
         for _ in range(attempts):
             try:
@@ -439,11 +463,14 @@ class GRPCClient(  # type: ignore
             self._connect_net(net)
 
     def _connect_net(self, net: NET) -> None:
-        # connect ONLY this net; leave the other untouched
+        # connect ONLY this net; leave the others untouched
+        channel, stub = self._build_channel_and_stub(net)
         if net == NET.MAINNET:
-            self.channel_mainnet, self.stub_mainnet = self._build_channel_and_stub(net)
+            self.channel_mainnet, self.stub_mainnet = channel, stub
+        elif net == NET.TESTNET:
+            self.channel_testnet, self.stub_testnet = channel, stub
         else:
-            self.channel_testnet, self.stub_testnet = self._build_channel_and_stub(net)
+            self.channel_devnet, self.stub_devnet = channel, stub
 
     def _build_channel_and_stub(self, net: NET):
         host_cfg = self.hosts[net][self.host_index[net]]
@@ -479,7 +506,7 @@ class GRPCClient(  # type: ignore
         return channel, stub
 
     def connection_info(self, caller: str, tooter: Tooter, ADMIN_CHAT_ID: int) -> None:
-        message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n"
+        message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n<code>devnet</code> - {self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['host']}:{self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['port']}\n"
         tooter.relay(
             channel=TooterChannel.NOTIFIER,
             title="",
@@ -489,7 +516,7 @@ class GRPCClient(  # type: ignore
         )
 
     async def aconnection_info(self, caller: str, tooter: Tooter, ADMIN_CHAT_ID: int) -> None:
-        message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n"
+        message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n<code>devnet</code> - {self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['host']}:{self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['port']}\n"
         tooter.relay(
             channel=TooterChannel.NOTIFIER,
             title="",

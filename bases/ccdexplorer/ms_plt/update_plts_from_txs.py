@@ -6,7 +6,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_CreatePLT,
     CCD_InitializationParameters,
 )
-from ccdexplorer.mongodb import Collections, MongoDB, CollectionsUtilities
+from ccdexplorer.mongodb import Collections, MongoDB, CollectionsUtilities, net_db
 from pymongo import DeleteOne, ReplaceOne
 from pymongo.collection import Collection
 import httpx
@@ -25,7 +25,7 @@ def log_last_heartbeat_plts_in_mongo(db: dict[Collections, Collection], height: 
 
 
 def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_height: int) -> None:
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
 
     address_plt_pairs_impacted: list[dict] = []
 
@@ -140,7 +140,7 @@ def update_plts(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heigh
 
 
 def save_new_plt(mongodb: MongoDB, net: str, tx: CCD_BlockItemSummary) -> None:
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
     db_utilities: dict[CollectionsUtilities, Collection] = mongodb.utilities
     create_plt = tx.token_creation.create_plt  # type: ignore
 

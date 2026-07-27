@@ -1,6 +1,6 @@
 import datetime as dt
 
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
 from ccdexplorer.tooter import Tooter
@@ -9,7 +9,7 @@ from ccdexplorer.tooter import Tooter
 def update_tx_types_count_hourly(
     context, mongodb: MongoDB, net: str, start: dt.datetime, end: dt.datetime
 ):
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
 
     if context:
         context.log.info(
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     current_date = start_date
     sum_total = 0
     net = "testnet"
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
     coll = db[Collections.transactions]
     print("Mongo target:", coll.database.name, coll.name)
     print("tx docs:", coll.estimated_document_count())

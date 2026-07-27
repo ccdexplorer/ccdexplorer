@@ -1,6 +1,6 @@
 import json
 import cbor2
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
@@ -47,7 +47,7 @@ def log_last_heartbeat_memo_to_hashes_in_mongo(db: dict[Collections, Collection]
 
 def update_memos_to_hashes(context, mongodb: MongoDB, net: str):
     dct = {}
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
 
     # Read heartbeat_memos_last_processed_block
     result = db[Collections.helpers].find_one({"_id": "heartbeat_memos_last_processed_block"})

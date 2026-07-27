@@ -9,7 +9,7 @@ from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.env.settings import RUN_LOCAL_STR
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor, net_db
 from ccdexplorer.tooter import Tooter
 from celery import shared_task
 from .heartbeat import Heartbeat
@@ -58,7 +58,7 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
         # block_hash) and ms_events_and_impacts (height-only, no hash — it only
         # has block_height). So resolve the hash authoritatively from the blocks
         # collection by height; balanceOf must run against this exact block.
-        db = mongodb.mainnet if RUN_ON_NET == "mainnet" else mongodb.testnet
+        db = net_db(mongodb, RUN_ON_NET)
         block_doc = db[Collections.blocks].find_one({"height": block_height}, {"hash": 1})
         if block_doc is None:
             # block not yet visible to this worker → let autoretry handle it

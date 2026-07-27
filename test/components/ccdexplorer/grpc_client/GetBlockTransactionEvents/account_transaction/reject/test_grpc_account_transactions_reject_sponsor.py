@@ -12,7 +12,7 @@ from ccdexplorer.domain.generic import NET
 
 @pytest.fixture
 def grpcclient_dev():
-    return GRPCClient(devnet=True)
+    return GRPCClient(net="devnet")
 
 
 @pytest.fixture
@@ -31,8 +31,13 @@ def tx_at_index_from(
 
 
 def test_tx_sponsor_reject(grpcclient_dev: GRPCClient):
-    block_hash = "c7f287ced1bf0b23f6727861db8c7810c703befc65a0b6961eababb2c9524659"
-    tx = tx_at_index_from(0, block_hash, grpcclient_dev)
+    # Devnet resets frequently, so look up a live transaction rather than pinning
+    # a specific block hash that will stop existing on the next reset.
+    block_hash = "last_final"
+    block = grpcclient_dev.get_block_transaction_events(block_hash, net=NET.DEVNET)
+    if not block.transaction_summaries:
+        pytest.skip("No transactions in the latest devnet block to check.")
+    tx = block.transaction_summaries[0]
     print(tx)
     # assert tx is not None
     # assert tx.account_transaction is not None

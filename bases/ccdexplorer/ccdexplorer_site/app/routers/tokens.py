@@ -787,6 +787,7 @@ async def show_plt(
         "ogp_url": request.url._url,
         "tx_type_translation_from_python": tx_type_translation_for_js(),
         # "owner_history_list": owner_history_list,
+        "plt_locks_feature_visible": net == "devnet",
     }
 
     return request.app.templates.TemplateResponse(

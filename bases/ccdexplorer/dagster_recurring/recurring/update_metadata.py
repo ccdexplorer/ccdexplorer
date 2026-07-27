@@ -3,7 +3,7 @@ from typing import Any
 
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.domain.mongo import MongoTypeTokenAddress
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo.collection import Collection
 from redis import Redis
 
@@ -34,7 +34,7 @@ def send_metadata_to_redis(r: Redis, dom: MongoTypeTokenAddress):
 def update_metadata(context, mongodb: MongoDB, redis: Redis, net: str):
     dct = {}
 
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
     """
     This method looks into the token_addresses_v2 collection and tries to read the
     metadata_url to fetch the metdata for a token.

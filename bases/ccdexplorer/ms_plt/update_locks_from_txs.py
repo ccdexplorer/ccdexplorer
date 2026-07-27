@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import grpc
+
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -7,12 +9,14 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_LockId,
     CCD_LockInfoDecoded,
 )
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo import DeleteMany, UpdateOne
 from pymongo.collection import Collection
 
 
-def resolve_account_address_from_index(db: dict[Collections, Collection], account_index: int) -> str | None:
+def resolve_account_address_from_index(
+    db: dict[Collections, Collection], account_index: int
+) -> str | None:
     entry = db[Collections.stable_address_info].find_one({"account_index": account_index})
     return entry.get("account_address") if entry else None
 
@@ -41,7 +45,7 @@ def compute_account_roles(
 
 
 def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_height: int) -> None:
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
 
     pipeline = [
         {"$match": {"block_info.height": block_height}},
@@ -86,6 +90,7 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
     links_queue = []
     for lock_id_str, entry in touched.items():
         lock_id: CCD_LockId = entry["lock_id"]
+        print(f"Working on lock_id {lock_id}")
         set_fields: dict = {"last_updated_block_height": block_height}
 
         if entry["destroyed"]:
@@ -96,43 +101,58 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
             # duplicated here - nothing on the link rows needs updating on destroy.
             set_fields["status"] = "cancelled"
         else:
-            lock_info = grpc_client.get_lock_info("last_final", lock_id, net=NET(net))
-            decoded = grpc_client.decode_lock_info(lock_info.lock_info)
-            token_ids = sorted(set(decoded.controller.tokens))
-            set_fields.update(
-                {
-                    "status": "open",
-                    "recipients": decoded.recipients,
-                    "expiry": decoded.expiry,
-                    "controller": decoded.controller.model_dump(),
-                    "funds": [fund.model_dump() for fund in decoded.funds],
-                    "token_ids": token_ids,
-                }
-            )
+            try:
+                # Query state as of the block actually being processed, not "last_final"
+                # (the current chain tip). During backfill those can be far apart, and
+                # querying the tip would incorrectly look up a lock that's since been
+                # destroyed by a later block we haven't replayed yet.
+                lock_info = grpc_client.get_lock_info(block_height, lock_id, net=NET(net))
+            except grpc.RpcError as e:
+                if isinstance(e, grpc.Call) and e.code() == grpc.StatusCode.NOT_FOUND:
+                    # Shouldn't normally happen now that we query the exact block, but
+                    # keep this as a safety net (e.g. node pruning) rather than crashing
+                    # the whole backfill run - treat it the same as an explicit destroy.
+                    print(f"lock_id {lock_id} not found at block {block_height}; marking cancelled")
+                    set_fields["status"] = "cancelled"
+                else:
+                    raise
+            else:
+                decoded = grpc_client.decode_lock_info(lock_info.lock_info)
+                token_ids = sorted(set(decoded.controller.tokens))
+                set_fields.update(
+                    {
+                        "status": "open",
+                        "recipients": decoded.recipients,
+                        "expiry": decoded.expiry,
+                        "controller": decoded.controller.model_dump(),
+                        "funds": [fund.model_dump() for fund in decoded.funds],
+                        "token_ids": token_ids,
+                    }
+                )
 
-            # Roles change over time (e.g. LockReturn removes a funder entirely), and the
-            # lock's full state is already re-fetched live above, so fully resync this
-            # lock's link rows too rather than accumulating stale ones. Link rows only
-            # record the relationship (which accounts, in which roles) - lock attributes
-            # like status/expiry/token_ids live solely on `plts_locks` and are joined in
-            # at query time, not duplicated here.
-            account_roles = compute_account_roles(db, lock_id, decoded)
-            links_queue.append(DeleteMany({"lock_id_str": lock_id_str}))
-            for account, roles in account_roles.items():
-                links_queue.append(
-                    UpdateOne(
-                        {"_id": f"{lock_id_str}::{account[:29]}"},
-                        {
-                            "$set": {
-                                "lock_id_str": lock_id_str,
-                                "account_address": account,
-                                "account_address_canonical": account[:29],
-                                "account_roles": sorted(roles),
-                                "last_updated_block_height": block_height,
-                            }
-                        },
-                        upsert=True,
-                    )
+                # Roles change over time (e.g. LockReturn removes a funder entirely), and
+                # the lock's full state is already re-fetched live above, so fully resync
+                # this lock's link rows too rather than accumulating stale ones. Link rows
+                # only record the relationship (which accounts, in which roles) - lock
+                # attributes like status/expiry/token_ids live solely on `plts_locks` and
+                # are joined in at query time, not duplicated here.
+                account_roles = compute_account_roles(db, lock_id, decoded)
+                links_queue.append(DeleteMany({"lock_id_str": lock_id_str}))
+                for account, roles in account_roles.items():
+                    links_queue.append(
+                        UpdateOne(
+                            {"_id": f"{lock_id_str}::{account[:29]}"},
+                            {
+                                "$set": {
+                                    "lock_id_str": lock_id_str,
+                                    "account_address": account,
+                                    "account_address_canonical": account[:29],
+                                    "account_roles": sorted(roles),
+                                    "last_updated_block_height": block_height,
+                                }
+                            },
+                            upsert=True,
+                        )
                 )
 
         queue.append(

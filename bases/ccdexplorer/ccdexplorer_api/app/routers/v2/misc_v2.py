@@ -29,6 +29,7 @@ from ccdexplorer.mongodb import (
     CollectionsUtilities,
     MongoDB,
     MongoMotor,
+    net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -73,10 +74,10 @@ async def get_tx_data_for_project(
     """
     Endpoint to get transactions counts for projects (and the chain).
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
@@ -105,13 +106,13 @@ async def get_today_in_data(
     """
     Endpoint to get all interesting facts for this day.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     return_result = {"date": date}
 
@@ -220,13 +221,13 @@ async def get_bictory_cns_domain(
     """
     Endpoint to get possible Bictory CNS Domain name from tokenId.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     result = await db_to_use[Collections.cns_domains].find_one({"_id": tokenID})
     if result:
         return JSONResponse({"domain_name": result["domain_name"]})
@@ -250,13 +251,13 @@ async def get_credential_issuers(
     """
     Endpoint to get credential issuers for the requested net.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     result = await db_to_use[Collections.credentials_issuers].find({}).to_list(length=None)
     if result:
         credential_issuers = [x["_id"] for x in result]
@@ -281,10 +282,10 @@ async def get_spot_exchange_rates(
     """
     Endpoint to get spot exchange rates.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     return exchange_rates
@@ -301,11 +302,11 @@ async def get_protocol_updates(
     """
     Endpoint to get protocol update transactions for the requested net.
     """
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    if net not in ["mainnet", "testnet"]:
+    db_to_use = net_db(mongomotor, net)
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     pipeline = [
@@ -315,6 +316,28 @@ async def get_protocol_updates(
 
     result = await await_await(db_to_use, Collections.transactions, pipeline)
     return result
+
+
+@router.get("/{net}/misc/current-node")
+async def get_current_node(
+    request: Request,
+    net: str,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """
+    Endpoint to get the identity (host:port) of the gRPC node currently
+    selected for the requested net. Best-effort: GRPCClient can rotate hosts
+    on failure, so this reflects whichever host most recently served (or was
+    last attempted for) a call on this net -- intended for diagnostics, not
+    as a guarantee of which node served any specific prior request.
+    """
+    if net not in ["mainnet", "testnet", "devnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
+        )
+    return {"node": grpcclient.current_node(NET(net))}
 
 
 @router.get("/{net}/misc/identity-providers")
@@ -327,10 +350,10 @@ async def get_identity_providers(
     """
     Endpoint to get identity providers for the requested net.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     identity_providers = grpcclient.get_identity_providers("last_final", NET(net))
@@ -347,10 +370,10 @@ async def get_anonymity_revokers(
     """
     Endpoint to get anonymity revokers for the requested net.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     anonymity_revokers = grpcclient.get_anonymity_revokers("last_final", NET(net))
@@ -370,10 +393,10 @@ async def get_labeled_accounts(
     """
     Endpoint to get community labeled accounts.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     # labeled accounts only exist for mainnet
@@ -421,10 +444,10 @@ async def get_community_labeled_accounts(
     """
     Endpoint to get community labeled accounts (indexes).
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     # labeled accounts only exist for mainnet
@@ -542,10 +565,10 @@ async def get_data_for_chain_analysis(
     """
     Endpoint to get data for analysis.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     dates_to_include = generate_dates_from_start_until_end(start_date, end_date)
@@ -576,10 +599,10 @@ async def get_data_for_analysis(
     """
     Endpoint to get data for analysis.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -613,10 +636,10 @@ async def get_nodes_count(
     """
     Endpoint to get count of all validator nodes.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     db_to_use = mongomotor.mainnet
@@ -644,10 +667,10 @@ async def get_node_info(
     """
     Endpoint to get node information for a given node id.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     db_to_use = mongomotor.mainnet
@@ -671,10 +694,10 @@ async def get_all_project_ids(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     project_ids = {}
@@ -696,10 +719,10 @@ async def get_project_id(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> Any | None:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     result = await mongomotor.utilities[CollectionsUtilities.projects].find_one({"_id": project_id})
@@ -718,13 +741,13 @@ async def get_project_addresses(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     project_addresses = (
         await db_to_use[Collections.projects].find({"project_id": project_id}).to_list(length=None)
     )
@@ -762,10 +785,10 @@ async def get_consensus_detailed_status(
     """
     Endpoint to get consensus detailed status for the requested net.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -952,10 +975,10 @@ async def get_winning_bakers_epoch(
 
     Currently not in use.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:

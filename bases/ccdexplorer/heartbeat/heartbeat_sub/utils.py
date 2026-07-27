@@ -61,7 +61,10 @@ class Utils:
             {
                 "_id": f"block_failure_{current_block_to_process.height}",
                 "height": current_block_to_process.height,
-                "Exception": e,
+                # Store as text, not the exception object -- pymongo can't
+                # BSON-encode arbitrary exception types (e.g. grpc.RpcError),
+                # and a failure here would crash error logging itself.
+                "Exception": f"{type(e).__name__}: {e}",
             },
             upsert=True,
         )

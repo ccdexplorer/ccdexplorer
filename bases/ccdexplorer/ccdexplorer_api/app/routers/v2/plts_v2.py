@@ -10,7 +10,7 @@ from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrapper
 import dateutil
 import grpc
 from grpc._channel import _MultiThreadedRendezvous
-from ccdexplorer.mongodb import Collections, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from ccdexplorer.domain.generic import NET
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -71,10 +71,10 @@ async def get_all_plt_tokens_from_node(
     Raises:
         HTTPException: If the network is unsupported or the node call fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:
@@ -114,11 +114,11 @@ async def get_all_plt_tokens(
     Raises:
         HTTPException: If the network is unsupported or no data is available.
     """
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
-    if net not in ["mainnet", "testnet"]:
+    db_to_use = net_db(mongomotor, net)
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     result = await db_to_use[Collections.plts_tags].find({}).to_list(length=None)
@@ -141,10 +141,10 @@ async def get_all_plt_tokens_at_block(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> list[CCD_TokenId]:
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     try:

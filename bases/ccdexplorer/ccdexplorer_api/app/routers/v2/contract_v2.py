@@ -19,6 +19,7 @@ from ccdexplorer.cis import CIS
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
+    net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
@@ -85,7 +86,7 @@ async def get_balance_of(req: GetBalanceOfRequest):
     invoking the balanceOf method on the CIS-2 compatible contract.
     To make this call, we need the contract, the corresponding module name and token_id.
     """
-    db_to_use = req.motor.testnet if req.net == "testnet" else req.motor.mainnet
+    db_to_use = net_db(req.motor, req.net)
     ci = CIS(
         req.grpcclient,
         req.contract_address.index,
@@ -207,13 +208,13 @@ async def get_schema_from_source(
     Raises:
         HTTPException: If the network is unsupported or the schema cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     result = await db_to_use[Collections.instances].find_one(
         {"_id": CCD_ContractAddress.from_index(contract_index, contract_subindex).to_str()}
@@ -279,13 +280,13 @@ async def get_token_information(
     Raises:
         HTTPException: If the network is unsupported or no metadata exists.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     result = (
         await db_to_use[Collections.tokens_tags]
@@ -337,12 +338,12 @@ async def get_contract_information(
     Raises:
         HTTPException: If the network is unsupported or the instance is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_info_grpc = grpcclient.get_instance_info(
         contract_index,
         contract_subindex,
@@ -405,10 +406,10 @@ async def get_instance_CIS_support(
     Raises:
         HTTPException: If the network is unsupported or the instance is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if "." in net:
@@ -416,7 +417,7 @@ async def get_instance_CIS_support(
     else:
         net_to_use = NET(net)
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
     if result:
@@ -471,10 +472,10 @@ async def get_instance_CIS_support_multiple(
     Raises:
         HTTPException: If the network is unsupported or the instance is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if "." in net:
@@ -482,7 +483,7 @@ async def get_instance_CIS_support_multiple(
     else:
         net_to_use = NET(net)
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
     if result:
@@ -535,13 +536,13 @@ async def get_instance_tnt_ids(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
         {"$match": {"event_info.standard": "CIS-6"}},
@@ -596,13 +597,13 @@ async def get_instance_tnt_logged_events(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline_for_all = [
         {"$match": {"event_info.standard": "CIS-6"}},
@@ -656,13 +657,13 @@ async def get_instance_tnt_logged_events_for_item_id(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     pipeline = [
         {"$match": {"event_info.standard": "CIS-6"}},
@@ -703,13 +704,13 @@ async def get_contract_tokens_available(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     result_list = list(
         await db_to_use[Collections.tokens_links_v3]
@@ -749,13 +750,13 @@ async def get_instance_tag_information(
     Raises:
         HTTPException: If the network is unsupported or the tag is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     instance_address = f"<{contract_index},{contract_subindex}>"
     result = await db_to_use[Collections.tokens_tags].find_one(
         {"contracts": {"$in": [instance_address]}}
@@ -797,13 +798,13 @@ async def get_contract_deployment_tx(
     Raises:
         HTTPException: If the network is unsupported or the transaction is missing.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     pipeline = [
         {"$match": {"account_transaction.effects.contract_initialized": {"$exists": True}}},
         {
@@ -849,13 +850,13 @@ async def get_contract_txs_count(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {

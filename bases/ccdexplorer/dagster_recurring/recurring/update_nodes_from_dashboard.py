@@ -2,14 +2,14 @@ import datetime as dt
 
 import httpx
 from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
-from ccdexplorer.mongodb import Collections, MongoDB
+from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
 
 
 def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> int:
     len_nodes = 0
-    db: dict[Collections, Collection] = mongodb.mainnet if net == "mainnet" else mongodb.testnet
+    db: dict[Collections, Collection] = net_db(mongodb, net)
     with httpx.Client() as client:
         if net == "testnet":
             url = "https://dashboard.testnet.concordium.com/nodesSummary"

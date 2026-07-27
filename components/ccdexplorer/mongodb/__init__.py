@@ -5,6 +5,7 @@ from ccdexplorer.mongodb.core import (
     CollectionsUtilities,
     Collection,
     build_collection_identifier,
+    net_db,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "CollectionsUtilities",
     "Collection",
     "build_collection_identifier",
+    "net_db",
 ]

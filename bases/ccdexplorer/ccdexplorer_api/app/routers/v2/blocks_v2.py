@@ -11,6 +11,7 @@ from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
+    net_db,
 )
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType  # noqa
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
@@ -48,13 +49,13 @@ async def get_last_blocks(
     Raises:
         HTTPException: If the network is unsupported or the query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     limit = min(50, max(limit, 1))
     error = None
     try:
@@ -64,7 +65,7 @@ async def get_last_blocks(
         print(error)
         result = None
 
-    if result:
+    if result is not None:
         return result
     else:
         raise HTTPException(
@@ -102,13 +103,13 @@ async def get_paginated_blocks(
         HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=404,
             detail="Unsupported network. Choose 'mainnet' or 'testnet'.",
         )
 
-    db = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db = net_db(mongomotor, net)
 
     try:
         # total documents for client-side page computations
@@ -155,10 +156,10 @@ async def get_last_blocks_newer_than(
         HTTPException: If the network is unsupported or the query fails.
     """
 
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if since == 0:
@@ -167,7 +168,7 @@ async def get_last_blocks_newer_than(
             detail="`Since` parameter cannot be zero.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     error = None
     try:
         result = (

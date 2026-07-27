@@ -112,6 +112,7 @@ class TypeContentsCategories(Enum):
     chain = "Chain"
     rejected = "Rejected"
     plt = "PLT"
+    meta_update_effect = "PLT Lock"
 
 
 class TypeContentsCategoryColors(Enum):
@@ -123,6 +124,7 @@ class TypeContentsCategoryColors(Enum):
     chain = ("#FFFDE4",)
     rejected = ("#DC5050",)
     plt = ("#4A90E2",)
+    meta_update_effect = ("#4A90E2",)
 
 
 class TypeContents(BaseModel):
@@ -269,9 +271,15 @@ tx_type_translation["create_plt"] = TypeContents(
 )
 
 tx_type_translation["token_update_effect"] = TypeContents(
-    display_str="token update",
+    display_str="PLT - token update",
     category=TypeContentsCategories.plt,
     color=TypeContentsCategoryColors.plt.value[0],
+)
+
+tx_type_translation["meta_update_effect"] = TypeContents(
+    display_str="PLT - lock update",
+    category=TypeContentsCategories.meta_update_effect,
+    color=TypeContentsCategoryColors.meta_update_effect.value[0],
 )
 
 for event_type in [
@@ -449,6 +457,11 @@ def tx_type_translator(
     tx_type_contents: str, request_type: str, sponsor: CCD_SponsorDetails | None = None
 ) -> str | None:
     result = tx_type_translation.get(tx_type_contents, None)
+    if result is None and "-" in tx_type_contents:
+        # Unregistered event subtype (e.g. a PLT module event like "assign
+        # admin roles" that isn't in the hardcoded transfer/mint/burn/...
+        # list) -- fall back to the base type instead of showing nothing.
+        result = tx_type_translation.get(tx_type_contents.split("-")[0], None)
     if result:
         result: TypeContents
         if request_type == "icon":
@@ -468,6 +481,8 @@ def tx_type_translator(
                 icon = (
                     f'<i  style="color:{result.color};" class="bi bi-wrench-adjustable-circle"></i>'
                 )
+            elif result.category == TypeContentsCategories.meta_update_effect:
+                icon = f'<i  style="color:{result.color};" class="bi bi-lock-fill"></i>'
             elif result.category == TypeContentsCategories.chain:
                 icon = '<img class="tiny-logo" src="/static/logos/small-logo-grey.png" alt="small-logo" height="16px" width="16px">'
 
@@ -1061,7 +1076,12 @@ def account_label_on_index(
                 account_labeled = True
 
     if not account_label:
-        if community_labels:
+        # community_labels is always sourced from mainnet (see factory.py's
+        # repeated_task_get_community_labeled_accounts) and keyed by plain
+        # integer account index, which collides across nets -- e.g. mainnet's
+        # "First-Day-64" label would otherwise bleed onto testnet/devnet
+        # account index 64. Only apply it when actually viewing mainnet.
+        if community_labels and net == "mainnet":
             account_labeled = str(account_index) in community_labels["labels_melt"]
             # get_address_identifiers(str(account_index), net)
             if account_labeled:

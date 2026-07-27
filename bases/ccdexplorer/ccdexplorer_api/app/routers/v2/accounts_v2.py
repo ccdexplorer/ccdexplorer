@@ -41,6 +41,7 @@ from ccdexplorer.mongodb import (
     Collections,
     CollectionsUtilities,
     MongoMotor,
+    net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -77,13 +78,13 @@ async def get_last_accounts_newer_than(
     Raises:
         HTTPException: If the network is unsupported or MongoDB query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     response = await httpx_client.get(f"{request.app.api_url}/v2/{net}/misc/identity-providers")
     identity_providers = {}
     for id in response.json():
@@ -165,13 +166,13 @@ async def get_accounts_count_estimate(
     Raises:
         HTTPException: If the network is unsupported or the query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = await await_await(
             db_to_use,
@@ -216,10 +217,10 @@ async def get_account_indexes(
     Raises:
         HTTPException: If the network is unsupported or the query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     body = await request.body()
@@ -228,7 +229,7 @@ async def get_account_indexes(
 
     else:
         account_ids = []
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = await await_await(
             db_to_use,
@@ -290,7 +291,7 @@ async def search_accounts(
     regex = re.compile(search_str, re.IGNORECASE)
     search_str_canonical = str(value)[:29]
     regex_canonical = re.compile(search_str_canonical, re.IGNORECASE)
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {"$addFields": {"account_index_str": {"$toString": "$account_index"}}},
@@ -329,10 +330,10 @@ async def get_account_addresses(
     Raises:
         HTTPException: If the network is unsupported or the lookup fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     body = await request.body()
@@ -341,7 +342,7 @@ async def get_account_addresses(
 
     else:
         account_indexes = []
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = await await_await(
             db_to_use,
@@ -383,13 +384,13 @@ async def get_current_payday_info(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = (
             await db_to_use[Collections.paydays_v2_current_payday].find({}).to_list(length=None)
@@ -419,13 +420,13 @@ async def get_last_payday_info(
     Endpoint to get the last payday block info.
 
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     result = await db_to_use[Collections.paydays_v2].find_one(sort=[("date", -1)])
     if result:
         return result
@@ -449,13 +450,13 @@ async def get_last_accounts(
     Endpoint to get the last X accounts. Maxes out at 50.
 
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     count = min(50, max(count, 1))
     error = None
     try:
@@ -523,7 +524,7 @@ async def get_business_accounts(
             detail="This endpoint only supports mainnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     error = None
     if sort_key:
         sort_key = "nonce" if sort_key == "sequence_number" else sort_key
@@ -586,13 +587,13 @@ async def get_nodes_and_validators(
     Endpoint to get nodes and validators. Note: validator information is updated once a day at the payday moment.
 
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     all_nodes = await db_to_use[Collections.dashboard_nodes].find({}).to_list(length=None)
     all_nodes_by_node_id = {x["nodeId"]: x for x in all_nodes}
@@ -676,13 +677,13 @@ async def get_validator_primed_suspended_information(
     """
     Endpoint to get validator primed suspended information.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {"$match": {"action": "suspended"}},
@@ -756,14 +757,14 @@ async def get_payday_pools(
     """
     Endpoint to get payday pools.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     #### get dashboard nodes to get node name
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     all_nodes = await await_await(db_to_use, Collections.dashboard_nodes, [])
     pools_for_status: dict[str, list] = {}
@@ -916,10 +917,10 @@ async def get_paydays(
     """
     Endpoint to get paydays.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -934,7 +935,7 @@ async def get_paydays(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     total_rows = await db_to_use[Collections.paydays_v2].count_documents({})
     result = (
         await db_to_use[Collections.paydays_v2]
@@ -964,10 +965,10 @@ async def get_payday_passive_info(
     """
     Endpoint to get payday passive information.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     passive_delegation_info = grpcclient.get_passive_delegation_info("last_final")
@@ -989,10 +990,10 @@ async def get_payday_passive_delegators(
     """
     Endpoint to get payday passive delegators.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -1055,10 +1056,10 @@ async def get_paginated_scheduled_release_accounts(
     for that account. (Note, this only identifies accounts by index,
     and only indicates the first pending release for each account.)
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     scheduled_release_accounts_org = grpcclient.get_scheduled_release_accounts(
@@ -1107,10 +1108,10 @@ async def get_scheduled_release_accounts(
 
     Currently not in use.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     scheduled_release_accounts = grpcclient.get_scheduled_release_accounts("last_final", NET(net))
@@ -1136,10 +1137,10 @@ async def get_cooldown_accounts(
     and only indicates the first pending cooldown for each account.)
     Prior to protocol version 7, the resulting stream will always be empty.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     cooldown_accounts = grpcclient.get_cooldown_accounts("last_final", NET(net))
@@ -1178,10 +1179,10 @@ async def get_pre_cooldown_accounts(
     (This only identifies accounts by index.) Prior to protocol version 7,
     the resulting stream will always be empty.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     pre_cooldown_accounts = grpcclient.get_pre_cooldown_accounts("last_final", NET(net))
@@ -1205,10 +1206,10 @@ async def get_pre_pre_cooldown_accounts(
     (This only identifies accounts by index.) Prior to protocol version 7,
     the resulting stream will always be empty.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     pre_pre_cooldown_accounts = grpcclient.get_pre_pre_cooldown_accounts("last_final", NET(net))
@@ -1234,13 +1235,13 @@ async def get_paginated_accounts(
     Endpoint to page through the `accounts` collection using skip/limit.
     """
     # validate network
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=404,
             detail="Unsupported network. Choose 'mainnet' or 'testnet'.",
         )
 
-    db = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db = net_db(mongomotor, net)
     limit = min(limit, 100)
     response = await httpx_client.get(f"{request.app.api_url}/v2/{net}/misc/identity-providers")
     identity_providers = {}
@@ -1322,12 +1323,12 @@ async def get_credential_commitment_attributes_summary(
     """
     Endpoint to get a summary of credential commitment attributes information for all accounts
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         {"$unwind": "$credentials"},
@@ -1371,12 +1372,12 @@ async def get_credential_ip_usage_summary(
     """
     Endpoint to get a summary of credential IP usage information for all accounts
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     pipeline = [
         # One row per credential
@@ -1459,10 +1460,10 @@ async def get_net_transfers_for_accounts(
     Raises:
         HTTPException: If the network is unsupported or the body is invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     body = await request.body()
@@ -1483,7 +1484,7 @@ async def get_net_transfers_for_accounts(
     counterparty_labels = body_dict.get("counterparty_labels", True)
     min_hold_days = body_dict.get("min_hold_days")
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     # Resolve account indexes to their canonical (29-char) addresses.
     address_docs = await await_await(

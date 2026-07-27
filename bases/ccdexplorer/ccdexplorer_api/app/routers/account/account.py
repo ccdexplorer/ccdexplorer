@@ -6,8 +6,8 @@ from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,
     CollectionsUtilities,
+    net_db,
 )
-
 import datetime as dt
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
 from fastapi import APIRouter, Depends, Request
@@ -100,9 +100,7 @@ async def account_home(
         motormongo=mongomotor, app=request.app, for_="account_home"
     )
     # find transactions through logged events
-    db_to_use = (
-        request.app.motormongo.testnet if API_NET == "testnet" else request.app.motormongo.mainnet
-    )
+    db_to_use = net_db(request.app.motormongo, API_NET)
 
     _ = await get_payment_tx_and_update_payments(request, user, db_to_use)
     # read user again back from updated db

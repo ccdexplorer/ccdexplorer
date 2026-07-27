@@ -21,7 +21,7 @@ def grpcclient():
 
 @pytest.fixture
 def grpcclient_devnet():
-    return GRPCClient(devnet=True)
+    return GRPCClient(net="devnet")
 
 
 def tx_at_index_from(
@@ -81,7 +81,8 @@ def test_tx_effect_account_transfer_plt_mint_and_transfer(grpcclient: GRPCClient
 
 
 def test_tx_plt_create_lock_devnet(grpcclient_devnet: GRPCClient):
-    # tx_hash="1e21c8af2dc081703a775a26cbbeb2f29e27c36f624c4fc3a99553fd6133d440"
-    block_hash = ""
-    tx = tx_at_index_from(0, block_hash, grpcclient_devnet, net=NET.TESTNET)
-    print(tx)
+    block_hash = "last_final"
+    block = grpcclient_devnet.get_block_transaction_events(block_hash, net=NET.DEVNET)
+    if not block.transaction_summaries:
+        pytest.skip("No transactions in the latest devnet block to check.")
+    print(block.transaction_summaries[0])

@@ -11,7 +11,7 @@ from ccdexplorer.ccdexplorer_api.app.models import User
 from pymongo.asynchronous.database import AsyncDatabase
 from ccdexplorer.domain.mongo import MongoTypeBlockPerDay
 from ccdexplorer.tooter import TooterChannel, TooterType
-from ccdexplorer.mongodb import CollectionsUtilities, Collections
+from ccdexplorer.mongodb import CollectionsUtilities, Collections, net_db
 
 
 def get_dict_diff(old_dict: dict, new_dict: dict) -> str:
@@ -226,11 +226,7 @@ def get_blocks_per_day(
 
     else:
         if "net" in req.path_params:
-            db_to_use = (
-                req.app.mongodb.testnet
-                if req.path_params["net"] == "testnet"
-                else req.app.mongodb.mainnet
-            )
+            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
         else:
             db_to_use = req.app.mongodb.mainnet
 
@@ -257,11 +253,7 @@ def get_memos(
         # print("memo_transfers from cache.")
     else:
         if "net" in req.path_params:
-            db_to_use = (
-                req.app.mongodb.testnet
-                if req.path_params["net"] == "testnet"
-                else req.app.mongodb.mainnet
-            )
+            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
         set_memos = {
             x["_id"]: x["tx_hashes"] for x in db_to_use[Collections.memos_to_hashes].find({})
         }

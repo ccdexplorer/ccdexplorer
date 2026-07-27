@@ -1,6 +1,7 @@
 import pytest
 
 
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from rich import print
 
@@ -20,12 +21,12 @@ def test_token_list(grpcclient: GRPCClient):
 
 @pytest.fixture
 def grpcclient_devnet():
-    return GRPCClient(devnet=True)
+    return GRPCClient(net="devnet")
 
 
 def test_token_list_devnet(grpcclient_devnet: GRPCClient):
     block_hash = "last_final"
-    token_list = grpcclient_devnet.get_token_list(block_hash)
+    token_list = grpcclient_devnet.get_token_list(block_hash, net=NET.DEVNET)
     assert isinstance(token_list, list)
     # assert token_list == ["USDR", "EURR"]
     print(token_list)

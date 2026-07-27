@@ -8,7 +8,7 @@ from ccdexplorer.tooter import Tooter
 tooter: Tooter = Tooter()
 mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_recurring")
 
-net_partition = dg.StaticPartitionsDefinition(["mainnet", "testnet"])
+net_partition = dg.StaticPartitionsDefinition(["mainnet", "testnet", "devnet"])
 hourly_partition = dg.HourlyPartitionsDefinition(
     start_date="2021-06-09-09", timezone="UTC", fmt="%Y-%m-%d-%H"
 )

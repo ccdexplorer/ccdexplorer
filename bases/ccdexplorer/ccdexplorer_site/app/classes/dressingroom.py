@@ -209,7 +209,7 @@ class MakeUp:
                     display_value = token_amount_using_decimals_rounded(
                         int(self.additional_info["amount"]), decimals, 0
                     )
-                    type_additional_info = f'{display_value} <span class="ccd">{self.additional_info["token_id"]}</span>'
+                    type_additional_info = f'<span class="ccd">{display_value}</span> <span class="ccd">{self.additional_info["token_id"]}</span>'
 
                 elif "token_id" in self.additional_info:
                     if not plt_page:
@@ -1055,6 +1055,10 @@ class MakeUp:
                     self.classifier = TransactionClassifier.PLT
                     self.process_plt_events(effects.token_update_effect.events)
 
+                elif effects.meta_update_effect:
+                    self.classifier = TransactionClassifier.PLT
+                    self.process_meta_events(effects.meta_update_effect.events)
+
                 elif effects.delegation_configured:
                     self.classifier = TransactionClassifier.Baking
 
@@ -1635,6 +1639,103 @@ class MakeUp:
                 ),
             }
             plt_string = f'PLT: <a href="/{self.net}/tokens/{event.token_id}"><span class="ccd">{event.token_id if not display_name else display_name}</span></a>'
+            if event.transfer_event:
+                memo = (
+                    f"Memo: {decode_memo(event.transfer_event.memo)}"
+                    if event.transfer_event.memo
+                    else None
+                )
+                self.additional_info["amount"] = int(event.transfer_event.amount.value)
+                new_event = EventType(
+                    f"Transferred {token_amount_using_decimals_rounded(int(event.transfer_event.amount.value), decimals)} from {account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    plt_string,
+                    memo if memo else None,
+                )
+
+            elif event.mint_event is not None:
+                self.additional_info["amount"] = int(event.mint_event.amount.value)
+                new_event = EventType(
+                    f"Minted {token_amount_using_decimals_rounded(int(event.mint_event.amount.value), decimals)} to {account_link(event.mint_event.target.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    plt_string,
+                    None,
+                )
+
+            elif event.burn_event is not None:
+                self.additional_info["amount"] = int(event.burn_event.amount.value)
+                new_event = EventType(
+                    f"Burned {token_amount_using_decimals_rounded(int(event.burn_event.amount.value), decimals)} from {account_link(event.burn_event.target.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                    plt_string,
+                    None,
+                )
+
+            elif event.module_event is not None:
+                new_event = EventType(
+                    f"Module event:  {event.module_event.type}",
+                    plt_string,
+                    None,
+                )
+            if new_event:
+                self.events_list.append(new_event)
+
+    def process_meta_events(self, events: list[CCD_MetaEvent]):
+        new_event = None
+        for event in events:
+            # Lock create/destroy events aren't tied to a single PLT token
+            # (a lock is a per-account vault, not a token-scoped concept),
+            # so they're handled separately from the token/transfer/mint/
+            # burn/module events below, which all carry their own token_id.
+            if event.lock_create_event is not None:
+                lock = event.lock_create_event.lock_id
+                lock_id = lock.to_str()
+                lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
+                new_event = EventType(
+                    f'Lock created: <a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock_id}</span></a>',
+                    None,
+                    None,
+                )
+                self.events_list.append(new_event)
+                continue
+
+            if event.lock_destroy_event is not None:
+                lock = event.lock_destroy_event.lock_id
+                lock_id = lock.to_str()
+                lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
+                new_event = EventType(
+                    f'Lock destroyed: <a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock_id}</span></a>',
+                    None,
+                    None,
+                )
+                self.events_list.append(new_event)
+                continue
+
+            token_id = (
+                (event.transfer_event.token_id if event.transfer_event else None)
+                or (event.mint_event.token_id if event.mint_event else None)
+                or (event.burn_event.token_id if event.burn_event else None)
+                or (event.module_event.token_id if event.module_event else None)
+            )
+
+            if token_id:
+                plt = self.app.plt_cache[self.net].get(token_id)
+                decimals = plt.get("decimals", 0) if plt else 0
+                display_name = (
+                    plt.get("initialization_parameters", {}).get("name", "") if plt else None
+                )
+                plt_string = f'PLT: <a href="/{self.net}/tokens/{token_id}"><span class="ccd">{token_id if not display_name else display_name}</span></a>'
+            else:
+                decimals = 0
+                plt_string = "PLT"
+
+            self.additional_info = {
+                "type": "plt",
+                "token_id": token_id,
+                "event_type": (
+                    self.transaction.type.additional_data
+                    if self.transaction.type is not None
+                    else ""
+                ),
+            }
+
             if event.transfer_event:
                 memo = (
                     f"Memo: {decode_memo(event.transfer_event.memo)}"

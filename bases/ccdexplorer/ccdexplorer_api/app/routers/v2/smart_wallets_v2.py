@@ -7,7 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
-from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor, net_db
 from fastapi import APIRouter, Depends, Request, Security, HTTPException
 from fastapi.responses import JSONResponse
 from pymongo.collection import Collection
@@ -49,10 +49,10 @@ async def get_last_smart_wallet_transactions_newer_than(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     return await _get_paginated_smart_wallets_txs_non_route(
@@ -85,13 +85,13 @@ async def get_all_smart_wallet_contracts_info(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     distinct_wallet_addresses = list(
         db_to_use[Collections.cis5_public_keys_contracts].distinct("wallet_contract_address")
     )
@@ -186,13 +186,13 @@ async def get_all_smart_wallet_contracts(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     distinct_wallet_addresses = list(
         db_to_use[Collections.cis5_public_keys_contracts].distinct("wallet_contract_address")
     )
@@ -257,13 +257,13 @@ async def get_smart_wallet_public_key_creations_per_day(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     height_for_first_block_start_date, height_for_last_block_end_date = (
         get_block_ranges_from_start_and_end_dates(start_date, end_date, db_to_use)
     )
@@ -293,7 +293,7 @@ async def _get_paginated_smart_wallets_txs_non_route(
     """
     Internal function to get paginated smart wallets transactions.
     """
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
 
     distinct_wallet_addresses = (
         await db_to_use[Collections.cis5_public_keys_contracts].distinct("wallet_contract_address")
@@ -399,10 +399,10 @@ async def get_paginated_smart_wallets_txs(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:

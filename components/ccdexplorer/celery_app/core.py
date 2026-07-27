@@ -22,7 +22,9 @@ class TaskResult(BaseModel):
     queue: str = Field(..., description="Processor/queue name, e.g. 'plt'.")
     block_height: Optional[int] = None
     token_address: Optional[str] = None
-    net: str = Field(..., pattern="^(mainnet|testnet)$", description="Network this task ran on.")
+    net: str = Field(
+        ..., pattern="^(mainnet|testnet|devnet)$", description="Network this task ran on."
+    )
     status: Literal["STARTED", "SUCCESS", "FAILURE"] = Field(
         ..., description="Task execution status."
     )
@@ -48,7 +50,11 @@ sentry_sdk.init(
     send_default_pii=True,
 )
 
-RESULT_MONGO_DB = "concordium_mainnet" if RUN_ON_NET == "mainnet" else "concordium_testnet"
+RESULT_MONGO_DB = {
+    "mainnet": "concordium_mainnet",
+    "testnet": "concordium_testnet",
+    "devnet": "concordium_devnet",
+}[RUN_ON_NET]
 
 app = Celery("ccd")
 app.conf.update(
@@ -86,7 +92,11 @@ def store_result_in_mongo(mongodb: MongoDB, task: TaskResult) -> None:
     if task.traceback:
         native["traceback"] = task.traceback
 
-    db_to_use = mongodb.mainnet if task.net == "mainnet" else mongodb.testnet
+    db_to_use = {
+        "mainnet": mongodb.mainnet,
+        "testnet": mongodb.testnet,
+        "devnet": mongodb.devnet,
+    }[task.net]
     db_to_use[Collections.celery_taskmeta].update_one(
         {"_id": task.id}, {"$set": native}, upsert=True
     )

@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,
+    net_db,
 )
 from typing import Optional
 from pydantic import BaseModel
@@ -86,13 +87,13 @@ async def get_transaction_types(
     Raises:
         HTTPException: If the network is unsupported or the types cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     collection_to_get = "$counts" if collection != "sponsored" else "$sponsored_counts"
     pipeline = [
         # Turn {"counts": {"a": 2, "b": 5}} into [{"k":"a","v":2},{"k":"b","v":5}]
@@ -141,13 +142,13 @@ async def get_last_transactions(
     Raises:
         HTTPException: If the network is unsupported, the filter is invalid, or the query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     count = min(50, max(count, 1))
     error = None
 
@@ -207,13 +208,13 @@ async def get_last_transactions_newer_than(
     Raises:
         HTTPException: If the network is unsupported or the database query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = (
             await db_to_use[Collections.transactions]
@@ -262,13 +263,13 @@ async def get_transactions_with_filter(
     Raises:
         HTTPException: If the network is unsupported or the database query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     count = min(500, max(count, 1))
 
     total_for_type = 0
@@ -359,13 +360,13 @@ async def post_transactions_with_filter(
     Raises:
         HTTPException: If the network is unsupported or the database query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     count = min(500, max(count, 1))
     filters = body.filter or []
     type_filter = any([x.field == "type" for x in filters])
@@ -450,10 +451,10 @@ async def get_transactions_tps(
     Raises:
         HTTPException: If the network is unsupported, not mainnet, or the data cannot be retrieved.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if net != "mainnet":
@@ -498,13 +499,13 @@ async def get_transactions_count_estimate(
     Raises:
         HTTPException: If the network is unsupported or the estimate cannot be computed.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     try:
         result = await db_to_use[Collections.transactions].estimated_document_count()
         error = None
@@ -549,13 +550,13 @@ async def get_transactions_from_data_registered(
     Raises:
         HTTPException: If the network is unsupported, the request body is missing, or the query fails.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     limit = min(50, max(limit, 1))
     error = None
     body = await request.body()
@@ -643,13 +644,13 @@ async def get_transactions_from_transfers(
     Raises:
         HTTPException: If validation fails, the network is unsupported, or the query errors.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db_to_use = net_db(mongomotor, net)
     limit = min(500, max(limit, 1))
     error = None
     body = await request.body()
@@ -794,13 +795,13 @@ async def get_paginated_transactions(
         HTTPException: If the network is unsupported or the query fails.
     """
     # validate network
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=404,
             detail="Unsupported network. Choose 'mainnet' or 'testnet'.",
         )
 
-    db = mongomotor.testnet if net == "testnet" else mongomotor.mainnet
+    db = net_db(mongomotor, net)
 
     try:
         # total documents for client-side page computations

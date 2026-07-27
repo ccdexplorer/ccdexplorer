@@ -2,6 +2,7 @@ from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import (
     Collections,
+    net_db,
 )
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary, CCD_AccountInfo
 from ccdexplorer.tooter import Tooter
@@ -19,7 +20,7 @@ class Address:
         self.grpc_client: GRPCClient
         self.tooter: Tooter
 
-        db_to_use = self.testnet if net.value == "testnet" else self.mainnet
+        db_to_use = net_db(self, net)
 
         try:
             pipeline = [

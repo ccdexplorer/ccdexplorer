@@ -17,6 +17,7 @@ from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
+    net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -56,13 +57,13 @@ async def get_module_deployment_tx(
     Raises:
         HTTPException: If the network is unsupported or the module is unknown.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
 
     result = await db_to_use[Collections.transactions].find_one(
         {"account_transaction.effects.module_deployed": module_ref}
@@ -98,10 +99,10 @@ async def get_module_schema(
     Raises:
         HTTPException: If the network is unsupported or the source cannot be found.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     ms: VersionedModuleSource = grpcclient.get_module_source_original_classes(
@@ -147,10 +148,10 @@ async def get_module_instances(
     Raises:
         HTTPException: If the network is unsupported or pagination invalid.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
     if skip < 0:
@@ -165,7 +166,7 @@ async def get_module_instances(
             detail="Limit must be less than or equal to 100.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     pipeline = [
         {"$match": {"source_module": module_ref}},
         {
@@ -217,13 +218,13 @@ async def get_module_usage(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     module_instances_result = (
         await db_to_use[Collections.instances]
         .find({"source_module": module_ref})
@@ -266,13 +267,13 @@ async def get_module(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    if net not in ["mainnet", "testnet"]:
+    if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
-            detail="Don't be silly. We only support mainnet and testnet.",
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    db_to_use = mongodb.testnet if net == "testnet" else mongodb.mainnet
+    db_to_use = net_db(mongodb, net)
     result = await db_to_use[Collections.modules].find_one({"_id": module_ref})
 
     return result
