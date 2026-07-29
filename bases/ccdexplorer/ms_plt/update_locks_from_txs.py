@@ -79,7 +79,13 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
                 lock_id.to_str(),
                 {"lock_id": lock_id, "destroyed": False, "touching_txs": []},
             )
-            entry["touching_txs"].append({"tx_hash": tx.hash, "block_height": tx.block_info.height})
+            # A single tx can carry multiple events touching the same lock
+            # (e.g. lock_create_event + a transfer_event depositing into it
+            # in the same tx) -- don't record it twice.
+            if not any(t["tx_hash"] == tx.hash for t in entry["touching_txs"]):
+                entry["touching_txs"].append(
+                    {"tx_hash": tx.hash, "block_height": tx.block_info.height}
+                )
             if destroyed:
                 entry["destroyed"] = True
 
@@ -153,7 +159,7 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
                             },
                             upsert=True,
                         )
-                )
+                    )
 
         queue.append(
             UpdateOne(
@@ -164,7 +170,10 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
                         "lock_id": lock_id.model_dump(),
                         "created_block_height": block_height,
                     },
-                    "$push": {"touching_txs": {"$each": entry["touching_txs"]}},
+                    # addToSet, not push: guards against the same tx being
+                    # recorded twice if this block ever gets reprocessed
+                    # (e.g. backfill overlapping with the live watcher).
+                    "$addToSet": {"touching_txs": {"$each": entry["touching_txs"]}},
                 },
                 upsert=True,
             )
