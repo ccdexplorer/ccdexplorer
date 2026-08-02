@@ -1743,11 +1743,29 @@ class MakeUp:
                     else None
                 )
                 self.additional_info["amount"] = int(event.transfer_event.amount.value)
-                new_event = EventType(
-                    f"Transferred {token_amount_using_decimals_rounded(int(event.transfer_event.amount.value), decimals)} from {account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
-                    plt_string,
-                    memo if memo else None,
+                amount_str = token_amount_using_decimals_rounded(
+                    int(event.transfer_event.amount.value), decimals
                 )
+                # a transfer into/out of a lock has from_ == to (same account) with
+                # to_lock/from_lock set - showing that as "Transferred X from A to A" is
+                # confusing, so render it as a single-account funded/received-from-lock line.
+                lock = event.transfer_event.to_lock or event.transfer_event.from_lock
+                if lock:
+                    lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
+                    lock_link = f'<a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock.to_str()}</span></a>'
+                    if event.transfer_event.to_lock:
+                        account = account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)
+                        description = f"{account} funded lock {lock_link} with {amount_str}"
+                    else:
+                        account = account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)
+                        description = f"{account} received {amount_str} from lock {lock_link}"
+                    new_event = EventType(description, plt_string, memo if memo else None)
+                else:
+                    new_event = EventType(
+                        f"Transferred {amount_str} from {account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
+                        plt_string,
+                        memo if memo else None,
+                    )
 
             elif event.mint_event is not None:
                 self.additional_info["amount"] = int(event.mint_event.amount.value)
