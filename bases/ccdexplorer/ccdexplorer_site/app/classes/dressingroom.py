@@ -206,10 +206,14 @@ class MakeUp:
                     display_value = None
 
                 if "amount" in self.additional_info:
+                    # token_amount_using_decimals_rounded already wraps its own return value
+                    # in a .ccd span - wrapping it again here nests two .ccd spans, and since
+                    # .ccd's font-size is a percentage, nesting compounds it (82% of 82%),
+                    # rendering visibly smaller than every other amount on the page.
                     display_value = token_amount_using_decimals_rounded(
                         int(self.additional_info["amount"]), decimals, 0
                     )
-                    type_additional_info = f'<span class="ccd">{display_value}</span> <span class="ccd">{self.additional_info["token_id"]}</span>'
+                    type_additional_info = f'{display_value} <span class="ccd">{self.additional_info["token_id"]}</span>'
 
                 elif "token_id" in self.additional_info:
                     if not plt_page:
