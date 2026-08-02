@@ -86,3 +86,11 @@ def test_tx_plt_create_lock_devnet(grpcclient_devnet: GRPCClient):
     if not block.transaction_summaries:
         pytest.skip("No transactions in the latest devnet block to check.")
     print(block.transaction_summaries[0])
+
+
+def test_tx_plt_create_lock_devnet2(grpcclient_devnet: GRPCClient):
+    block_hash = "f89e57612a246bf54a98813106e95a5b7931ded53ff742f97a3586f773a701dd"
+    block = grpcclient_devnet.get_block_transaction_events(block_hash, net=NET.DEVNET)
+    if not block.transaction_summaries:
+        pytest.skip("No transactions in the latest devnet block to check.")
+    print(block.transaction_summaries[0])

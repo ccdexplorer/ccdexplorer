@@ -28,6 +28,7 @@ pipeline = [
             "$or": [
                 {"account_transaction.effects.token_update_effect": {"$exists": True}},
                 {"account_transaction.effects.meta_update_effect": {"$exists": True}},
+                {"token_creation": {"$exists": True}},
             ]
         }
     },
