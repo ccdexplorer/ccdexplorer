@@ -446,6 +446,19 @@ class CCD_LockId(BaseModel):
         """Format this `CCD_LockId` as the composite string used as its Mongo `_id`/URL path segments."""
         return f"{self.account_index}-{self.sequence_number}-{self.creation_order}"
 
+    @classmethod
+    def from_str(cls, value: str) -> "CCD_LockId":
+        """Parse the composite string produced by `to_str()` back into a `CCD_LockId`."""
+        parts = value.split("-")
+        if len(parts) != 3:
+            raise ValueError(f"Invalid CCD_LockId string: {value!r}")
+        account_index, sequence_number, creation_order = parts
+        return cls(
+            account_index=int(account_index),
+            sequence_number=int(sequence_number),
+            creation_order=int(creation_order),
+        )
+
 
 class CCD_LockCreateEvent(BaseModel):
     """A new lock was created.
@@ -701,10 +714,18 @@ class CCD_LockController(BaseModel):
     Attributes:
         grants (list[CCD_LockControllerGrant]): Per-account permission grants.
         tokens (list[CCD_TokenId]): Token ids the lock is configured to support.
+        keep_alive (bool): When true, the lock survives an account's locked balance being
+            fully drained via a normal Send (it would otherwise be auto-deleted once empty,
+            per concordium-node's `remove_lock_balance_ref`). Only an explicit Cancel destroys
+            a `keep_alive` lock. Absent from the CBOR (defaults to `False`) unless explicitly set.
+        memo (Optional[CCD_Memo]): Optional memo attached to the lock's controller
+            configuration at creation. Absent from the CBOR unless explicitly set.
     """
 
     grants: list[CCD_LockControllerGrant]
     tokens: list[CCD_TokenId]
+    keep_alive: bool = False
+    memo: Optional[CCD_Memo] = None
 
     model_config = ConfigDict(extra="allow")
 

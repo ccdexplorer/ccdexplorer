@@ -19,14 +19,32 @@
                       {% if lock_info.status == "open" %}<span class="badge text-bg-success">Open</span>
                       {% elif lock_info.status == "cancelled" %}<span class="badge text-bg-secondary">Cancelled</span>
                       {% else %}<span class="badge text-bg-warning">Unknown</span>{% endif %}
+                      <a href="#" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="lock-status-info" data-bs-trigger="focus" data-bs-title="Lock Status" data-bs-content="
+                          <b>Open</b>: the lock exists and its state was successfully read from the chain.<br/><br/>
+                          <b>Cancelled</b>: the lock has been destroyed - either explicitly via a Cancel operation (before expiry this requires the &quot;cancel&quot; role; once expired, anyone can cancel it), or automatically once a Send drains the last locked balance to zero (only when Keep Alive is not enabled).<br/><br/>
+                          <b>Unknown</b>: we don't currently have indexed state for this lock, even though its transaction history shows activity.
+                          ">(i)</a>
                   </td>
               </tr>
+              {% if lock_info.controller %}
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Keep Alive</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% if lock_info.controller.keep_alive %}<span class="badge text-bg-info">Yes</span>
+                      {% else %}<span class="badge text-bg-secondary">No</span>{% endif %}
+                      <a href="#" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="lock-keep-alive-info" data-bs-trigger="focus" data-bs-title="Keep Alive" data-bs-content="
+                          When enabled, this lock survives its balance reaching zero via a Send operation - it stays open (though empty) until an explicit Cancel destroys it.<br/><br/>
+                          When disabled, the lock is automatically destroyed as soon as its balance reaches zero via Send.
+                          ">(i)</a>
+                  </td>
+              </tr>
+              {% endif %}
               {% if lock_info.expiry %}
               <tr class="table-row-line-height sm-text">
                   <td class="text-start text-secondary-emphasis">Expiry</td>
                   <td class="text-end text-secondary-emphasis">
                       {% if lock_info.expired %}
-                          <span class="badge text-bg-secondary">Expired</span> <span class="text-muted">({{ lock_info.expiry|datetime_regular_parse }})</span>
+                          <span class="badge text-bg-secondary">Expired</span> <span class="text-secondary-emphasis">({{ lock_info.expiry|datetime_regular_parse }})</span>
                       {% else %}
                           {{ lock_info.expiry|datetime_regular_parse }}
                       {% endif %}
@@ -36,7 +54,8 @@
               <tr class="table-row-line-height sm-text">
                   <td class="text-start text-secondary-emphasis">Recipients</td>
                   <td class="text-end text-secondary-emphasis">
-                      {% if lock_info.recipients == "any" %}Any
+                      {% if not lock_info.recipients %}<span class="text-muted">Unknown</span>
+                      {% elif lock_info.recipients == "any" %}Any
                       {% else %}
                           {% for account in lock_info.recipients %}{{ account|account_link(net,user,tags,request.app)|safe }}{% if not loop.last %}, {% endif %}{% endfor %}
                       {% endif %}
@@ -45,13 +64,31 @@
               <tr class="table-row-line-height sm-text">
                   <td class="text-start text-secondary-emphasis">Supported Tokens</td>
                   <td class="text-end text-secondary-emphasis">
-                      {% for supported_token_id in lock_info.controller.tokens %}<a href="/{{net}}/tokens/{{supported_token_id}}"><span class="ccd">{{ supported_token_id }}</span></a>{% if not loop.last %}, {% endif %}{% endfor %}
+                      {% if not lock_info.controller %}<span class="text-muted">Unknown</span>
+                      {% else %}
+                          {% for supported_token_id in lock_info.controller.tokens %}<a href="/{{net}}/tokens/{{supported_token_id}}"><span class="ccd">{{ supported_token_id }}</span></a>{% if not loop.last %}, {% endif %}{% endfor %}
+                      {% endif %}
                   </td>
               </tr>
+              {% if lock_info.controller and lock_info.controller.memo %}
+              <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Create Memo</td>
+                  <td class="text-end text-secondary-emphasis">{{ lock_info.controller.memo }}</td>
+              </tr>
+              {% endif %}
           </table>
       </div>
     </div>
 </div>
+
+<script>
+  const lockStatusInfo = document.getElementById('lock-status-info')
+  const popover_lock_status_info = new bootstrap.Popover(lockStatusInfo, {trigger: 'focus'})
+  const lockKeepAliveInfo = document.getElementById('lock-keep-alive-info')
+  if (lockKeepAliveInfo) {
+      const popover_lock_keep_alive_info = new bootstrap.Popover(lockKeepAliveInfo, {trigger: 'focus'})
+  }
+</script>
 
 <div class="row row-flex">
     <div class="col-md-6  col-sm-12 ">
@@ -65,6 +102,7 @@
                       <th class="text-end text-secondary-emphasis">Roles</th>
                   </tr>
               </thead>
+              {% if lock_info.controller %}
               {% for grant in lock_info.controller.grants %}
               <tr class="table-row-line-height sm-text">
                   <td class="text-start text-secondary-emphasis">{{ grant.account|account_link(net,user,tags,request.app)|safe }}</td>
@@ -73,7 +111,11 @@
                   </td>
               </tr>
               {% endfor %}
+              {% endif %}
           </table>
+          {% if not lock_info.controller %}
+          <p class="sm-text text-secondary-emphasis">No controller data available for this lock.</p>
+          {% endif %}
       </div>
     </div>
 

@@ -22,7 +22,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
     CCD_LockId,
 )
-from pymongo import ASCENDING, DESCENDING
+from pymongo import DESCENDING
 
 router = APIRouter(tags=["Protocol-Level Token"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
@@ -361,7 +361,10 @@ async def get_paginated_token_locks(
         )
 
 
-@router.get("/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}", response_class=JSONResponse)
+@router.get(
+    "/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}",
+    response_class=JSONResponse,
+)
 async def get_lock_detail(
     request: Request,
     net: str,
@@ -390,7 +393,7 @@ async def get_lock_detail(
         api_key: API key extracted from the request headers.
 
     Returns:
-        Decoded lock state merged with ``status`` and ``touching_txs``.
+        Decoded lock state merged with ``status``.
 
     Raises:
         HTTPException: If the network is unsupported or the lock is not found.
@@ -416,13 +419,30 @@ async def get_lock_detail(
         decoded = None
 
     if not decoded and not mongo_doc:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Lock {lock_id.to_str()} not found on {net}.",
+        # plts_locks has never indexed this lock (e.g. a backfill gap), but its transaction
+        # history may still be known via impacted_addresses - if so, don't 404 the whole
+        # page over it, just report an unknown status alongside no decoded state.
+        has_activity = await db_to_use[Collections.impacted_addresses].find_one(
+            {"lock_ids": lock_id.to_str()}, {"_id": 1}
         )
+        if not has_activity:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Lock {lock_id.to_str()} not found on {net}.",
+            )
+
+    # Live state takes precedence when available. Once a lock is destroyed, GetLockInfo
+    # 404s (there's nothing left to query), so fall back to its last-known state as of the
+    # most recent non-destroy update - stored on the indexed doc under the same keys
+    # `decode_lock_info(...).model_dump()` would produce.
+    lock_state = decoded or {
+        key: mongo_doc[key]
+        for key in ("recipients", "expiry", "controller", "funds")
+        if mongo_doc and key in mongo_doc
+    }
 
     return {
-        **(decoded or {}),
+        **lock_state,
         "status": mongo_doc.get("status") if mongo_doc else "unknown",
     }
 
@@ -444,6 +464,12 @@ async def get_paginated_lock_transactions(
 ) -> dict:
     """List transactions that have touched a lock, most recent first.
 
+    Sourced from ``impacted_addresses`` (every account impacted by a lock event is filed
+    there with a ``lock_id`` tag), joined back to ``Collections.transactions`` for the full
+    tx documents - the same lookup pattern used by ``get_paginated_plt_transactions`` for a
+    token's transaction history. ``plts_locks`` itself only holds current lock state, not
+    transaction history.
+
     Args:
         request: FastAPI request context providing pagination limits.
         net: Network identifier, must be ``mainnet`` or ``testnet``.
@@ -452,7 +478,7 @@ async def get_paginated_lock_transactions(
         creation_order: The 0-based creation order of the lock within that transaction.
         skip: Number of transactions to skip.
         limit: Maximum number of transactions to return.
-        mongomotor: Mongo client dependency used to query ``plts_locks``.
+        mongomotor: Mongo client dependency used to query impacts and transactions.
         api_key: API key extracted from the request headers.
 
     Returns:
@@ -486,26 +512,44 @@ async def get_paginated_lock_transactions(
     ).to_str()
     db_to_use = net_db(mongomotor, net)
     try:
+        base_filter = {"lock_ids": lock_id_str}
+        # count unique hashes
         count_pipeline = [
-            {"$match": {"_id": lock_id_str}},
-            {"$project": {"total": {"$size": {"$ifNull": ["$touching_txs", []]}}}},
+            {"$match": base_filter},
+            {"$group": {"_id": "$tx_hash"}},
+            {"$count": "total"},
         ]
-        count_result = await await_await(db_to_use, Collections.plts_locks, count_pipeline, 1)
+        count_result = await await_await(
+            db_to_use, Collections.impacted_addresses, count_pipeline, 1
+        )
         total_count = count_result[0]["total"] if count_result else 0
 
+        # fetch page
         pipeline = [
-            {"$match": {"_id": lock_id_str}},
-            {"$project": {"touching_txs": 1}},
-            {"$unwind": "$touching_txs"},
-            {"$sort": {"touching_txs.block_height": DESCENDING}},
+            {"$match": base_filter},
+            {"$sort": {"block_height": DESCENDING}},
+            {"$project": {"_id": 0, "tx_hash": 1}},
             {"$skip": skip},
-            {"$limit": limit},
-            {"$replaceRoot": {"newRoot": "$touching_txs"}},
+            {"$limit": limit * 3},
         ]
-        touching_txs = await await_await(db_to_use, Collections.plts_locks, pipeline, limit)
+        all_txs_hashes = await await_await(
+            db_to_use,
+            Collections.impacted_addresses,
+            pipeline,
+            limit * 3,
+            allowDiskUse=True,
+            maxTimeMS=10_000,  # abort if > 10 s
+        )
+        pipeline = [
+            {"$match": {"_id": {"$in": [x["tx_hash"] for x in all_txs_hashes]}}},
+            {"$sort": {"block_info.height": DESCENDING}},
+            {"$limit": limit},
+        ]
+        int_result = await await_await(db_to_use, Collections.transactions, pipeline)
+        tx_result = [CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in int_result]
 
         return {
-            "data": touching_txs,
+            "data": tx_result,
             "total_row_count": total_count,
         }
 

@@ -551,6 +551,13 @@ class MongoImpactedAddress(BaseModel):
         block_height (int): The block height at which the impact occurred.
         included_in_flow (Optional[bool]): Indicates whether the impacted address is included in the flow.
         date (Optional[str]): The date when the impact occurred.
+        lock_ids (Optional[list[str]]): Set when this impact stems from one or more PLT lock
+            events (create/destroy/transfer into or out of a lock) - a single tx can touch
+            more than one lock for the same address (e.g. destroy one, create another), so
+            this accumulates rather than being overwritten. Each entry is technically
+            `CCD_LockId.to_str()` (`"{account_index}-{sequence_number}-{creation_order}"`)
+            since the composite `CCD_LockId` itself can't be stored/queried as a Mongo field
+            directly.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -564,6 +571,7 @@ class MongoImpactedAddress(BaseModel):
     included_in_flow: Optional[bool] = None
     date: Optional[str] = None
     plt_token_id: Optional[str] = None
+    lock_ids: Optional[list[str]] = None
 
 
 class MongoTokensImpactedAddress(BaseModel):

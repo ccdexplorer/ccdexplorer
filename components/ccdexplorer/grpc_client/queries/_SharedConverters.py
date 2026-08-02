@@ -998,7 +998,20 @@ class Mixin(Protocol):
             )
             for grant in simple["grants"]
         ]
-        return CCD_LockController(grants=grants, tokens=simple["tokens"])
+        # `memo`, like a regular transfer memo, is CBOR tag 24 (embedded CBOR data item)
+        # wrapping a CBOR-encoded text string, not a plain string itself.
+        raw_memo = simple.get("memo")
+        memo = (
+            cbor2.loads(raw_memo.value)
+            if isinstance(raw_memo, cbor2.CBORTag) and raw_memo.tag == 24
+            else raw_memo
+        )
+        return CCD_LockController(
+            grants=grants,
+            tokens=simple["tokens"],
+            keep_alive=simple.get("keepAlive", False),
+            memo=memo,
+        )
 
     def decode_lock_recipients(self, cbor_decoded: dict) -> str | list[CCD_AccountAddress]:
         recipients = cbor_decoded["recipients"]
