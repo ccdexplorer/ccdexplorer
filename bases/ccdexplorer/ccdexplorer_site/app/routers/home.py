@@ -249,7 +249,7 @@ async def search_all(
 
     user: SiteUser | None = await get_user_detailsv2(request)
     single_urls = {}
-    # order: account, block, transaction, module, instance, token
+    # order: account, block, transaction, lock, module, instance, token
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/accounts/search/{value}",
         httpx_client,
@@ -288,6 +288,17 @@ async def search_all(
 
     if tx:
         single_urls["transaction"] = f"/{net}/transaction/{tx.hash}"
+
+    if net == "devnet":
+        # PLT locks only exist on devnet for now (see plt_locks_feature_visible) - skip
+        # the lookup entirely on mainnet/testnet rather than firing a guaranteed-404 API
+        # call on every single search there.
+        api_result = await get_url_from_api(
+            f"{request.app.api_url}/v2/{net}/plt/lock/{value}", httpx_client
+        )
+        lock_info = api_result.return_value if api_result.ok else None
+        if lock_info:
+            single_urls["lock"] = f"/{net}/tokens/plt/lock/{value}"
 
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/modules/search/{value}",
@@ -364,6 +375,8 @@ async def search(request: Request, search_request: SearchRequest):
         url = f"/{search_request.net}/contract/{search_request.value.replace(' ', '')}/0"
     if search_request.selector == "module":
         url = f"/{search_request.net}/module/{search_request.value.replace(' ', '')}"
+    if search_request.selector == "lock":
+        url = f"/{search_request.net}/tokens/plt/lock/{search_request.value.replace(' ', '')}"
     if search_request.selector == "token":
         search_request.value = search_request.value.replace(" ", "")
         if "-" in search_request.value:
@@ -435,6 +448,8 @@ async def search_placeholder(
         return "Search for module hash"
     if search_selector == "token":
         return '"contract_index-token_id"'
+    if search_selector == "lock":
+        return "Search for lock id"
 
 
 @router.get("/tmp/{filename}", response_class=FileResponse)

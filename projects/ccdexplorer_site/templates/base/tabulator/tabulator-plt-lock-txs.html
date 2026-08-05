@@ -13,13 +13,21 @@
 
       },
       {
+        title: "Description", field: "description",
+        formatter: "html",
+        headerSort: false,
+        hozAlign: "left", headerHozAlign: "left",
+
+      },
+      {
         title: "Block", field: "block_height",
         formatter: "html",
         headerSort: false,
         hozAlign: "right", headerHozAlign: "right",
         accessorDownload: (value, data) => data.block_height_download,
 
-      }
+      },
+      
 
     ];
 

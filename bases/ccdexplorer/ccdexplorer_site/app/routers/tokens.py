@@ -490,7 +490,9 @@ async def get_plt_lock_transactions_paginated(
     page: int = Query(),
     size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
 ):
+    user: SiteUser | None = await get_user_detailsv2(request)
     skip = (page - 1) * size
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/plt/lock/{lock_id}/transactions/{skip}/{size}",
@@ -510,9 +512,36 @@ async def get_plt_lock_transactions_paginated(
             },
         )
 
-    tb_made_up_rows = [
-        create_dict_for_tabulator_display_for_plt_lock_transactions(net, row) for row in txs["data"]
-    ]
+    tb_made_up_rows = []
+    for row in txs["data"]:
+        transaction = CCD_BlockItemSummary(**row)
+        makeup_request = MakeUpRequest(
+            **{
+                "net": net,
+                "httpx_client": httpx_client,
+                "tags": tags,
+                "user": user,
+                "app": request.app,
+                "requesting_route": RequestingRoute.account,
+            }
+        )
+        # "" / False: this table isn't scoped to a single account, so there's no
+        # sender/receiver to highlight differently - same call the plt token
+        # transactions table below makes.
+        classified_tx = await MakeUp(makeup_request=makeup_request).prepare_for_display(
+            transaction, "", False
+        )
+        # `event.emit` carries the memo (e.g. "Memo: ...") for a lock-funding/lock-payout
+        # transfer - see MakeUp.process_meta_events - it's not baked into `event.event`.
+        description = "<br>".join(
+            event.event + (f"<br>{event.emit}" if event.emit else "")
+            for event in classified_tx.events_list
+        )
+        tb_made_up_rows.append(
+            create_dict_for_tabulator_display_for_plt_lock_transactions(
+                net, classified_tx, description
+            )
+        )
     total_rows = txs["total_row_count"]  # type: ignore
     last_page = math.ceil(total_rows / size)
     return JSONResponse(

@@ -18,6 +18,9 @@
                         <option value="contract">Contract</option>
                         <option value="module">Module</option>
                         <option value="token">Token</option>
+                        {% if net == "devnet" %}
+                        <option value="lock">Lock</option>
+                        {% endif %}
 
                       </select>
                     <input type="text" placeholder="Address | Validator id | Block | Tx | ..." id="search_value"

@@ -2316,16 +2316,17 @@ def create_dict_for_tabulator_display_for_account_plt_locks(net: str, row: dict)
     }
 
 
-def create_dict_for_tabulator_display_for_plt_lock_transactions(net: str, row: dict):
-    # `row` is now a full transaction document (same shape get_paginated_plt_transactions
-    # returns), not the old touching_txs entry ({"tx_hash", "block_height"}).
-    tx_hash = row["hash"]
-    block_height = row["block_info"]["height"]
+def create_dict_for_tabulator_display_for_plt_lock_transactions(
+    net: str, classified_tx, description: str
+):
+    tx_hash = classified_tx.transaction.hash
+    block_height = classified_tx.transaction.block_info.height
     return {
         "hash": tx_hash_link(tx_hash, net),
         "hash_download": tx_hash,
         "block_height": block_height_link(block_height, net),
         "block_height_download": block_height,
+        "description": description,
     }
 
 

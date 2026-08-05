@@ -14,6 +14,15 @@
           {% set title= "Lock " + lock_id_str %}{% include 'base/box_title.html' %}
           <table class="table table-borderless">
               <tr class="table-row-line-height sm-text">
+                  <td class="text-start text-secondary-emphasis">Lock ID</td>
+                  <td class="text-end text-secondary-emphasis">
+                      {% set copy_value = lock_id_str %}
+                      {% set value_type = "lock_id" %}
+                      {% set display_value = lock_id_str|safe %}
+                      {% include "base/copy_to_clipboard.html"%}
+                  </td>
+              </tr>
+              <tr class="table-row-line-height sm-text">
                   <td class="text-start text-secondary-emphasis">Status</td>
                   <td class="text-end text-secondary-emphasis">
                       {% if lock_info.status == "open" %}<span class="badge text-bg-success">Open</span>

@@ -29,6 +29,9 @@
 {% if value_type == "tx_hash" %}
     {% set url_verb = "transaction" %}
 {% endif %}
+{% if value_type == "lock_id" %}
+    {% set url_verb = "tokens/plt/lock" %}
+{% endif %}
 {% if value_type == "source_module" %}
     {% set url_verb = "module" %}
 {% endif %}
