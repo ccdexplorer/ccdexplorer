@@ -152,7 +152,7 @@
           {% set title= "Transactions" %}{% include 'base/box_title.html' %}
           <div id="plt_lock_txs_table"></div>
           {% set ccd_tabulator_table ='plt_lock_txs_table'%}
-          {% set tabulator_ajax_url = '/ajax_plt_lock_transactions/'+net+'/'+account_index|string+'/'+sequence_number|string+'/'+creation_order|string %}
+          {% set tabulator_ajax_url = '/ajax_plt_lock_transactions/'+net+'/'+lock_id_str %}
           {% set filename='plt-lock-'+lock_id_str+'-txs-'+range(1000,10000)|random|string+'.csv' %}
           {% include "base/tabulator/tabulator-plt-lock-txs.html" %}
       </div>

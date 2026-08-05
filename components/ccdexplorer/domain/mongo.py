@@ -555,9 +555,9 @@ class MongoImpactedAddress(BaseModel):
             events (create/destroy/transfer into or out of a lock) - a single tx can touch
             more than one lock for the same address (e.g. destroy one, create another), so
             this accumulates rather than being overwritten. Each entry is technically
-            `CCD_LockId.to_str()` (`"{account_index}-{sequence_number}-{creation_order}"`)
-            since the composite `CCD_LockId` itself can't be stored/queried as a Mongo field
-            directly.
+            `CCD_LockId.to_str()` (a Base58Check string, matching the node SDK's
+            `LockId.toString()`) since the composite `CCD_LockId` itself can't be
+            stored/queried as a Mongo field directly.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

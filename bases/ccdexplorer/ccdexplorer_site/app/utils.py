@@ -2220,11 +2220,6 @@ def create_dict_for_tabulator_display_for_plt_token_holders(
     }
 
 
-def lock_id_path(row: dict) -> str:
-    lock_id = row.get("lock_id") or {}
-    return f"{lock_id.get('account_index')}/{lock_id.get('sequence_number')}/{lock_id.get('creation_order')}"
-
-
 def lock_status_badge(row: dict) -> str:
     status = row.get("status", "unknown")
     return {
@@ -2249,7 +2244,6 @@ def lock_recipients_display(row: dict) -> str:
 
 def create_dict_for_tabulator_display_for_plt_locks(net: str, row: dict, token_id: str, decimals: int):
     lock_id_str = row.get("_id", "")
-    lock_path = lock_id_path(row)
 
     balance = 0
     for fund in row.get("funds") or []:
@@ -2258,7 +2252,7 @@ def create_dict_for_tabulator_display_for_plt_locks(net: str, row: dict, token_i
                 balance += int(amount["amount"]["value"])
 
     return {
-        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_id_str}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
         "lock_id_download": lock_id_str,
         "status": lock_status_badge(row),
         "token_balance": f'<span class="text-secondary-emphasis">{token_amount_using_decimals_rounded(balance, decimals)}</span> <span class="ccd">{token_id}</span>',
@@ -2272,7 +2266,6 @@ def create_dict_for_tabulator_display_for_plt_locks(net: str, row: dict, token_i
 
 def create_dict_for_tabulator_display_for_plt_locks_global(net: str, row: dict):
     lock_id_str = row.get("_id", "")
-    lock_path = lock_id_path(row)
     token_ids = row.get("token_ids") or []
     tokens_display = ", ".join(
         f'<a href="/{net}/tokens/{token_id}"><span class="ccd">{token_id}</span></a>'
@@ -2280,7 +2273,7 @@ def create_dict_for_tabulator_display_for_plt_locks_global(net: str, row: dict):
     )
 
     return {
-        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_id_str}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
         "lock_id_download": lock_id_str,
         "status": lock_status_badge(row),
         "tokens": tokens_display,
@@ -2294,7 +2287,6 @@ def create_dict_for_tabulator_display_for_plt_locks_global(net: str, row: dict):
 
 def create_dict_for_tabulator_display_for_account_plt_locks(net: str, row: dict):
     lock_id_str = row.get("lock_id_str", "")
-    lock_path = lock_id_path(row)
     token_ids = row.get("token_ids") or []
     tokens_display = ", ".join(
         f'<a href="/{net}/tokens/{token_id}"><span class="ccd">{token_id}</span></a>'
@@ -2314,7 +2306,7 @@ def create_dict_for_tabulator_display_for_account_plt_locks(net: str, row: dict)
     return {
         "roles": roles_display,
         "roles_download": ", ".join(row.get("account_roles") or []),
-        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_path}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
+        "lock_id": f'<a href="/{net}/tokens/plt/lock/{lock_id_str}"><span class="ccd text-secondary-emphasis">{lock_id_str}</span></a>',
         "lock_id_download": lock_id_str,
         "status": lock_status_badge(row),
         "tokens": tokens_display,
