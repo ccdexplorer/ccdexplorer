@@ -2286,7 +2286,7 @@ def create_dict_for_tabulator_display_for_plt_locks_global(net: str, row: dict):
 
 
 def create_dict_for_tabulator_display_for_account_plt_locks(net: str, row: dict):
-    lock_id_str = row.get("lock_id_str", "")
+    lock_id_str = row.get("lock_id", "")
     token_ids = row.get("token_ids") or []
     tokens_display = ", ".join(
         f'<a href="/{net}/tokens/{token_id}"><span class="ccd">{token_id}</span></a>'
