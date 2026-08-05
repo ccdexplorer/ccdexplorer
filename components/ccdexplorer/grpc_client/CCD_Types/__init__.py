@@ -1,5 +1,6 @@
 # ruff: noqa: F403, F405, E402
 # pyright: reportInvalidTypeForm=false
+import base58
 from pydantic import BaseModel, Field, ConfigDict
 import datetime as dt
 from enum import Enum
@@ -427,6 +428,39 @@ CCD_TokenModuleRef = str
 """A token module reference. This is always 32 bytes long."""
 
 
+def _uleb128_encode(num: int) -> bytes:
+    """Encode a non-negative int as unsigned LEB128, matching the node SDK's `uleb128Encode`."""
+    if num < 0:
+        raise ValueError("uleb128 encode requires a non-negative integer")
+    out = bytearray()
+    while True:
+        byte = num & 0x7F
+        num >>= 7
+        if num:
+            out.append(byte | 0x80)
+        else:
+            out.append(byte)
+            return bytes(out)
+
+
+def _uleb128_decode_with_index(data: bytes, index: int = 0) -> tuple[int, int]:
+    """Decode a ULEB128 number starting at `index`, returning `(value, index_after_number)`."""
+    if index >= len(data):
+        raise ValueError(f"ULEB128 encoding was not valid: no byte to decode at index {index}")
+    acc = 0
+    shift = 0
+    for i in range(index, len(data)):
+        byte = data[i]
+        acc |= (byte & 0x7F) << shift
+        if (byte & 0x80) == 0:
+            return acc, i + 1
+        shift += 7
+    raise ValueError("ULEB128 encoding was not valid: could not find end of number")
+
+
+_LOCK_ID_BASE58CHECK_VERSION = 3
+
+
 class CCD_LockId(BaseModel):
     """Lock ID: a trio of numbers that together uniquely identify a lock.
 
@@ -443,20 +477,37 @@ class CCD_LockId(BaseModel):
     creation_order: int
 
     def to_str(self) -> str:
-        """Format this `CCD_LockId` as the composite string used as its Mongo `_id`/URL path segments."""
-        return f"{self.account_index}-{self.sequence_number}-{self.creation_order}"
+        """Format this `CCD_LockId` as Base58Check, matching `LockId.toString()` in the node SDK.
+
+        Encodes version byte 3 followed by the concatenated ULEB128 encodings of
+        `(account_index, sequence_number, creation_order)`, then Base58Check-encodes the result.
+        """
+        payload = (
+            bytes([_LOCK_ID_BASE58CHECK_VERSION])
+            + _uleb128_encode(self.account_index)
+            + _uleb128_encode(self.sequence_number)
+            + _uleb128_encode(self.creation_order)
+        )
+        return base58.b58encode_check(payload).decode()
 
     @classmethod
     def from_str(cls, value: str) -> "CCD_LockId":
-        """Parse the composite string produced by `to_str()` back into a `CCD_LockId`."""
-        parts = value.split("-")
-        if len(parts) != 3:
+        """Parse the Base58Check string produced by `to_str()` back into a `CCD_LockId`."""
+        data = base58.b58decode_check(value)
+        if not data or data[0] != _LOCK_ID_BASE58CHECK_VERSION:
+            raise ValueError(
+                f"Invalid CCD_LockId string: {value!r}. Expected a Base58Check string with "
+                f"version byte {_LOCK_ID_BASE58CHECK_VERSION}."
+            )
+        account_index, i = _uleb128_decode_with_index(data, 1)
+        sequence_number, j = _uleb128_decode_with_index(data, i)
+        creation_order, k = _uleb128_decode_with_index(data, j)
+        if k != len(data):
             raise ValueError(f"Invalid CCD_LockId string: {value!r}")
-        account_index, sequence_number, creation_order = parts
         return cls(
-            account_index=int(account_index),
-            sequence_number=int(sequence_number),
-            creation_order=int(creation_order),
+            account_index=account_index,
+            sequence_number=sequence_number,
+            creation_order=creation_order,
         )
 
 

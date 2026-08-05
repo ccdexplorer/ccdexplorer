@@ -1689,11 +1689,9 @@ class MakeUp:
             # so they're handled separately from the token/transfer/mint/
             # burn/module events below, which all carry their own token_id.
             if event.lock_create_event is not None:
-                lock = event.lock_create_event.lock_id
-                lock_id = lock.to_str()
-                lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
+                lock_id = event.lock_create_event.lock_id.to_str()
                 new_event = EventType(
-                    f'Lock created: <a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock_id}</span></a>',
+                    f'Lock created: <a href="/{self.net}/tokens/plt/lock/{lock_id}"><span class="ccd">{lock_id}</span></a>',
                     None,
                     None,
                 )
@@ -1701,11 +1699,9 @@ class MakeUp:
                 continue
 
             if event.lock_destroy_event is not None:
-                lock = event.lock_destroy_event.lock_id
-                lock_id = lock.to_str()
-                lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
+                lock_id = event.lock_destroy_event.lock_id.to_str()
                 new_event = EventType(
-                    f'Lock destroyed: <a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock_id}</span></a>',
+                    f'Lock destroyed: <a href="/{self.net}/tokens/plt/lock/{lock_id}"><span class="ccd">{lock_id}</span></a>',
                     None,
                     None,
                 )
@@ -1755,8 +1751,8 @@ class MakeUp:
                 # confusing, so render it as a single-account funded/received-from-lock line.
                 lock = event.transfer_event.to_lock or event.transfer_event.from_lock
                 if lock:
-                    lock_path = f"{lock.account_index}/{lock.sequence_number}/{lock.creation_order}"
-                    lock_link = f'<a href="/{self.net}/tokens/plt/lock/{lock_path}"><span class="ccd">{lock.to_str()}</span></a>'
+                    lock_id = lock.to_str()
+                    lock_link = f'<a href="/{self.net}/tokens/plt/lock/{lock_id}"><span class="ccd">{lock_id}</span></a>'
                     if event.transfer_event.to_lock:
                         account = account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)
                         description = f"{account} funded lock {lock_link} with {amount_str}"

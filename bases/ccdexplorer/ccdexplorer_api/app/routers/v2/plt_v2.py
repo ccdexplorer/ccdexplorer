@@ -362,15 +362,13 @@ async def get_paginated_token_locks(
 
 
 @router.get(
-    "/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}",
+    "/{net}/plt/lock/{lock_id}",
     response_class=JSONResponse,
 )
 async def get_lock_detail(
     request: Request,
     net: str,
-    account_index: int,
-    sequence_number: int,
-    creation_order: int,
+    lock_id: str,
     grpcclient: GRPCClient = Depends(get_grpcclient),
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
@@ -385,9 +383,7 @@ async def get_lock_detail(
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.
-        account_index: The account index that created the lock.
-        sequence_number: The sequence number of the creating transaction.
-        creation_order: The 0-based creation order of the lock within that transaction.
+        lock_id: Base58Check-encoded lock ID, as produced by ``CCD_LockId.to_str()``.
         grpcclient: gRPC client dependency used to fetch live lock info.
         mongomotor: Mongo client dependency used to fetch indexed lock metadata.
         api_key: API key extracted from the request headers.
@@ -396,7 +392,8 @@ async def get_lock_detail(
         Decoded lock state merged with ``status``.
 
     Raises:
-        HTTPException: If the network is unsupported or the lock is not found.
+        HTTPException: If the network is unsupported, the lock ID is malformed, or the lock
+            is not found.
     """
     if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
@@ -404,16 +401,18 @@ async def get_lock_detail(
             detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
 
-    lock_id = CCD_LockId(
-        account_index=account_index,
-        sequence_number=sequence_number,
-        creation_order=creation_order,
-    )
+    try:
+        parsed_lock_id = CCD_LockId.from_str(lock_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Lock ID {lock_id!r} is not a valid lock ID.",
+        )
     db_to_use = net_db(mongomotor, net)
-    mongo_doc = await db_to_use[Collections.plts_locks].find_one({"_id": lock_id.to_str()})
+    mongo_doc = await db_to_use[Collections.plts_locks].find_one({"_id": lock_id})
 
     try:
-        lock_info = grpcclient.get_lock_info("last_final", lock_id, net=NET(net))
+        lock_info = grpcclient.get_lock_info("last_final", parsed_lock_id, net=NET(net))
         decoded = grpcclient.decode_lock_info(lock_info.lock_info).model_dump(exclude_none=True)
     except grpc._channel._InactiveRpcError:  # type: ignore
         decoded = None
@@ -423,12 +422,12 @@ async def get_lock_detail(
         # history may still be known via impacted_addresses - if so, don't 404 the whole
         # page over it, just report an unknown status alongside no decoded state.
         has_activity = await db_to_use[Collections.impacted_addresses].find_one(
-            {"lock_ids": lock_id.to_str()}, {"_id": 1}
+            {"lock_ids": lock_id}, {"_id": 1}
         )
         if not has_activity:
             raise HTTPException(
                 status_code=404,
-                detail=f"Lock {lock_id.to_str()} not found on {net}.",
+                detail=f"Lock {lock_id} not found on {net}.",
             )
 
     # Live state takes precedence when available. Once a lock is destroyed, GetLockInfo
@@ -448,15 +447,13 @@ async def get_lock_detail(
 
 
 @router.get(
-    "/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}/transactions/{skip}/{limit}",
+    "/{net}/plt/lock/{lock_id}/transactions/{skip}/{limit}",
     response_class=JSONResponse,
 )
 async def get_paginated_lock_transactions(
     request: Request,
     net: str,
-    account_index: int,
-    sequence_number: int,
-    creation_order: int,
+    lock_id: str,
     skip: int,
     limit: int,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
@@ -473,9 +470,7 @@ async def get_paginated_lock_transactions(
     Args:
         request: FastAPI request context providing pagination limits.
         net: Network identifier, must be ``mainnet`` or ``testnet``.
-        account_index: The account index that created the lock.
-        sequence_number: The sequence number of the creating transaction.
-        creation_order: The 0-based creation order of the lock within that transaction.
+        lock_id: Base58Check-encoded lock ID, as produced by ``CCD_LockId.to_str()``.
         skip: Number of transactions to skip.
         limit: Maximum number of transactions to return.
         mongomotor: Mongo client dependency used to query impacts and transactions.
@@ -485,7 +480,8 @@ async def get_paginated_lock_transactions(
         A dictionary with transaction entries and the total count.
 
     Raises:
-        HTTPException: If the network is unsupported or pagination invalid.
+        HTTPException: If the network is unsupported, the lock ID is malformed, or
+            pagination invalid.
     """
     if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
@@ -505,11 +501,15 @@ async def get_paginated_lock_transactions(
             detail="Limit must be less than or equal to 100.",
         )
 
-    lock_id_str = CCD_LockId(
-        account_index=account_index,
-        sequence_number=sequence_number,
-        creation_order=creation_order,
-    ).to_str()
+    try:
+        CCD_LockId.from_str(lock_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Lock ID {lock_id!r} is not a valid lock ID.",
+        )
+
+    lock_id_str = lock_id
     db_to_use = net_db(mongomotor, net)
     try:
         base_filter = {"lock_ids": lock_id_str}

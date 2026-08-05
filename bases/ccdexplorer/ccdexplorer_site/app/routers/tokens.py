@@ -480,27 +480,25 @@ async def get_plt_locks_paginated(
 
 
 @router.get(
-    "/ajax_plt_lock_transactions/{net}/{account_index}/{sequence_number}/{creation_order}",
+    "/ajax_plt_lock_transactions/{net}/{lock_id}",
     response_class=HTMLResponse,
 )
 async def get_plt_lock_transactions_paginated(
     request: Request,
     net: str,
-    account_index: int,
-    sequence_number: int,
-    creation_order: int,
+    lock_id: str,
     page: int = Query(),
     size: int = Query(),
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     skip = (page - 1) * size
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}/transactions/{skip}/{size}",
+        f"{request.app.api_url}/v2/{net}/plt/lock/{lock_id}/transactions/{skip}/{size}",
         httpx_client,
     )
     txs = api_result.return_value if api_result.ok else {}
     if not txs:
-        error = f"Request error getting transactions for lock {account_index}-{sequence_number}-{creation_order} on {net}."
+        error = f"Request error getting transactions for lock {lock_id} on {net}."
         return request.app.templates.TemplateResponse(
             request,
             "base/error-request.html",
@@ -526,21 +524,19 @@ async def get_plt_lock_transactions_paginated(
     )
 
 
-@router.get("/{net}/tokens/plt/lock/{account_index}/{sequence_number}/{creation_order}")
+@router.get("/{net}/tokens/plt/lock/{lock_id}")
 async def show_plt_lock(
     request: Request,
     net: str,
-    account_index: int,
-    sequence_number: int,
-    creation_order: int,
+    lock_id: str,
     tags: dict = Depends(get_labeled_accounts),
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
-    lock_id_str = f"{account_index}-{sequence_number}-{creation_order}"
+    lock_id_str = lock_id
     og_title = f"PLT lock {lock_id_str} on Concordium {net}"
 
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/plt/lock/{account_index}/{sequence_number}/{creation_order}",
+        f"{request.app.api_url}/v2/{net}/plt/lock/{lock_id}",
         request.app.httpx_client,
     )
     lock_info = api_result.return_value if api_result.ok else None
@@ -568,9 +564,6 @@ async def show_plt_lock(
         "env": request.app.env,
         "request": request,
         "net": net,
-        "account_index": account_index,
-        "sequence_number": sequence_number,
-        "creation_order": creation_order,
         "lock_id_str": lock_id_str,
         "lock_info": lock_info,
         "tags": tags,

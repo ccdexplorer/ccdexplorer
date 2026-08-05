@@ -601,7 +601,6 @@ async def get_paginated_account_plt_locks(
                 "_id": 1,
                 "lock_id_str": 1,
                 "account_roles": 1,
-                "lock_id": "$lock.lock_id",
                 "token_ids": "$lock.token_ids",
                 "status": "$lock.status",
                 "expiry": "$lock.expiry",
