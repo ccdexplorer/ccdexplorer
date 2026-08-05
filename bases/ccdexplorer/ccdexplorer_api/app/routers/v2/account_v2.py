@@ -590,7 +590,7 @@ async def get_paginated_account_plt_locks(
         {
             "$lookup": {
                 "from": Collections.plts_locks.value,
-                "localField": "lock_id_str",
+                "localField": "lock_id",
                 "foreignField": "_id",
                 "as": "lock",
             }
@@ -599,7 +599,7 @@ async def get_paginated_account_plt_locks(
         {
             "$project": {
                 "_id": 1,
-                "lock_id_str": 1,
+                "lock_id": 1,
                 "account_roles": 1,
                 "token_ids": "$lock.token_ids",
                 "status": "$lock.status",

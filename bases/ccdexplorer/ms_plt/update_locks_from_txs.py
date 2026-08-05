@@ -145,14 +145,14 @@ def update_locks(mongodb: MongoDB, grpc_client: GRPCClient, net: str, block_heig
                 # attributes like status/expiry/token_ids live solely on `plts_locks` and
                 # are joined in at query time, not duplicated here.
                 account_roles = compute_account_roles(db, lock_id, decoded)
-                links_queue.append(DeleteMany({"lock_id_str": lock_id_str}))
+                links_queue.append(DeleteMany({"lock_id": lock_id_str}))
                 for account, roles in account_roles.items():
                     links_queue.append(
                         UpdateOne(
-                            {"_id": f"{lock_id_str}::{account[:29]}"},
+                            {"_id": f"{lock_id_str}-{account[:29]}"},
                             {
                                 "$set": {
-                                    "lock_id_str": lock_id_str,
+                                    "lock_id": lock_id_str,
                                     "account_address": account,
                                     "account_address_canonical": account[:29],
                                     "account_roles": sorted(roles),
