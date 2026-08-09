@@ -15,10 +15,12 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_IpInfo,
 )
 from fastapi import FastAPI, Response
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")
 _prometheus_multiprocess = importlib.import_module("prometheus_client.multiprocess")
@@ -96,6 +98,57 @@ async def _aclose(resource) -> None:
         if hasattr(res, "__await__"):  # some close() are async
             await res  # pyright: ignore[reportGeneralTypeIssues]
         return
+
+
+_SESSION_MIDDLEWARE_SKIP_PREFIXES = ("/static/", "/node/", "/addresses/", "/metrics")
+
+
+class SiteSessionMiddleware(BaseHTTPMiddleware):
+    """Resolves the `access-token` cookie into a SiteUser once per request.
+
+    The cookie holds a rotating *session* token (see the `/site-auth/sessions`
+    endpoints), not the account's identity token -- so route handlers never
+    see the raw cookie value. This middleware is the single place that talks
+    to the resolve endpoint; everything else reads ``request.state.user`` /
+    ``request.state.session_id`` (via ``get_user_detailsv2``).
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        request.state.user = None
+        request.state.session_id = None
+
+        if request.url.path.startswith(_SESSION_MIDDLEWARE_SKIP_PREFIXES):
+            return await call_next(request)
+
+        cookie_token = request.cookies.get(ACCESS_TOKEN_COOKIE)
+        new_session_token = None
+
+        if cookie_token:
+            try:
+                api_response = await request.app.httpx_client.post(
+                    f"{request.app.api_url}/site-auth/sessions/resolve",
+                    json={"session_token": cookie_token},
+                )
+                api_response.raise_for_status()
+                data = api_response.json()
+            except httpx.HTTPError:
+                data = {"ok": False}
+
+            if data.get("ok"):
+                request.state.user = SiteUser(**data["user"])
+                request.state.session_id = data["session_id"]
+                if data["session_token"] != cookie_token:
+                    new_session_token = data["session_token"]
+
+        response = await call_next(request)
+
+        if cookie_token and request.state.user is None:
+            # Session was invalid/revoked -- drop the stale cookie.
+            clear_access_token_cookie(request, response)
+        elif new_session_token:
+            set_access_token_cookie(request, response, new_session_token)
+
+        return response
 
 
 # def datetime_to_date(value: dt.datetime):
@@ -253,6 +306,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         },
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(SiteSessionMiddleware)
 
     app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
     app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
@@ -288,6 +342,28 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
         data = generate_latest(registry)
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
+    # ── .well-known ──────────────────────────────────────────────────────
+    @app.get("/.well-known/security.txt", include_in_schema=False)
+    def security_txt() -> Response:
+        body = (
+            "Contact: mailto:security@ccdexplorer.io\n"
+            "Expires: 2027-08-09T00:00:00.000Z\n"
+            "Canonical: https://ccdexplorer.io/.well-known/security.txt\n"
+        )
+        return Response(content=body, media_type="text/plain")
+
+    @app.get("/security.txt", include_in_schema=False)
+    def security_txt_legacy() -> RedirectResponse:
+        # RFC 9116 legacy fallback location; the canonical copy lives under
+        # /.well-known/.
+        return RedirectResponse(url="/.well-known/security.txt", status_code=301)
+
+    @app.get("/.well-known/change-password", include_in_schema=False)
+    def well_known_change_password() -> RedirectResponse:
+        # https://w3c.github.io/webappsec-change-password-url/ -- lets
+        # browsers/password managers deep-link straight to account settings.
+        return RedirectResponse(url="/settings/user/overview#account-security", status_code=302)
 
     app.add_middleware(
         CORSMiddleware,

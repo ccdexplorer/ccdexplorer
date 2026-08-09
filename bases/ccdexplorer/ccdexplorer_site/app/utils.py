@@ -2038,6 +2038,32 @@ async def put_url_from_api(url: str, httpx_client: httpx.AsyncClient, json_put_c
     return api_response
 
 
+async def delete_url_from_api(url: str, httpx_client: httpx.AsyncClient) -> APIResponseResult:
+    api_response = APIResponseResult(status_code=-1, duration_in_sec=-1, ok=False)
+    response = None
+    now = dt.datetime.now().astimezone(dt.UTC)
+    try:
+        response = await httpx_client.delete(url)
+        try:
+            api_response.return_value = response.json()
+        except:  # noqa: E722
+            # if the response happens to be empty, json decoder gives an error.
+            api_response.return_value = None
+        api_response.status_code = response.status_code
+        api_response.ok = True if response.status_code == 200 else False
+    except httpx.HTTPError:
+        api_response.return_value = None
+        if response:
+            api_response.status_code = response.status_code
+            api_response.return_value = response.json()
+
+    end = dt.datetime.now().astimezone(dt.UTC)
+
+    api_response.duration_in_sec = (end - now).total_seconds()
+    print(f"DELETE: {api_response.duration_in_sec:2,.4f}s for {url}")
+    return api_response
+
+
 def format_preference_key(value: str):
     value = value.replace("_", " ")
     return value.capitalize()

@@ -1,0 +1,113 @@
+<hr/>
+<b>Active sessions</b>
+<p class="sm-text">Devices currently logged in to your account. No IP address or device info is
+stored -- just when a session started and was last used.</p>
+{% if sessions %}
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th class="sm-text">Session</th>
+      <th class="sm-text">Started</th>
+      <th class="sm-text">Last active</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for session in sessions %}
+    <tr>
+      <td class="sm-text">
+        {% if session.session_id == current_session_id %}
+          <span class="badge bg-secondary">This device</span>
+        {% else %}
+          Session
+        {% endif %}
+      </td>
+      <td class="sm-text">
+        <a href="#" tabindex="0" class="session-timestamp" data-bs-toggle="popover"
+           data-bs-trigger="hover focus" data-bs-title="Exact time"
+           data-bs-content="{{ session.created_at | datetime_regular_parse }} UTC">
+          {{ session.created_at | datetime_delta_format_since }} ago
+        </a>
+      </td>
+      <td class="sm-text">
+        <a href="#" tabindex="0" class="session-timestamp" data-bs-toggle="popover"
+           data-bs-trigger="hover focus" data-bs-title="Exact time"
+           data-bs-content="{{ session.last_seen_at | datetime_regular_parse }} UTC">
+          {{ session.last_seen_at | datetime_delta_format_since }} ago
+        </a>
+      </td>
+      <td>
+        {% if session.session_id != current_session_id %}
+        <button class="btn btn-link btn-sm ms-0 ps-0 text-danger"
+                hx-delete="/settings/userv2/sessions/{{ session.session_id }}"
+                hx-confirm="Revoke this session?">Revoke</button>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="sm-text">No active sessions found.</p>
+{% endif %}
+
+<script>
+  document.querySelectorAll('.session-timestamp').forEach(function (el) {
+    new bootstrap.Popover(el)
+  })
+</script>
+
+<button class="btn btn-link ms-0 ps-0" hx-post="/auth/logout-everywhere" hx-swap="outerHTML">
+  Log out of all other devices
+</button>
+
+<hr/>
+<b>Recent activity</b>
+{% if audit_log %}
+<ul class="sm-text">
+  {% for entry in audit_log %}
+  <li>
+    {% if entry.event == "session_reuse_detected" %}
+      <span class="text-danger">Suspicious login blocked</span>
+    {% elif entry.event == "login_success" %}
+      Successful login
+    {% elif entry.event == "login_failed" %}
+      Failed login attempt
+    {% elif entry.event == "logout_others" %}
+      Logged out of all other devices
+    {% else %}
+      {{ entry.event }}
+    {% endif %}
+    &mdash; {{ entry.at | datetime_regular_parse }}
+  </li>
+  {% endfor %}
+</ul>
+{% if audit_log | selectattr("event", "equalto", "session_reuse_detected") | list | length > 0 %}
+<div class="alert alert-danger sm-text" role="alert">
+  We blocked a login attempt that reused an already-replaced session token, which can mean a
+  cookie was copied/stolen. That session was revoked automatically. If this wasn't you, use
+  "Log out of all other devices" above and change your password.
+</div>
+{% endif %}
+{% else %}
+<p class="sm-text">No recent activity.</p>
+{% endif %}
+
+<hr/>
+<b>Your data</b>
+<p class="sm-text"><a href="/settings/user/export">Export your account data</a> as a JSON file.</p>
+
+<hr/>
+<b class="text-danger">Delete account</b>
+<p class="sm-text">This permanently deletes your account and all saved preferences. This cannot be undone.</p>
+<form action="/auth/delete-account" method="post" onsubmit="return confirm('This will permanently delete your account. This cannot be undone. Continue?');">
+  {% if user.password %}
+  <div class="row">
+    <div class="col me-3">
+      <label class="form-label sm-text">Confirm your password</label>
+      <input type="password" name="password" class="form-control" required>
+    </div>
+  </div>
+  {% endif %}
+  <button type="submit" class="btn btn-link ms-0 ps-0 text-danger">Delete my account</button>
+</form>

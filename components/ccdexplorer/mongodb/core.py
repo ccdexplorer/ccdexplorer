@@ -182,6 +182,8 @@ class CollectionsUtilities(Enum):
     exchange_rates_historical = "exchange_rates_historical"
     users_v2_prod = "users_v2_prod"
     users_v2_dev = "users_v2_dev"
+    user_sessions = "user_sessions"
+    login_audit_log = "login_audit_log"
     message_log = "message_log"
     preferences_explanations = "preferences_explanations"
     release_notes = "release_notes"

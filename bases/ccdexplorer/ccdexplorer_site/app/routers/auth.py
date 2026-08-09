@@ -10,10 +10,13 @@ endpoints (the site has no DB/email of its own). On success we set the existing
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
     post_url_from_api,
     get_url_from_api,
+    delete_url_from_api,
     set_access_token_cookie,
+    clear_access_token_cookie,
 )
 
 router = APIRouter()
@@ -22,6 +25,20 @@ router = APIRouter()
 def set_login_cookie(request: Request, response: Response, token: str) -> None:
     """Attach the hardened ``access-token`` cookie used for site login."""
     set_access_token_cookie(request, response, token)
+
+
+async def _start_session(request: Request, response: Response, user_token: str) -> None:
+    """Mint a session for ``user_token`` and cookie its (rotating) session
+    token -- called after every fresh proof of credentials (password login,
+    email verification, password reset) instead of cookying the account's
+    identity token directly."""
+    api_response = await post_url_from_api(
+        f"{request.app.api_url}/site-auth/{user_token}/sessions",
+        request.app.httpx_client,
+        {},
+    )
+    if api_response.ok:
+        set_login_cookie(request, response, api_response.return_value["session_token"])
 
 
 def _ctx(request: Request, **extra) -> dict:
@@ -59,7 +76,7 @@ async def login_post(
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(request, response, api_response.return_value["token"])
+        await _start_session(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request, "auth/login.html", _ctx(request, email=email, error=_error_of(api_response))
@@ -102,7 +119,7 @@ async def verify_email(request: Request, verification_token: str):
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(request, response, api_response.return_value["token"])
+        await _start_session(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request, "auth/login.html", _ctx(request, error=_error_of(api_response))
@@ -154,7 +171,7 @@ async def reset_password_post(
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_login_cookie(request, response, api_response.return_value["token"])
+        await _start_session(request, response, api_response.return_value["token"])
         return response
     return request.app.templates.TemplateResponse(
         request,
@@ -168,11 +185,11 @@ async def reset_password_post(
 # --------------------------------------------------------------------------- #
 @router.post("/auth/resend-verification", response_class=HTMLResponse)
 async def resend_verification(request: Request):
-    token = request.cookies.get("access-token")
-    if not token:
+    user = await get_user_detailsv2(request)
+    if not user:
         return '<span class="sm-text text-danger">Please log in first.</span>'
     api_response = await post_url_from_api(
-        f"{request.app.api_url}/site-auth/{token}/resend-verification",
+        f"{request.app.api_url}/site-auth/{user.token}/resend-verification",
         request.app.httpx_client,
         {},
     )
@@ -196,15 +213,15 @@ async def set_password_post(
     password: str = Form(...),
     email: str = Form(None),
 ):
-    token = request.cookies.get("access-token")
-    if not token:
+    user = await get_user_detailsv2(request)
+    if not user:
         return RedirectResponse(url="/auth/login", status_code=303)
 
-    payload = {"password": password}
+    payload = {"password": password, "session_id": request.state.session_id}
     if email:
         payload["email"] = email
     api_response = await post_url_from_api(
-        f"{request.app.api_url}/site-auth/{token}/set-password",
+        f"{request.app.api_url}/site-auth/{user.token}/set-password",
         request.app.httpx_client,
         payload,
     )
@@ -220,3 +237,59 @@ async def set_password_post(
         "auth/message.html",
         _ctx(request, message=_error_of(api_response)),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Log out of all other devices
+# --------------------------------------------------------------------------- #
+@router.post("/auth/logout-everywhere", response_class=HTMLResponse)
+async def logout_everywhere(request: Request):
+    user = await get_user_detailsv2(request)
+    if not user:
+        return '<span class="sm-text text-danger">Please log in first.</span>'
+    await post_url_from_api(
+        f"{request.app.api_url}/site-auth/{user.token}/sessions/revoke-others",
+        request.app.httpx_client,
+        {"keep_session_id": request.state.session_id},
+    )
+    return '<span class="sm-text text-success">Logged out of all other devices.</span>'
+
+
+# --------------------------------------------------------------------------- #
+# Delete account
+# --------------------------------------------------------------------------- #
+@router.post("/auth/delete-account")
+async def delete_account_post(
+    request: Request,
+    password: str = Form(None),
+):
+    user = await get_user_detailsv2(request)
+    if not user:
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    if user.password:
+        # Password-login users must re-prove ownership before deletion.
+        if not password:
+            return request.app.templates.TemplateResponse(
+                request,
+                "auth/message.html",
+                _ctx(request, message="Please enter your password to confirm deletion."),
+            )
+        check = await post_url_from_api(
+            f"{request.app.api_url}/site-auth/login",
+            request.app.httpx_client,
+            {"email": user.email_address, "password": password},
+        )
+        if not check.ok:
+            return request.app.templates.TemplateResponse(
+                request,
+                "auth/message.html",
+                _ctx(request, message="Incorrect password. Account not deleted."),
+            )
+
+    await delete_url_from_api(
+        f"{request.app.api_url}/site-auth/{user.token}", request.app.httpx_client
+    )
+    response = RedirectResponse(url="/", status_code=303)
+    clear_access_token_cookie(request, response)
+    return response
