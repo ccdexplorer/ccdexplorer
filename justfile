@@ -77,7 +77,11 @@ site:
 
 mcp:
     uvicorn projects.ccdexplorer_mcp.asgi:app --loop asyncio --port 8765
-    
+
+# Playwright end-to-end tests for ccdexplorer_site (headless)
+e2e:
+    cd e2e && npm test
+
 accounts:
     python -m bases.ccdexplorer.accounts_retrieval
 
