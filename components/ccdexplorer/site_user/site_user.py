@@ -76,6 +76,8 @@ class AccountNotificationPreferences(BaseModel):
     # if the account is delegating, get notified if your validator configures
 
     token_event: Optional[NotificationPreferences] = None
+    lock_create_event: Optional[NotificationPreferences] = None
+    lock_destroy_event: Optional[NotificationPreferences] = None
 
 
 class ValidatorNotificationPreferences(BaseModel):
@@ -108,6 +110,8 @@ class OtherNotificationPreferences(BaseModel):
     validator_primed_for_suspension: Optional[NotificationPreferences] = None
     validator_node_version_upgrade: Optional[NotificationPreferences] = None
     token_creation: Optional[NotificationPreferences] = None
+    lock_create_event: Optional[NotificationPreferences] = None
+    lock_destroy_event: Optional[NotificationPreferences] = None
 
 
 class AccountForUser(BaseModel):

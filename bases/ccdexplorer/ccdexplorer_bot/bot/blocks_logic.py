@@ -245,6 +245,93 @@ class Mixin(Utils):
             if plt_event.module_event:
                 continue
 
+    def add_lock_events_to_queue(
+        self,
+        meta_effect: CCD_MetaEffect | None,
+        tx: CCD_BlockItemSummary,
+        block: CCD_BlockComplete,
+    ):
+        if not meta_effect:
+            return
+
+        for meta_event in meta_effect.events:
+            if meta_event.lock_create_event:
+                # General feed: anyone subscribed to "any lock was created" gets notified,
+                # regardless of whether their own accounts are involved.
+                general_notification_event = self.prepare_notification_event(
+                    EventType(
+                        other=EventTypeOther(lock_create_event=meta_event.lock_create_event)
+                    ),
+                    tx_hash=tx.hash,
+                    block_info=block.block_info,
+                    impacted_addresses=[],
+                )
+                self.add_notification_event_to_queue(general_notification_event)
+
+                # Account-scoped feed: the creator, every controller, and every explicit
+                # recipient are impacted by the lock being created. Mirrors
+                # ms_events_and_impacts/subscriber/impacted_addresses_from_tx.py's
+                # _process_lock_create_event, so impacted-account derivation stays
+                # consistent between the indexer and the bot.
+                config = self.connections.grpcclient.decode_lock_config(  # type: ignore
+                    meta_event.lock_create_event.lock_config
+                )
+                accounts = {tx.account_transaction.sender}
+                accounts.update(grant.account for grant in config.controller.grants)
+                if isinstance(config.recipients, list):
+                    accounts.update(config.recipients)
+
+                for account in accounts:
+                    account_notification_event = self.prepare_notification_event(
+                        EventType(
+                            account=EventTypeAccount(
+                                lock_create_event=meta_event.lock_create_event
+                            )
+                        ),
+                        tx_hash=tx.hash,
+                        block_info=block.block_info,
+                        impacted_addresses=[
+                            ImpactedAddress(
+                                address=self.complete_address(account),
+                                address_type=AddressType.account,
+                            )
+                        ],
+                    )
+                    self.add_notification_event_to_queue(account_notification_event)
+
+            elif meta_event.lock_destroy_event:
+                general_notification_event = self.prepare_notification_event(
+                    EventType(
+                        other=EventTypeOther(lock_destroy_event=meta_event.lock_destroy_event)
+                    ),
+                    tx_hash=tx.hash,
+                    block_info=block.block_info,
+                    impacted_addresses=[],
+                )
+                self.add_notification_event_to_queue(general_notification_event)
+
+                # A destroy event carries no account data beyond the tx sender - mirrors
+                # ms_events_and_impacts's _process_lock_destroy_event.
+                account_notification_event = self.prepare_notification_event(
+                    EventType(
+                        account=EventTypeAccount(
+                            lock_destroy_event=meta_event.lock_destroy_event
+                        )
+                    ),
+                    tx_hash=tx.hash,
+                    block_info=block.block_info,
+                    impacted_addresses=[
+                        ImpactedAddress(
+                            address=self.complete_address(tx.account_transaction.sender),
+                            address_type=AddressType.account,
+                        )
+                    ],
+                )
+                self.add_notification_event_to_queue(account_notification_event)
+
+            elif meta_event.transfer_event or meta_event.module_event:
+                continue
+
     async def get_new_blocks_from_mongo(self, context: ContextTypes.DEFAULT_TYPE):
         # print("get_new_blocks_from_mongo", end=" ")
         current_time = dt.datetime.now().astimezone(tz=dt.timezone.utc)
@@ -757,6 +844,9 @@ class Mixin(Utils):
                 effects = tx.account_transaction.effects
 
                 field_set = list(effects.model_fields_set)[0]
+
+                if field_set == "meta_update_effect":
+                    self.add_lock_events_to_queue(effects.meta_update_effect, tx, block)
 
                 if EventTypeValidator.model_fields.get(field_set):
                     impacted_addresses = [

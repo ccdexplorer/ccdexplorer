@@ -94,6 +94,8 @@ class EventTypeAccount(BaseModel):
     validator_suspended: Optional[int] = None
     validator_primed_for_suspension: Optional[int] = None
     token_update_effect: Optional[CCD_TokenEvent] = None
+    lock_create_event: Optional[CCD_LockCreateEvent] = None
+    lock_destroy_event: Optional[CCD_LockDestroyEvent] = None
 
 
 class EventTypeValidator(BaseModel):
@@ -138,6 +140,8 @@ class EventTypeOther(BaseModel):
     validator_primed_for_suspension: Optional[int] = None
     validator_node_version_upgrade: Optional[str] = None
     token_creation: Optional[CCD_CreatePLT] = None
+    lock_create_event: Optional[CCD_LockCreateEvent] = None
+    lock_destroy_event: Optional[CCD_LockDestroyEvent] = None
 
     # Note these are also listed under EventTypeAccount.
     # There they are events for the account itself.

@@ -173,4 +173,24 @@ class ProcessOther(MessageOther, Utils):
             if any(notification_services_to_send.values()):
                 message_response = self.define_token_creation_message(notification_event, user)
 
+        elif event_type.lock_create_event:
+            notification_services_to_send = self.set_notification_service(
+                user.other_notification_preferences.lock_create_event
+            )
+
+            if any(notification_services_to_send.values()):
+                message_response = self.define_lock_create_event_message_general(
+                    notification_event, user
+                )
+
+        elif event_type.lock_destroy_event:
+            notification_services_to_send = self.set_notification_service(
+                user.other_notification_preferences.lock_destroy_event
+            )
+
+            if any(notification_services_to_send.values()):
+                message_response = self.define_lock_destroy_event_message_general(
+                    notification_event, user
+                )
+
         return message_response, notification_services_to_send
