@@ -494,3 +494,53 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
                 "message_email": message,
             }
         )
+
+    def define_lock_create_event_message_general(
+        self, notification_event: NotificationEvent, user: SiteUser
+    ) -> MessageResponse:
+        lock_create_event = notification_event.event_type.other.lock_create_event
+        assert lock_create_event is not None
+        lock_id = lock_create_event.lock_id.to_str()
+
+        message = f"""
+        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> was created.<br/><br/>
+        Lock id: {lock_id}<br/>
+        """
+
+        message += f"""
+
+        {self.footer(notification_event)}
+        """
+        return MessageResponse(
+            **{
+                "title_telegram": "",
+                "title_email": ("CCDExplorer Notification - PLT Lock Creation"),
+                "message_telegram": message,
+                "message_email": message,
+            }
+        )
+
+    def define_lock_destroy_event_message_general(
+        self, notification_event: NotificationEvent, user: SiteUser
+    ) -> MessageResponse:
+        lock_destroy_event = notification_event.event_type.other.lock_destroy_event
+        assert lock_destroy_event is not None
+        lock_id = lock_destroy_event.lock_id.to_str()
+
+        message = f"""
+        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> was destroyed/cancelled.<br/><br/>
+        Lock id: {lock_id}<br/>
+        """
+
+        message += f"""
+
+        {self.footer(notification_event)}
+        """
+        return MessageResponse(
+            **{
+                "title_telegram": "",
+                "title_email": ("CCDExplorer Notification - PLT Lock Destruction"),
+                "message_telegram": message,
+                "message_email": message,
+            }
+        )

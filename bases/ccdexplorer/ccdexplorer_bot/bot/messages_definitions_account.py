@@ -568,3 +568,49 @@ Validator <code>{validator.label}</code> is suspended.<br/>
                 "message_email": message_telegram,
             }
         )
+
+    def define_lock_create_event_message(
+        self, notification_event: NotificationEvent, user: SiteUser
+    ) -> MessageResponse:
+        notification_event = self.add_labels_to_notitication_event(user, notification_event)
+        lock_create_event = notification_event.event_type.account.lock_create_event
+        assert lock_create_event is not None
+        lock_id = lock_create_event.lock_id.to_str()
+
+        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> being created.<br/>
+"""
+        message_telegram += f"""
+
+{self.footer(notification_event)}
+"""
+        return MessageResponse(
+            **{
+                "title_telegram": "",
+                "title_email": f"CCDExplorer Notification - Account {notification_event.impacted_addresses[0].label} was affected by a PLT lock creation",
+                "message_telegram": message_telegram,
+                "message_email": message_telegram,
+            }
+        )
+
+    def define_lock_destroy_event_message(
+        self, notification_event: NotificationEvent, user: SiteUser
+    ) -> MessageResponse:
+        notification_event = self.add_labels_to_notitication_event(user, notification_event)
+        lock_destroy_event = notification_event.event_type.account.lock_destroy_event
+        assert lock_destroy_event is not None
+        lock_id = lock_destroy_event.lock_id.to_str()
+
+        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> being destroyed/cancelled.<br/>
+"""
+        message_telegram += f"""
+
+{self.footer(notification_event)}
+"""
+        return MessageResponse(
+            **{
+                "title_telegram": "",
+                "title_email": f"CCDExplorer Notification - Account {notification_event.impacted_addresses[0].label} was affected by a PLT lock destruction",
+                "message_telegram": message_telegram,
+                "message_email": message_telegram,
+            }
+        )

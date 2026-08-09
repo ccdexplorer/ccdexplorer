@@ -157,4 +157,18 @@ class ProcessAccount(MessageAccount, Utils):
             if any(notification_services_to_send.values()):
                 message_response = self.define_token_update_effect_message(notification_event, user)
 
+        if event_type.lock_create_event:
+            notification_services_to_send = self.set_notification_service(
+                user_account.account_notification_preferences.lock_create_event
+            )
+            if any(notification_services_to_send.values()):
+                message_response = self.define_lock_create_event_message(notification_event, user)
+
+        if event_type.lock_destroy_event:
+            notification_services_to_send = self.set_notification_service(
+                user_account.account_notification_preferences.lock_destroy_event
+            )
+            if any(notification_services_to_send.values()):
+                message_response = self.define_lock_destroy_event_message(notification_event, user)
+
         return message_response, notification_services_to_send
