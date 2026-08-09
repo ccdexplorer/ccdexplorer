@@ -181,22 +181,23 @@ def get_and_save_user_from_collection(req: Request):
 
 
 async def get_user_detailsv2(req: Request, token: str | None = None):
-    if not token:
-        token = req.cookies.get("access-token")
     if token:
+        # Explicit account-token lookup (e.g. the Telegram deep-link
+        # /token/{token} route) -- unrelated to the session cookie, this
+        # resolves the SiteUser directly by its stable identity token.
         try:
             response = await req.app.httpx_client.get(f"{req.app.api_url}/v2/site_user/{token}")
             response.raise_for_status()
             user = response.json()
         except httpx.HTTPError:
             user = None
-    else:
-        user = None
-
-    if user:
-        if type(user) is not SiteUser:
+        if user and type(user) is not SiteUser:
             user = SiteUser(**user)
-    return user
+        return user
+
+    # No explicit token: use the session resolved once per request (from the
+    # `access-token` cookie) by SiteSessionMiddleware.
+    return getattr(req.state, "user", None)
 
 
 async def get_credential_issuers(

@@ -43,6 +43,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     put_url_from_api,
     post_url_from_api,
     get_url_from_api,
+    delete_url_from_api,
     APIResponseResult,
     set_access_token_cookie,
     clear_access_token_cookie,
@@ -67,20 +68,69 @@ async def slash_token(
     request: Request,
     token: str,
 ):
+    """Telegram deep-link login (``?start={token}``): ``token`` here is the
+    account's stable identity token, not a session token."""
     user: SiteUser = await get_user_detailsv2(request, token)
     if not isinstance(user, SiteUser):
         user = SiteUser(**user)
     if user:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        set_access_token_cookie(request, response, token)
+        session_response = await post_url_from_api(
+            f"{request.app.api_url}/site-auth/{user.token}/sessions",
+            request.app.httpx_client,
+            {},
+        )
+        if session_response.ok:
+            set_access_token_cookie(
+                request, response, session_response.return_value["session_token"]
+            )
         return response
 
 
 @router.get("/settings/user/logout")
 async def logout(request: Request, response: Response):
     response = RedirectResponse(url="/", status_code=302)
+    user = await get_user_detailsv2(request)
+    if user and request.state.session_id:
+        await delete_url_from_api(
+            f"{request.app.api_url}/site-auth/{user.token}/sessions/{request.state.session_id}",
+            request.app.httpx_client,
+        )
     clear_access_token_cookie(request, response)
     request.app.user = None
+    return response
+
+
+@router.get("/settings/user/export")
+async def export_account_data(request: Request):
+    """Download the account's stored data as JSON (no secrets included)."""
+    user: SiteUser | None = await get_user_detailsv2(request)
+    if not user:
+        return RedirectResponse(url="/auth/login", status_code=303)
+    api_response = await get_url_from_api(
+        f"{request.app.api_url}/site-auth/{user.token}/export",
+        request.app.httpx_client,
+    )
+    if not api_response.ok:
+        return RedirectResponse(url="/settings/user/overview", status_code=303)
+    return Response(
+        content=json.dumps(api_response.return_value, indent=2),
+        media_type="application/json",
+        headers={"Content-Disposition": "attachment; filename=ccdexplorer-account-data.json"},
+    )
+
+
+@router.delete("/settings/userv2/sessions/{session_id}")
+async def revoke_session_response(request: Request, session_id: str):
+    """Revoke a single session from the "Active sessions" list."""
+    user: SiteUser | None = await get_user_detailsv2(request)
+    if user:
+        await delete_url_from_api(
+            f"{request.app.api_url}/site-auth/{user.token}/sessions/{session_id}",
+            request.app.httpx_client,
+        )
+    response = RedirectResponse(url="/settings/user/overview", status_code=204)
+    response.headers["HX-Refresh"] = "true"
     return response
 
 
@@ -89,10 +139,24 @@ async def user_settings_all(
     request: Request,
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
+    sessions = []
+    audit_log = []
     if user:
         if not isinstance(user, SiteUser):
             user = SiteUser(**user)
         html = await generate_edit_html_for_other_notification_preferences(user, request)
+        sessions_response = await get_url_from_api(
+            f"{request.app.api_url}/site-auth/{user.token}/sessions",
+            request.app.httpx_client,
+        )
+        if sessions_response.ok:
+            sessions = sessions_response.return_value.get("sessions", [])
+        audit_response = await get_url_from_api(
+            f"{request.app.api_url}/site-auth/{user.token}/audit-log",
+            request.app.httpx_client,
+        )
+        if audit_response.ok:
+            audit_log = audit_response.return_value.get("entries", [])
     else:
         html = None
     return request.app.templates.TemplateResponse(
@@ -101,6 +165,9 @@ async def user_settings_all(
         {
             "env": request.app.env,
             "request": request,
+            "current_session_id": request.state.session_id,
+            "sessions": sessions,
+            "audit_log": audit_log,
             "user": user,
             "net": "mainnet",
             "other_notification_preferences": html,

@@ -11,6 +11,7 @@ and sets the ``access-token`` cookie with the returned ``token``.
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import json
 from typing import Optional
 from uuid import uuid4
 
@@ -112,10 +113,19 @@ class ResetPasswordRequest(BaseModel):
 class SetPasswordRequest(BaseModel):
     password: str
     email: Optional[str] = None
+    session_id: Optional[str] = None
 
 
 class SetEmailRequest(BaseModel):
     email: str
+
+
+class ResolveSessionRequest(BaseModel):
+    session_token: str
+
+
+class RevokeOtherSessionsRequest(BaseModel):
+    keep_session_id: Optional[str] = None
 
 
 # --- Short-lived token lifecycle (reset / email verification) --------------- #
@@ -173,6 +183,223 @@ async def save_user(user: SiteUser, mongomotor: MongoMotor) -> None:
             )
         ]
     )
+
+
+# --- Sessions ----------------------------------------------------------- #
+# ``SiteUser.token`` stays exactly what it always was: the account's stable
+# identity (Telegram linking, the Mongo lookup/replace key, every existing
+# `/site-auth/{token}/...` call). The browser cookie no longer holds that
+# value directly -- it holds a *session* token from this collection, one per
+# logged-in device, so individual devices can be listed/revoked without
+# touching the account's identity.
+#
+# The session token rotates on every use (at most once per ROTATE_THROTTLE),
+# the same idea OAuth refresh-token rotation uses. The value it replaces stays
+# valid for SESSION_GRACE_PERIOD purely to absorb concurrent in-flight
+# requests that started just before a rotation (e.g. a page firing a couple of
+# near-simultaneous HTMX calls on the same cookie) -- using it during the
+# grace window doesn't rotate again, it just converges back onto the current
+# token. Presenting a token *older* than that is treated as a stolen-cookie
+# signal: the session is revoked and an audit entry is written.
+ROTATE_THROTTLE = dt.timedelta(seconds=30)
+SESSION_GRACE_PERIOD = dt.timedelta(seconds=10)
+
+
+def _as_utc(value: Optional[dt.datetime]) -> Optional[dt.datetime]:
+    """Mongo may hand back naive datetimes; treat those as UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=dt.timezone.utc)
+    return value
+
+
+async def create_session(user_token: str, mongomotor: MongoMotor) -> dict:
+    """Mint a new session (one per logged-in device) for ``user_token``.
+
+    No device/network identifiers are captured or stored -- a session is just
+    a rotating bearer token, its lifecycle timestamps, and which account it
+    belongs to.
+    """
+    now = _now()
+    doc = {
+        "_id": str(uuid4()),
+        "token": str(uuid4()),
+        "previous_token": None,
+        "previous_token_expires": None,
+        "user_token": user_token,
+        "created_at": now,
+        "last_seen_at": now,
+        "last_rotated_at": now,
+        "revoked": False,
+        "revoked_reason": None,
+    }
+    await mongomotor.utilities[CollectionsUtilities.user_sessions].insert_one(doc)
+    return doc
+
+
+async def _resolved(
+    user_token: str, session_id: str, session_token: str, mongomotor: MongoMotor
+) -> dict:
+    user = await get_site_user_by_field("token", user_token, mongomotor)
+    if user is None:
+        return {"ok": False, "reason": "invalid"}
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "session_token": session_token,
+        "user": json.loads(user.model_dump_json()),
+    }
+
+
+async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
+    """Authenticate a session cookie value, rotating it if it's due."""
+    sessions = mongomotor.utilities[CollectionsUtilities.user_sessions]
+    now = _now()
+
+    doc = await sessions.find_one({"token": session_token, "revoked": False})
+    if doc is not None:
+        last_rotated = _as_utc(doc.get("last_rotated_at")) or _as_utc(doc["created_at"])
+        if now - last_rotated >= ROTATE_THROTTLE:
+            new_token = str(uuid4())
+            await sessions.update_one(
+                {"_id": doc["_id"], "token": session_token},
+                {
+                    "$set": {
+                        "token": new_token,
+                        "previous_token": session_token,
+                        "previous_token_expires": now + SESSION_GRACE_PERIOD,
+                        "last_rotated_at": now,
+                        "last_seen_at": now,
+                    }
+                },
+            )
+            returned_token = new_token
+        else:
+            await sessions.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"last_seen_at": now}},
+            )
+            returned_token = session_token
+        return await _resolved(doc["user_token"], doc["_id"], returned_token, mongomotor)
+
+    doc = await sessions.find_one({"previous_token": session_token, "revoked": False})
+    if doc is not None:
+        if _expiry_ok(_as_utc(doc.get("previous_token_expires"))):
+            # In-flight request racing a rotation that already happened --
+            # converge on the current token instead of treating this as reuse.
+            return await _resolved(doc["user_token"], doc["_id"], doc["token"], mongomotor)
+        await sessions.update_one(
+            {"_id": doc["_id"]},
+            {"$set": {"revoked": True, "revoked_reason": "reuse_detected"}},
+        )
+        await _append_audit_entry(doc["user_token"], "session_reuse_detected", mongomotor)
+        return {"ok": False, "reason": "revoked"}
+
+    # Migration fallback: an old-style cookie holding a raw SiteUser.token
+    # directly (pre-dates the session layer). Treat it as an implicit login
+    # instead of forcing a mass logout on deploy.
+    user = await get_site_user_by_field("token", session_token, mongomotor)
+    if user is not None:
+        session = await create_session(user.token, mongomotor)
+        return await _resolved(user.token, session["_id"], session["token"], mongomotor)
+
+    return {"ok": False, "reason": "invalid"}
+
+
+async def list_user_sessions(user_token: str, mongomotor: MongoMotor) -> list[dict]:
+    cursor = (
+        mongomotor.utilities[CollectionsUtilities.user_sessions]
+        .find({"user_token": user_token, "revoked": False})
+        .sort("last_seen_at", -1)
+    )
+    return [doc async for doc in cursor]
+
+
+async def revoke_session(
+    user_token: str, session_id: str, reason: str, mongomotor: MongoMotor
+) -> None:
+    await mongomotor.utilities[CollectionsUtilities.user_sessions].update_one(
+        {"_id": session_id, "user_token": user_token},
+        {"$set": {"revoked": True, "revoked_reason": reason}},
+    )
+
+
+async def revoke_other_sessions(
+    user_token: str,
+    keep_session_id: Optional[str],
+    reason: str,
+    mongomotor: MongoMotor,
+) -> None:
+    query: dict = {"user_token": user_token, "revoked": False}
+    if keep_session_id:
+        query["_id"] = {"$ne": keep_session_id}
+    await mongomotor.utilities[CollectionsUtilities.user_sessions].update_many(
+        query, {"$set": {"revoked": True, "revoked_reason": reason}}
+    )
+
+
+def _iso_utc(value: Optional[dt.datetime]) -> Optional[str]:
+    """Serialize as an unambiguous UTC ISO string (explicit +00:00).
+
+    Real MongoDB drivers hand back naive datetimes for UTC-stored values; a
+    bare ``.isoformat()`` on those loses the "this is UTC" marker, and
+    downstream code that calls ``.astimezone()`` on a naive datetime silently
+    reinterprets it as the *server's local time* instead -- a real bug, not
+    just a display nit. Normalizing to aware-UTC before serializing avoids it
+    regardless of what timezone the server process happens to run in.
+    """
+    value = _as_utc(value)
+    return value.isoformat() if value else None
+
+
+def _session_public(doc: dict) -> dict:
+    return {
+        "session_id": doc["_id"],
+        "created_at": _iso_utc(doc.get("created_at")),
+        "last_seen_at": _iso_utc(doc.get("last_seen_at")),
+    }
+
+
+# --- Login / session audit trail ----------------------------------------- #
+# Deliberately no IP address, user agent, or other device/network identifiers
+# -- this log exists only so an account owner can see *that* something
+# happened (a login, a suspected stolen cookie) and *when*, not track devices.
+async def _append_audit_entry(
+    user_token: Optional[str],
+    event: str,
+    mongomotor: MongoMotor,
+) -> None:
+    """Best-effort audit log write -- never let this break an auth flow."""
+    if not user_token:
+        return
+    try:
+        await mongomotor.utilities[CollectionsUtilities.login_audit_log].insert_one(
+            {
+                "user_token": user_token,
+                "event": event,
+                "at": _now(),
+            }
+        )
+    except Exception:
+        pass
+
+
+async def get_audit_log(user_token: str, mongomotor: MongoMotor, limit: int = 10) -> list[dict]:
+    cursor = (
+        mongomotor.utilities[CollectionsUtilities.login_audit_log]
+        .find({"user_token": user_token})
+        .sort("at", -1)
+        .limit(limit)
+    )
+    return [doc async for doc in cursor]
+
+
+def _audit_public(doc: dict) -> dict:
+    return {
+        "event": doc.get("event"),
+        "at": _iso_utc(doc.get("at")),
+    }
 
 
 def send_verification_email(request: Request, user: SiteUser) -> None:
@@ -235,10 +462,13 @@ async def login(
     user = await get_site_user_by_field("email_address", body.email, mongomotor)
     if (user is None) or (not user.password) or (not verify_password(body.password, user.password)):
         await _record_attempt(request, "login", body.email, LOGIN_WINDOW_SECONDS)
+        if user is not None:
+            await _append_audit_entry(user.token, "login_failed", mongomotor)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     if not user.email_verified:
         raise HTTPException(status_code=403, detail="Please verify your email address first.")
     await _reset_attempts(request, "login", body.email)
+    await _append_audit_entry(user.token, "login_success", mongomotor)
     return {"token": user.token}
 
 
@@ -303,6 +533,10 @@ async def reset_password(
     user.reset_password_token = None
     user.reset_password_token_expires = None
     await save_user(user, mongomotor)
+    # A password reset proves mailbox ownership, not device ownership -- kick
+    # every existing session (including any that still has the old password's
+    # session cookie) and let this flow issue a fresh one.
+    await revoke_other_sessions(user.token, None, "password_changed", mongomotor)
     return {"token": user.token}
 
 
@@ -398,7 +632,169 @@ async def set_password(
 
     await save_user(user, mongomotor)
 
+    # Setting/changing a password from the settings page is done from a
+    # logged-in session -- keep that one device signed in, kick every other.
+    await revoke_other_sessions(user.token, body.session_id, "password_changed", mongomotor)
+
     if needs_verification:
         send_verification_email(request, user)
 
     return {"ok": True, "needs_verification": needs_verification}
+
+
+# --------------------------------------------------------------------------- #
+# Sessions ("see sessions" / "log out everywhere")
+# --------------------------------------------------------------------------- #
+@router.post("/{token}/sessions", response_class=JSONResponse)
+async def create_session_endpoint(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Mint a session for account ``token`` -- called right after a successful
+    login/register/verify-email/reset-password, so the browser cookie can hold
+    a rotating session token instead of the account's identity token."""
+    user = await get_site_user_by_field("token", token, mongomotor)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    session = await create_session(user.token, mongomotor)
+    return {"session_id": session["_id"], "session_token": session["token"]}
+
+
+@router.post("/sessions/resolve", response_class=JSONResponse)
+async def resolve_session_endpoint(
+    body: ResolveSessionRequest,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Authenticate + (if due) rotate a session token. Called once per site
+    request by the site's session middleware."""
+    return await resolve_session(body.session_token, mongomotor)
+
+
+@router.get("/{token}/sessions", response_class=JSONResponse)
+async def list_sessions_endpoint(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """List active sessions/devices for the settings page."""
+    sessions = await list_user_sessions(token, mongomotor)
+    return {"sessions": [_session_public(s) for s in sessions]}
+
+
+@router.delete("/{token}/sessions/{session_id}", response_class=JSONResponse)
+async def revoke_session_endpoint(
+    token: str,
+    session_id: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Revoke a single session (e.g. from the "Active sessions" list)."""
+    await revoke_session(token, session_id, "user_revoked", mongomotor)
+    return {"ok": True}
+
+
+@router.post("/{token}/sessions/revoke-others", response_class=JSONResponse)
+async def revoke_other_sessions_endpoint(
+    token: str,
+    body: RevokeOtherSessionsRequest,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """"Log out of all other devices"."""
+    await revoke_other_sessions(token, body.keep_session_id, "logout_others", mongomotor)
+    await _append_audit_entry(token, "logout_others", mongomotor)
+    return {"ok": True}
+
+
+@router.get("/{token}/audit-log", response_class=JSONResponse)
+async def audit_log_endpoint(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Recent login/session activity for the settings page."""
+    entries = await get_audit_log(token, mongomotor)
+    return {"entries": [_audit_public(e) for e in entries]}
+
+
+# --------------------------------------------------------------------------- #
+# Account lifecycle: deletion + data export
+# --------------------------------------------------------------------------- #
+@router.delete("/{token}", response_class=JSONResponse)
+async def delete_account(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Permanently delete a SiteUser and every session belonging to it."""
+    user = await get_site_user_by_field("token", token, mongomotor)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    await mongomotor.utilities[CollectionsUtilities.users_v2_prod].delete_one({"token": token})
+    await mongomotor.utilities[CollectionsUtilities.user_sessions].delete_many(
+        {"user_token": token}
+    )
+    return {"ok": True}
+
+
+def _prune_disabled_notifications(prefs: Optional[dict]) -> dict:
+    """From a {field_name: NotificationPreferences|null} mapping, keep only
+    entries that have at least one channel actually turned on, and within
+    those, only the enabled channel(s). Used to keep the data export focused
+    on features the user has actually enabled instead of the full skeleton of
+    every possible per-event/per-channel toggle (almost all left at their
+    default "off")."""
+    if not prefs:
+        return {}
+    pruned: dict = {}
+    for key, value in prefs.items():
+        if not value:
+            continue
+        enabled_channels = {
+            channel: service
+            for channel in ("telegram", "email")
+            if (service := value.get(channel)) and service.get("enabled")
+        }
+        if enabled_channels:
+            pruned[key] = enabled_channels
+    return pruned
+
+
+@router.get("/{token}/export", response_class=JSONResponse)
+async def export_account(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> JSONResponse:
+    """The account's data as a downloadable JSON document, secrets stripped
+    and notification preferences pruned down to what's actually enabled."""
+    user = await get_site_user_by_field("token", token, mongomotor)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    data = json.loads(
+        user.model_dump_json(
+            exclude={"password", "reset_password_token", "verification_token"}
+        )
+    )
+
+    data["other_notification_preferences"] = _prune_disabled_notifications(
+        data.get("other_notification_preferences")
+    )
+    for account in (data.get("accounts") or {}).values():
+        account["account_notification_preferences"] = _prune_disabled_notifications(
+            account.get("account_notification_preferences")
+        )
+        account["validator_notification_preferences"] = _prune_disabled_notifications(
+            account.get("validator_notification_preferences")
+        )
+    for contract in (data.get("contracts") or {}).values():
+        contract_update_issued = (contract.get("contract_notification_preferences") or {}).get(
+            "contract_update_issued"
+        )
+        contract["contract_notification_preferences"] = {
+            "contract_update_issued": _prune_disabled_notifications(contract_update_issued)
+        }
+
+    return JSONResponse(content=data)
