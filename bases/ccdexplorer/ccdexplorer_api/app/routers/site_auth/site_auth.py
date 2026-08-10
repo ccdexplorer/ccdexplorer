@@ -23,7 +23,7 @@ from pymongo import ReplaceOne
 
 from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_api_auth
 from ccdexplorer.ccdexplorer_api.app.security import hash_password, verify_password
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
+from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from ccdexplorer.env import environment
 from ccdexplorer.mongodb import CollectionsUtilities, MongoMotor
@@ -165,7 +165,7 @@ def _expiry_ok(expires: Optional[dt.datetime]) -> bool:
 
 async def get_site_user_by_field(field: str, value, mongomotor: MongoMotor) -> Optional[SiteUser]:
     """Return the first SiteUser whose ``field`` equals ``value``, if any."""
-    result = await mongomotor.utilities[CollectionsUtilities.users_v2_prod].find_one({field: value})
+    result = await mongomotor.utilities[site_users_collection_name()].find_one({field: value})
     if result:
         return SiteUser(**result)
     return None
@@ -174,7 +174,7 @@ async def get_site_user_by_field(field: str, value, mongomotor: MongoMotor) -> O
 async def save_user(user: SiteUser, mongomotor: MongoMotor) -> None:
     """Upsert the SiteUser keyed on its token (preserves the existing ``_id``)."""
     user.last_modified = dt.datetime.now().astimezone(dt.timezone.utc)
-    await mongomotor.utilities[CollectionsUtilities.users_v2_prod].bulk_write(
+    await mongomotor.utilities[site_users_collection_name()].bulk_write(
         [
             ReplaceOne(
                 {"token": str(user.token)},
@@ -732,7 +732,7 @@ async def delete_account(
     user = await get_site_user_by_field("token", token, mongomotor)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
-    await mongomotor.utilities[CollectionsUtilities.users_v2_prod].delete_one({"token": token})
+    await mongomotor.utilities[site_users_collection_name()].delete_one({"token": token})
     await mongomotor.utilities[CollectionsUtilities.user_sessions].delete_many(
         {"user_token": token}
     )

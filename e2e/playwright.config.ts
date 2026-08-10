@@ -12,6 +12,7 @@ const sitePort = process.env.PLAYWRIGHT_SITE_PORT ?? '8011';
 
 export default defineConfig({
   testDir: './tests',
+  globalSetup: './global-setup.ts',
   fullyParallel: true,
   retries: isCI ? 2 : 0,
   reporter: 'html',
@@ -38,6 +39,20 @@ export default defineConfig({
       url: `http://127.0.0.1:${apiPort}/openapi.json`,
       reuseExistingServer: !isCI,
       timeout: 60_000,
+      env: {
+        // Spread first: Playwright's webServer `env` replaces process.env
+        // rather than merging into it, so without this the child process
+        // would lose MONGO_URI / GRPC_* / CCDEXPLORER_API_KEY etc.
+        ...(process.env as Record<string, string>),
+        // state_getters.site_users_collection_name() reads this to route
+        // SiteUser reads/writes at users_v2_dev instead of users_v2_prod --
+        // same collection the bot's own tests use -- so the e2e test account
+        // (and anything it does: sessions, notification prefs, deletion)
+        // never touches real user data. Scoped to just this spawned process,
+        // not the repo .env, so it doesn't affect anyone's manual/VS Code
+        // debug session against the real API.
+        ENVIRONMENT: 'dev',
+      },
     },
     {
       command: `uv run uvicorn projects.ccdexplorer_site.asgi:app --loop asyncio --port ${sitePort}`,
@@ -53,6 +68,7 @@ export default defineConfig({
         // Point the locally-started site at the locally-started API rather
         // than whatever remote API_URL the dev's own .env might set.
         API_URL: `http://127.0.0.1:${apiPort}`,
+        ENVIRONMENT: 'dev',
       },
     },
   ],

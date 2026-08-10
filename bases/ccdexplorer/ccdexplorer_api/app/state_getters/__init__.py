@@ -5,13 +5,32 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from fastapi import Request
-from ccdexplorer.env import API_URL, ADMIN_CHAT_ID
+from ccdexplorer.env import API_URL, ADMIN_CHAT_ID, environment
 import datetime as dt
 from ccdexplorer.ccdexplorer_api.app.models import User
 from pymongo.asynchronous.database import AsyncDatabase
 from ccdexplorer.domain.mongo import MongoTypeBlockPerDay
 from ccdexplorer.tooter import TooterChannel, TooterType
 from ccdexplorer.mongodb import CollectionsUtilities, Collections, net_db
+
+
+def site_users_collection_name() -> CollectionsUtilities:
+    """Which SiteUser collection ``site_auth.py``/``site_user_v2.py`` read and
+    write: ``users_v2_dev`` when ``ENVIRONMENT=dev``, ``users_v2_prod``
+    otherwise.
+
+    Mirrors the bot's own dev/prod split for this same collection
+    (``ccdexplorer_bot/bot/__init__.py::users_collection``), just switched by
+    an explicit env var instead of "is pytest running" -- this runs under a
+    real uvicorn process (e.g. Playwright's e2e webServer, which sets
+    ENVIRONMENT=dev so its test account never touches real user data), not
+    pytest.
+    """
+    return (
+        CollectionsUtilities.users_v2_dev
+        if environment.get("ENVIRONMENT") == "dev"
+        else CollectionsUtilities.users_v2_prod
+    )
 
 
 def get_dict_diff(old_dict: dict, new_dict: dict) -> str:
