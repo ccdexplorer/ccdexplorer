@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse
 
 from ccdexplorer.ccdexplorer_site.app.state import get_httpx_client
 from ccdexplorer.ccdexplorer_site.app.utils import get_url_from_api
-import httpx
+import httpx2 as httpx
 
 router = APIRouter()
 

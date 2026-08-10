@@ -19,7 +19,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME, API_URL
 from fastapi.security.api_key import APIKeyHeader
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_httpx_client
-import httpx
+import httpx2 as httpx
 
 router = APIRouter(tags=["Contracts"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)

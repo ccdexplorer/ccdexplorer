@@ -35,7 +35,7 @@ dependencies = [
     "celery[redis,mongodb]",
     "protobuf",
     "googleapis-common-protos",
-    "httpx",
+    "httpx2",
     "scheduler>=0.8.8",
     "dagster>=1.11.14",
     "dagster-postgres>=0.27.14",

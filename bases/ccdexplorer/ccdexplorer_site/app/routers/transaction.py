@@ -28,7 +28,7 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_httpx_client,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import tx_type_translation, get_url_from_api
-import httpx
+import httpx2 as httpx
 
 router = APIRouter()
 

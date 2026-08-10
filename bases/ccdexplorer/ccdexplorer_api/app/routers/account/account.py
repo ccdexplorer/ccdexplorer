@@ -1,7 +1,7 @@
 from uuid import uuid4
 import math
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, get_plts_that_track_eur
-import httpx
+import httpx2 as httpx
 from ccdexplorer.mongodb import (
     MongoMotor,
     Collections,

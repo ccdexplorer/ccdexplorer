@@ -34,7 +34,7 @@ dependencies = [
     "celery[redis,mongodb]",
     "protobuf",
     "googleapis-common-protos",
-    "httpx",
+    "httpx2",
     "scheduler>=0.8.8",
     "python-telegram-bot[job-queue]>=22.5",
     # Pin <0.119: FastAPI 0.119.0 adds `_IncludedRouter` objects to app.routes,

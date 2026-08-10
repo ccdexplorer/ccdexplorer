@@ -15,7 +15,7 @@ from typing import Any, Optional
 import cbor2
 import dateutil
 import dateutil.parser
-import httpx
+import httpx2 as httpx
 import plotly.graph_objects as go
 
 # from urllib import request

@@ -1,7 +1,7 @@
 import math
 from typing import Optional
 
-import httpx
+import httpx2 as httpx
 import polars as polars
 from ccdexplorer.site_user import SiteUser
 from fastapi import APIRouter, Depends, Query, Request

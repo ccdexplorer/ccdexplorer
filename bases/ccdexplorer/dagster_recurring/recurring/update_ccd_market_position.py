@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 from ccdexplorer.mongodb import Collections, MongoDB, CollectionsUtilities
 
 from pymongo import ReplaceOne

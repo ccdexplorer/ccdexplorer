@@ -1,6 +1,6 @@
 # ruff: noqa: F403, F405, E402, E501, E722
 
-import httpx
+import httpx2 as httpx
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo
 from ccdexplorer.mongodb import *
 from fastapi import APIRouter, Depends, Request, Query

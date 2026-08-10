@@ -6,7 +6,7 @@ import asyncio
 import traceback
 import warnings
 from typing import Any
-import httpx
+import httpx2 as httpx
 from ccdexplorer.celery_app import TaskResult, store_result_in_mongo
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.domain.generic import NET

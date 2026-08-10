@@ -1,7 +1,7 @@
 import math
 from typing import Optional
 
-import httpx
+import httpx2 as httpx
 import polars as polars
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,

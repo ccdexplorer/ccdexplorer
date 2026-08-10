@@ -13,7 +13,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Optional
 
-import httpx
+import httpx2 as httpx
 import humanize
 import urllib3
 from ccdexplorer.mongodb import MongoDB, MongoMotor
@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from httpx import ASGITransport
+from httpx2 import ASGITransport
 
 _prometheus_client = importlib.import_module("prometheus_client")
 _prometheus_multiprocess = importlib.import_module("prometheus_client.multiprocess")

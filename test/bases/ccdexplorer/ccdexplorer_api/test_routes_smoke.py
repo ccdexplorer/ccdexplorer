@@ -1,6 +1,6 @@
 import pytest
 from fastapi.routing import APIRoute
-import httpx
+import httpx2 as httpx
 
 from conftest import build_test_app
 from .hand_picked_routes import (

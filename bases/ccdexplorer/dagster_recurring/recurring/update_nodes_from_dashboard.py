@@ -1,6 +1,6 @@
 import datetime as dt
 
-import httpx
+import httpx2 as httpx
 from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
 from ccdexplorer.mongodb import Collections, MongoDB, net_db
 from pymongo import ReplaceOne

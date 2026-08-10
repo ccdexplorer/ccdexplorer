@@ -9,7 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import ccdexplorer.grpc_client.wadze as wadze
-import httpx
+import httpx2 as httpx
 from ccdexplorer.domain.generic import NET
 from pymongo.asynchronous.collection import AsyncCollection
 from ccdexplorer.grpc_client import GRPCClient

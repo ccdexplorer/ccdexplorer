@@ -14,7 +14,7 @@ import datetime as dt
 import math
 
 import dateutil
-import httpx
+import httpx2 as httpx
 import plotly.graph_objects as go
 import polars as polars
 from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (

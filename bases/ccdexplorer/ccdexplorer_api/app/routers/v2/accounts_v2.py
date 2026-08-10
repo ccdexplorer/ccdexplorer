@@ -13,7 +13,7 @@ import asyncio
 from typing import Any
 
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
-import httpx
+import httpx2 as httpx
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_blocks_per_day,
     get_grpcclient,

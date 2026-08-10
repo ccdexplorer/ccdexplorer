@@ -17,7 +17,7 @@ import json
 import uuid
 import math
 from bisect import bisect_right
-import httpx
+import httpx2 as httpx
 import numpy as np
 import pandas as pd
 import plotly.express as px

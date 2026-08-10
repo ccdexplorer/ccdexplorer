@@ -1,6 +1,6 @@
 import math
 
-import httpx
+import httpx2 as httpx
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 

@@ -9,7 +9,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.mongodb import Collections, MongoDB, CollectionsUtilities, net_db
 from pymongo import DeleteOne, ReplaceOne
 from pymongo.collection import Collection
-import httpx
+import httpx2 as httpx
 
 
 def log_last_heartbeat_plts_in_mongo(db: dict[Collections, Collection], height: int):

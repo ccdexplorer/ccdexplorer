@@ -13,7 +13,7 @@ import datetime as dt
 import os
 from enum import Enum
 
-import httpx
+import httpx2 as httpx
 import pandas as pd
 import plotly.express as px
 from ccdexplorer.grpc_client.CCD_Types import (

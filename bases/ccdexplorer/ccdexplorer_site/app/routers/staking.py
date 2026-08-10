@@ -1,7 +1,7 @@
 # ruff: noqa: F403, F405, E402, E501, E722
 import math
 
-import httpx
+import httpx2 as httpx
 import dateutil
 from dateutil import parser
 from ccdexplorer.site_user import SiteUser

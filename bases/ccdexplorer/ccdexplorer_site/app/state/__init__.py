@@ -1,5 +1,5 @@
 from fastapi import Request
-import httpx
+import httpx2 as httpx
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer.mongodb import (
     Collections,
