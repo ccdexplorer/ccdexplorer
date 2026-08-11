@@ -28,7 +28,7 @@
         <div class="row">
             <div class="col">
                 {% set explanation_key = "account-"+field %}
-                <label><b>{{field|format_preference_key}}</b></label> <br/><span class="text-secondary-emphasis">{{explanations[explanation_key].explanation}}</span>
+                <label><b>{{field|format_preference_key}}</b></label> <br/><span class="text-secondary-emphasis">{{explanations.get(explanation_key, {}).get('explanation', '')}}</span>
             </div>
         </div>
         {% if show_telegram %}
@@ -103,7 +103,7 @@
             <div class="row">
                 <div class="col">
                     {% set explanation_key = "validator-"+field %}
-                <label><b>{{field|format_preference_key}}</b></label> <br/><span class="text-secondary-emphasis">{{explanations[explanation_key].explanation}}</span>
+                <label><b>{{field|format_preference_key}}</b></label> <br/><span class="text-secondary-emphasis">{{explanations.get(explanation_key, {}).get('explanation', '')}}</span>
                 </div>
             </div>
             {% if show_telegram %}

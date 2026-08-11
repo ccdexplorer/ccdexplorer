@@ -6,7 +6,7 @@
     <div class="row">
         <div class="col text-start">
             {% set explanation_key = "other-"+field %}
-            <label><b>{{field|format_preference_key}}</b></label><br/> <span class="text-secondary-emphasis">{{explanations[explanation_key].explanation}}</span>
+            <label><b>{{field|format_preference_key}}</b></label><br/> <span class="text-secondary-emphasis">{{explanations.get(explanation_key, {}).get('explanation', '')}}</span>
     </div>
     </div>
     {% if show_telegram %}
