@@ -5,7 +5,6 @@ import re
 import shutil
 import subprocess
 import tarfile
-from datetime import timedelta
 from pathlib import Path
 
 import ccdexplorer.grpc_client.wadze as wadze
@@ -14,17 +13,15 @@ from ccdexplorer.domain.generic import NET
 from pymongo.asynchronous.collection import AsyncCollection
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
-from ccdexplorer.domain.mongo import ModuleVerification, MongoTypeInstance, MongoTypeModule
+from ccdexplorer.domain.mongo import ModuleVerification
 from ccdexplorer.mongodb import (
     Collections,
     net_db,
 )
 from ccdexplorer.tooter import Tooter
-from dateutil.relativedelta import relativedelta
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
 from rich.console import Console
-from sortedcontainers import SortedDict
 
 from ccdexplorer.concordium_client import ConcordiumClient
 
@@ -50,8 +47,6 @@ class Module:
                     print(f"Processed new module: {module_ref}, now verifying...")
                     await self.verify_module(net, self.concordium_client, module_ref)
                     print(f"Verified module: {module_ref}")
-                    if net == NET.MAINNET:
-                        await self.save_smart_contracts_overview(net)
 
     # Add this helper at class level
     def get_project_root(self):
@@ -428,89 +423,3 @@ class Module:
         tooter_message = f"{net.value}: Module {module_ref} with name {module_from_collection['module_name']} added verification with status {verification.verified}. Explanation: {verification.explanation}."
         print(tooter_message)
         self.tooter.send_to_tooter(tooter_message)
-
-    async def save_smart_contracts_overview(self, net: NET):
-        self.mainnet: dict[Collections, Collection]
-        self.testnet: dict[Collections, Collection]
-        db_to_use = net_db(self, net)
-        modules_dict = {
-            x["_id"]: MongoTypeModule(**x) for x in db_to_use[Collections.modules].find()
-        }
-        mm = [
-            CCD_BlockItemSummary(**x)
-            for x in db_to_use[Collections.transactions].find({"type.contents": "module_deployed"})
-        ]
-
-        inits_dict = {
-            x.account_transaction.effects.module_deployed: x.block_info.slot_time  # type: ignore
-            for x in mm
-            if x.account_transaction is not None
-        }
-
-        # update modules_dict with init dates
-        modules_sorted_by_date = SortedDict()
-        for module_ref, module in modules_dict.items():
-            init_date = inits_dict.get(module_ref, None)
-            if init_date:
-                module.init_date = init_date
-                modules_dict[module_ref] = module
-                modules_sorted_by_date[init_date] = module.model_dump(exclude_none=True)
-                instances = [
-                    MongoTypeInstance(**x).model_dump(exclude_none=True)
-                    for x in db_to_use[Collections.instances].find({"source_module": module_ref})
-                ]
-                modules_sorted_by_date[init_date].update(
-                    {"instances": [x["id"] for x in instances]}
-                )
-
-                verification = modules_sorted_by_date[init_date]["verification"]
-                verification.update({"source_code_at_verification_time": None})
-                modules_sorted_by_date[init_date]["verification"] = verification
-
-        # now do an ugly hack to get the modules into year/month buckets
-        max_date = max(modules_sorted_by_date.keys())
-        min_date = min(modules_sorted_by_date.keys())
-        months_list = []
-        cur_date = min_date
-        while cur_date < max_date:
-            end_of_day = dt.datetime.combine(cur_date, dt.time.max)
-            next_month = end_of_day.replace(day=28) + timedelta(days=4)
-            res = next_month - timedelta(days=next_month.day)
-            # print(f"Last date of month is:", res.date())
-            months_list.append(
-                {
-                    "display_string": f"{cur_date.year}-{cur_date.month:02}",
-                    "end_of_month_date": res,
-                }
-            )
-            cur_date += relativedelta(months=1)
-
-        the_dict = {}
-        for init_date in reversed(modules_sorted_by_date):
-            display_string_for_module = f"{init_date.year}-{init_date.month:02}"
-            already_found_display_dates = the_dict.get(display_string_for_module, None)
-            if not already_found_display_dates:
-                the_dict[display_string_for_module] = [modules_sorted_by_date[init_date]]
-            else:
-                the_dict[display_string_for_module].append(modules_sorted_by_date[init_date])
-
-        # save to mongo collection
-        queue = []
-        analysis_type = "statistics_modules_overview"
-        for year_month in the_dict:
-            queue.append(
-                ReplaceOne(
-                    {"_id": f"{year_month}-{analysis_type}"},
-                    {
-                        "_id": f"{year_month}-{analysis_type}",
-                        "date": f"{year_month}-01",
-                        "year_month": year_month,
-                        "net": net.value,
-                        "type": analysis_type,
-                        "modules": the_dict[year_month],
-                    },
-                    upsert=True,
-                ),
-            )
-
-        _ = db_to_use[Collections.statistics].bulk_write(queue)

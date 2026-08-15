@@ -4,7 +4,7 @@
 <p><i>Notifications are on a best effort basis. No guarantee they will arrive (on time, or at all). </i></p>
 {% if user %}
 <p>
-            
+
     {% if user.username %}
         You are logged in as <a href="https://telegram.me/{{user.username}}">@{{user.username}}</a> (<a href="/settings/user/logout">logout</a>).
     {% elif user.first_name %}
@@ -14,89 +14,127 @@
     {% endif %}
 
 </p>
-<div class="row mt-4 row-flex">
-    <div class="col-md-6  col-sm-12 ">
-        <div class="border content curved-border " >
-          {% set title= "User Settings" %}{% include 'base/box_title.html' %}
 
-    {% include "userv2/user_email_address_start.html" %}
-    {% include "userv2/login_connections.html" %}
-        </div>
-    </div>
-    
-    <div class="col-md-6  col-sm-12">
-        <div id="" class=" content border curved-border  " >
-          {% set title= "General Notification Preferences" %}{% include 'base/box_title.html' %}
-          <!-- <h5>General Notification Preferences</h5> -->
-        
-          <p>
-              
-                  Edit notification preferences for events on-chain that are not directly related to an account (such as validators lowering its stake, (large) account transfers, protocol updates, etc.). 
-              
-          </p>
-          {% include "userv2/other_notification_preferences_start.html" %}        
-        </div>
-    </div>
+<ul class="nav nav-pills mb-3" id="settings-pills-tab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active explorer bg-secondary-subtle" id="user-settings-tab" data-bs-toggle="pill" data-bs-target="#user-settings" type="button" role="tab" aria-controls="user-settings" aria-selected="true">User Settings</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link explorer bg-secondary-subtle" id="account-security-tab" data-bs-toggle="pill" data-bs-target="#account-security" type="button" role="tab" aria-controls="account-security" aria-selected="false">Account Security</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link explorer bg-secondary-subtle" id="general-notifications-tab" data-bs-toggle="pill" data-bs-target="#general-notifications" type="button" role="tab" aria-controls="general-notifications" aria-selected="false">General</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link explorer bg-secondary-subtle" id="account-notifications-tab" data-bs-toggle="pill" data-bs-target="#account-notifications" type="button" role="tab" aria-controls="account-notifications" aria-selected="false">Account</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link explorer bg-secondary-subtle" id="contract-notifications-tab" data-bs-toggle="pill" data-bs-target="#contract-notifications" type="button" role="tab" aria-controls="contract-notifications" aria-selected="false">Contract</button>
+  </li>
+</ul>
 
-</div>
+<div class="tab-content" id="settings-pills-tabContent">
 
-<div class="row mt-4 row-flex">
-    <div class="col-md-12 col-sm-12">
-        <div id="account-security" class="border content curved-border">
-          {% set title= "Account Security" %}{% include 'base/box_title.html' %}
-          {% include "userv2/account_security.html" %}
+  <div class="tab-pane fade show active" id="user-settings" role="tabpanel" aria-labelledby="user-settings-tab" tabindex="0">
+    <div class="row">
+      <div class="col-md-12 col-sm-12">
+        <div class="border content curved-border">
+          {% include "userv2/user_email_address_start.html" %}
+          {% include "userv2/login_connections.html" %}
         </div>
-    </div>
-</div>
-
-  <div class="row  row-flex">
-
-    <div class="col-md-6  col-sm-12">
-        <div id="" class=" content border curved-border  " >
-            {% set title= "Account Notification Preferences" %}{% include 'base/box_title.html' %}
-            
-            <p>Edit notification preferences for your accounts below. Note that for all accounts you can edit the 
-                <i>account notification preferences</i>, while you can only edit the <i>validator notification preferences</i> for validators.
-            </p>
-            <br/>
-            <b>Add a new account</b>
-            {% include "userv2/user_new_account_start.html" %}   
-            {% if user.accounts|length > 0 %}
-                {% for user_account_index, user_account in user.accounts.items() %}
-                    {% include "userv2/user_account_start.html" %}
-                {% endfor %}
-            {% else %} 
-                <div class="alert alert-info" role="alert">
-                    (You have no accounts listed. Please add a new account below.)
-                </div>
-                
-            {% endif %}        
-        </div>
-    </div>
-    <div class="col-md-6  col-sm-12">
-        <div id="" class=" content border curved-border  " >
-            {% set title= "Contract Notification Preferences" %}{% include 'base/box_title.html' %}
-        <p>Edit notification preferences for your contracts by selecting the methods you want to be notified for. 
-        </p>
-        <br/>
-        <h6>Add a new contract</h6>
-        {% include "userv2/user_new_contract_start.html" %}   
-        {% if user.contracts|length > 0 %}
-            {% for contract_index, contract in user.contracts.items() %}
-                {% include "userv2/user_contract_start.html" %}
-            {% endfor %}
-        {% else %} 
-            <div class="alert alert-info" role="alert">
-                (You have no contracts listed. Please add a new contract below.)
-            </div>
-            
-        {% endif %}        
-        </div>
+      </div>
     </div>
   </div>
 
-  {% else %} 
-  {% include "userv2/user_settings_logged_out.html" %}
+  <div class="tab-pane fade" id="account-security" role="tabpanel" aria-labelledby="account-security-tab" tabindex="0">
+    <div class="row">
+      <div class="col-md-12 col-sm-12">
+        <div class="content border curved-border">
+          {% include "userv2/account_security.html" %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="general-notifications" role="tabpanel" aria-labelledby="general-notifications-tab" tabindex="0">
+    <div class="row">
+      <div class="col-md-12 col-sm-12">
+        <div class="content border curved-border">
+          <p>
+            Edit notification preferences for events on-chain that are not directly related to an account (such as validators lowering its stake, (large) account transfers, protocol updates, etc.).
+          </p>
+          {% include "userv2/other_notification_preferences_start.html" %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="account-notifications" role="tabpanel" aria-labelledby="account-notifications-tab" tabindex="0">
+    <div class="row">
+      <div class="col-md-12 col-sm-12">
+        <div class="content border curved-border">
+          <p>Edit notification preferences for your accounts below. Note that for all accounts you can edit the
+              <i>account notification preferences</i>, while you can only edit the <i>validator notification preferences</i> for validators.
+          </p>
+          <br/>
+          <b>Add a new account</b>
+          {% include "userv2/user_new_account_start.html" %}
+          {% if user.accounts|length > 0 %}
+              {% for user_account_index, user_account in user.accounts.items() %}
+                  {% include "userv2/user_account_start.html" %}
+              {% endfor %}
+          {% else %}
+              <div class="alert alert-info" role="alert">
+                  (You have no accounts listed. Please add a new account below.)
+              </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="contract-notifications" role="tabpanel" aria-labelledby="contract-notifications-tab" tabindex="0">
+    <div class="row">
+      <div class="col-md-12 col-sm-12">
+        <div class="content border curved-border">
+          <p>Edit notification preferences for your contracts by selecting the methods you want to be notified for.
+          </p>
+          <br/>
+          <h6>Add a new contract</h6>
+          {% include "userv2/user_new_contract_start.html" %}
+          {% if user.contracts|length > 0 %}
+              {% for contract_index, contract in user.contracts.items() %}
+                  {% include "userv2/user_contract_start.html" %}
+              {% endfor %}
+          {% else %}
+              <div class="alert alert-info" role="alert">
+                  (You have no contracts listed. Please add a new contract below.)
+              </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Activate the right pill on load when linked to directly (e.g. the
+  // /.well-known/change-password redirect points at #account-security).
+  (function () {
+    var hash = window.location.hash;
+    if (!hash) return;
+    var pane = document.querySelector(hash);
+    if (!pane || !pane.classList.contains('tab-pane')) return;
+    var trigger = document.querySelector('[data-bs-target="' + hash + '"]');
+    if (trigger) {
+      new bootstrap.Tab(trigger).show();
+    }
+  })();
+</script>
+
+{% else %}
+{% include "userv2/user_settings_logged_out.html" %}
 
 {% endif %}
 

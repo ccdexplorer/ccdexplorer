@@ -19,6 +19,7 @@ import typing
 from enum import Enum
 
 import httpx2 as httpx
+import markupsafe
 from ccdexplorer.cis import *  # type: ignore
 from ccdexplorer.domain.s7 import s7_contract_to_erc_version
 from ccdexplorer.domain.s7 import (
@@ -235,49 +236,54 @@ class MakeUp:
         return type_additional_info, sender
 
     async def set_cns_action_message(self, effect_updated: CCD_InstanceUpdatedEvent):
+        # domain_name/subdomain/set_data_key/set_data_value are decoded straight from
+        # raw transaction bytes (see CNSDomainDecoder.string() in ccdexplorer.cns.core)
+        # with no charset restriction, so they're fully attacker-controlled free text -
+        # escape before building HTML below.
+        domain_name = markupsafe.escape(self.cns_domain.domain_name or "")
+        subdomain = markupsafe.escape(self.cns_domain.subdomain or "")
+        set_data_key = markupsafe.escape(self.cns_domain.set_data_key or "")
+        set_data_value = markupsafe.escape(self.cns_domain.set_data_value or "")
+
         if effect_updated.receive_name == "BictoryCns.register":
             self.amount = self.cns_domain.amount - self.amount
-            self.cns_domain.action_message = f"Registered <b>{self.cns_domain.domain_name}</b> for <b>{self.cns_domain.duration_years}</b> year{'s' if self.cns_domain.duration_years > 1 else ''}"  # type: ignore # at {self.cns_domain.register_address}'
+            self.cns_domain.action_message = f"Registered <b>{domain_name}</b> for <b>{self.cns_domain.duration_years}</b> year{'s' if self.cns_domain.duration_years > 1 else ''}"  # type: ignore # at {self.cns_domain.register_address}'
 
         if effect_updated.receive_name == "BictoryCns.extend":
-            self.cns_domain.action_message = f"Extended <b>{self.cns_domain.domain_name}</b> for <b>{self.cns_domain.duration_years}</b> year{'s' if self.cns_domain.duration_years > 1 else ''}"  # type: ignore
+            self.cns_domain.action_message = f"Extended <b>{domain_name}</b> for <b>{self.cns_domain.duration_years}</b> year{'s' if self.cns_domain.duration_years > 1 else ''}"  # type: ignore
 
         if effect_updated.receive_name == "BictoryCns.createSubdomain":
             self.amount = self.cns_domain.amount - self.amount
-            self.cns_domain.action_message = f"Sub domain <b>{self.cns_domain.subdomain}</b> created on <b>{self.cns_domain.domain_name}</b>"
+            self.cns_domain.action_message = (
+                f"Sub domain <b>{subdomain}</b> created on <b>{domain_name}</b>"
+            )
 
         if effect_updated.receive_name == "BictoryCns.setAddress":
-            self.cns_domain.action_message = f"Address (to {account_link(self.cns_domain.set_address, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}) set on <b>{self.cns_domain.domain_name}.</b>"
+            self.cns_domain.action_message = f"Address (to {account_link(self.cns_domain.set_address, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}) set on <b>{domain_name}.</b>"
 
         if effect_updated.receive_name == "BictoryCns.setData":
-            self.cns_domain.action_message = f"Data ({self.cns_domain.set_data_key}: {self.cns_domain.set_data_value}) set on <b>{self.cns_domain.domain_name}</b>."
+            self.cns_domain.action_message = (
+                f"Data ({set_data_key}: {set_data_value}) set on <b>{domain_name}</b>."
+            )
 
         if effect_updated.receive_name == "BictoryCnsNft.transfer":
-            self.cns_domain.action_message = f"<b>Transferred {self.cns_domain.domain_name}</b> to {account_link(self.cns_domain.transfer_to, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
+            self.cns_domain.action_message = f"<b>Transferred {domain_name}</b> to {account_link(self.cns_domain.transfer_to, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
 
         if effect_updated.receive_name == "BictoryNftAuction.bid":
-            self.cns_domain.action_message = f"Bid placed on <b>{self.cns_domain.domain_name}</b> for <b>{micro_ccd_no_decimals(self.cns_domain.amount)}</b>"
+            self.cns_domain.action_message = f"Bid placed on <b>{domain_name}</b> for <b>{micro_ccd_no_decimals(self.cns_domain.amount)}</b>"
 
         if effect_updated.receive_name == "BictoryNftAuction.cancel":
-            self.cns_domain.action_message = (
-                f"Auction cancelled for <b>{self.cns_domain.domain_name}</b>"
-            )
+            self.cns_domain.action_message = f"Auction cancelled for <b>{domain_name}</b>"
 
         if effect_updated.receive_name == "BictoryNftAuction.finalize":
             if self.cns_domain.cns_event == CNSEvent.FinalizeEvent:
-                self.cns_domain.action_message = (
-                    f"Auction finalized for <b>{self.cns_domain.domain_name}</b>"
-                )
+                self.cns_domain.action_message = f"Auction finalized for <b>{domain_name}</b>"
 
             if self.cns_domain.cns_event == CNSEvent.AbortEvent:
-                self.cns_domain.action_message = (
-                    f"Auction aborted for <b>{self.cns_domain.domain_name}</b>"
-                )
+                self.cns_domain.action_message = f"Auction aborted for <b>{domain_name}</b>"
 
             if self.cns_domain.cns_event == CNSEvent.CancelEvent:
-                self.cns_domain.action_message = (
-                    f"Auction cancelled for <b>{self.cns_domain.domain_name}</b>"
-                )
+                self.cns_domain.action_message = f"Auction cancelled for <b>{domain_name}</b>"
 
     async def get_domain_from_collection(self):
         result_from_cache = self.app.cns_domain_cache[self.net].get(self.cns_domain.tokenId)
@@ -1025,9 +1031,12 @@ class MakeUp:
                             )
 
                         elif event.baker_set_metadata_url:
+                            escaped_metadata_url = markupsafe.escape(
+                                event.baker_set_metadata_url.url
+                            )
                             new_event = EventType(
                                 f"Validator Set MetaDataURL for validator: {event.baker_set_metadata_url.baker_id}",
-                                f"metadataURL: <a href='{event.baker_set_metadata_url.url}'>{event.baker_set_metadata_url.url}</a>",
+                                f"metadataURL: <a href='{escaped_metadata_url}'>{escaped_metadata_url}</a>",
                                 None,
                             )
 
@@ -1189,8 +1198,12 @@ class MakeUp:
                 "schedule": [],
             }
 
+            plt_token_id = markupsafe.escape(t.token_creation.create_plt.token_id)
+            plt_name = markupsafe.escape(
+                t.token_creation.create_plt.initialization_parameters.name
+            )
             new_event = EventType(
-                f'Protocol-Level Token created: <a href="/{self.net}/tokens/{t.token_creation.create_plt.token_id}"><span class="ccd">{t.token_creation.create_plt.initialization_parameters.name} ({t.token_creation.create_plt.token_id})</span></a>',
+                f'Protocol-Level Token created: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_name} ({plt_token_id})</span></a>',
                 None,
                 None,  # f"Index: {shorten_address(t.account_creation.address, address=True)}",
             )
@@ -1303,9 +1316,15 @@ class MakeUp:
                 self.events_list.append(new_event)
 
             elif t.update.payload.protocol_update:
+                protocol_update_message = markupsafe.escape(
+                    t.update.payload.protocol_update.message_
+                )
+                protocol_update_url = markupsafe.escape(
+                    t.update.payload.protocol_update.specification_url
+                )
                 new_event = EventType(
                     "Protocol Update",
-                    f"Effective Time: {eff}<br>{t.update.payload.protocol_update.message_}<br>More info at the <a href='{t.update.payload.protocol_update.specification_url}'>Specification URL</a>.",
+                    f"Effective Time: {eff}<br>{protocol_update_message}<br>More info at the <a href='{protocol_update_url}'>Specification URL</a>.",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1360,9 +1379,13 @@ class MakeUp:
                 self.events_list.append(new_event)
 
             elif t.update.payload.add_identity_provider_update:
+                idp_description = t.update.payload.add_identity_provider_update.description
+                idp_name = markupsafe.escape(idp_description.name)
+                idp_desc = markupsafe.escape(idp_description.description)
+                idp_url = markupsafe.escape(idp_description.url)
                 new_event = EventType(
                     "Add Identity Provider",
-                    f"Effective Time: {eff}<br>Name: {t.update.payload.add_identity_provider_update.description.name}<br>Description: {t.update.payload.add_identity_provider_update.description.description}<br/>More info at: <a href='{t.update.payload.add_identity_provider_update.description.url}'>{t.update.payload.add_identity_provider_update.description.url}</a>",
+                    f"Effective Time: {eff}<br>Name: {idp_name}<br>Description: {idp_desc}<br/>More info at: <a href='{idp_url}'>{idp_url}</a>",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1376,9 +1399,13 @@ class MakeUp:
                 self.events_list.append(new_event)
 
             elif t.update.payload.add_anonymity_revoker_update:
+                ar_description = t.update.payload.add_anonymity_revoker_update.description
+                ar_name = markupsafe.escape(ar_description.name)
+                ar_desc = markupsafe.escape(ar_description.description)
+                ar_url = markupsafe.escape(ar_description.url)
                 new_event = EventType(
                     "Add Anonymity Revoker",
-                    f"Effective Time: {eff}<br>Name: {t.update.payload.add_anonymity_revoker_update.description.name}<br>Description: {t.update.payload.add_anonymity_revoker_update.description.description}<br/>More info at: <a href='{t.update.payload.add_anonymity_revoker_update.description.url}'>{t.update.payload.add_anonymity_revoker_update.description.url}</a>",
+                    f"Effective Time: {eff}<br>Name: {ar_name}<br>Description: {ar_desc}<br/>More info at: <a href='{ar_url}'>{ar_url}</a>",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1642,7 +1669,9 @@ class MakeUp:
                     else ""
                 ),
             }
-            plt_string = f'PLT: <a href="/{self.net}/tokens/{event.token_id}"><span class="ccd">{event.token_id if not display_name else display_name}</span></a>'
+            plt_token_id = markupsafe.escape(event.token_id)
+            plt_display = plt_token_id if not display_name else markupsafe.escape(display_name)
+            plt_string = f'PLT: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_display}</span></a>'
             if event.transfer_event:
                 memo = (
                     f"Memo: {decode_memo(event.transfer_event.memo)}"
@@ -1721,7 +1750,11 @@ class MakeUp:
                 display_name = (
                     plt.get("initialization_parameters", {}).get("name", "") if plt else None
                 )
-                plt_string = f'PLT: <a href="/{self.net}/tokens/{token_id}"><span class="ccd">{token_id if not display_name else display_name}</span></a>'
+                plt_token_id = markupsafe.escape(token_id)
+                plt_display = (
+                    plt_token_id if not display_name else markupsafe.escape(display_name)
+                )
+                plt_string = f'PLT: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_display}</span></a>'
             else:
                 decimals = 0
                 plt_string = "PLT"

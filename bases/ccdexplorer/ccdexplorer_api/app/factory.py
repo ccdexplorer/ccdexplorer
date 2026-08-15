@@ -368,6 +368,10 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.exchange_rates_historical = None
         app.blocks_per_day = None
         app.memos = None
+        app.module_instance_counts = {}
+        app.module_instance_counts_last_requested = {}
+        app.module_deployments = {}
+        app.module_deployments_last_requested = {}
         app.REQUEST_LIMIT = 500  # default request limit for the API
 
         try:

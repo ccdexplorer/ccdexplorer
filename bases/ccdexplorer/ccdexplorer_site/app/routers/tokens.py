@@ -15,7 +15,6 @@
 import math
 from typing import Optional
 
-import requests
 from ccdexplorer.env import *
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
@@ -85,18 +84,6 @@ def split_token_address(token_address: str) -> tuple[str, str]:
     contract = token_address.split("-")[0]
     token_id = token_address.split("-")[1]
     return (contract, token_id)
-
-
-@router.get("/{net}/ajax_token_metadata_display/{url}")  # type:ignore
-async def tokens_tag_metadata(
-    request: Request,
-    net: str,
-    url: str,
-    tags: dict = Depends(get_labeled_accounts),
-):
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response
 
 
 @router.get("/{net}/fungible-tokens/tvl")  # type:ignore

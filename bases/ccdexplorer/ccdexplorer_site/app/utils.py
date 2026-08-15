@@ -16,6 +16,7 @@ import cbor2
 import dateutil
 import dateutil.parser
 import httpx2 as httpx
+import markupsafe
 import plotly.graph_objects as go
 
 # from urllib import request
@@ -1039,6 +1040,17 @@ def account_label_on_index_for_label(
     return label
 
 
+def _sanitize_for_plotly_text(value: str) -> str:
+    """
+    Plotly.js parses a small whitelist of pseudo-HTML tags (<br>, <b>, <a href=...>, etc.)
+    in text/label fields, so raw user text can still inject markup there even though it's
+    not rendered through Jinja/the DOM as HTML. Unlike markupsafe.escape(), we only strip
+    the tag delimiters and leave everything else (including '&') untouched, since Plotly
+    doesn't decode HTML entities in plain text and '&amp;' would otherwise show up literally.
+    """
+    return value.replace("<", "").replace(">", "")
+
+
 def account_label_on_index(
     account_index: int,
     user: SiteUser | None = None,
@@ -1066,13 +1078,14 @@ def account_label_on_index(
             user_label = account_index_to_label.get(account_index, None)
 
             if user_label:
+                escaped_user_label = markupsafe.escape(user_label)
                 account_label = (
-                    f'<i style="color:#7939BA;" class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{user_label}</span'
+                    f'<i style="color:#7939BA;" class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{escaped_user_label}</span'
                     if not header
-                    else f'<span style="margin-top: 12px;" class="badge rounded-pill bg-warning  ms-5 mt-1"><small>{user_label}</small></span>'
+                    else f'<span style="margin-top: 12px;" class="badge rounded-pill bg-warning  ms-5 mt-1"><small>{escaped_user_label}</small></span>'
                 )
                 if sankey:
-                    account_label = user_label
+                    account_label = _sanitize_for_plotly_text(user_label)
                 account_labeled = True
 
     if not account_label:
