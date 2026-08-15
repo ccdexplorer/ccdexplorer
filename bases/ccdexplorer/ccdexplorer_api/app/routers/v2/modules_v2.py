@@ -7,6 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from markdown_it.rules_core import block
+import datetime as dt
 import re
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mongo_motor
@@ -22,6 +23,73 @@ router = APIRouter(tags=["Modules"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 
+# The modules overview used to be served from a `statistics_modules_overview`
+# document that ms_modules/subscriber/module.py rebuilt from scratch, but only
+# whenever a *new module* was deployed -- so it drifted whenever an instance
+# was created, or upgraded to point at a different module, in between
+# deployments. All three pieces the page needs (module metadata, which month
+# each module belongs to, and per-module instance counts) are small, indexed,
+# fast live queries (~500ms cold for all three combined -- see the modules /
+# module_deployed-transactions / instances collections directly), so we query
+# them live instead and cache each piece for as long as it stays fresh:
+# module identity/deployment-month barely ever changes (only grows on a new
+# deployment), instance counts change far more often.
+MODULE_DEPLOYMENTS_CACHE_SECONDS = 5 * 60
+MODULE_INSTANCE_COUNTS_CACHE_SECONDS = 15
+
+
+async def get_modules_with_deployment_dates(request: Request, net: str, db_to_use: dict) -> dict:
+    """{module_ref: {...module fields..., "init_date": datetime}} for every
+    module that has a matching module_deployed transaction."""
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    last_requested = request.app.module_deployments_last_requested.get(net)
+    cached = request.app.module_deployments.get(net)
+    if (
+        cached is not None
+        and last_requested is not None
+        and (now - last_requested).total_seconds() < MODULE_DEPLOYMENTS_CACHE_SECONDS
+    ):
+        return cached
+
+    modules_dict = {}
+    async for module in db_to_use[Collections.modules].find({}):
+        module["id"] = module.pop("_id")  # match the shape templates already expect
+        modules_dict[module["id"]] = module
+
+    deploys = await await_await(
+        db_to_use, Collections.transactions, [{"$match": {"type.contents": "module_deployed"}}]
+    )
+    for tx in deploys:
+        module_ref = tx.get("account_transaction", {}).get("effects", {}).get("module_deployed")
+        module = modules_dict.get(module_ref)
+        if module:
+            module["init_date"] = tx["block_info"]["slot_time"]
+
+    result = {ref: m for ref, m in modules_dict.items() if "init_date" in m}
+    request.app.module_deployments[net] = result
+    request.app.module_deployments_last_requested[net] = now
+    return result
+
+
+async def get_live_module_instance_counts(request: Request, net: str, db_to_use: dict) -> dict:
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    last_requested = request.app.module_instance_counts_last_requested.get(net)
+    cached = request.app.module_instance_counts.get(net)
+    if (
+        cached is not None
+        and last_requested is not None
+        and (now - last_requested).total_seconds() < MODULE_INSTANCE_COUNTS_CACHE_SECONDS
+    ):
+        return cached
+
+    pipeline = [{"$group": {"_id": "$source_module", "count": {"$sum": 1}}}]
+    result = await await_await(db_to_use, Collections.instances, pipeline)
+    counts = {x["_id"]: x["count"] for x in result if x["_id"]}
+
+    request.app.module_instance_counts[net] = counts
+    request.app.module_instance_counts_last_requested[net] = now
+    return counts
+
 
 @router.get("/{net}/modules/overview", response_class=JSONResponse)
 async def get_overview_of_all_modules(
@@ -30,12 +98,15 @@ async def get_overview_of_all_modules(
     mongodb: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """Return the latest monthly overview statistics for every module.
+    """Return the latest monthly overview statistics for every module, live
+    (module identity/deployment-month cached 5 minutes, instance counts
+    cached 15 seconds -- see get_modules_with_deployment_dates and
+    get_live_module_instance_counts).
 
     Args:
         request: FastAPI request context (unused but required).
         net: Network identifier, must be ``mainnet`` or ``testnet``.
-        mongodb: Mongo client dependency used to read the ``statistics`` collection.
+        mongodb: Mongo client dependency used to query modules/transactions/instances.
         api_key: API key extracted from the request headers.
 
     Returns:
@@ -52,14 +123,24 @@ async def get_overview_of_all_modules(
 
     db_to_use = net_db(mongodb, net)
 
-    modules_overview = (
-        await db_to_use[Collections.statistics]
-        .find({"type": "statistics_modules_overview"})
-        .sort({"date": -1})
-        .to_list(length=None)
-    )
+    modules_by_ref = await get_modules_with_deployment_dates(request, net, db_to_use)
+    live_instance_counts = await get_live_module_instance_counts(request, net, db_to_use)
 
-    return {x["year_month"]: x for x in modules_overview}
+    by_month: dict[str, list[dict]] = {}
+    for module_ref, module in modules_by_ref.items():
+        module = dict(module)  # don't mutate the cached dict
+        module["instances_count"] = live_instance_counts.get(module_ref, 0)
+        init_date = module["init_date"]
+        year_month = f"{init_date.year}-{init_date.month:02}"
+        by_month.setdefault(year_month, []).append(module)
+
+    for modules in by_month.values():
+        modules.sort(key=lambda m: m["init_date"], reverse=True)
+
+    return {
+        year_month: {"year_month": year_month, "net": net, "modules": modules}
+        for year_month, modules in sorted(by_month.items(), reverse=True)
+    }
 
 
 @router.get("/{net}/modules/search/{value}", response_class=JSONResponse)
