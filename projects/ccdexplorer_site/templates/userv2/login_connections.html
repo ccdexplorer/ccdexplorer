@@ -40,3 +40,14 @@
 {% else %}
   <p class="sm-text">Telegram is connected.</p>
 {% endif %}
+
+<hr/>
+<p class="sm-text">
+    {% if user.username %}
+        You are logged in as <a href="https://telegram.me/{{user.username}}">@{{user.username}}</a> (<a href="/settings/user/logout">logout</a>).
+    {% elif user.first_name %}
+        You are logged in as {{user.first_name}} (<a href="/settings/user/logout">logout</a>).
+    {% else %}
+        You are logged in as {{user.chat_id}} (<a href="/settings/user/logout">logout</a>).
+    {% endif %}
+</p>
