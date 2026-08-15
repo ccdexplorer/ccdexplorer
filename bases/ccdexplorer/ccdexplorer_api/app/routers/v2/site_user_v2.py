@@ -18,7 +18,7 @@ from ccdexplorer.mongodb import (
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from fastapi.encoders import jsonable_encoder
-import httpx
+import httpx2 as httpx
 import datetime as dt
 from ccdexplorer.site_user import SiteUser
 

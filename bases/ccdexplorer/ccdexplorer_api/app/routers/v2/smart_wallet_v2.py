@@ -37,7 +37,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_db,
     get_httpx_client,
 )
-import httpx
+import httpx2 as httpx
 
 # from ccdexplorer.ccdexplorer_api.app.utils import TokenHolding
 

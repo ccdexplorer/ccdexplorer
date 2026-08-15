@@ -29,7 +29,7 @@ dependencies = [
     "aiohttp",
     "redis",
     "celery[redis,mongodb]",
-    "httpx",
+    "httpx2",
     "ccdexplorer-schema-parser==0.1.4",
     "sortedcontainers>=2.4.0",
     "scheduler>=0.8.8",

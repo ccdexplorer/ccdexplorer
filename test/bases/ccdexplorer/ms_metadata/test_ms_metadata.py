@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-import httpx
+import httpx2 as httpx
 import pytest
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient

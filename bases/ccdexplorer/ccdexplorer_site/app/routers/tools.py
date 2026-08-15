@@ -16,7 +16,7 @@ import math
 from typing import Any, Mapping, Optional, Sequence
 from collections import defaultdict
 import dateutil
-import httpx
+import httpx2 as httpx
 import pandas as pd
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,

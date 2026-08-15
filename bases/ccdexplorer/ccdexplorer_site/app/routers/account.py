@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import Optional
 
-import httpx
+import httpx2 as httpx
 import pandas as pd
 import plotly.express as px
 

@@ -24,7 +24,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_grpcclient,
 )
 from ccdexplorer.grpc_client.CCD_Types import CCD_TokenId
-import httpx
+import httpx2 as httpx
 from calendar import monthrange
 
 router = APIRouter(tags=["Protocol-Level Tokens"], prefix="/v2")

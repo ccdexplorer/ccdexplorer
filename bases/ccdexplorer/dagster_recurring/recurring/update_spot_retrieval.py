@@ -3,7 +3,7 @@ import time
 from datetime import timezone
 
 import dateutil
-import httpx
+import httpx2 as httpx
 from ccdexplorer.env import COIN_API_KEY
 from ccdexplorer.mongodb import (
     CollectionsUtilities,

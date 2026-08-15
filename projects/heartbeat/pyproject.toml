@@ -34,7 +34,7 @@ dependencies = [
     "celery[redis,mongodb]",
     "protobuf",
     "googleapis-common-protos",
-    # "httpx",
+    # "httpx2",
     "scheduler>=0.8.8",
     "prometheus-client",
 ]

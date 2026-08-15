@@ -1,7 +1,7 @@
 import datetime as dt
 from datetime import timezone
 
-import httpx
+import httpx2 as httpx
 from ccdexplorer.cis import (
     CIS,
 )

@@ -11,7 +11,7 @@
 # pyright: reportIndexIssue=false
 import math
 
-import httpx
+import httpx2 as httpx
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
     CCD_ContractAddress,

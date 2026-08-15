@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 
-import httpx
+import httpx2 as httpx
 import importlib
 import urllib3
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from httpx import ASGITransport, Request
+from httpx2 import ASGITransport, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")

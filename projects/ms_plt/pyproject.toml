@@ -35,7 +35,7 @@ dependencies = [
     "celery[redis,mongodb]",
     "protobuf",
     "googleapis-common-protos",
-    "httpx",
+    "httpx2",
     "sortedcontainers>=2.4.0",
     "prometheus-client",
 ]

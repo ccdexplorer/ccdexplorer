@@ -1,6 +1,6 @@
 import math
 
-import httpx
+import httpx2 as httpx
 import plotly.graph_objects as go
 import polars as polars
 from ccdexplorer.grpc_client.CCD_Types import (

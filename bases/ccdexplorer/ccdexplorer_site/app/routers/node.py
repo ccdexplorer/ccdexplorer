@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 import polars as polars
 from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
 from ccdexplorer.site_user import SiteUser

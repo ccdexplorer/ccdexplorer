@@ -18,7 +18,7 @@ import json
 import typing
 from enum import Enum
 
-import httpx
+import httpx2 as httpx
 import markupsafe
 from ccdexplorer.cis import *  # type: ignore
 from ccdexplorer.domain.s7 import s7_contract_to_erc_version

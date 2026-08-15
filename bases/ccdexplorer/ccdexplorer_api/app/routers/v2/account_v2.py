@@ -10,7 +10,7 @@ import math
 
 import dateutil
 import grpc
-import httpx
+import httpx2 as httpx
 from ccdexplorer.ccdexplorer_api.app.routers.v2.contract_v2 import (
     GetBalanceOfRequest,
     get_balance_of,

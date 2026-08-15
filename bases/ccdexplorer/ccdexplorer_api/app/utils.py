@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Any, Optional
 from pymongo.asynchronous.collection import AsyncCollection
 from ccdexplorer.mongodb.core import Collections, CollectionsUtilities
-import httpx
+import httpx2 as httpx
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_RejectReason,
     CCD_UpdatePayload,

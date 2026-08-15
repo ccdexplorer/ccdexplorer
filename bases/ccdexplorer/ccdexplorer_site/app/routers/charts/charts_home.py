@@ -1,4 +1,4 @@
-import httpx
+import httpx2 as httpx
 from ccdexplorer.site_user import SiteUser
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
