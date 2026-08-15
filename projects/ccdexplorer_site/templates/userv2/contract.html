@@ -18,7 +18,7 @@
 </div>
 
 {% set explanation_key = "contract-contract_update_issued" %}
-<span class="text-secondary-emphasis">{{explanations[explanation_key].explanation}}</span>
+<span class="text-secondary-emphasis">{{explanations.get(explanation_key, {}).get('explanation', '')}}</span>
 {% for field in contract_all_fields %}
     {% if field in contract_all_fields_dict.keys() %}
         <div class="row">
