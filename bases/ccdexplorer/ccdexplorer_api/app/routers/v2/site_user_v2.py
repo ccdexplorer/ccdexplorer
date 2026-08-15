@@ -15,7 +15,7 @@ from ccdexplorer.mongodb import (
     MongoMotor,
     CollectionsUtilities,
 )
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor
+from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from fastapi.encoders import jsonable_encoder
 import httpx
@@ -97,7 +97,7 @@ async def get_site_user_from_token(
     """
     db_to_use = mongomotor.utilities
     try:
-        result = await db_to_use[CollectionsUtilities.users_v2_prod].find_one(
+        result = await db_to_use[site_users_collection_name()].find_one(
             {"token": token},
             # Never expose the password hash or reset/verification tokens. These
             # are projected out so they can't leak even if SiteUser grows fields.
@@ -154,7 +154,7 @@ async def post_user_email_address(
     # Update only the email address. A ReplaceOne here would drop the server-only
     # secrets (password hash, reset/verification tokens) that the read endpoint
     # no longer returns and therefore can't be echoed back by the caller.
-    await mongomotor.utilities[CollectionsUtilities.users_v2_prod].update_one(
+    await mongomotor.utilities[site_users_collection_name()].update_one(
         {"token": str(user.token)},
         {
             "$set": {
@@ -196,7 +196,7 @@ async def post_user(
         ``True`` when the user's preferences are updated, ``False`` if no user
         exists for the token.
     """
-    stored = await mongomotor.utilities[CollectionsUtilities.users_v2_prod].find_one(
+    stored = await mongomotor.utilities[site_users_collection_name()].find_one(
         {"token": user_token}
     )
     if not stored:
@@ -218,7 +218,7 @@ async def post_user(
     }
     update["last_modified"] = dt.datetime.now().astimezone(tz=dt.timezone.utc)
 
-    await mongomotor.utilities[CollectionsUtilities.users_v2_prod].update_one(
+    await mongomotor.utilities[site_users_collection_name()].update_one(
         {"token": user_token},
         {"$set": update},
     )

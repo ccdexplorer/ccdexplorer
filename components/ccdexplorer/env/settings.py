@@ -83,4 +83,5 @@ environment = {
     "SENTRY_DSN": SENTRY_DSN,
     "TX_REQUEST_LIMIT_DISPLAY": TX_REQUEST_LIMIT_DISPLAY,
     "NET": "mainnet",
+    "ENVIRONMENT": ENVIRONMENT,
 }

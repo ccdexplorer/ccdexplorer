@@ -134,8 +134,13 @@ class FakeCollection:
 
 class FakeMongo:
     def __init__(self, users=None, sessions=None, audit_log=None):
+        users = users if users is not None else FakeCollection([])
         self.utilities = {
-            CollectionsUtilities.users_v2_prod: users if users is not None else FakeCollection([]),
+            # Both keys point at the same collection so tests don't depend on
+            # the developer's local ENVIRONMENT setting -- see
+            # state_getters.site_users_collection_name().
+            CollectionsUtilities.users_v2_prod: users,
+            CollectionsUtilities.users_v2_dev: users,
             CollectionsUtilities.user_sessions: (
                 sessions if sessions is not None else FakeCollection([])
             ),
