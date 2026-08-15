@@ -78,10 +78,18 @@ stored -- just when a session started and was last used.</p>
     {% else %}
       {{ entry.event }}
     {% endif %}
-    &mdash; {{ entry.at | datetime_regular_parse }}
+    &mdash; <span class="local-time" data-utc="{{ entry.at }}">{{ entry.at | datetime_regular_parse }} UTC</span>
   </li>
   {% endfor %}
 </ul>
+<script>
+  document.querySelectorAll('#account-security .local-time[data-utc]').forEach(function (el) {
+    var d = new Date(el.dataset.utc);
+    if (!isNaN(d)) {
+      el.textContent = d.toLocaleString();
+    }
+  });
+</script>
 {% if audit_log | selectattr("event", "equalto", "session_reuse_detected") | list | length > 0 %}
 <div class="alert alert-danger sm-text" role="alert">
   We blocked a login attempt that reused an already-replaced session token, which can mean a
