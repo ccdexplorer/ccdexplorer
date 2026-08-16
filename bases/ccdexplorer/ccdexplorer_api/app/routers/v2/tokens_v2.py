@@ -73,11 +73,12 @@ async def get_tokens_count_estimate(
         )
 
     db_to_use = net_db(mongob, net)
+    error_message = None
     try:
         result = db_to_use[Collections.tokens_token_addresses_v2].estimated_document_count()
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -85,7 +86,7 @@ async def get_tokens_count_estimate(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving tokens count on {net}, {error}.",
+            detail=f"Error retrieving tokens count on {net}, {error_message}.",
         )
 
 
