@@ -2,7 +2,7 @@
 
 from unittest.mock import AsyncMock
 import pytest
-from ccdexplorer.domain.mongo import MongoTypeLoggedEvent
+from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
@@ -40,7 +40,7 @@ def read_block_information_v3(
 
     ### Logged Events
     if result:
-        logged_events_in_block = [MongoTypeLoggedEvent(**x) for x in result]
+        logged_events_in_block = [MongoTypeLoggedEventV2(**x) for x in result]
     else:
         logged_events_in_block = []
 

@@ -5,16 +5,11 @@ from rich import print
 from rich.console import Console
 import aiohttp
 from ccdexplorer.domain.mongo import (
-    MongoTypeLoggedEvent,
+    MongoTypeLoggedEventV2,
     MongoTypeTokenAddress,
     MongoTypeInvolvedAccount,
     MongoTypeInvolvedContract,
     MongoTypeTokensTag,
-)
-from ccdexplorer.domain.cis import (
-    burnEvent,
-    mintEvent,
-    transferEvent,
 )
 from pymongo import ReplaceOne
 from ccdexplorer.domain.generic import NET
@@ -410,14 +405,14 @@ class Mixin(Utils):
                                 ### Transactions in block
                                 txs_in_block = [CCD_BlockItemSummary(**x) for x in result]
 
-                                result = db_to_use[Collections.tokens_logged_events].find(
-                                    {"block_height": requested_height}
+                                result = db_to_use[Collections.tokens_logged_events_v2].find(
+                                    {"tx_info.block_height": requested_height}
                                 )
 
                                 ### Logged Events
                                 if result:
                                     logged_events_in_block = [
-                                        MongoTypeLoggedEvent(**x) for x in result
+                                        MongoTypeLoggedEventV2(**x) for x in result
                                     ]
                                 else:
                                     logged_events_in_block = []
@@ -523,10 +518,18 @@ class Mixin(Utils):
     async def find_events_in_logged_events(self, block: CCD_BlockComplete):
         if block.logged_events:
             for logged_event in block.logged_events:
-                logged_event: MongoTypeLoggedEvent
+                logged_event: MongoTypeLoggedEventV2
+                if logged_event.recognized_event is None:
+                    continue
+                recognized_event = logged_event.recognized_event
+                tag = recognized_event.tag
+                token_address = logged_event.event_info.token_address
+                contract = logged_event.event_info.contract
+                tx_hash = logged_event.tx_info.tx_hash
+
                 stored_token_address = self.connections.mongodb.mainnet[
                     Collections.tokens_token_addresses
-                ].find_one({"_id": logged_event.token_address})
+                ].find_one({"_id": token_address})
                 if stored_token_address:
                     stored_token_address = MongoTypeTokenAddress(**stored_token_address)
                     if stored_token_address.token_metadata:
@@ -534,25 +537,24 @@ class Mixin(Utils):
                     else:
                         token_name = "Not yet available..."
                 else:
-                    console.log(f"{logged_event.token_address=} not found in Mongo collection yet.")
-                if (logged_event.contract == "<9377,0>") and (logged_event.tag == 254):
-                    domain_name = await self.find_web23_domain_name(logged_event.token_address)
+                    console.log(f"{token_address=} not found in Mongo collection yet.")
+                if (contract == "<9377,0>") and (tag == 254):
+                    domain_name = await self.find_web23_domain_name(token_address)
                     if domain_name:
                         event_other = EventTypeOther(
                             domain_name_minted=domain_name,
                         )
-                        logged_event.result = mintEvent(**logged_event.result)
                         notification_event = self.prepare_notification_event(
                             EventType(other=event_other),
-                            tx_hash=logged_event.tx_hash,
+                            tx_hash=tx_hash,
                             block_info=block.block_info,
                             impacted_addresses=[
                                 ImpactedAddress(
-                                    address=self.complete_address(logged_event.result.to_address),
+                                    address=self.complete_address(recognized_event.to_address),
                                     address_type=AddressType.account,
                                 ),
                                 ImpactedAddress(
-                                    address=self.complete_address(logged_event.contract),
+                                    address=self.complete_address(contract),
                                     address_type=AddressType.contract,
                                 ),
                             ],
@@ -561,31 +563,29 @@ class Mixin(Utils):
                         self.add_notification_event_to_queue(notification_event)
                     # self.event_queue.append(notification_event)
 
-                if logged_event.tag in [255, 254, 253]:
+                if tag in [255, 254, 253]:
                     event_account = EventTypeAccount(
                         token_event=TokenEvent(
-                            result=logged_event.result,  # type: ignore
-                            token_address=logged_event.token_address,
-                            token_name=token_name if token_name else None,  # type: ignore
+                            result=recognized_event,
+                            token_address=token_address,
+                            token_name=token_name if token_name else None,
                         )
                     )
-                    if logged_event.tag == 255:
-                        if isinstance(logged_event.result, dict):
-                            logged_event.result = transferEvent(**logged_event.result)
+                    if tag == 255:
                         impacted_addresses = [
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.from_address),  # type: ignore
+                                address=self.complete_address(recognized_event.from_address),
                                 address_type=AddressType.sender,
                             ),
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.to_address),
+                                address=self.complete_address(recognized_event.to_address),
                                 address_type=AddressType.receiver,
                             ),
                         ]
                         # the FROM account
                         notification_event = self.prepare_notification_event(
                             EventType(account=event_account),
-                            tx_hash=logged_event.tx_hash,
+                            tx_hash=tx_hash,
                             block_info=block.block_info,
                             impacted_addresses=impacted_addresses,
                         )
@@ -594,62 +594,57 @@ class Mixin(Utils):
                         # the TO account
                         impacted_addresses = [
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.to_address),
+                                address=self.complete_address(recognized_event.to_address),
                                 address_type=AddressType.receiver,
                             ),
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.from_address),  # type: ignore
+                                address=self.complete_address(recognized_event.from_address),
                                 address_type=AddressType.sender,
                             ),
                         ]
                         notification_event = self.prepare_notification_event(
                             EventType(account=event_account),
-                            tx_hash=logged_event.tx_hash,
+                            tx_hash=tx_hash,
                             block_info=block.block_info,
                             impacted_addresses=impacted_addresses,
                         )
                         self.event_queue.append(notification_event)  # type: ignore
 
-                    elif logged_event.tag == 254:
-                        if isinstance(logged_event.result, dict):
-                            logged_event.result = mintEvent(**logged_event.result)
+                    elif tag == 254:
                         # the TO account
                         impacted_addresses = [
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.to_address),
+                                address=self.complete_address(recognized_event.to_address),
                                 address_type=AddressType.account,
                             ),
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.contract),
+                                address=self.complete_address(contract),
                                 address_type=AddressType.contract,
                             ),
                         ]
                         notification_event = self.prepare_notification_event(
                             EventType(account=event_account),
-                            tx_hash=logged_event.tx_hash,
+                            tx_hash=tx_hash,
                             block_info=block.block_info,
                             impacted_addresses=impacted_addresses,
                         )
                         self.event_queue.append(notification_event)  # type: ignore
 
-                    elif logged_event.tag == 253:
-                        if isinstance(logged_event.result, dict):
-                            logged_event.result = burnEvent(**logged_event.result)
-
+                    elif tag == 253:
                         # the FROM account
                         impacted_addresses = [
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.result.from_address),  # type: ignore
+                                address=self.complete_address(recognized_event.from_address),
                                 address_type=AddressType.account,
                             ),
                             ImpactedAddress(
-                                address=self.complete_address(logged_event.contract),
+                                address=self.complete_address(contract),
                                 address_type=AddressType.contract,
                             ),
                         ]
                         notification_event = self.prepare_notification_event(
                             EventType(account=event_account),
-                            tx_hash=logged_event.tx_hash,
+                            tx_hash=tx_hash,
                             block_info=block.block_info,
                             impacted_addresses=impacted_addresses,
                         )
