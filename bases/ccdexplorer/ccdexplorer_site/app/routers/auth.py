@@ -35,7 +35,7 @@ async def _start_session(request: Request, response: Response, user_token: str) 
     api_response = await post_url_from_api(
         f"{request.app.api_url}/site-auth/{user_token}/sessions",
         request.app.httpx_client,
-        {},
+        {"user_agent": request.headers.get("user-agent")},
     )
     if api_response.ok:
         set_login_cookie(request, response, api_response.return_value["session_token"])

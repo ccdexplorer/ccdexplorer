@@ -128,6 +128,13 @@ class RevokeOtherSessionsRequest(BaseModel):
     keep_session_id: Optional[str] = None
 
 
+class CreateSessionRequest(BaseModel):
+    # Sent by the site (not read from this request's own headers): the caller
+    # here is the site's backend, not the browser, so its own User-Agent would
+    # be the site's httpx client, not the visitor's.
+    user_agent: Optional[str] = None
+
+
 # --- Short-lived token lifecycle (reset / email verification) --------------- #
 # These are single-use links emailed to the user; they must expire so a leaked
 # link (mailbox access, logs) can't be replayed indefinitely.
@@ -205,6 +212,52 @@ ROTATE_THROTTLE = dt.timedelta(seconds=30)
 SESSION_GRACE_PERIOD = dt.timedelta(seconds=10)
 
 
+def _device_label(user_agent: Optional[str]) -> Optional[str]:
+    """Coarse "Browser on OS" label from a User-Agent string, e.g. "Chrome on
+    macOS" or "Safari on iPhone". Deliberately approximate (order-sensitive
+    substring checks, not a full UA-parsing library) -- this is only meant to
+    help someone recognize a device in their own session list, not to
+    fingerprint or precisely identify one.
+    """
+    if not user_agent:
+        return None
+    ua = user_agent
+
+    if "iPhone" in ua:
+        os_label = "iPhone"
+    elif "iPad" in ua:
+        os_label = "iPad"
+    elif "Android" in ua:
+        os_label = "Android"
+    elif "Mac OS X" in ua:
+        os_label = "macOS"
+    elif "Windows" in ua:
+        os_label = "Windows"
+    elif "Linux" in ua:
+        os_label = "Linux"
+    else:
+        os_label = None
+
+    # Order matters: Edge/Chrome UAs also contain "Safari", and Chrome's UA
+    # also contains "OPR" only for Opera -- check the more specific tokens first.
+    if "Edg/" in ua:
+        browser = "Edge"
+    elif "OPR/" in ua or "Opera" in ua:
+        browser = "Opera"
+    elif "Chrome" in ua:
+        browser = "Chrome"
+    elif "Firefox" in ua:
+        browser = "Firefox"
+    elif "Safari" in ua:
+        browser = "Safari"
+    else:
+        browser = None
+
+    if browser and os_label:
+        return f"{browser} on {os_label}"
+    return browser or os_label
+
+
 def _as_utc(value: Optional[dt.datetime]) -> Optional[dt.datetime]:
     """Mongo may hand back naive datetimes; treat those as UTC."""
     if value is None:
@@ -214,12 +267,16 @@ def _as_utc(value: Optional[dt.datetime]) -> Optional[dt.datetime]:
     return value
 
 
-async def create_session(user_token: str, mongomotor: MongoMotor) -> dict:
+async def create_session(
+    user_token: str, mongomotor: MongoMotor, user_agent: Optional[str] = None
+) -> dict:
     """Mint a new session (one per logged-in device) for ``user_token``.
 
-    No device/network identifiers are captured or stored -- a session is just
-    a rotating bearer token, its lifecycle timestamps, and which account it
-    belongs to.
+    No IP address or other network identifiers are captured or stored -- just
+    a rotating bearer token, its lifecycle timestamps, which account it
+    belongs to, and (if provided) a coarse "Browser on OS" device label
+    derived from the User-Agent header, so an account owner can tell sessions
+    apart on the "Active sessions" list.
     """
     now = _now()
     doc = {
@@ -233,6 +290,7 @@ async def create_session(user_token: str, mongomotor: MongoMotor) -> dict:
         "last_rotated_at": now,
         "revoked": False,
         "revoked_reason": None,
+        "device": _device_label(user_agent),
     }
     await mongomotor.utilities[CollectionsUtilities.user_sessions].insert_one(doc)
     return doc
@@ -358,6 +416,7 @@ def _session_public(doc: dict) -> dict:
         "session_id": doc["_id"],
         "created_at": _iso_utc(doc.get("created_at")),
         "last_seen_at": _iso_utc(doc.get("last_seen_at")),
+        "device": doc.get("device"),
     }
 
 
@@ -648,6 +707,7 @@ async def set_password(
 @router.post("/{token}/sessions", response_class=JSONResponse)
 async def create_session_endpoint(
     token: str,
+    body: CreateSessionRequest = CreateSessionRequest(),
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
@@ -657,7 +717,7 @@ async def create_session_endpoint(
     user = await get_site_user_by_field("token", token, mongomotor)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
-    session = await create_session(user.token, mongomotor)
+    session = await create_session(user.token, mongomotor, user_agent=body.user_agent)
     return {"session_id": session["_id"], "session_token": session["token"]}
 
 
