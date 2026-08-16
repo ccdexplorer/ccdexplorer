@@ -6,7 +6,7 @@ import pytest
 from ccdexplorer.ccdexplorer_bot.bot import Bot
 from ccdexplorer.ccdexplorer_bot.notification_classes import *  # type: ignore
 from ccdexplorer.domain.generic import NET
-from ccdexplorer.domain.mongo import MongoTypeLoggedEvent
+from ccdexplorer.domain.mongo import MongoTypeLoggedEventV2
 from ccdexplorer.env import BLOCK_COUNT_SPECIALS_CHECK
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
@@ -44,7 +44,7 @@ def read_block_information_v3(
 
     ### Logged Events
     if result:
-        logged_events_in_block = [MongoTypeLoggedEvent(**x) for x in result]
+        logged_events_in_block = [MongoTypeLoggedEventV2(**x) for x in result]
     else:
         logged_events_in_block = []
 
