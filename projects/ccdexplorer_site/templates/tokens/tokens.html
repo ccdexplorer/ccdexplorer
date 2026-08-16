@@ -18,7 +18,7 @@
     {% set metadata = token.token_metadata %}
         <div class="card  low border-dark m-2 p-2" style="width: 10rem;">
             {% if metadata and metadata.display %}
-                <img src="{{metadata.display}}" referrerpolicy="no-referrer" style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo">
+                <img src="{{metadata.display}}" referrerpolicy="no-referrer" style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo" onerror="this.style.display='none'">
             {% endif %}
             <div class="card-body  m-0 p-0 text-center">
                 <span class="card-title text-center">
@@ -59,7 +59,7 @@
                     
                   
                     <!-- <div class="card-title text-center text-muted px-1 pb-3 text-secondary-emphasis"><small>TVL: {% if token.token_value_USD %}{{token.token_value_USD|round_x_decimal_with_comma(0)}}{% else %} 0{%endif%} USD</small></div> -->
-                    <img src="{{vi.logo_url}}"  style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo">
+                    <img src="{{vi.logo_url}}"  style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo" onerror="this.style.display='none'">
                     <div class="card-body  m-0 p-0 text-center">
                         <span class="card-title text-center">
                                 
@@ -106,7 +106,7 @@
                 <div class="card  low border-dark m-2 p-2" style="width: 10rem;">
                     
                   
-                    <img src="{{vi.logo_url}}"  style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo">
+                    <img src="{{vi.logo_url}}"  style="width: 50%; max-height: 75px;" class="mx-auto  card-img-top" alt="logo" onerror="this.style.display='none'">
                     <div class="card-body  m-0 p-0 text-center">
                         <span class="card-title text-center">
                                 
