@@ -25,6 +25,19 @@ GRPC_NET_UNRESPONSIVE_TOTAL = Counter(
     "Number of times gRPC calls failed for a net after all retries",
     ["net", "reason"],
 )
+
+
+def _record_net_unresponsive(net: str, reason: str) -> None:
+    """Best-effort metric write. In prometheus_client's multiprocess mode this
+    touches a file under PROMETHEUS_MULTIPROC_DIR; if that directory isn't set
+    up in a given process's environment (e.g. not every service that imports
+    this module also sets up the multiprocess registry), a failed increment
+    here must never take down the gRPC call it's just trying to record.
+    """
+    try:
+        GRPC_NET_UNRESPONSIVE_TOTAL.labels(net=net, reason=reason).inc()
+    except Exception as error:
+        console.log(f"Could not record ccd_grpc_net_unresponsive_total metric: {error}")
 _RETRYABLE = {
     grpc.StatusCode.UNAVAILABLE,
     grpc.StatusCode.DEADLINE_EXCEEDED,
@@ -310,10 +323,7 @@ class GRPCClient(  # type: ignore
                         continue
 
                     # All readiness attempts exhausted → net considered unresponsive for this call
-                    GRPC_NET_UNRESPONSIVE_TOTAL.labels(
-                        net=net.value,
-                        reason="connect_not_ready",
-                    ).inc()
+                    _record_net_unresponsive(net.value, "connect_not_ready")
                     raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
 
             stub = getattr(self, f"stub_{net.value}")
@@ -361,10 +371,7 @@ class GRPCClient(  # type: ignore
                 else:
                     reason = "rpc_non_retryable"
 
-                GRPC_NET_UNRESPONSIVE_TOTAL.labels(
-                    net=net.value,
-                    reason=reason,
-                ).inc()
+                _record_net_unresponsive(net.value, reason)
 
                 raise
 
