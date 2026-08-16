@@ -296,6 +296,10 @@ class AppSettings(BaseModel):
     tooter_factory: Optional[Callable[[], Tooter]] = None
     ccdexplorer_api_key: str | None = None
     api_url: str | None = None
+    # UsageMiddleware writes an api_usage_daily upsert on every request, which
+    # requires a writable primary. Tests point at a read-only Mongo secondary,
+    # so this telemetry (not something tests need to exercise) is skippable.
+    enable_usage_tracking: bool = True
 
 
 def use_route_names_as_operation_ids(app: FastAPI) -> None:
@@ -434,7 +438,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             "x-mcp-proxy-auth",
         ],
     )
-    if app_settings.motor_factory is not None:
+    if app_settings.motor_factory is not None and app_settings.enable_usage_tracking:
         app.add_middleware(UsageMiddleware, mongomotor=app_settings.motor_factory())
 
     app.add_middleware(

@@ -24,11 +24,21 @@ async def test_token_accounting(
         deleted_count=0,
     )
     mock_collection.bulk_write.return_value = mock_result
+    # update_token_accounting_v2 also bulk_writes to tokens_token_addresses_v2
+    # (heartbeat/token_accounting_v2.py:479); mock it too so the test never
+    # attempts a real write.
+    mock_token_addresses_collection = MagicMock()
+    mock_token_addresses_collection.bulk_write.return_value = SimpleNamespace(
+        matched_count=0, modified_count=0, upserted_count=0, deleted_count=0
+    )
     with (
         patch.object(tooter, "send_to_tooter") as _,
         patch.dict(
             mongodb.mainnet,
-            {Collections.tokens_links_v3: mock_collection},
+            {
+                Collections.tokens_links_v3: mock_collection,
+                Collections.tokens_token_addresses_v2: mock_token_addresses_collection,
+            },
             clear=False,
         ),
         patch(

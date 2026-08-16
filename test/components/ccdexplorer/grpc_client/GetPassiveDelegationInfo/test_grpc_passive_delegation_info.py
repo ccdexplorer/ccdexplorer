@@ -13,7 +13,7 @@ def test_pool_info(grpcclient: GRPCClient):
     block_hash = "ee6f396d82bd3615fb74e53681dbacb1f409fba22eaa12fba60941bc3d387f2b"
     pi = grpcclient.get_passive_delegation_info(block_hash)
 
-    # print (pi.dict(exclude_none=True))
+    # print (pi.model_dump(exclude_none=True))
     # print (pi)
     assert pi.all_pool_total_capital == 8663567331383744
     assert pi.delegated_capital == 141046997927499

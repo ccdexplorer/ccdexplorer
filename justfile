@@ -55,9 +55,12 @@ format:
     uv run ruff format .
 
 test:
+	uv run pytest -n auto
+
+test-coverage:
 	uv run pytest --cov=. --cov-report=xml:cov.xml --cov-report=term -n auto && \
-	uv run coverage html && \
-	open htmlcov/index.html
+	uv run coverage html
+	# open htmlcov/index.html
 
 
  

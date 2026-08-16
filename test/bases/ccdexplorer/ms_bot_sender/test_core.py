@@ -60,8 +60,7 @@ async def test_send_to_email():
         )
 
 
-@pytest.mark.asyncio
-async def test_send_message_telegram_path():
+def test_send_message_telegram_path():
     payload = {
         "service": "telegram",
         "telegram_chat_id": 999,
@@ -77,15 +76,15 @@ async def test_send_message_telegram_path():
         patch.object(bot_sender, "send_to_telegram", AsyncMock()) as mock_tg,
         patch.object(bot_sender, "send_to_email", AsyncMock()) as mock_mail,
     ):
-        # Celery task must be invoked via .run(...)
-        await bot_sender.send_message.run("message", payload)  # type: ignore
+        # send_service_message is a sync Celery task that drives its own event
+        # loop internally (asyncio.run), so it must be called from sync code.
+        bot_sender.send_service_message.run(payload)  # type: ignore
 
         mock_tg.assert_awaited_once()
         mock_mail.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_send_message_email_path():
+def test_send_message_email_path():
     payload = {
         "service": "email",
         "email_address": "test@example.com",
@@ -101,7 +100,7 @@ async def test_send_message_email_path():
         patch.object(bot_sender, "send_to_email", AsyncMock()) as mock_mail,
         patch.object(bot_sender, "send_to_telegram", AsyncMock()) as mock_tg,
     ):
-        await bot_sender.send_message.run("message", payload)  # type: ignore
+        bot_sender.send_service_message.run(payload)  # type: ignore
 
         mock_mail.assert_awaited_once()
         mock_tg.assert_not_awaited()

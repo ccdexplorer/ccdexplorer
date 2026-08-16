@@ -202,7 +202,7 @@ def test_tx_effect_contract_update_issued(grpcclient: GRPCClient):
     assert ctx.effects[0].interrupted.address == CCD_ContractAddress(
         **{"index": 7076, "subindex": 0}
     )
-    print(tx.dict(exclude_none=True))
+    print(tx.model_dump(exclude_none=True))
 
 
 def test_tx_effect_baker_resumed(grpcclient: GRPCClient):

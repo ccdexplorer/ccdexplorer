@@ -78,7 +78,7 @@ async def slash_token(
         session_response = await post_url_from_api(
             f"{request.app.api_url}/site-auth/{user.token}/sessions",
             request.app.httpx_client,
-            {},
+            {"user_agent": request.headers.get("user-agent")},
         )
         if session_response.ok:
             set_access_token_cookie(

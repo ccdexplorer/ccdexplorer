@@ -73,7 +73,7 @@ async def get_last_accounts_newer_than(
         api_key: API key extracted from the request headers.
 
     Returns:
-        Up to 1000 account records ordered by index descending.
+        Up to 100 account records ordered by index descending.
 
     Raises:
         HTTPException: If the network is unsupported or MongoDB query fails.
@@ -93,6 +93,42 @@ async def get_last_accounts_newer_than(
             "ip_identity": id.identity,
             "ip_description": id.description.name,
         }
+
+    async def process_account(x: dict) -> dict:
+        # get_account_info is a blocking grpc call; run off the event loop so
+        # up to 100 accounts can be resolved concurrently instead of serially.
+        account_info = await asyncio.to_thread(
+            grpcclient.get_account_info,
+            "last_final",
+            account_index=x["account_index"],
+            net=NET(net),
+        )
+        response = await httpx_client.get(
+            f"{request.app.api_url}/v2/{net}/account/{account_info.address}/deployed"
+        )
+        response.raise_for_status()
+        deployment_tx = CCD_BlockItemSummary(**response.json())
+        if account_info.stake:
+            if account_info.stake.delegator:
+                staking = "Delegator"
+            elif account_info.stake.baker:
+                staking = "Validator"
+            else:
+                staking = None
+        else:
+            staking = None
+        return {
+            "address": account_info.address,
+            "account_index": account_info.index,
+            "available_balance": account_info.available_balance,
+            "sequence_number": account_info.sequence_number,
+            "staking": staking,
+            "identity": identity_providers[
+                str(Identity(account_info).credentials[0]["ip_identity"])
+            ]["ip_description"],
+            "deployment_tx_slot_time": deployment_tx.block_info.slot_time,
+        }
+
     try:
         accounts = await await_await(
             db_to_use,
@@ -100,43 +136,11 @@ async def get_last_accounts_newer_than(
             [
                 {"$match": {"account_index": {"$gt": since_index}}},
                 {"$sort": {"account_index": -1}},
-                {"$limit": 1000},
+                {"$limit": 100},
             ],
         )
-        rr = []
-        for x in accounts:
-            account_info = grpcclient.get_account_info(
-                "last_final", account_index=x["account_index"], net=NET(net)
-            )
-            response = await httpx_client.get(
-                f"{request.app.api_url}/v2/{net}/account/{account_info.address}/deployed"
-            )
-            response.raise_for_status()
-            deployment_tx = CCD_BlockItemSummary(**response.json())
-            if account_info.stake:
-                if account_info.stake.delegator:
-                    staking = "Delegator"
-                elif account_info.stake.baker:
-                    staking = "Validator"
-                else:
-                    staking = None
-            else:
-                staking = None
-            rr.append(
-                {
-                    "address": account_info.address,
-                    "account_index": account_info.index,
-                    "available_balance": account_info.available_balance,
-                    "sequence_number": account_info.sequence_number,
-                    "staking": staking,
-                    "identity": identity_providers[
-                        str(Identity(account_info).credentials[0]["ip_identity"])
-                    ]["ip_description"],
-                    "deployment_tx_slot_time": deployment_tx.block_info.slot_time,
-                }
-            )
-
-        return rr or []
+        rr = await asyncio.gather(*(process_account(x) for x in accounts))
+        return list(rr) or []
 
     except Exception as error:
         raise HTTPException(
@@ -173,6 +177,7 @@ async def get_accounts_count_estimate(
         )
 
     db_to_use = net_db(mongomotor, net)
+    error_message = None
     try:
         result = await await_await(
             db_to_use,
@@ -182,9 +187,9 @@ async def get_accounts_count_estimate(
             ],
             1,
         )
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -192,7 +197,7 @@ async def get_accounts_count_estimate(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving accounts count on {net}, {error}.",
+            detail=f"Error retrieving accounts count on {net}, {error_message}.",
         )
 
 
@@ -230,15 +235,16 @@ async def get_account_indexes(
     else:
         account_ids = []
     db_to_use = net_db(mongomotor, net)
+    error_message = None
     try:
         result = await await_await(
             db_to_use,
             Collections.stable_address_info,
             [{"$match": {"_id": {"$in": account_ids}}}],
         )
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -246,7 +252,7 @@ async def get_account_indexes(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving accounts list on {net}, {error}.",
+            detail=f"Error retrieving accounts list on {net}, {error_message}.",
         )
 
 
@@ -343,15 +349,16 @@ async def get_account_addresses(
     else:
         account_indexes = []
     db_to_use = net_db(mongomotor, net)
+    error_message = None
     try:
         result = await await_await(
             db_to_use,
             Collections.stable_address_info,
             [{"$match": {"account_index": {"$in": account_indexes}}}],
         )
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -359,7 +366,7 @@ async def get_account_addresses(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving accounts list on {net}, {error}.",
+            detail=f"Error retrieving accounts list on {net}, {error_message}.",
         )
 
 
@@ -391,13 +398,14 @@ async def get_current_payday_info(
         )
 
     db_to_use = net_db(mongomotor, net)
+    error_message = None
     try:
         result = (
             await db_to_use[Collections.paydays_v2_current_payday].find({}).to_list(length=None)
         )
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -405,7 +413,7 @@ async def get_current_payday_info(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving current payday info, {error}.",
+            detail=f"Error retrieving current payday info, {error_message}.",
         )
 
 
@@ -458,7 +466,7 @@ async def get_last_accounts(
 
     db_to_use = net_db(mongomotor, net)
     count = min(50, max(count, 1))
-    error = None
+    error_message = None
     try:
         result = [
             x["account_index"]
@@ -488,15 +496,15 @@ async def get_last_accounts(
 
     except Exception as error:  # noqa: F811
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
         return accounts
     else:
-        error = None
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving last {count} accounts on {net}, {error}.",
+            detail=f"Error retrieving last {count} accounts on {net}, {error_message}.",
         )
 
 

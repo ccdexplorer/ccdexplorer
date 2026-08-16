@@ -220,7 +220,7 @@ async def get_last_transactions_newer_than(
             await db_to_use[Collections.transactions]
             .find({"block_info.height": {"$gt": since}})
             .sort({"block_info.height": -1, "index": -1})
-            .to_list(length=min(since, 1000))
+            .to_list(length=1000)
         )
         return result
     except Exception as error:
@@ -464,11 +464,12 @@ async def get_transactions_tps(
         )
 
     db_to_use = mongomotor.mainnet
+    error_message = None
     try:
         result = await db_to_use[Collections.pre_render].find_one({"_id": "tps_table"})
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -476,7 +477,7 @@ async def get_transactions_tps(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving last transactions tps, {error}.",
+            detail=f"Error retrieving last transactions tps, {error_message}.",
         )
 
 
@@ -506,11 +507,12 @@ async def get_transactions_count_estimate(
         )
 
     db_to_use = net_db(mongomotor, net)
+    error_message = None
     try:
         result = await db_to_use[Collections.transactions].estimated_document_count()
-        error = None
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result:
@@ -518,7 +520,7 @@ async def get_transactions_count_estimate(
     else:
         raise HTTPException(
             status_code=404,
-            detail=f"Error retrieving transactions count on {net}, {error}.",
+            detail=f"Error retrieving transactions count on {net}, {error_message}.",
         )
 
 

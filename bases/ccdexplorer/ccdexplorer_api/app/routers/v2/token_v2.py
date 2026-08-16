@@ -23,6 +23,7 @@ from ccdexplorer.mongodb import (
     net_db,
 )
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 from pydantic import BaseModel
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_db,
@@ -718,19 +719,26 @@ async def add_token_address_without_token_id_to_metadata_refresh_queue(
 
 
 async def send_metadata_to_redis(r: Redis, repl_dict: dict, net: str):
-    """Push a token metadata refresh request onto the Redis stream."""
+    """Push a token metadata refresh request onto the Redis stream.
+
+    Best-effort: this is a queue nudge, not the response payload itself, so a
+    Redis outage/connection refusal shouldn't fail the request that triggered it.
+    """
     if r is not None and len(repl_dict) > 0:
         token_address = f"{repl_dict['contract']}-{repl_dict['token_id']}"
-        await r.xadd(
-            f"blocks:metadata:{net}",
-            {
-                "data": json.dumps(
-                    {
-                        "token_address": token_address,
-                    }
-                ).encode("utf-8")
-            },
-        )
+        try:
+            await r.xadd(
+                f"blocks:metadata:{net}",
+                {
+                    "data": json.dumps(
+                        {
+                            "token_address": token_address,
+                        }
+                    ).encode("utf-8")
+                },
+            )
+        except RedisError as error:
+            print(f"Could not enqueue metadata refresh for {token_address}: {error}")
 
 
 @router.post(

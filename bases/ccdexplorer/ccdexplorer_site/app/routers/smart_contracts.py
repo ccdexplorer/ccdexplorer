@@ -546,6 +546,7 @@ async def module_module_address(
     schema_available = False
     schema_dict = {}
     schema_methods = {}
+    module_instance_count = 0
     if not result:
         error = f"Can't find the module at {module_ref} on {net}."
         return request.app.templates.TemplateResponse(

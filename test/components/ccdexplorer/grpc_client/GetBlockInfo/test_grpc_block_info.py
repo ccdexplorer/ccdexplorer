@@ -45,7 +45,7 @@ def test_tx_block_info(grpcclient: GRPCClient):
     assert bi.transactions_energy_cost == 4455
     assert bi.transactions_size == 1494
 
-    print(bi.dict(exclude_none=True))
+    print(bi.model_dump(exclude_none=True))
 
 
 def test_tx_block_info_genesis(grpcclient: GRPCClient):
@@ -56,7 +56,7 @@ def test_tx_block_info_genesis(grpcclient: GRPCClient):
     assert bi.baker is None
     assert bi.slot_time == dt.datetime(2021, 6, 9, 6, 0, tzinfo=dt.timezone.utc)
 
-    print(bi)  # ).dict(exclude_none=True))
+    print(bi)  # ).model_dump(exclude_none=True))
 
     # 2454999
 
@@ -69,7 +69,7 @@ def test_tx_block_info_protocol_6(grpcclient: GRPCClient):
     # assert bi.baker == None
     # assert bi.slot_time == dt.datetime(2021, 6, 9, 6, 0, tzinfo=dt.timezone.utc)
 
-    print(bi)  # ).dict(exclude_none=True))
+    print(bi)  # ).model_dump(exclude_none=True))
 
     # 2454999
 
@@ -82,7 +82,7 @@ def test_tx_block_info_using_height(grpcclient: GRPCClient):
     # assert bi.baker == None
     # assert bi.slot_time == dt.datetime(2021, 6, 9, 6, 0, tzinfo=dt.timezone.utc)
 
-    print(bi)  # ).dict(exclude_none=True))
+    print(bi)  # ).model_dump(exclude_none=True))
 
 
 def test_tx_block_info_testnet(grpcclient: GRPCClient):
@@ -124,4 +124,4 @@ def test_tx_block_info_random(grpcclient: GRPCClient):
     # assert bi.transactions_energy_cost == 4455
     # assert bi.transactions_size == 1494
 
-    # print(bi.dict(exclude_none=True))
+    # print(bi.model_dump(exclude_none=True))

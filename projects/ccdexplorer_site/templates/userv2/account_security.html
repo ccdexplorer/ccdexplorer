@@ -1,7 +1,7 @@
 <hr/>
 <b>Active sessions</b>
-<p class="sm-text">Devices currently logged in to your account. No IP address or device info is
-stored -- just when a session started and was last used.</p>
+<p class="sm-text">Devices currently logged in to your account. No IP address is stored -- just a
+coarse browser/OS label (e.g. "Chrome on macOS"), and when a session started and was last used.</p>
 {% if sessions %}
 <table class="table table-sm">
   <thead>
@@ -18,8 +18,9 @@ stored -- just when a session started and was last used.</p>
       <td class="sm-text">
         {% if session.session_id == current_session_id %}
           <span class="badge bg-secondary">This device</span>
+          {% if session.device %} {{ session.device }} {% endif %}
         {% else %}
-          Session
+          {{ session.device or "Session" }}
         {% endif %}
       </td>
       <td class="sm-text">

@@ -22,6 +22,7 @@ from ccdexplorer.ccdexplorer_bot.notification_classes import *  # type: ignore
 from ccdexplorer.site_user import (
     NotificationServices,
 )
+from conftest import TEST_USER_CHAT_ID
 
 
 def read_block_information_v3(
@@ -85,7 +86,7 @@ async def test_contract_update_issued(bot: Bot, grpcclient: GRPCClient, mongodb:
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
 
     notification_services_to_send = MagicMock(
@@ -114,7 +115,7 @@ async def test_contract_update_issued_mint_domain(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
 
     notification_services_to_send = MagicMock(

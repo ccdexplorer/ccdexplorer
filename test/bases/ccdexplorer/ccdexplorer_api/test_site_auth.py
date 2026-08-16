@@ -402,10 +402,14 @@ def _session_doc(**overrides):
 
 @pytest.mark.asyncio
 async def test_create_session_mints_rotating_token_with_no_pii():
+    # "No PII" here means no IP address / network identifiers -- a coarse
+    # "Browser on OS" device label is the one deliberate exception, so an
+    # account owner can tell sessions apart on the "Active sessions" list.
     mongo = FakeMongo(FakeCollection([_user_doc()]))
     session = await site_auth.create_session("tok", mongo)
     assert session["user_token"] == "tok"
     assert session["token"]
+    assert session["device"] is None
     assert set(session.keys()) == {
         "_id",
         "token",
@@ -417,7 +421,22 @@ async def test_create_session_mints_rotating_token_with_no_pii():
         "last_rotated_at",
         "revoked",
         "revoked_reason",
+        "device",
     }
+
+
+@pytest.mark.asyncio
+async def test_create_session_stores_coarse_device_label_from_user_agent():
+    mongo = FakeMongo(FakeCollection([_user_doc()]))
+    session = await site_auth.create_session(
+        "tok",
+        mongo,
+        user_agent=(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+    )
+    assert session["device"] == "Chrome on macOS"
 
 
 @pytest.mark.asyncio

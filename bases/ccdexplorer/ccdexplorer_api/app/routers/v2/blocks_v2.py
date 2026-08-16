@@ -57,12 +57,13 @@ async def get_last_blocks(
 
     db_to_use = net_db(mongomotor, net)
     limit = min(50, max(limit, 1))
-    error = None
+    error_message = None
     try:
         result = await db_to_use[Collections.blocks].find({}).sort({"height": -1}).to_list(limit)
 
     except Exception as error:
         print(error)
+        error_message = str(error)
         result = None
 
     if result is not None:
@@ -70,7 +71,7 @@ async def get_last_blocks(
     else:
         raise HTTPException(
             status_code=500,
-            detail=f"Error retrieving last {limit} blocks on {net}, {error}.",
+            detail=f"Error retrieving last {limit} blocks on {net}, {error_message}.",
         )
 
 

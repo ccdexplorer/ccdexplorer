@@ -28,7 +28,7 @@ def test_tokenomics_info_v0(grpcclient: GRPCClient):
 def test_tokenomics_info_v1(grpcclient: GRPCClient):
     block_hash = "ee6f396d82bd3615fb74e53681dbacb1f409fba22eaa12fba60941bc3d387f2b"
     ti = grpcclient.get_tokenomics_info(block_hash)
-    print(ti)  # .dict(exclude_none=True))
+    print(ti)  # .model_dump(exclude_none=True))
     assert ti.v1.total_amount == 11671992054603492
     assert ti.v1.total_encrypted_amount == 185491140399
     assert ti.v1.baking_reward_account == 417
