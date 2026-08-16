@@ -8,10 +8,31 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.collection import Collection
 from rich.console import Console
 
-from ccdexplorer.env import MONGO_URI
+from ccdexplorer.env import MONGO_READ_PREFERENCE, MONGO_URI
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 
 console = Console()
+
+_READ_PREFERENCE_BY_NAME = {
+    "primary": ReadPreference.PRIMARY,
+    "primaryPreferred": ReadPreference.PRIMARY_PREFERRED,
+    "secondary": ReadPreference.SECONDARY,
+    "secondaryPreferred": ReadPreference.SECONDARY_PREFERRED,
+    "nearest": ReadPreference.NEAREST,
+}
+
+
+def _resolve_read_preference(nearest: bool):
+    """Read preference for MongoDB()/MongoMotor(). `nearest=True` normally
+    means PRIMARY (naming is historical, not a mistake to "fix" here); the
+    MONGO_READ_PREFERENCE env var lets the test harness override that when
+    pointed at a replica-set secondary that can't serve PRIMARY-affinity reads.
+    """
+    if MONGO_READ_PREFERENCE:
+        override = _READ_PREFERENCE_BY_NAME.get(MONGO_READ_PREFERENCE)
+        if override is not None:
+            return override
+    return ReadPreference.PRIMARY if nearest else None
 
 
 def _resolve_caller_name(caller_name: str | None) -> str:
@@ -209,8 +230,9 @@ class MongoDB:
         self.tooter = tooter
         self.caller_name = _resolve_caller_name(caller_name)
         try:
-            if nearest:
-                con = MongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
+            read_pref = _resolve_read_preference(nearest)
+            if read_pref is not None:
+                con = MongoClient(MONGO_URI, read_preference=read_pref)
             else:
                 con = MongoClient(MONGO_URI)
             self.connection: MongoClient = con
@@ -257,8 +279,9 @@ class MongoMotor:
         self.tooter = tooter
         self.caller_name = _resolve_caller_name(caller_name)
         try:
-            if nearest:
-                con = AsyncMongoClient(MONGO_URI, read_preference=ReadPreference.PRIMARY)
+            read_pref = _resolve_read_preference(nearest)
+            if read_pref is not None:
+                con = AsyncMongoClient(MONGO_URI, read_preference=read_pref)
             else:
                 con = AsyncMongoClient(MONGO_URI)
             self.connection = con

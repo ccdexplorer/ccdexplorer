@@ -20,6 +20,15 @@ MONGO_URI = os.environ.get("MONGO_URI")
 # so a Mongo user restricted to just the concordium_devnet database can be used instead
 # of the shared MONGO_URI that other services need broad mainnet/testnet/devnet access with.
 DEVNET_MONGO_URI = os.environ.get("DEVNET_MONGO_URI", MONGO_URI)
+# Separate Mongo instance the test suite points at, so pytest runs never
+# contend with production for connections on the shared MONGO_URI host.
+TEST_MONGO_URI = os.environ.get("TEST_MONGO_URI", MONGO_URI)
+# Overrides the read preference MongoDB()/MongoMotor() use (see
+# mongodb/core.py's nearest= handling). Only meant to be set by the test
+# harness, when TEST_MONGO_URI points at a replica-set secondary that would
+# otherwise reject PRIMARY-affinity reads server-side (NotPrimaryError).
+# One of: primary, primaryPreferred, secondary, secondaryPreferred, nearest.
+MONGO_READ_PREFERENCE = os.environ.get("MONGO_READ_PREFERENCE")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
