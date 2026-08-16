@@ -149,7 +149,7 @@ def test_invoke_instance_provenance(grpcclient: GRPCClient):
 #     support_result = ci.supports_response(res)
 #     print(support_result)
 
-#     print(ii.dict(exclude_none=True))
+#     print(ii.model_dump(exclude_none=True))
 
 
 # def test_invoke_instance_tokenMetadata_9377(grpcclient: GRPCClient):
@@ -172,7 +172,7 @@ def test_invoke_instance_provenance(grpcclient: GRPCClient):
 #     support_result = ci.supports_response(res)
 #     print(support_result)
 
-#     print(ii.dict(exclude_none=True))
+#     print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_supports(grpcclient: GRPCClient):
@@ -195,7 +195,7 @@ def test_invoke_instance_supports(grpcclient: GRPCClient):
     support_result = ci.supports_response(res)
     print(support_result)
 
-    print(ii.dict(exclude_none=True))
+    print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_supports_cis2_dsid(grpcclient: GRPCClient):
@@ -218,7 +218,7 @@ def test_invoke_instance_supports_cis2_dsid(grpcclient: GRPCClient):
     support_result = ci.supports_response(res)
     print(support_result)
 
-    print(ii.dict(exclude_none=True))
+    print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_supports_cis3(grpcclient: GRPCClient):
@@ -241,7 +241,7 @@ def test_invoke_instance_supports_cis3(grpcclient: GRPCClient):
     support_result = ci.supports_response(res)
     print(support_result)
 
-    print(ii.dict(exclude_none=True))
+    print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_supports_MOTODEX(grpcclient: GRPCClient):
@@ -268,7 +268,7 @@ def test_invoke_instance_supports_MOTODEX(grpcclient: GRPCClient):
         lookup_result, support_result = ci.supports_response(res)
         print(f"{ss.value}: {lookup_result} | {support_result}")
 
-    # print(ii.dict(exclude_none=True))
+    # print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_supports_CIS_6(grpcclient: GRPCClient):
@@ -323,7 +323,7 @@ def test_invoke_instance_view_history(grpcclient: GRPCClient):
     print(ci.viewOwnerHistoryResponse(result))
 
     # rr = ci.invoke_token_metadataUrl(tokenID)
-    # print(ii.dict(exclude_none=True))
+    # print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_metadataURL(grpcclient: GRPCClient):
@@ -553,7 +553,7 @@ def test_invoke_instance_balanceOf_EUROe(grpcclient: GRPCClient):
 #     res = ii.success.return_value
 #     support_result = ci.support_result(res)
 #     print(support_result)
-#     print(ii.dict(exclude_none=True))
+#     print(ii.model_dump(exclude_none=True))
 
 
 def test_invoke_instance_balanceOf_CIS5(grpcclient: GRPCClient):

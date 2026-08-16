@@ -16,7 +16,7 @@ def test_delegators_pool(grpcclient: GRPCClient):
     pool_id = 72723
     dr = grpcclient.get_delegators_for_pool(pool_id, block_hash)
 
-    # print (dr.dict(exclude_none=True))
+    # print (dr.model_dump(exclude_none=True))
     print(dr)
     # assert dr.all_pool_total_capital == 8663567331383744
     # assert dr.delegated_capital == 141046997927499

@@ -55,7 +55,7 @@ def test_tx_account_info_encrypted_transfer(grpcclient: GRPCClient):
     account = "2xKDpRzaqUeSEeo3Bcaq7HRKmRaKRoz2KSY7DSsp9qGZdKfiLM"
     block_hash = "9c89b7b3cd65d3f5a96b1b9112c66530a0cea4dc831ba9b6c9dfddbeafbd8813"
     ai = grpcclient.get_account_info(block_hash, account)
-    print(ai.dict(exclude_none=True))
+    print(ai.model_dump(exclude_none=True))
     assert ai.address == account
     assert (
         ai.encryption_key
