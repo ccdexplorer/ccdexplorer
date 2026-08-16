@@ -20,6 +20,7 @@ from ccdexplorer.site_user import (
 )
 from ccdexplorer.tooter import Tooter
 from rich import print
+from conftest import TEST_USER_CHAT_ID
 
 
 def read_block_information_v3(
@@ -89,7 +90,7 @@ async def test_message_payday_pool_reward_72723(bot: Bot, grpcclient: GRPCClient
     (
         message_response,
         notification_services_to_send,
-    ) = await bot.determine_if_user_should_be_notified_of_event(bot.users["user_for_test"], event)  # type: ignore
+    ) = await bot.determine_if_user_should_be_notified_of_event(bot.users[TEST_USER_CHAT_ID], event)  # type: ignore
     assert message_response is not None
     if SEND_MESSAGES:
         await bot.send_notification_queue()
@@ -127,7 +128,7 @@ async def test_message_block_validated(bot: Bot, grpcclient: GRPCClient, mongodb
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
 
@@ -152,7 +153,7 @@ async def test_baker_removed(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB)
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -170,7 +171,7 @@ async def test_baker_stake_increased(bot: Bot, grpcclient: GRPCClient, mongodb: 
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -188,7 +189,7 @@ async def test_baker_stake_decreased(bot: Bot, grpcclient: GRPCClient, mongodb: 
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -206,7 +207,7 @@ async def test_baker_restake_earnings_updated(bot: Bot, grpcclient: GRPCClient, 
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -224,7 +225,7 @@ async def test_baker_set_open_status(bot: Bot, grpcclient: GRPCClient, mongodb: 
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -244,7 +245,7 @@ async def test_delegation_configured_message_for_validator(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -264,7 +265,7 @@ async def test_delegation_configured_message_for_validator_85223(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:
@@ -283,7 +284,7 @@ async def test_delegation_removed_message(bot: Bot, grpcclient: GRPCClient, mong
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     # assert message_response is not None
     if SEND_MESSAGES:
@@ -301,7 +302,7 @@ async def test_primed(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB):
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert bot.event_queue[0] is not None
     if SEND_MESSAGES:
@@ -323,7 +324,7 @@ async def test_message_validator_validator_missed_rounds(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     if SEND_MESSAGES:

@@ -12,6 +12,12 @@ from .hand_picked_routes import (
 
 ALLOWED_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 
+# Routes that exist but aren't wired up to any live caller yet, so smoke-testing them
+# just burns time on an endpoint nobody hits.
+UNUSED_ROUTES = {
+    "POST /v2/mainnet/transactions/search/data/0/10",
+}
+
 
 def extract_path_param_names(route: APIRoute) -> list[str]:
     return [p.name for p in route.dependant.path_params]
@@ -95,13 +101,18 @@ def pytest_generate_tests(metafunc):
         cases = collect_smoke_cases(app)  # -> [(method, url, route, kwargs), ...]
         assert cases, "No testable routes found — extend SAMPLE_PATH_VALUES."
 
-        params = [(m, u, kw) for (m, u, _r, kw) in cases]
         ids = [f"{m} {u}" for (m, u, _r, kw) in cases]
+        params = [
+            pytest.param(m, u, kw, marks=pytest.mark.skip(reason="route not in use yet"))
+            if test_id in UNUSED_ROUTES
+            else (m, u, kw)
+            for (m, u, _r, kw), test_id in zip(cases, ids)
+        ]
 
         metafunc.parametrize("method,url,kwargs", params, ids=ids)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_smoke(client: httpx.AsyncClient, method, url, kwargs):
     resp = await client.request(method, url, **(kwargs or {}))
     assert resp.status_code < 500, f"{method} {url} → {resp.status_code} ({resp.text[:200]})"

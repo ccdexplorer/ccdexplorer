@@ -16,6 +16,7 @@ from rich import print
 from ccdexplorer.ccdexplorer_bot.bot import Bot
 
 from ccdexplorer.ccdexplorer_bot.notification_classes import *  # type: ignore
+from conftest import TEST_USER_CHAT_ID
 
 
 def read_block_information_v3(
@@ -80,7 +81,7 @@ async def test_account_created_in_other(bot: Bot, grpcclient: GRPCClient, mongod
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
 
     assert bot.event_queue[0].event_type.other is not None
@@ -134,7 +135,7 @@ async def test_domain_minted_in_other(bot: Bot, grpcclient: GRPCClient, mongodb:
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
 
     assert bot.event_queue[0].event_type.other is not None
@@ -157,7 +158,7 @@ async def test_domain_minted_in_other_2(bot: Bot, grpcclient: GRPCClient, mongod
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
 
     assert bot.event_queue[0].event_type.other is not None
@@ -236,7 +237,7 @@ async def test_message_account_transfer_with_schedule(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     # test separately
@@ -257,7 +258,7 @@ async def test_message_other_lowered_stake(bot: Bot, grpcclient: GRPCClient, mon
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[2]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[2]
     )
     assert message_response is not None
     # test separately
@@ -279,7 +280,7 @@ async def test_message_other_lowered_stake_remove_validator(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[2]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[2]
     )
     assert message_response is not None
     # test separately
@@ -299,7 +300,7 @@ async def test_message_add_identity_provider(bot: Bot, grpcclient: GRPCClient, m
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert message_response is not None
     # test separately
@@ -358,7 +359,7 @@ async def test_message_pool_commission_changed(bot: Bot, grpcclient: GRPCClient,
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     assert bot.event_queue[0].event_type.other is not None
     assert bot.event_queue[0].impacted_addresses is not None

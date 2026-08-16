@@ -23,6 +23,11 @@ import ccdexplorer.env
 importlib.reload(ccdexplorer.env)  # need to reload to pick up changed env vars
 # Set environment variables for testing
 
+# `Bot.users` (bot/__init__.py:read_users_from_collection) is keyed by telegram_chat_id,
+# not by the seed document's _id/username/token. This is the telegram_chat_id on the
+# users_v2_dev seed doc {"_id": "user_for_test", "username": "user_for_test", ...}.
+TEST_USER_CHAT_ID = "913126895"
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -106,10 +111,10 @@ def build_test_app(
     return app
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def test_app(mongodb, motormongo, grpcclient, tooter):
     def mongo_factory():
-        return MongoDB(Tooter(), caller_name=__name__)  # each test gets its own fresh instances
+        return MongoDB(Tooter(), caller_name=__name__)  # built once per test session
 
     def motor_factory():
         return MongoMotor(Tooter(), nearest=True, caller_name=__name__)
@@ -128,20 +133,21 @@ def test_app(mongodb, motormongo, grpcclient, tooter):
     )
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def live_app(test_app):
     async with LifespanManager(test_app):
         yield test_app
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def client(live_app):
-    # Ensure FastAPI startup/shutdown (lifespan) runs:
-    async with LifespanManager(live_app):
-        transport = httpx.ASGITransport(app=live_app)
-        async with httpx.AsyncClient(
-            transport=transport,
-            base_url="http://testserver",
-            headers={"x-ccdexplorer-key": "test-key"},
-        ) as ac:
-            yield ac
+    # live_app already ran FastAPI startup/shutdown (lifespan) via LifespanManager above;
+    # wrapping it in a second LifespanManager here would re-run lifespan and open a second
+    # set of Mongo connections for no reason.
+    transport = httpx.ASGITransport(app=live_app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://testserver",
+        headers={"x-ccdexplorer-key": "test-key"},
+    ) as ac:
+        yield ac

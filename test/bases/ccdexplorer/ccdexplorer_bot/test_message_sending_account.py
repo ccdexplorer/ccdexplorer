@@ -28,6 +28,7 @@ from ccdexplorer.site_user import (
     NotificationServices,
     SiteUser,
 )
+from conftest import TEST_USER_CHAT_ID
 
 
 def read_block_information_v3(
@@ -92,7 +93,7 @@ async def test_logged_event_web23_domain(bot: Bot, grpcclient: GRPCClient, mongo
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[1]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[1]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -119,7 +120,7 @@ async def test_logged_event_usdt_transfer(bot: Bot, grpcclient: GRPCClient, mong
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -151,7 +152,7 @@ async def test_message_payday_account_reward(bot: Bot, grpcclient: GRPCClient, m
                 message_response,
                 notification_services_to_send,
             ) = await bot.determine_if_user_should_be_notified_of_event(
-                bot.users["user_for_test"], notification_event
+                bot.users[TEST_USER_CHAT_ID], notification_event
             )
     assert message_response is not None  # type: ignore
 
@@ -173,7 +174,7 @@ async def test_message_transferred_with_schedule(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -197,7 +198,7 @@ async def test_message_account_transfer(bot: Bot, grpcclient: GRPCClient, mongod
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -219,7 +220,7 @@ async def test_message_data_registered(bot: Bot, grpcclient: GRPCClient, mongodb
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -243,7 +244,7 @@ async def test_token_event_message(bot: Bot, grpcclient: GRPCClient, mongodb: Mo
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -267,7 +268,7 @@ async def test_delegation_configured_message_for_account(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -291,7 +292,7 @@ async def test_delegation_configured_message2_for_account(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -315,7 +316,7 @@ async def test_message_account_transfer_with_limit_should_not_send(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[1]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[1]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -344,7 +345,7 @@ async def test_message_account_transfer_with_limit_should_send(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -418,7 +419,7 @@ async def test_message_target_pool_commission_changed(
     )
     bot.event_queue.append(notification_event)
     # set user
-    user: SiteUser = bot.users["user_for_test"]
+    user: SiteUser = bot.users[TEST_USER_CHAT_ID]
     user_account = AccountForUser(account_index=86662, delegation_target=72723)
     user_account.account_notification_preferences = AccountNotificationPreferences(
         validator_commission_changed=NotificationPreferences(
@@ -432,7 +433,7 @@ async def test_message_target_pool_commission_changed(
         message_response,
         notification_services_to_send,
     ) = await bot.determine_if_user_should_be_notified_of_event(
-        bot.users["user_for_test"], bot.event_queue[0]
+        bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
     )
     notification_services_to_send = MagicMock(
         telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
@@ -467,7 +468,7 @@ async def test_message_account_plt_event_mint(bot: Bot, grpcclient: GRPCClient, 
             message_response,
             notification_services_to_send,
         ) = await bot.determine_if_user_should_be_notified_of_event(
-            bot.users["user_for_test"], bot.event_queue[0]
+            bot.users[TEST_USER_CHAT_ID], bot.event_queue[0]
         )
         notification_services_to_send = MagicMock(
             telegram=MagicMock(enabled=True), email=MagicMock(enabled=False)
