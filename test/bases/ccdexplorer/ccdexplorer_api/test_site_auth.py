@@ -462,6 +462,48 @@ async def test_resolve_session_rotates_after_throttle_window():
 
 
 @pytest.mark.asyncio
+async def test_resolve_session_concurrent_rotation_converges_instead_of_orphaning():
+    """Two near-simultaneous requests both see the throttle has elapsed and
+    both race to rotate. The loser's `update_one` matches nothing (the token
+    it filtered on was already replaced by the winner) -- it must not hand
+    back its own locally-generated token, since that value was never
+    persisted anywhere and would orphan the browser's cookie on the next
+    request."""
+
+    class RaceyCollection(FakeCollection):
+        """Simulates a second request winning the rotation race between this
+        request's find_one and its update_one."""
+
+        def __init__(self, docs, winner_token):
+            super().__init__(docs)
+            self._winner_token = winner_token
+            self._raced = False
+
+        async def update_one(self, query, update):
+            if not self._raced and "previous_token" not in query and query.get("token"):
+                self._raced = True
+                for doc in self.docs:
+                    if doc["_id"] == query["_id"]:
+                        doc["token"] = self._winner_token
+                        doc["previous_token"] = query["token"]
+                        doc["last_rotated_at"] = _utc_now()
+            return await super().update_one(query, update)
+
+    stale = _utc_now() - site_auth.ROTATE_THROTTLE - dt.timedelta(seconds=1)
+    sessions = RaceyCollection(
+        [_session_doc(last_rotated_at=stale, created_at=stale)],
+        winner_token="winner-token",
+    )
+    mongo = FakeMongo(FakeCollection([_user_doc()]), sessions)
+    result = await site_auth.resolve_session("current-token", mongo)
+    assert result["ok"] is True
+    # Must converge on the token the winning request actually persisted, not
+    # some locally-generated token this request lost the race to write.
+    assert result["session_token"] == "winner-token"
+    assert sessions.docs[0]["token"] == "winner-token"
+
+
+@pytest.mark.asyncio
 async def test_resolve_session_grace_window_converges_to_current_token():
     """A request racing a rotation (using the just-superseded token) gets the
     new current token back, and does *not* trigger another rotation."""
