@@ -54,7 +54,7 @@ from ccdexplorer.schema_parser import Schema
 from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from rich import print
 
 # from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import MakeUp
@@ -499,8 +499,7 @@ def tx_type_translator(
 
 
 class ProcessEventRequest(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     contract_address: CCD_ContractAddress
     token_metadata: Optional[TokenMetaData] = None

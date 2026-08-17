@@ -32,7 +32,7 @@ from ccdexplorer.cns import CNSActions, CNSDomain, CNSEvent
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer.schema_parser import Schema
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from ccdexplorer.cis import CIS
 from ccdexplorer.ccdexplorer_site.app.classes.Enums import *  # type: ignore
 from ccdexplorer.env import *  # type: ignore
@@ -92,8 +92,7 @@ class RequestingRoute(Enum):
 
 
 class MakeUpRequest(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     net: str
     httpx_client: httpx.AsyncClient
