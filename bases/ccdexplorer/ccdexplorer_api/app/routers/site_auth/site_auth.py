@@ -320,7 +320,7 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
         last_rotated = _as_utc(doc.get("last_rotated_at")) or _as_utc(doc["created_at"])
         if now - last_rotated >= ROTATE_THROTTLE:
             new_token = str(uuid4())
-            await sessions.update_one(
+            result = await sessions.update_one(
                 {"_id": doc["_id"], "token": session_token},
                 {
                     "$set": {
@@ -332,7 +332,16 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
                     }
                 },
             )
-            returned_token = new_token
+            if result.matched_count:
+                returned_token = new_token
+            else:
+                # Lost a concurrent rotation race (e.g. two near-simultaneous
+                # requests both crossing ROTATE_THROTTLE at once) -- some other
+                # request already rotated this token first. `new_token` was
+                # never persisted, so don't hand it back to the browser;
+                # converge on whichever token actually won.
+                winner = await sessions.find_one({"_id": doc["_id"]})
+                returned_token = winner["token"] if winner else session_token
         else:
             await sessions.update_one(
                 {"_id": doc["_id"]},
