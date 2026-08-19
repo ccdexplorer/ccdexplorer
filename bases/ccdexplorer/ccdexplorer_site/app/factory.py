@@ -19,7 +19,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from httpx2 import ASGITransport, Request
+from httpx2 import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -224,21 +224,13 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     async def lifespan(app: FastAPI):
         app.api_url = app_settings.api_url or environment["API_URL"]
         app.app_settings = app_settings
-        app.httpx_client = httpx.AsyncClient(
-            transport=ASGITransport(app=app),
-            timeout=None,
-            headers={
-                "x-ccdexplorer-key": app_settings.ccdexplorer_api_key
-                or environment["CCDEXPLORER_API_KEY"]
-            },
-        )
 
         init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
 
         app.api_url = environment["API_URL"]
         app.httpx_client = httpx.AsyncClient(
             # event_hooks={"request": [log_request], "response": [log_response]},
-            timeout=None,
+            timeout=httpx.Timeout(30.0, connect=10.0),
             headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
         )
         app.env = environment
@@ -278,15 +270,10 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         await repeated_task_get_accounts_id_providers(app)
         await repeated_task_get_community_labeled_accounts(app)
         scheduler.start()
-        yield
-        scheduler.shutdown()
-        await app.httpx_client.aclose()
-        print("END")
-        pass
-
         try:
             yield
         finally:
+            scheduler.shutdown()
             await app.httpx_client.aclose()
 
     app = FastAPI(
