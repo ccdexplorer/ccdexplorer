@@ -129,6 +129,12 @@ async def test_account_created_in_other(bot: Bot, grpcclient: GRPCClient, mongod
 async def test_domain_minted_in_other(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB):
     bot.connections.tooter.async_relay = AsyncMock(return_value=None)
     bot.connections.tooter.email = AsyncMock(return_value=None)
+    # find_web23_domain_name hits a live third-party metadata endpoint with a
+    # tight 2s timeout; under parallel test runs (-n auto) it flakes even
+    # though the service itself is fine, so mock it to remove the network
+    # dependency. The test only checks event_type.other/message_response, not
+    # the actual domain string.
+    bot.find_web23_domain_name = AsyncMock(return_value="test.web23")
     block = read_block_information_v3(7137472, 3, grpcclient, mongodb)
     await bot.find_events_in_logged_events(block)
     (
@@ -152,6 +158,7 @@ async def test_domain_minted_in_other(bot: Bot, grpcclient: GRPCClient, mongodb:
 async def test_domain_minted_in_other_2(bot: Bot, grpcclient: GRPCClient, mongodb: MongoDB):
     bot.connections.tooter.async_relay = AsyncMock(return_value=None)
     bot.connections.tooter.email = AsyncMock(return_value=None)
+    bot.find_web23_domain_name = AsyncMock(return_value="test.web23")
     block = read_block_information_v3(9985999, 5, grpcclient, mongodb)
     await bot.find_events_in_logged_events(block)
     (
