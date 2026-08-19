@@ -351,7 +351,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.api_url = app_settings.api_url or environment["API_URL"]
         app.httpx_client = httpx.AsyncClient(
             transport=ASGITransport(app=app),
-            timeout=None,
+            timeout=httpx.Timeout(30.0, connect=10.0),
             headers={
                 "x-ccdexplorer-key": app_settings.ccdexplorer_api_key
                 or environment["CCDEXPLORER_API_KEY"]
