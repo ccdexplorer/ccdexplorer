@@ -616,11 +616,17 @@ plot_info = {
 }
 
 
-def return_plot_response(fig: go.Figure, request: Request, title: str):
+async def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
-        img_bytes = pio.to_image(fig, format="png", width=720)
+        # pio.to_image() shells out to headless Chromium (Kaleido) and blocks
+        # until it renders -- run it off the event loop so one PNG request
+        # (e.g. a link-preview crawler) can't stall every other request on
+        # this single-worker process for the duration of the render.
+        img_bytes = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: pio.to_image(fig, format="png", width=720)
+        )
         return Response(content=img_bytes, media_type="image/png")
 
     else:
