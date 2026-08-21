@@ -1366,7 +1366,7 @@ async def request_account_graph(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,

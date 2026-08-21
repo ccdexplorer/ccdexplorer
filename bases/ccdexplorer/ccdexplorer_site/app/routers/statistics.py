@@ -612,7 +612,7 @@ async def statistics_daily_limits_plotly(
         height=350,
     )
     fig.update_xaxes(title=None)
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
 
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
@@ -692,7 +692,7 @@ async def statistics_network_summary_validator_count_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=500,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -784,7 +784,7 @@ async def statistics_network_summary_accounts_per_day_plotly(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # fig = add_watermark_to_plot(fig, request)
     # if "/plots" in request.url.path:
     #     img_bytes = pio.to_image(fig, format="png", width=1200, height=628, scale=2)
@@ -969,7 +969,7 @@ async def staking_graphs_plotly(
             name=title,
         )
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1061,7 +1061,7 @@ async def statistics_rewards_explained(
     #         colorscale=[(0.0, "white"), (1.0, plot_color)],
     #     ),
     # )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1125,7 +1125,7 @@ async def statistics_restaked_rewards(
         height=350,
     )
 
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1192,7 +1192,7 @@ async def statistics_microccd_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1282,7 +1282,7 @@ async def statistics_validator_staking_plotly(
             "categoryarray": df_bakers["Validator ID"].to_list(),
         },
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1387,7 +1387,7 @@ async def statistics_ccd_on_exchanges_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1546,7 +1546,7 @@ async def statistics_percentage_staked_plotly(
         yaxis_title=None,
     )
     fig.update_xaxes(title=None)
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1654,7 +1654,7 @@ async def statistics_network_activity_tps_plotly(
         template=ccdexplorer_plotly_template(theme),
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1749,7 +1749,7 @@ async def statistics_transaction_details_histogram_python(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
 
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
@@ -1825,7 +1825,7 @@ async def statistics_exchange_wallets_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1888,7 +1888,7 @@ async def statistics_transaction_fees_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
@@ -1950,7 +1950,7 @@ async def statistics_realized_prices_plotly(
         title=f"<b>{title}</b><br><sup>{d_date}</sup>",
         height=350,
     )
-    return return_plot_response(fig, request, title)
+    return await return_plot_response(fig, request, title)
     # return fig.to_html(
     #     config={"responsive": True, "displayModeBar": False},
     #     full_html=False,
