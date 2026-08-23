@@ -616,17 +616,25 @@ plot_info = {
 }
 
 
+# The app's lifespan starts kaleido's persistent server (one headless Chromium,
+# reused for every render) instead of the default of launching a fresh
+# Chromium subprocess per pio.to_image() call. Its task queue
+# (kaleido/_sync_server.py) processes one render at a time and hands results
+# back via a separate queue matched up purely by call order -- concurrent
+# callers can each end up with the *other* caller's image. Our own lock keeps
+# exactly one render in flight at a time, which also matches the server's
+# actual (serial) throughput, so there's no concurrency to give up.
+_KALEIDO_RENDER_LOCK = asyncio.Lock()
+
+
 async def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
-        # pio.to_image() shells out to headless Chromium (Kaleido) and blocks
-        # until it renders -- run it off the event loop so one PNG request
-        # (e.g. a link-preview crawler) can't stall every other request on
-        # this single-worker process for the duration of the render.
-        img_bytes = await asyncio.get_running_loop().run_in_executor(
-            None, lambda: pio.to_image(fig, format="png", width=720)
-        )
+        async with _KALEIDO_RENDER_LOCK:
+            img_bytes = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: pio.to_image(fig, format="png", width=720)
+            )
         return Response(content=img_bytes, media_type="image/png")
 
     else:

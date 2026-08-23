@@ -8,6 +8,7 @@ from pathlib import Path
 
 import httpx2 as httpx
 import importlib
+import kaleido
 import urllib3
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -270,10 +271,16 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         await repeated_task_get_accounts_id_providers(app)
         await repeated_task_get_community_labeled_accounts(app)
         scheduler.start()
+        # One persistent headless Chromium, reused by every chart-image render
+        # (see return_plot_response) -- without this, kaleido launches a brand
+        # new Chromium process per render, and enough concurrent renders can
+        # exhaust container memory.
+        kaleido.start_sync_server()
         try:
             yield
         finally:
             scheduler.shutdown()
+            kaleido.stop_sync_server()
             await app.httpx_client.aclose()
 
     app = FastAPI(
