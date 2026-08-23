@@ -376,7 +376,7 @@ async def test_verify_email_rejects_expired_token():
 
 
 # --------------------------------------------------------------------------- #
-# Sessions: rotate-on-use with reuse detection, no PII stored
+# Sessions: rotate-on-use, no PII stored
 # --------------------------------------------------------------------------- #
 def _utc_now():
     return dt.datetime.now(dt.timezone.utc)
@@ -388,7 +388,6 @@ def _session_doc(**overrides):
         "_id": "sess-1",
         "token": "current-token",
         "previous_token": None,
-        "previous_token_expires": None,
         "user_token": "tok",
         "created_at": now,
         "last_seen_at": now,
@@ -414,7 +413,6 @@ async def test_create_session_mints_rotating_token_with_no_pii():
         "_id",
         "token",
         "previous_token",
-        "previous_token_expires",
         "user_token",
         "created_at",
         "last_seen_at",
@@ -504,15 +502,17 @@ async def test_resolve_session_concurrent_rotation_converges_instead_of_orphanin
 
 
 @pytest.mark.asyncio
-async def test_resolve_session_grace_window_converges_to_current_token():
+async def test_resolve_session_previous_token_converges_to_current_token():
     """A request racing a rotation (using the just-superseded token) gets the
-    new current token back, and does *not* trigger another rotation."""
+    new current token back, and does *not* trigger another rotation or get
+    logged out -- there's no reuse-detection/revocation on the previous
+    token, however long ago the rotation happened."""
     sessions = FakeCollection(
         [
             _session_doc(
                 token="new-token",
                 previous_token="old-token",
-                previous_token_expires=_utc_now() + dt.timedelta(seconds=5),
+                last_rotated_at=_utc_now() - dt.timedelta(hours=1),
             )
         ]
     )
@@ -521,29 +521,7 @@ async def test_resolve_session_grace_window_converges_to_current_token():
     assert result["ok"] is True
     assert result["session_token"] == "new-token"
     assert sessions.docs[0]["token"] == "new-token"  # unchanged: no re-rotation
-
-
-@pytest.mark.asyncio
-async def test_resolve_session_reuse_past_grace_window_is_revoked_and_logged():
-    sessions = FakeCollection(
-        [
-            _session_doc(
-                token="new-token",
-                previous_token="old-token",
-                previous_token_expires=_utc_now() - dt.timedelta(seconds=1),
-            )
-        ]
-    )
-    audit = FakeCollection([])
-    mongo = FakeMongo(FakeCollection([_user_doc()]), sessions, audit)
-    result = await site_auth.resolve_session("old-token", mongo)
-    assert result == {"ok": False, "reason": "revoked"}
-    assert sessions.docs[0]["revoked"] is True
-    assert sessions.docs[0]["revoked_reason"] == "reuse_detected"
-    assert audit.docs[0]["event"] == "session_reuse_detected"
-    assert audit.docs[0]["user_token"] == "tok"
-    assert "ip" not in audit.docs[0]
-    assert "user_agent" not in audit.docs[0]
+    assert sessions.docs[0]["revoked"] is False
 
 
 @pytest.mark.asyncio
