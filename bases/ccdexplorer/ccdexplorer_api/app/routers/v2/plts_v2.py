@@ -114,12 +114,12 @@ async def get_all_plt_tokens(
     Raises:
         HTTPException: If the network is unsupported or no data is available.
     """
-    db_to_use = net_db(mongomotor, net)
     if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
             detail="Don't be silly. We only support mainnet, testnet, and devnet.",
         )
+    db_to_use = net_db(mongomotor, net)
 
     result = await db_to_use[Collections.plts_tags].find({}).to_list(length=None)
     result = {x["_id"]: x for x in result}

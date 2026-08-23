@@ -38,7 +38,7 @@ async def staking(
         f"{request.app.api_url}/v2/{net}/account/passive_delegation/staking-rewards-object/passive_delegation",
         httpx_client,
     )
-    account_apy_object = api_result.return_value if api_result.ok else None
+    account_apy_object = api_result.return_value if api_result.ok else {}
 
     request.state.api_calls = {}
     request.state.api_calls["Paydays"] = (

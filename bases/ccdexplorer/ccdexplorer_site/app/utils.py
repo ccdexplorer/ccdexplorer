@@ -54,7 +54,7 @@ from ccdexplorer.schema_parser import Schema
 from dateutil.relativedelta import relativedelta
 from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from rich import print
 
 # from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import MakeUp
@@ -1691,64 +1691,72 @@ async def process_event_for_makeup(req: ProcessEventRequest):
         bs = io.BytesIO(bytes.fromhex(event_info.logged_event))
         tag_ = int.from_bytes(bs.read(1), byteorder="little")
 
-        if contract_version == "erc721_v1":
-            if tag_ == 0:
-                event_type = "Add Trader"
-                s7_event = s7.s7_erc721_v1_inventory_add_trader_event(cis_instance, req.event)
-            if tag_ == 1:
-                event_type = "Transfer"
-                s7_event = s7.s7_erc721_v1_inventory_transfer_event(cis_instance, req.event)
-            if tag_ == 4:
-                event_type = "OnSale"
-                s7_event = s7.s7_erc721_v1_inventory_on_sale_event(cis_instance, req.event)
-            if tag_ == 5:
-                event_type = "Buying"
-                s7_event = s7.s7_erc721_v1_inventory_buying_event(cis_instance, req.event)
+        try:
+            if contract_version == "erc721_v1":
+                if tag_ == 0:
+                    event_type = "Add Trader"
+                    s7_event = s7.s7_erc721_v1_inventory_add_trader_event(cis_instance, req.event)
+                if tag_ == 1:
+                    event_type = "Transfer"
+                    s7_event = s7.s7_erc721_v1_inventory_transfer_event(cis_instance, req.event)
+                if tag_ == 4:
+                    event_type = "OnSale"
+                    s7_event = s7.s7_erc721_v1_inventory_on_sale_event(cis_instance, req.event)
+                if tag_ == 5:
+                    event_type = "Buying"
+                    s7_event = s7.s7_erc721_v1_inventory_buying_event(cis_instance, req.event)
 
-        if contract_version == "erc721_v2":
-            if tag_ == 0:
-                event_type = "Add Trader"
-                s7_event = s7.s7_erc721_v2_inventory_add_trader_event(cis_instance, req.event)
-            if tag_ == 1:
-                event_type = "Transfer"
-                s7_event = s7.s7_erc721_v2_inventory_transfer_event(cis_instance, req.event)
-            if tag_ == 4:
-                event_type = "OnSale"
-                s7_event = s7.s7_erc721_v2_inventory_on_sale_event(cis_instance, req.event)
-            if tag_ == 5:
-                event_type = "Buying"
-                s7_event = s7.s7_erc721_v2_inventory_buying_event(cis_instance, req.event)
-            if tag_ == 6:
-                event_type = "Pause"
-                s7_event = s7.s7_erc721_v2_inventory_pause_event(cis_instance, req.event)
-            if tag_ == 7:
-                event_type = "Closed"
-                s7_event = s7.s7_erc721_v2_inventory_closed_event(cis_instance, req.event)
-            if tag_ == 8:
-                event_type = "Created"
-                s7_event = s7.s7_erc721_v2_inventory_created_event(cis_instance, req.event)
-        if contract_version == "erc1155_v1":
-            if tag_ == 0:
-                event_type = "Add Trader"
-                s7_event = s7.s7_erc1155_v1_inventory_add_trader_event(cis_instance, req.event)
-            if tag_ == 1:
-                event_type = "Transfer"
-                s7_event = s7.s7_erc1155_v1_inventory_transfer_event(cis_instance, req.event)
-            if tag_ == 4:
-                event_type = "OnSale"
-                s7_event = s7.s7_erc1155_v1_inventory_on_sale_event(cis_instance, req.event)
-            if tag_ == 5:
-                event_type = "Buying"
-                s7_event = s7.s7_erc1155_v1_inventory_buying_event(cis_instance, req.event)
-            if tag_ == 6:
-                event_type = "Pause"
-                s7_event = s7.s7_erc1155_v1_inventory_pause_event(cis_instance, req.event)
-            if tag_ == 7:
-                event_type = "Closed"
-                s7_event = s7.s7_erc1155_v1_inventory_closed_event(cis_instance, req.event)
-            if tag_ == 8:
-                event_type = "Created"
-                s7_event = s7.s7_erc1155_v1_inventory_create_event(cis_instance, req.event)
+            if contract_version == "erc721_v2":
+                if tag_ == 0:
+                    event_type = "Add Trader"
+                    s7_event = s7.s7_erc721_v2_inventory_add_trader_event(cis_instance, req.event)
+                if tag_ == 1:
+                    event_type = "Transfer"
+                    s7_event = s7.s7_erc721_v2_inventory_transfer_event(cis_instance, req.event)
+                if tag_ == 4:
+                    event_type = "OnSale"
+                    s7_event = s7.s7_erc721_v2_inventory_on_sale_event(cis_instance, req.event)
+                if tag_ == 5:
+                    event_type = "Buying"
+                    s7_event = s7.s7_erc721_v2_inventory_buying_event(cis_instance, req.event)
+                if tag_ == 6:
+                    event_type = "Pause"
+                    s7_event = s7.s7_erc721_v2_inventory_pause_event(cis_instance, req.event)
+                if tag_ == 7:
+                    event_type = "Closed"
+                    s7_event = s7.s7_erc721_v2_inventory_closed_event(cis_instance, req.event)
+                if tag_ == 8:
+                    event_type = "Created"
+                    s7_event = s7.s7_erc721_v2_inventory_created_event(cis_instance, req.event)
+            if contract_version == "erc1155_v1":
+                if tag_ == 0:
+                    event_type = "Add Trader"
+                    s7_event = s7.s7_erc1155_v1_inventory_add_trader_event(cis_instance, req.event)
+                if tag_ == 1:
+                    event_type = "Transfer"
+                    s7_event = s7.s7_erc1155_v1_inventory_transfer_event(cis_instance, req.event)
+                if tag_ == 4:
+                    event_type = "OnSale"
+                    s7_event = s7.s7_erc1155_v1_inventory_on_sale_event(cis_instance, req.event)
+                if tag_ == 5:
+                    event_type = "Buying"
+                    s7_event = s7.s7_erc1155_v1_inventory_buying_event(cis_instance, req.event)
+                if tag_ == 6:
+                    event_type = "Pause"
+                    s7_event = s7.s7_erc1155_v1_inventory_pause_event(cis_instance, req.event)
+                if tag_ == 7:
+                    event_type = "Closed"
+                    s7_event = s7.s7_erc1155_v1_inventory_closed_event(cis_instance, req.event)
+                if tag_ == 8:
+                    event_type = "Created"
+                    s7_event = s7.s7_erc1155_v1_inventory_create_event(cis_instance, req.event)
+        except (ValidationError, ValueError, IndexError):
+            # a SpaceSeven event that doesn't decode into the expected shape
+            # (unexpected byte layout, truncated parameter, ...) -- fall back
+            # to the "Non CIS event" rendering below instead of crashing the
+            # transaction page
+            s7_event = None
+
         if s7_event:
             if (
                 not isinstance(s7_event, s7_erc1155_v1_AddTraderEvent)
@@ -1998,6 +2006,11 @@ async def get_url_from_api(url: str, httpx_client: httpx.AsyncClient) -> APIResp
         if response:
             api_response.status_code = response.status_code
             api_response.return_value = response.json()
+    except RuntimeError:
+        # httpx raises a bare RuntimeError (not httpx.HTTPError) when the
+        # client has already been closed -- expected when a scheduled task
+        # fires during app shutdown, so treat it like any other failed call
+        api_response.return_value = None
 
     end = dt.datetime.now().astimezone(dt.UTC)
 
@@ -2390,8 +2403,9 @@ def create_dict_for_tabulator_display_for_cis2_token_holders(
     row: dict,
     account_address: str,
     decimals: int,
-    stored_token_address: dict,
+    stored_token_address: dict | None,
 ):
+    stored_token_address = stored_token_address or {}
     token_label = ""
     if stored_token_address.get("verified_information") is not None:
         if (
@@ -2485,20 +2499,20 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
 
 
 def create_dict_for_tabulator_display_for_unverified_token(net, row: dict):
-    ai = row["address_information"]
+    ai = row["address_information"] or {}
+    token_address = ai.get("_id", row["token_address"])
+    token_id = ai.get("token_id", row["token_id"])
     return {
         "issuer": f'<span class="ccd text-secondary-emphasis">{row["contract"]}</span>',
         "token": (
-            f'<a href="/{net}/token/{split_into_url_slug(ai["_id"])}">{ai["token_metadata"]["name"]}</a>'
+            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{ai["token_metadata"]["name"]}</a>'
             if ai.get("token_metadata")
-            else f'<a href="/{net}/token/{split_into_url_slug(ai["_id"])}">{ai["token_id"]}</a>'
+            else f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{token_id}</a>'
         ),
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
         "issuer_download": f"{row['contract']}",
         "token_download": (
-            f"{ai['token_id']}"
-            if not ai.get("token_metadata")
-            else f"{ai['token_metadata']['name']}"
+            f"{token_id}" if not ai.get("token_metadata") else f"{ai['token_metadata']['name']}"
         ),
         "balance_download": f"{row['token_amount']}",
     }

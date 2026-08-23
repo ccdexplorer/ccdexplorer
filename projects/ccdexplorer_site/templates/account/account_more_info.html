@@ -12,25 +12,27 @@
             
         </tr>
         {% endif %}
-            <!-- <tr class="table-row-line-height sm-text">
+            {#
+            <tr class="table-row-line-height sm-text">
                 <td class="text-start text-secondary-emphasis">Deployed in block</td>
                 {% if not deployed_in_genesis_block %}
                     <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}</td>
                 {% else %}
                     <td class="text-end text-secondary-emphasis ccd">0</td>
                 {% endif %}
-            </tr> -->
-            <!-- {% if not deployed_in_genesis_block %}
+            </tr>
+            {% if not deployed_in_genesis_block %}
                 <tr class="table-row-line-height sm-text">
                     <td class="text-start text-secondary-emphasis">Deployed in tx</td>
                     <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
-                        
+
                         </td>
                 </tr>
-            {% endif %} -->
+            {% endif %}
+            #}
             <tr class="table-row-line-height sm-text">
                 <td class="text-start text-secondary-emphasis">Age</td>
-                {% if not deployed_in_genesis_block %}
+                {% if not deployed_in_genesis_block and tx_deployed %}
                     <td class="text-end text-secondary-emphasis ccd"><a href="/{{net}}/transaction/{{tx_deployed.hash}}"><span style="font-family: monospace, monospace;">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}} <i class="bi bi-arrow-up-right"></i></span></a></td>
                 {% else %}
                     <td class="text-end text-secondary-emphasis ccd"><a href="/{{net}}/block/0"><span style="font-family: monospace, monospace;">{{genesis_block_slot_time|datetime_delta_format_since}} <i class="bi bi-arrow-up-right"></i></span></a></td>

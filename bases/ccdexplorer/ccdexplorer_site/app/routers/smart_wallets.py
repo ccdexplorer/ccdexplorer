@@ -262,7 +262,7 @@ async def get_public_key_page(
         f"{request.app.api_url}/v2/{net}/smart-wallet/{index}/{subindex}/public-key/{public_key}/ccd-balance",
         httpx_client,
     )
-    balances = api_result.return_value if api_result.ok else None
+    balances = api_result.return_value if api_result.ok else {}
 
     balance_ccd = balances.get("ccd", 0)
 
