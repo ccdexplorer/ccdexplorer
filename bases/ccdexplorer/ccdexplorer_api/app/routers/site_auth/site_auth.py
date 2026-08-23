@@ -202,14 +202,11 @@ async def save_user(user: SiteUser, mongomotor: MongoMotor) -> None:
 #
 # The session token rotates on every use (at most once per ROTATE_THROTTLE),
 # the same idea OAuth refresh-token rotation uses. The value it replaces stays
-# valid for SESSION_GRACE_PERIOD purely to absorb concurrent in-flight
-# requests that started just before a rotation (e.g. a page firing a couple of
-# near-simultaneous HTMX calls on the same cookie) -- using it during the
-# grace window doesn't rotate again, it just converges back onto the current
-# token. Presenting a token *older* than that is treated as a stolen-cookie
-# signal: the session is revoked and an audit entry is written.
+# on the session doc as `previous_token` until the *next* rotation overwrites
+# it -- so a request that raced a rotation (e.g. a page firing a couple of
+# near-simultaneous HTMX calls on the same cookie) still converges back onto
+# the current token instead of getting logged out.
 ROTATE_THROTTLE = dt.timedelta(seconds=30)
-SESSION_GRACE_PERIOD = dt.timedelta(seconds=10)
 
 
 def _device_label(user_agent: Optional[str]) -> Optional[str]:
@@ -283,7 +280,6 @@ async def create_session(
         "_id": str(uuid4()),
         "token": str(uuid4()),
         "previous_token": None,
-        "previous_token_expires": None,
         "user_token": user_token,
         "created_at": now,
         "last_seen_at": now,
@@ -326,7 +322,6 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
                     "$set": {
                         "token": new_token,
                         "previous_token": session_token,
-                        "previous_token_expires": now + SESSION_GRACE_PERIOD,
                         "last_rotated_at": now,
                         "last_seen_at": now,
                     }
@@ -352,16 +347,9 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
 
     doc = await sessions.find_one({"previous_token": session_token, "revoked": False})
     if doc is not None:
-        if _expiry_ok(_as_utc(doc.get("previous_token_expires"))):
-            # In-flight request racing a rotation that already happened --
-            # converge on the current token instead of treating this as reuse.
-            return await _resolved(doc["user_token"], doc["_id"], doc["token"], mongomotor)
-        await sessions.update_one(
-            {"_id": doc["_id"]},
-            {"$set": {"revoked": True, "revoked_reason": "reuse_detected"}},
-        )
-        await _append_audit_entry(doc["user_token"], "session_reuse_detected", mongomotor)
-        return {"ok": False, "reason": "revoked"}
+        # In-flight request racing a rotation that already happened --
+        # converge on the current token instead of forcing a re-login.
+        return await _resolved(doc["user_token"], doc["_id"], doc["token"], mongomotor)
 
     # Migration fallback: an old-style cookie holding a raw SiteUser.token
     # directly (pre-dates the session layer). Treat it as an implicit login

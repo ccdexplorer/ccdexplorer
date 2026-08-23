@@ -68,9 +68,7 @@ coarse browser/OS label (e.g. "Chrome on macOS"), and when a session started and
 <ul class="sm-text">
   {% for entry in audit_log %}
   <li>
-    {% if entry.event == "session_reuse_detected" %}
-      <span class="text-danger">Suspicious login blocked</span>
-    {% elif entry.event == "login_success" %}
+    {% if entry.event == "login_success" %}
       Successful login
     {% elif entry.event == "login_failed" %}
       Failed login attempt
@@ -91,13 +89,6 @@ coarse browser/OS label (e.g. "Chrome on macOS"), and when a session started and
     }
   });
 </script>
-{% if audit_log | selectattr("event", "equalto", "session_reuse_detected") | list | length > 0 %}
-<div class="alert alert-danger sm-text" role="alert">
-  We blocked a login attempt that reused an already-replaced session token, which can mean a
-  cookie was copied/stolen. That session was revoked automatically. If this wasn't you, use
-  "Log out of all other devices" above and change your password.
-</div>
-{% endif %}
 {% else %}
 <p class="sm-text">No recent activity.</p>
 {% endif %}
