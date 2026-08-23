@@ -316,7 +316,7 @@ async def smart_contracts_overview(
         f"{request.app.api_url}/v2/{net}/modules/overview",
         httpx_client,
     )
-    the_dict = api_result.return_value if api_result.ok else None
+    the_dict = api_result.return_value if api_result.ok else {}
     if the_dict:
         the_dict = {k: v["modules"] for k, v in the_dict.items()}
     return request.app.templates.TemplateResponse(

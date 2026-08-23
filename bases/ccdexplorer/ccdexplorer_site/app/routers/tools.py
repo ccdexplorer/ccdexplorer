@@ -434,7 +434,7 @@ async def labeled_accounts(
         f"{request.app.api_url}/v2/{net}/misc/projects/all-ids",
         httpx_client,
     )
-    projects = api_result.return_value if api_result.ok else []
+    projects = api_result.return_value if api_result.ok else {}
     if net == "mainnet":
         return request.app.templates.TemplateResponse(
             request,
@@ -759,7 +759,7 @@ async def transactions_by_type_page(
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/transaction_types/all", httpx_client
     )
-    tx_type_counts = api_result.return_value if api_result.ok else None
+    tx_type_counts = api_result.return_value if api_result.ok else []
     tx_type_counts = {x["_id"]: x["count"] for x in tx_type_counts}  # type: ignore
     request.state.api_calls = {}
     request.state.api_calls["Latest Txs"] = (

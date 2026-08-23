@@ -29,16 +29,17 @@
                 </td>
         </tr>
         {% endif %} -->
+    {% if tx_deployed %}
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Deployed in block</td>
         <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
-            
+
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Deployed in tx</td>
         <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
-            
+
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
@@ -48,10 +49,11 @@
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Creator</td>
         <td class="text-end text-secondary-emphasis">{{ tx_deployed.account_transaction.sender|account_link(net,user,tags,request.app)|safe}}
-            
+
             </td>
     </tr>
-    
+    {% endif %}
+
     <tr class="table-row-line-height sm-text">
         <td class="text-start text-secondary-emphasis">Last Activity in block</td>
         <td class="text-end text-secondary-emphasis ccd">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}

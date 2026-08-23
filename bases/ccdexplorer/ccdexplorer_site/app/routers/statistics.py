@@ -729,7 +729,11 @@ async def statistics_network_summary_accounts_per_day_plotly(
         analysis, request.app, chain_start, yesterday
     )
     d_date = yesterday
+    title = "Accounts Active and Growth per day"
     df_per_day = pd.DataFrame(all_data)
+    if df_per_day.empty:
+        return await return_plot_response(go.Figure(), request, title)
+
     df_per_day["d_count_accounts"] = df_per_day["account_count"] - df_per_day[
         "account_count"
     ].shift(+1)
@@ -740,7 +744,6 @@ async def statistics_network_summary_accounts_per_day_plotly(
         columns={"d_count_accounts": "growth", "account_count": "level"}, inplace=True
     )
     df_per_day = df_per_day[["date", "growth", "level"]]
-    title = "Accounts Active and Growth per day"
 
     # Create figure with secondary y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -1925,11 +1928,13 @@ async def statistics_realized_prices_plotly(
         analysis, request.app, chain_start, yesterday
     )
     d_date = yesterday
+    title = "Realized Price (CCD)"
     df = pd.DataFrame(all_data)
+    if df.empty:
+        return await return_plot_response(go.Figure(), request, title)
     df.fillna(0)
 
     rng = ["#EE9B54"]
-    title = "Realized Price (CCD)"
     fig = px.line(
         df,
         x="date",

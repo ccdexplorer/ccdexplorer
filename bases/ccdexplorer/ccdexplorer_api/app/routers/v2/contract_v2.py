@@ -72,10 +72,20 @@ async def get_module_name_from_contract_address(db_to_use, contract_address: CCD
     instance_result = await db_to_use[Collections.instances].find_one(
         {"_id": contract_address.to_str()}
     )
+    if not instance_result:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Contract instance '{contract_address.to_str()}' not found.",
+        )
     if "v1" in instance_result:
         module_name = instance_result["v1"]["name"].replace("init_", "")
     elif "v0" in instance_result:
         module_name = instance_result["v0"]["name"].replace("init_", "")
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Contract instance '{contract_address.to_str()}' has no known module version.",
+        )
     return module_name
 
 
@@ -816,8 +826,12 @@ async def get_contract_deployment_tx(
     result = await await_await(db_to_use, Collections.transactions, pipeline)
 
     if result:
-        result = CCD_BlockItemSummary(**result[0])
-        return result
+        return CCD_BlockItemSummary(**result[0])
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Requested deployment transaction for '<{contract_index},{contract_subindex}>' not found on {net}.",
+    )
 
 
 @router.get(

@@ -523,43 +523,52 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_accounts_id_providers(app: FastAPI):
         for net in ["mainnet", "testnet", "devnet"]:
-            api_result = await get_url_from_api(
-                f"{app.api_url}/v2/{net}/accounts/last/50", app.httpx_client
-            )
-            app.accounts_cache[net] = api_result.return_value if api_result.ok else []
+            try:
+                api_result = await get_url_from_api(
+                    f"{app.api_url}/v2/{net}/accounts/last/50", app.httpx_client
+                )
+                app.accounts_cache[net] = api_result.return_value if api_result.ok else []
 
-            identity_providers = {}
-            api_result = await get_url_from_api(
-                f"{app.api_url}/v2/{net}/misc/identity-providers",
-                app.httpx_client,
-            )
-            if api_result.return_value is None:
-                continue
-            for id in api_result.return_value:  # type: ignore
-                id = CCD_IpInfo(**id)
-                identity_providers[str(id.identity)] = {
-                    "ip_identity": id.identity,
-                    "ip_description": id.description.name,
-                }
+                identity_providers = {}
+                api_result = await get_url_from_api(
+                    f"{app.api_url}/v2/{net}/misc/identity-providers",
+                    app.httpx_client,
+                )
+                if api_result.return_value is None:
+                    continue
+                for id in api_result.return_value:  # type: ignore
+                    if not isinstance(id, dict):
+                        # a malformed entry (e.g. a flaky devnet returning an
+                        # error payload instead of a list) shouldn't blow up
+                        # the whole cache refresh for this net
+                        continue
+                    id = CCD_IpInfo(**id)
+                    identity_providers[str(id.identity)] = {
+                        "ip_identity": id.identity,
+                        "ip_description": id.description.name,
+                    }
 
-            app.identity_providers_cache[net] = identity_providers if api_result.ok else None
-            if app.accounts_cache[net]:
-                for account_ in app.accounts_cache[net]:
-                    account_info: CCD_AccountInfo = CCD_AccountInfo(**account_["account_info"])
-                    if account_info.address[:29] not in app.addresses_to_indexes[net]:
-                        print(f"Adding {account_info.index} to cache... FROM SCHEDULE")
-                        add_account_info_to_cache(account_info, app, net)
+                app.identity_providers_cache[net] = identity_providers if api_result.ok else None
+                if app.accounts_cache[net]:
+                    for account_ in app.accounts_cache[net]:
+                        account_info: CCD_AccountInfo = CCD_AccountInfo(**account_["account_info"])
+                        if account_info.address[:29] not in app.addresses_to_indexes[net]:
+                            print(f"Adding {account_info.index} to cache... FROM SCHEDULE")
+                            add_account_info_to_cache(account_info, app, net)
 
-            api_result = await get_url_from_api(
-                f"{app.api_url}/v2/{net}/plts/overview", app.httpx_client
-            )
-            # Keep plt_cache[net] a dict even when there's no PLT data yet
-            # (e.g. a 404 "Can't list tokens on {net}" for a net with none
-            # indexed) -- consumers do plt_cache[net].get(...)/`in` checks
-            # and would crash on None.
-            app.plt_cache[net] = api_result.return_value if api_result.ok else {}
-            if not api_result.ok:
-                print(f"ERROR: {api_result.return_value}")
+                api_result = await get_url_from_api(
+                    f"{app.api_url}/v2/{net}/plts/overview", app.httpx_client
+                )
+                # Keep plt_cache[net] a dict even when there's no PLT data yet
+                # (e.g. a 404 "Can't list tokens on {net}" for a net with none
+                # indexed) -- consumers do plt_cache[net].get(...)/`in` checks
+                # and would crash on None.
+                app.plt_cache[net] = api_result.return_value if api_result.ok else {}
+                if not api_result.ok:
+                    print(f"ERROR: {api_result.return_value}")
+            except Exception as error:
+                # one network's failure shouldn't stop the others from refreshing
+                print(f"ERROR in repeated_task_get_accounts_id_providers for {net}: {error}")
 
     @scheduler.scheduled_job("interval", seconds=5 * 60, args=[app])
     async def repeated_task_get_staking_pools(app: FastAPI):
