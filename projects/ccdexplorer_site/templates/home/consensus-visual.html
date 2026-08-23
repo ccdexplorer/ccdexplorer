@@ -33,79 +33,120 @@
     font-size: 0.7rem;
   }
   .cv-baker { color: var(--bs-secondary-color); }
-  .cv-finalized-row { border-top: 2px solid var(--bs-border-color); margin-top: 8px; padding-top: 8px; }
+  @keyframes cv-enter {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  /* opacity only (never transform) so this can't fight the FLIP script's
+     use of transform for movement between polls */
+  .cv-block-new { animation: cv-enter 0.5s ease-out; }
+  .cv-finalized-divider {
+    border-top: 2px solid var(--bs-border-color);
+    padding-top: 6px;
+  }
   .cv-page-box {
     border: 1px solid var(--bs-border-color);
     border-radius: 8px;
     padding: 16px;
   }
   .cv-legend {
-    list-style: none;
-    padding-left: 0;
     margin-bottom: 0;
   }
+  .cv-legend td {
+    border-color: var(--bs-border-color);
+    vertical-align: middle;
+  }
+  .cv-legend-swatch {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+  }
+  /* .cv-legend-swatch's own `border` shorthand comes after .cv-block-qc etc.
+     in this stylesheet, so at equal specificity it would otherwise win and
+     silently reset their border-color back to the default grey - these
+     two-class selectors outrank it instead of relying on source order */
+  .cv-legend-swatch.cv-block-qc { border-color: #2ecc71; }
+  .cv-legend-swatch.cv-block-terminal { border-color: #e74c3c; border-style: dashed; }
+  .cv-legend-swatch.cv-block-finalized { border-color: #3498db; }
+  .cv-legend-swatch-round {
+    background: #375a7f;
+    border-color: #375a7f;
+  }
   .cv-poll-area {
-    min-height: 260px;
+    min-height: 380px;
   }
-  @keyframes cv-pulse-new {
-    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.5); }
-    100% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); }
+  .cv-inprogress-area {
+    height: 110px;
+    overflow-y: auto;
   }
-  @keyframes cv-pulse-certified {
-    0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.8); }
-    100% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
-  }
-  @keyframes cv-pulse-tip {
-    0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 1); }
-    100% { box-shadow: 0 0 0 14px rgba(241, 196, 15, 0); }
-  }
-  @keyframes cv-pulse-finalized {
-    0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.9); }
-    100% { box-shadow: 0 0 0 10px rgba(52, 152, 219, 0); }
-  }
-  .cv-flash-new { animation: cv-pulse-new 1.6s ease-out; }
-  .cv-flash-certified { animation: cv-pulse-certified 1.6s ease-out; }
-  .cv-flash-tip { animation: cv-pulse-tip 1.8s ease-out; }
-  .cv-flash-finalized { animation: cv-pulse-finalized 1.6s ease-out; }
 </style>
     <div class="row  mt-8">
       <div class="col-lg-12 mt-4 cv-page-box">
         <span class="text-uppercase sm-text text-secondary-emphasis">Consensus Visual (Experimental)</span>
 
-        <div class="cv-poll-area" hx-get="/{{net}}/ajax_consensus_visual" hx-trigger="load, every 0.5s"></div>
+        <div class="cv-poll-area" hx-get="/{{net}}/ajax_consensus_visual" hx-trigger="load, every 0.5s" hx-swap="innerHTML"></div>
 
-        <ul class="sm-text text-secondary-emphasis mt-2 cv-legend">
-          <li>blue border = last finalized
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-finalized"
-               data-bs-trigger="focus" data-bs-title="Last finalized block"
-               data-bs-content="The last finalized block is permanently part of the chain and irreversible.">(i)</a>
-          </li>
-          <li>yellow ring = tip
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-tip"
-               data-bs-trigger="focus" data-bs-title="Tip"
-               data-bs-content="The current tip is the highest block that has a quorum certificate &mdash; the block consensus has most recently converged on.">(i)</a>
-          </li>
-          <li>green border = has a quorum certificate
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-qc"
-               data-bs-trigger="focus" data-bs-title="Quorum certificate"
-               data-bs-content="This block has a quorum certificate &mdash; a supermajority of finalizers voted for it &mdash; but it is not yet finalized.">(i)</a>
-          </li>
-          <li>red dashed border = terminal block
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-terminal"
-               data-bs-trigger="focus" data-bs-title="Terminal block"
-               data-bs-content="The terminal block is the furthest block consensus currently considers valid to build on.">(i)</a>
-          </li>
-          <li>grey border = proposed, no quorum certificate yet
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-proposed"
-               data-bs-trigger="focus" data-bs-title="Proposed block"
-               data-bs-content="This block has been proposed for its round but has not yet received a quorum certificate. It's the least-confirmed state, and may not have reached the node behind block lookups yet &mdash; so it isn't clickable.">(i)</a>
-          </li>
-          <li>round
-            <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-round"
-               data-bs-trigger="focus" data-bs-title="Round"
-               data-bs-content="The consensus round the block was produced in, not its block height. Rounds also advance on timeouts with no block, so round numbers drift ahead of height over time.">(i)</a>
-          </li>
-        </ul>
+        <table class="table sm-text cv-legend">
+          <tbody class="table-group-divider">
+            <tr>
+              <td><span class="cv-legend-swatch cv-block-finalized"></span></td>
+              <td class="text-secondary-emphasis">Finalized</td>
+              <td class="text-secondary-emphasis">newest at the top, older ones fade below it
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-finalized"
+                   data-bs-trigger="focus" data-bs-title="Finalized blocks"
+                   data-bs-content="A block is finalized once there's a finalization entry for it &mdash; a quorum certificate proving the block itself is valid (finalized_qc), plus proof that a valid successor block exists. From then on it's permanently part of the chain and can't be reverted. The last 5 are shown, newest at the top &mdash; watch a block slide down out of 'in progress' into this stack the moment it finalizes.">(i)</a>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="cv-legend-swatch cv-block-tip"></span></td>
+              <td class="text-secondary-emphasis">Tip</td>
+              <td class="text-secondary-emphasis">highest certified block right now
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-tip"
+                   data-bs-trigger="focus" data-bs-title="Tip"
+                   data-bs-content="RoundStatus.highest_certified_block: the highest certified block in the current round &mdash; the block consensus has most recently converged on building the next one upon.">(i)</a>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="cv-legend-swatch cv-block-qc"></span></td>
+              <td class="text-secondary-emphasis">Quorum certificate</td>
+              <td class="text-secondary-emphasis">certified, not yet finalized
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-qc"
+                   data-bs-trigger="focus" data-bs-title="Quorum certificate"
+                   data-bs-content="A RawQuorumCertificate is the aggregate signature of the finalizers (its signatories) who signed for this specific block, proving a supermajority validated it. That's stronger than just being proposed, but it still needs a full finalization entry before it's irreversible.">(i)</a>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="cv-legend-swatch cv-block-terminal"></span></td>
+              <td class="text-secondary-emphasis">Terminal block</td>
+              <td class="text-secondary-emphasis">furthest block valid to build on
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-terminal"
+                   data-bs-trigger="focus" data-bs-title="Terminal block"
+                   data-bs-content="The terminal block is the furthest block consensus currently considers valid to build on.">(i)</a>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="cv-legend-swatch"></span></td>
+              <td class="text-secondary-emphasis">Proposed</td>
+              <td class="text-secondary-emphasis">no quorum certificate yet
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-proposed"
+                   data-bs-trigger="focus" data-bs-title="Proposed block"
+                   data-bs-content="A RoundExistingBlock &mdash; a block that exists for its round, with a validator who created it, but no quorum certificate yet. It's the least-confirmed state, and may not have reached the node behind block lookups yet &mdash; so it isn't clickable.">(i)</a>
+              </td>
+            </tr>
+            <tr>
+              <td><span class="cv-legend-swatch cv-legend-swatch-round"></span></td>
+              <td class="text-secondary-emphasis">Round</td>
+              <td class="text-secondary-emphasis">the consensus round each block was produced in
+                <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-round"
+                   data-bs-trigger="focus" data-bs-title="Round"
+                   data-bs-content="Rounds are a ConcordiumBFT concept, present from protocol version 6 onward. The consensus round a block was produced in is not its block height &mdash; rounds also advance on timeouts with no block, so round numbers drift ahead of height over time.">(i)</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -116,6 +157,49 @@
       new bootstrap.Popover(el, { trigger: "focus" });
     }
   });
+</script>
+
+<script>
+  // FLIP animation: a block keeps the same data-block hash whether it's in
+  // "in progress" or "finalized", so when it moves between them (or shifts
+  // slots within the finalized stack), we record its position before the
+  // htmx swap and animate from there to its new position after the swap -
+  // instead of relying on the browser's View Transitions API, which kept
+  // snapshotting mid-flight CSS animations and produced flicker.
+  (function () {
+    const pollArea = document.querySelector(".cv-poll-area");
+    if (!pollArea) return;
+
+    let positions = new Map();
+
+    function capturePositions() {
+      positions = new Map();
+      pollArea.querySelectorAll("[data-block]").forEach(function (el) {
+        positions.set(el.dataset.block, el.getBoundingClientRect());
+      });
+    }
+
+    function playFlip() {
+      pollArea.querySelectorAll("[data-block]").forEach(function (el) {
+        const old = positions.get(el.dataset.block);
+        if (!old) return;
+        const now = el.getBoundingClientRect();
+        const dx = old.left - now.left;
+        const dy = old.top - now.top;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+        el.style.transition = "none";
+        el.style.transform = "translate(" + dx + "px, " + dy + "px)";
+        el.getBoundingClientRect(); // force reflow before re-enabling transition
+        el.style.transition = "transform 0.4s ease";
+        el.style.transform = "";
+      });
+    }
+
+    pollArea.addEventListener("htmx:beforeSwap", capturePositions);
+    pollArea.addEventListener("htmx:afterSwap", function () {
+      requestAnimationFrame(playFlip);
+    });
+  })();
 </script>
 
 {% endblock %}

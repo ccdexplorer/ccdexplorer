@@ -1054,7 +1054,7 @@ async def ajax_consensus_own_page(
     return html
 
 
-@router.get("/{net}/consensus", response_class=HTMLResponse)
+@router.get("/{net}/consensus-details", response_class=HTMLResponse)
 async def consensus_page(
     request: Request,
     net: str,
@@ -1083,14 +1083,10 @@ async def consensus_page(
 
 def build_consensus_visualization(
     consensus: CCD_ConsensusDetailedStatus,
-    recent_transitions: dict | None = None,
+    finalized_history: list[dict],
+    new_hashes: set | None = None,
 ) -> dict:
-    recent_transitions = recent_transitions or {}
-    new_blocks = recent_transitions.get("new_blocks", set())
-    newly_certified = recent_transitions.get("newly_certified", set())
-    newly_finalized = recent_transitions.get("newly_finalized", set())
-    new_tip = recent_transitions.get("new_tip")
-
+    new_hashes = new_hashes or set()
     round_by_block: dict[str, int] = {}
     baker_by_block: dict[str, int] = {}
     for existing_block in consensus.round_existing_blocks or []:
@@ -1100,120 +1096,67 @@ def build_consensus_visualization(
     qc_rounds = {qc.round for qc in (consensus.round_existing_qcs or [])}
     highest_certified_hash = consensus.round_status.highest_certified_block.block_hash
 
+    # last_finalized_block_height is relative to the current protocol era's
+    # genesis, not the chain's absolute height - add genesis_block_height to
+    # get the height shown everywhere else on the site
+    base_height = consensus.genesis_block_height + consensus.last_finalized_block_height + 1
+
+    # round_existing_qcs only tracks a narrow window of recent rounds, so a
+    # block that got its QC a while ago (and is now aging toward finalization)
+    # can fall out of that window and look uncertified even though it isn't.
+    # A later block can't have a QC without its ancestor chain already being
+    # certified, so every height at or below the current tip's height is
+    # certified too - treat that as certified even if its round already aged
+    # out of round_existing_qcs.
+    tip_height = None
+    for i, branch in enumerate(consensus.branches or []):
+        if highest_certified_hash in branch.blocks_at_branch_height:
+            tip_height = base_height + i
+            break
+
     rows = []
     for i, branch in enumerate(consensus.branches or []):
-        height = consensus.last_finalized_block_height + 1 + i
+        height = base_height + i
         blocks = []
         for block_hash in branch.blocks_at_branch_height:
             round_number = round_by_block.get(block_hash)
+            has_qc = (round_number is not None and round_number in qc_rounds) or (
+                tip_height is not None and height <= tip_height
+            )
             blocks.append(
                 {
                     "hash": block_hash,
-                    "short_hash": f"{block_hash[:6]}…{block_hash[-4:]}",
+                    "short_hash": block_hash[:4],
                     "round": round_number,
-                    "has_qc": round_number in qc_rounds if round_number is not None else False,
+                    "has_qc": has_qc,
                     "baker": baker_by_block.get(block_hash),
                     "is_terminal": block_hash == consensus.terminal_block,
                     "is_highest_certified": block_hash == highest_certified_hash,
-                    "is_new": block_hash in new_blocks,
-                    "just_certified": block_hash in newly_certified,
-                    "just_became_tip": block_hash == new_tip,
+                    "is_new": block_hash in new_hashes,
                 }
             )
         rows.append({"height": height, "blocks": blocks})
     rows.reverse()  # newest height first
 
+    finalized_stack = [
+        {"hash": entry["hash"], "short_hash": entry["hash"][:4], "height": entry["height"]}
+        for entry in finalized_history
+    ]
+
     return {
         "current_round": consensus.round_status.current_round,
         "current_epoch": consensus.round_status.current_epoch,
         "current_timeout": consensus.round_status.current_timeout,
-        "last_finalized_block": consensus.last_finalized_block,
-        "last_finalized_block_short": f"{consensus.last_finalized_block[:6]}…{consensus.last_finalized_block[-4:]}",
-        "last_finalized_block_height": consensus.last_finalized_block_height,
-        "just_finalized": consensus.last_finalized_block in newly_finalized,
         "terminal_block": consensus.terminal_block,
         "non_finalized_transaction_count": consensus.non_finalized_transaction_count,
         "live_blocks_count": len(consensus.block_table.live_blocks) if consensus.block_table else 0,
         "dead_block_cache_size": consensus.block_table.dead_block_cache_size if consensus.block_table else 0,
         "rows": rows,
+        "finalized_stack": finalized_stack,
     }
 
 
-def compute_consensus_events(
-    previous: CCD_ConsensusDetailedStatus | None,
-    latest: CCD_ConsensusDetailedStatus,
-) -> list[dict]:
-    if previous is None:
-        return []
-
-    now = dt.datetime.now().astimezone(dt.timezone.utc)
-    events = []
-
-    round_by_block = {rb.block: rb.round for rb in (latest.round_existing_blocks or [])}
-    baker_by_block = {rb.block: rb.baker for rb in (latest.round_existing_blocks or [])}
-
-    prev_blocks = {
-        block_hash
-        for branch in (previous.branches or [])
-        for block_hash in branch.blocks_at_branch_height
-    }
-    for branch in latest.branches or []:
-        for block_hash in branch.blocks_at_branch_height:
-            if block_hash not in prev_blocks:
-                events.append({"ts": now, "kind": "proposed", "block": block_hash})
-
-    prev_qc_rounds = {qc.round for qc in (previous.round_existing_qcs or [])}
-    newly_qcd_rounds = {qc.round for qc in (latest.round_existing_qcs or [])} - prev_qc_rounds
-    for block_hash, round_number in round_by_block.items():
-        if round_number in newly_qcd_rounds:
-            events.append({"ts": now, "kind": "certified", "block": block_hash})
-
-    prev_tip = previous.round_status.highest_certified_block.block_hash
-    latest_tip = latest.round_status.highest_certified_block.block_hash
-    if latest_tip != prev_tip:
-        events.append({"ts": now, "kind": "tip_changed", "block": latest_tip})
-
-    if latest.last_finalized_block_height > previous.last_finalized_block_height:
-        events.append({"ts": now, "kind": "finalized", "block": latest.last_finalized_block})
-
-    prev_timeout_round = (
-        previous.round_status.previous_round_timeout.timeout_certificate.round
-        if previous.round_status.previous_round_timeout
-        else None
-    )
-    latest_timeout_round = (
-        latest.round_status.previous_round_timeout.timeout_certificate.round
-        if latest.round_status.previous_round_timeout
-        else None
-    )
-    if latest_timeout_round is not None and latest_timeout_round != prev_timeout_round:
-        events.append({"ts": now, "kind": "timeout", "round": latest_timeout_round})
-
-    return events
-
-
-def recent_block_transitions(events, max_age_seconds: float = 1.0) -> dict:
-    if not events:
-        return {}
-
-    now = dt.datetime.now().astimezone(dt.timezone.utc)
-    recent = [e for e in events if (now - e["ts"]).total_seconds() <= max_age_seconds]
-
-    new_tip = None
-    for event in reversed(recent):
-        if event["kind"] == "tip_changed":
-            new_tip = event["block"]
-            break
-
-    return {
-        "new_blocks": {e["block"] for e in recent if e["kind"] == "proposed"},
-        "newly_certified": {e["block"] for e in recent if e["kind"] == "certified"},
-        "newly_finalized": {e["block"] for e in recent if e["kind"] == "finalized"},
-        "new_tip": new_tip,
-    }
-
-
-@router.get("/{net}/consensus-visual", response_class=HTMLResponse)
+@router.get("/{net}/consensus", response_class=HTMLResponse)
 async def consensus_visual_page(
     request: Request,
     net: str,
@@ -1248,8 +1191,9 @@ async def ajax_consensus_visual(
     user: SiteUser | None = await get_user_detailsv2(request)
     try:
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
-        recent_transitions = recent_block_transitions(request.app.consensus_events.get(net, []))
-        visualization = build_consensus_visualization(latest_consensus, recent_transitions)
+        finalized_history = list(request.app.finalized_history.get(net, []))
+        new_hashes = request.app.new_block_hashes.get(net, set())
+        visualization = build_consensus_visualization(latest_consensus, finalized_history, new_hashes)
     except Exception as error:
         print(f"ERROR building consensus visualization for {net}: {error}")
         visualization = None
