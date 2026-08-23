@@ -2,6 +2,7 @@
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
 import uuid
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -13,6 +14,7 @@ import urllib3
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountInfo,
+    CCD_ConsensusDetailedStatus,
     CCD_IpInfo,
 )
 from fastapi import FastAPI, Response
@@ -258,6 +260,12 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.accounts_cache = {"mainnet": [], "testnet": [], "devnet": []}
         app.identity_providers_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.consensus_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.consensus_prev = {"mainnet": None, "testnet": None, "devnet": None}
+        app.consensus_events = {
+            "mainnet": deque(maxlen=300),
+            "testnet": deque(maxlen=300),
+            "devnet": deque(maxlen=300),
+        }
         app.plt_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.primed_suspended_cache = {}
         app.staking_pools_cache = {
@@ -435,7 +443,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             )
             app.transactions_cache[net] = api_result.return_value if api_result.ok else []
 
-    @scheduler.scheduled_job("interval", seconds=20, args=[app])
+    @scheduler.scheduled_job("interval", seconds=0.5, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):
         # for net in ["mainnet", "testnet", "devnet"]:
         for net in ["mainnet", "testnet", "devnet"]:
@@ -444,8 +452,13 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                     f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
                 )
                 app.consensus_cache[net] = api_result.return_value if api_result.ok else None
-            except Exception as _:
-                pass
+                if api_result.ok:
+                    latest = CCD_ConsensusDetailedStatus(**api_result.return_value)
+                    events = home.compute_consensus_events(app.consensus_prev[net], latest)
+                    app.consensus_events[net].extend(events)
+                    app.consensus_prev[net] = latest
+            except Exception as error:
+                print(f"ERROR getting consensus detailed status for {net}: {error}")
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_community_labeled_accounts(app: FastAPI):

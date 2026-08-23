@@ -199,13 +199,14 @@ class Mixin(_SharedConverters):
     def convertBranches(self, message) -> list[CCD_BranchBlocks]:
         branches = []
         for hash in message:
+            blocks_at_branch_height = []
             for field, value in hash.ListFields():
                 key = field.name
                 if key == "blocks_at_branch_height":
                     blocks_at_branch_height = self.convertBlocksAtBranchHeight(value)
-                branches.append(
-                    CCD_BranchBlocks(**{"blocks_at_branch_height": blocks_at_branch_height})
-                )
+            branches.append(
+                CCD_BranchBlocks(**{"blocks_at_branch_height": blocks_at_branch_height})
+            )
 
         return branches
 
@@ -295,6 +296,9 @@ class Mixin(_SharedConverters):
 
         return CCD_EpochBakers(**result)
 
+    def convertTimeoutMessageList(self, message) -> list[CCD_TimeoutMessage]:
+        return [self.convertTimeoutMessage(value) for value in message]
+
     def convertTimeoutMessages(self, message) -> CCD_TimeoutMessages:
         result = {}
         for field, value in message.ListFields():
@@ -303,7 +307,7 @@ class Mixin(_SharedConverters):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key in ["first_epoch_timeouts", "second_epoch_timeouts"]:
-                result[key] = self.convertTimeoutMessage(value)
+                result[key] = self.convertTimeoutMessageList(value)
 
         return CCD_TimeoutMessages(**result)
 

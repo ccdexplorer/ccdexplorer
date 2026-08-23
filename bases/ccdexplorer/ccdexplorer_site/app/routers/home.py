@@ -1020,7 +1020,8 @@ async def ajax_consensus_own_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     try:
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
-    except Exception as e:  # noqa: E722
+    except Exception as error:
+        print(f"ERROR parsing consensus detailed status for {net}: {error}")
         latest_consensus = None
 
     if not latest_consensus:
@@ -1076,6 +1077,204 @@ async def consensus_page(
             "user": user,
             "net": net,
             "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+def build_consensus_visualization(
+    consensus: CCD_ConsensusDetailedStatus,
+    recent_transitions: dict | None = None,
+) -> dict:
+    recent_transitions = recent_transitions or {}
+    new_blocks = recent_transitions.get("new_blocks", set())
+    newly_certified = recent_transitions.get("newly_certified", set())
+    newly_finalized = recent_transitions.get("newly_finalized", set())
+    new_tip = recent_transitions.get("new_tip")
+
+    round_by_block: dict[str, int] = {}
+    baker_by_block: dict[str, int] = {}
+    for existing_block in consensus.round_existing_blocks or []:
+        round_by_block[existing_block.block] = existing_block.round
+        baker_by_block[existing_block.block] = existing_block.baker
+
+    qc_rounds = {qc.round for qc in (consensus.round_existing_qcs or [])}
+    highest_certified_hash = consensus.round_status.highest_certified_block.block_hash
+
+    rows = []
+    for i, branch in enumerate(consensus.branches or []):
+        height = consensus.last_finalized_block_height + 1 + i
+        blocks = []
+        for block_hash in branch.blocks_at_branch_height:
+            round_number = round_by_block.get(block_hash)
+            blocks.append(
+                {
+                    "hash": block_hash,
+                    "short_hash": f"{block_hash[:6]}…{block_hash[-4:]}",
+                    "round": round_number,
+                    "has_qc": round_number in qc_rounds if round_number is not None else False,
+                    "baker": baker_by_block.get(block_hash),
+                    "is_terminal": block_hash == consensus.terminal_block,
+                    "is_highest_certified": block_hash == highest_certified_hash,
+                    "is_new": block_hash in new_blocks,
+                    "just_certified": block_hash in newly_certified,
+                    "just_became_tip": block_hash == new_tip,
+                }
+            )
+        rows.append({"height": height, "blocks": blocks})
+    rows.reverse()  # newest height first
+
+    return {
+        "current_round": consensus.round_status.current_round,
+        "current_epoch": consensus.round_status.current_epoch,
+        "current_timeout": consensus.round_status.current_timeout,
+        "last_finalized_block": consensus.last_finalized_block,
+        "last_finalized_block_short": f"{consensus.last_finalized_block[:6]}…{consensus.last_finalized_block[-4:]}",
+        "last_finalized_block_height": consensus.last_finalized_block_height,
+        "just_finalized": consensus.last_finalized_block in newly_finalized,
+        "terminal_block": consensus.terminal_block,
+        "non_finalized_transaction_count": consensus.non_finalized_transaction_count,
+        "live_blocks_count": len(consensus.block_table.live_blocks) if consensus.block_table else 0,
+        "dead_block_cache_size": consensus.block_table.dead_block_cache_size if consensus.block_table else 0,
+        "rows": rows,
+    }
+
+
+def compute_consensus_events(
+    previous: CCD_ConsensusDetailedStatus | None,
+    latest: CCD_ConsensusDetailedStatus,
+) -> list[dict]:
+    if previous is None:
+        return []
+
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    events = []
+
+    round_by_block = {rb.block: rb.round for rb in (latest.round_existing_blocks or [])}
+    baker_by_block = {rb.block: rb.baker for rb in (latest.round_existing_blocks or [])}
+
+    prev_blocks = {
+        block_hash
+        for branch in (previous.branches or [])
+        for block_hash in branch.blocks_at_branch_height
+    }
+    for branch in latest.branches or []:
+        for block_hash in branch.blocks_at_branch_height:
+            if block_hash not in prev_blocks:
+                events.append({"ts": now, "kind": "proposed", "block": block_hash})
+
+    prev_qc_rounds = {qc.round for qc in (previous.round_existing_qcs or [])}
+    newly_qcd_rounds = {qc.round for qc in (latest.round_existing_qcs or [])} - prev_qc_rounds
+    for block_hash, round_number in round_by_block.items():
+        if round_number in newly_qcd_rounds:
+            events.append({"ts": now, "kind": "certified", "block": block_hash})
+
+    prev_tip = previous.round_status.highest_certified_block.block_hash
+    latest_tip = latest.round_status.highest_certified_block.block_hash
+    if latest_tip != prev_tip:
+        events.append({"ts": now, "kind": "tip_changed", "block": latest_tip})
+
+    if latest.last_finalized_block_height > previous.last_finalized_block_height:
+        events.append({"ts": now, "kind": "finalized", "block": latest.last_finalized_block})
+
+    prev_timeout_round = (
+        previous.round_status.previous_round_timeout.timeout_certificate.round
+        if previous.round_status.previous_round_timeout
+        else None
+    )
+    latest_timeout_round = (
+        latest.round_status.previous_round_timeout.timeout_certificate.round
+        if latest.round_status.previous_round_timeout
+        else None
+    )
+    if latest_timeout_round is not None and latest_timeout_round != prev_timeout_round:
+        events.append({"ts": now, "kind": "timeout", "round": latest_timeout_round})
+
+    return events
+
+
+def recent_block_transitions(events, max_age_seconds: float = 1.0) -> dict:
+    if not events:
+        return {}
+
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    recent = [e for e in events if (now - e["ts"]).total_seconds() <= max_age_seconds]
+
+    new_tip = None
+    for event in reversed(recent):
+        if event["kind"] == "tip_changed":
+            new_tip = event["block"]
+            break
+
+    return {
+        "new_blocks": {e["block"] for e in recent if e["kind"] == "proposed"},
+        "newly_certified": {e["block"] for e in recent if e["kind"] == "certified"},
+        "newly_finalized": {e["block"] for e in recent if e["kind"] == "finalized"},
+        "new_tip": new_tip,
+    }
+
+
+@router.get("/{net}/consensus-visual", response_class=HTMLResponse)
+async def consensus_visual_page(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    return request.app.templates.TemplateResponse(
+        request,
+        "home/consensus-visual.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+@router.get("/{net}/ajax_consensus_visual", response_class=HTMLResponse)
+async def ajax_consensus_visual(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+):
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    try:
+        latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
+        recent_transitions = recent_block_transitions(request.app.consensus_events.get(net, []))
+        visualization = build_consensus_visualization(latest_consensus, recent_transitions)
+    except Exception as error:
+        print(f"ERROR building consensus visualization for {net}: {error}")
+        visualization = None
+
+    if not visualization:
+        error = f"Request error getting the most recent consensus detailed status on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    return request.app.templates.TemplateResponse(
+        request,
+        "home/consensus_visual_partial.html",
+        {
+            "request": request,
+            "v": visualization,
+            "net": net,
+            "user": user,
         },
     )
 

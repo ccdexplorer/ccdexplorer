@@ -1,0 +1,45 @@
+
+<div class="d-flex flex-wrap gap-4 my-2 sm-text">
+  <div><span class="text-secondary-emphasis">round</span> <span class="ccd">{{v.current_round}}</span></div>
+  <div><span class="text-secondary-emphasis">epoch</span> <span class="ccd">{{v.current_epoch}}</span></div>
+  <div><span class="text-secondary-emphasis">timeout</span> <span class="ccd">{{v.current_timeout}}</span> ms</div>
+  <div><span class="text-secondary-emphasis">pending txs</span> <span class="ccd">{{v.non_finalized_transaction_count}}</span></div>
+  <div><span class="text-secondary-emphasis">live blocks</span> <span class="ccd">{{v.live_blocks_count}}</span></div>
+  <div><span class="text-secondary-emphasis">dead cache</span> <span class="ccd">{{v.dead_block_cache_size}}</span></div>
+</div>
+
+<div class="mt-3">
+  {% for row in v.rows %}
+  <div class="d-flex align-items-start gap-2 mb-1">
+    <div class="cv-height text-end text-secondary-emphasis sm-text ccd" title="block height">{{row.height}}</div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for block in row.blocks %}
+      {% if block.has_qc %}
+      <a href="/{{net}}/block/{{block.hash}}"
+         class="cv-block{% if block.is_terminal %} cv-block-terminal{% endif %}{% if block.is_highest_certified %} cv-block-tip{% endif %} cv-block-qc{% if block.just_became_tip %} cv-flash-tip{% elif block.just_certified %} cv-flash-certified{% endif %}"
+         title="{{block.hash}}">
+        <span>{{block.short_hash}}</span>
+        {% if block.round is not none %}<span class="cv-badge-round ccd" title="consensus round (not block height)">round {{block.round}}</span>{% endif %}
+        {% if block.baker is not none %}<span class="cv-baker">validator <span class="ccd">{{block.baker}}</span></span>{% endif %}
+      </a>
+      {% else %}
+      <div class="cv-block{% if block.is_terminal %} cv-block-terminal{% endif %}{% if block.is_new %} cv-flash-new{% endif %}"
+           title="{{block.hash}} &#10;not clickable yet: no quorum certificate, so it may not have reached the node behind block lookups">
+        <span>{{block.short_hash}}</span>
+        {% if block.round is not none %}<span class="cv-badge-round ccd" title="consensus round (not block height)">round {{block.round}}</span>{% endif %}
+        {% if block.baker is not none %}<span class="cv-baker">validator <span class="ccd">{{block.baker}}</span></span>{% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="d-flex align-items-center gap-2 cv-finalized-row">
+    <div class="cv-height text-end text-secondary-emphasis sm-text ccd" title="block height">{{v.last_finalized_block_height}}</div>
+    <a href="/{{net}}/block/{{v.last_finalized_block}}" class="cv-block cv-block-finalized{% if v.just_finalized %} cv-flash-finalized{% endif %}" title="{{v.last_finalized_block}}">
+      <span>{{v.last_finalized_block_short}}</span>
+      <span class="cv-baker">last finalized</span>
+    </a>
+  </div>
+</div>

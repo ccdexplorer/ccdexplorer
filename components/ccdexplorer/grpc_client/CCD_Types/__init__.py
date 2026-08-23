@@ -4091,7 +4091,7 @@ class CCD_RawQuorumCertificate(BaseModel):
     round: CCD_Round
     epoch: CCD_Epoch
     aggregate_signature: CCD_QuorumSignature
-    signatories: list[CCD_FinalizerIndex]
+    signatories: list[CCD_FinalizerIndex] = []
 
 
 class CCD_TimeoutMessage(BaseModel):
@@ -4127,7 +4127,7 @@ class CCD_RawFinalizerRound(BaseModel):
     """
 
     round: CCD_Round
-    finalizers: list[CCD_FinalizerIndex]
+    finalizers: list[CCD_FinalizerIndex] = []
 
 
 class CCD_RawTimeoutCertificate(BaseModel):
@@ -4145,8 +4145,8 @@ class CCD_RawTimeoutCertificate(BaseModel):
 
     round: CCD_Round
     min_epoch: CCD_Epoch
-    qc_rounds_first_epoch: list[CCD_RawFinalizerRound]
-    qc_rounds_second_epoch: list[CCD_RawFinalizerRound]
+    qc_rounds_first_epoch: list[CCD_RawFinalizerRound] = []
+    qc_rounds_second_epoch: list[CCD_RawFinalizerRound] = []
     aggregate_signature: CCD_TimeoutSignature
 
 
@@ -4232,7 +4232,7 @@ class CCD_BlockTableSummary(BaseModel):
     """
 
     dead_block_cache_size: Optional[int] = 0
-    live_blocks: list[CCD_BlockHash]
+    live_blocks: list[CCD_BlockHash] = []
 
 
 class CCD_BranchBlocks(BaseModel):
@@ -4244,7 +4244,7 @@ class CCD_BranchBlocks(BaseModel):
         blocks_at_branch_height (list[CCD_BlockHash]): A list of block hashes at the branch height.
     """
 
-    blocks_at_branch_height: list[CCD_BlockHash]
+    blocks_at_branch_height: list[CCD_BlockHash] = []
 
 
 class CCD_RoundExistingBlock(BaseModel):
@@ -4310,8 +4310,8 @@ class CCD_BakersAndFinalizers(BaseModel):
         finalization_committee_hash ([CCD_FinalizationCommitteeHash): Hash of the finalization committee.
     """
 
-    bakers: list[CCD_FullBakerInfo]
-    finalizers: list[CCD_BakerId]
+    bakers: list[CCD_FullBakerInfo] = []
+    finalizers: list[CCD_BakerId] = []
     baker_total_stake: microCCD | str
     finalizer_total_stake: microCCD | str
     finalization_committee_hash: CCD_FinalizationCommitteeHash
@@ -4347,8 +4347,8 @@ class CCD_TimeoutMessages(BaseModel):
     """
 
     first_epoch: CCD_Epoch
-    first_epoch_timeouts: list[CCD_TimeoutMessage]
-    second_epoch_timeouts: list[CCD_TimeoutMessage]
+    first_epoch_timeouts: list[CCD_TimeoutMessage] = []
+    second_epoch_timeouts: list[CCD_TimeoutMessage] = []
 
 
 class CCD_AggregatedSignatures(BaseModel):
@@ -4410,9 +4410,9 @@ class CCD_ConsensusDetailedStatus(BaseModel):
         branches (list[CCD_BranchBlocks]): List of branch blocks.
         round_existing_blocks (list[CCD_RoundExistingBlock]): List of existing blocks in the current round.
         round_existing_qcs (list[CCD_RoundExistingQC]): List of existing QCs in the current round.
-        genesis_block_height (int): The height of the genesis block.
+        genesis_block_height (int): The height of the genesis block. Note that in the GRPC implementation, if the value equals the default value, it's not sent. Hence an Optional with default value of 0.
         last_finalized_block (CCD_BlockHash): The hash of the last finalized block.
-        last_finalized_block_height (int): The height of the last finalized block.
+        last_finalized_block_height (int): The height of the last finalized block. Note that in the GRPC implementation, if the value equals the default value, it's not sent. Hence an Optional with default value of 0.
         latest_finalization_entry (Optional[CCD_RawFinalizationEntry]): The latest finalization entry.
         epoch_bakers (CCD_EpochBakers): The epoch bakers.
         timeout_messages (Optional[CCD_TimeoutMessages]): The timeout messages.
@@ -4425,12 +4425,12 @@ class CCD_ConsensusDetailedStatus(BaseModel):
     non_finalized_transaction_count: Optional[int] = 0
     transaction_table_purge_counter: Optional[int] = 0
     block_table: CCD_BlockTableSummary
-    branches: list[CCD_BranchBlocks]
-    round_existing_blocks: list[CCD_RoundExistingBlock]
-    round_existing_qcs: list[CCD_RoundExistingQC]
-    genesis_block_height: int
+    branches: list[CCD_BranchBlocks] = []
+    round_existing_blocks: list[CCD_RoundExistingBlock] = []
+    round_existing_qcs: list[CCD_RoundExistingQC] = []
+    genesis_block_height: Optional[int] = 0
     last_finalized_block: CCD_BlockHash
-    last_finalized_block_height: int
+    last_finalized_block_height: Optional[int] = 0
     latest_finalization_entry: Optional[CCD_RawFinalizationEntry] = None
     epoch_bakers: CCD_EpochBakers
     timeout_messages: Optional[CCD_TimeoutMessages] = None
