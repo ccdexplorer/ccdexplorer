@@ -2,6 +2,7 @@
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
 import uuid
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -258,6 +259,14 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.accounts_cache = {"mainnet": [], "testnet": [], "devnet": []}
         app.identity_providers_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.consensus_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        app.consensus_genesis = {"mainnet": None, "testnet": None, "devnet": None}
+        app.finalized_history = {
+            "mainnet": deque(maxlen=5),
+            "testnet": deque(maxlen=5),
+            "devnet": deque(maxlen=5),
+        }
+        app.consensus_prev_branches = {"mainnet": set(), "testnet": set(), "devnet": set()}
+        app.new_block_hashes = {"mainnet": set(), "testnet": set(), "devnet": set()}
         app.plt_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.primed_suspended_cache = {}
         app.staking_pools_cache = {
@@ -435,7 +444,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             )
             app.transactions_cache[net] = api_result.return_value if api_result.ok else []
 
-    @scheduler.scheduled_job("interval", seconds=20, args=[app])
+    @scheduler.scheduled_job("interval", seconds=0.5, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):
         # for net in ["mainnet", "testnet", "devnet"]:
         for net in ["mainnet", "testnet", "devnet"]:
@@ -444,8 +453,59 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                     f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
                 )
                 app.consensus_cache[net] = api_result.return_value if api_result.ok else None
-            except Exception as _:
-                pass
+                if api_result.ok:
+                    # track which branch blocks are brand new since the last tick, so the
+                    # visual page can distinguish "a new block appeared" from "an existing
+                    # slot's occupant silently changed"
+                    current_branch_hashes = {
+                        block_hash
+                        for branch in api_result.return_value.get("branches", [])
+                        for block_hash in branch.get("blocks_at_branch_height", [])
+                    }
+                    app.new_block_hashes[net] = current_branch_hashes - app.consensus_prev_branches[net]
+                    app.consensus_prev_branches[net] = current_branch_hashes
+
+                    genesis = api_result.return_value.get("genesis_block")
+                    if app.consensus_genesis[net] is not None and app.consensus_genesis[net] != genesis:
+                        # the network was reset (new genesis) - old finalized heights no
+                        # longer belong to the same chain, so drop them instead of mixing
+                        # pre-restart and post-restart heights in the same stack
+                        app.finalized_history[net].clear()
+                    app.consensus_genesis[net] = genesis
+
+                    # last_finalized_block_height is relative to the current protocol
+                    # era's genesis - add genesis_block_height for the absolute height
+                    genesis_height = api_result.return_value.get("genesis_block_height", 0) or 0
+                    height = genesis_height + api_result.return_value.get("last_finalized_block_height", 0)
+                    block_hash = api_result.return_value.get("last_finalized_block")
+                    history = app.finalized_history[net]
+
+                    if block_hash and (not history or history[0]["height"] != height):
+                        gap = height - history[0]["height"] if history else 1
+                        if gap > 1:
+                            # more than one block finalized since the last tick (bursty
+                            # finalization, or a slow response) - GetConsensusDetailedStatus
+                            # only ever exposes the single current last-finalized block, so
+                            # backfill the missing ones from the gapless indexed blocks list
+                            # instead of just skipping straight to the newest one
+                            backfill = await get_url_from_api(
+                                f"{app.api_url}/v2/{net}/blocks/last/{min(gap, 50)}", app.httpx_client
+                            )
+                            known_height = history[0]["height"]
+                            if backfill.ok:
+                                missing = [
+                                    entry
+                                    for entry in backfill.return_value
+                                    if entry["height"] > known_height
+                                ]
+                                for entry in reversed(missing):  # oldest-of-the-gap first
+                                    history.appendleft({"hash": entry["hash"], "height": entry["height"]})
+                            else:
+                                history.appendleft({"hash": block_hash, "height": height})
+                        else:
+                            history.appendleft({"hash": block_hash, "height": height})
+            except Exception as error:
+                print(f"ERROR getting consensus detailed status for {net}: {error}")
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_community_labeled_accounts(app: FastAPI):

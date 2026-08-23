@@ -1,0 +1,54 @@
+
+<div class="d-flex flex-wrap gap-4 my-2 sm-text">
+  <div><span class="text-secondary-emphasis">round</span> <span class="ccd">{{v.current_round|round_x_decimal_with_comma(0)|safe}}</span></div>
+  <div><span class="text-secondary-emphasis">epoch</span> <span class="ccd">{{v.current_epoch|round_x_decimal_with_comma(0)|safe}}</span></div>
+  <div><span class="text-secondary-emphasis">timeout</span> <span class="ccd">{{v.current_timeout}}</span> ms</div>
+  <div><span class="text-secondary-emphasis">pending txs</span> <span class="ccd">{{v.non_finalized_transaction_count}}</span></div>
+  <div><span class="text-secondary-emphasis">live blocks</span> <span class="ccd">{{v.live_blocks_count}}</span></div>
+  <div><span class="text-secondary-emphasis">dead cache</span> <span class="ccd">{{v.dead_block_cache_size}}</span></div>
+</div>
+
+<div class="text-uppercase sm-text text-secondary-emphasis mt-2">in progress</div>
+<div class="mt-1 cv-inprogress-area">
+  {% for row in v.rows %}
+  <div class="d-flex align-items-start gap-2 mb-1">
+    <div class="cv-height text-end text-secondary-emphasis sm-text ccd" title="block height">{{row.height|round_x_decimal_with_comma(0)|safe}}</div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for block in row.blocks %}
+      {% if block.has_qc %}
+      <a href="/{{net}}/block/{{block.hash}}"
+         class="cv-block{% if block.is_terminal %} cv-block-terminal{% endif %}{% if block.is_highest_certified %} cv-block-tip{% endif %} cv-block-qc{% if block.is_new %} cv-block-new{% endif %}"
+         data-block="{{block.hash}}"
+         title="{{block.hash}}">
+        <span>{{block.short_hash}}</span>
+        {% if block.round is not none %}<span class="cv-badge-round ccd" title="consensus round (not block height)">round {{block.round|round_x_decimal_with_comma(0)|safe}}</span>{% endif %}
+        {% if block.baker is not none %}<span class="cv-baker">validator <span class="ccd">{{block.baker}}</span></span>{% endif %}
+      </a>
+      {% else %}
+      <div class="cv-block{% if block.is_terminal %} cv-block-terminal{% endif %}{% if block.is_new %} cv-block-new{% endif %}"
+           data-block="{{block.hash}}"
+           title="{{block.hash}} &#10;not clickable yet: no quorum certificate, so it may not have reached the node behind block lookups">
+        <span>{{block.short_hash}}</span>
+        {% if block.round is not none %}<span class="cv-badge-round ccd" title="consensus round (not block height)">round {{block.round|round_x_decimal_with_comma(0)|safe}}</span>{% endif %}
+        {% if block.baker is not none %}<span class="cv-baker">validator <span class="ccd">{{block.baker}}</span></span>{% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="text-uppercase sm-text text-secondary-emphasis mt-3 cv-finalized-divider">finalized</div>
+<div class="mt-1 mb-3">
+  {% for f in v.finalized_stack %}
+  <div class="d-flex align-items-center gap-2 mb-1">
+    <a href="/{{net}}/block/{{f.height}}" class="cv-height text-end sm-text ccd" title="block height">{{f.height|round_x_decimal_with_comma(0)|safe}}</a>
+    <a href="/{{net}}/block/{{f.hash}}" class="cv-block cv-block-finalized"
+       data-block="{{f.hash}}"
+       style="opacity: {{ [1, 0.8, 0.6, 0.45, 0.3][loop.index0] }}" title="{{f.hash}}">
+      <span>{{f.short_hash}}</span>
+    </a>
+  </div>
+  {% endfor %}
+</div>

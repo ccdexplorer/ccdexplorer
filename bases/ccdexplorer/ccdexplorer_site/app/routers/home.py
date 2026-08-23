@@ -1020,7 +1020,8 @@ async def ajax_consensus_own_page(
     user: SiteUser | None = await get_user_detailsv2(request)
     try:
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
-    except Exception as e:  # noqa: E722
+    except Exception as error:
+        print(f"ERROR parsing consensus detailed status for {net}: {error}")
         latest_consensus = None
 
     if not latest_consensus:
@@ -1053,7 +1054,7 @@ async def ajax_consensus_own_page(
     return html
 
 
-@router.get("/{net}/consensus", response_class=HTMLResponse)
+@router.get("/{net}/consensus-details", response_class=HTMLResponse)
 async def consensus_page(
     request: Request,
     net: str,
@@ -1076,6 +1077,148 @@ async def consensus_page(
             "user": user,
             "net": net,
             "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+def build_consensus_visualization(
+    consensus: CCD_ConsensusDetailedStatus,
+    finalized_history: list[dict],
+    new_hashes: set | None = None,
+) -> dict:
+    new_hashes = new_hashes or set()
+    round_by_block: dict[str, int] = {}
+    baker_by_block: dict[str, int] = {}
+    for existing_block in consensus.round_existing_blocks or []:
+        round_by_block[existing_block.block] = existing_block.round
+        baker_by_block[existing_block.block] = existing_block.baker
+
+    qc_rounds = {qc.round for qc in (consensus.round_existing_qcs or [])}
+    highest_certified_hash = consensus.round_status.highest_certified_block.block_hash
+
+    # last_finalized_block_height is relative to the current protocol era's
+    # genesis, not the chain's absolute height - add genesis_block_height to
+    # get the height shown everywhere else on the site
+    base_height = consensus.genesis_block_height + consensus.last_finalized_block_height + 1
+
+    # round_existing_qcs only tracks a narrow window of recent rounds, so a
+    # block that got its QC a while ago (and is now aging toward finalization)
+    # can fall out of that window and look uncertified even though it isn't.
+    # A later block can't have a QC without its ancestor chain already being
+    # certified, so every height at or below the current tip's height is
+    # certified too - treat that as certified even if its round already aged
+    # out of round_existing_qcs.
+    tip_height = None
+    for i, branch in enumerate(consensus.branches or []):
+        if highest_certified_hash in branch.blocks_at_branch_height:
+            tip_height = base_height + i
+            break
+
+    rows = []
+    for i, branch in enumerate(consensus.branches or []):
+        height = base_height + i
+        blocks = []
+        for block_hash in branch.blocks_at_branch_height:
+            round_number = round_by_block.get(block_hash)
+            has_qc = (round_number is not None and round_number in qc_rounds) or (
+                tip_height is not None and height <= tip_height
+            )
+            blocks.append(
+                {
+                    "hash": block_hash,
+                    "short_hash": block_hash[:4],
+                    "round": round_number,
+                    "has_qc": has_qc,
+                    "baker": baker_by_block.get(block_hash),
+                    "is_terminal": block_hash == consensus.terminal_block,
+                    "is_highest_certified": block_hash == highest_certified_hash,
+                    "is_new": block_hash in new_hashes,
+                }
+            )
+        rows.append({"height": height, "blocks": blocks})
+    rows.reverse()  # newest height first
+
+    finalized_stack = [
+        {"hash": entry["hash"], "short_hash": entry["hash"][:4], "height": entry["height"]}
+        for entry in finalized_history
+    ]
+
+    return {
+        "current_round": consensus.round_status.current_round,
+        "current_epoch": consensus.round_status.current_epoch,
+        "current_timeout": consensus.round_status.current_timeout,
+        "terminal_block": consensus.terminal_block,
+        "non_finalized_transaction_count": consensus.non_finalized_transaction_count,
+        "live_blocks_count": len(consensus.block_table.live_blocks) if consensus.block_table else 0,
+        "dead_block_cache_size": consensus.block_table.dead_block_cache_size if consensus.block_table else 0,
+        "rows": rows,
+        "finalized_stack": finalized_stack,
+    }
+
+
+@router.get("/{net}/consensus", response_class=HTMLResponse)
+async def consensus_visual_page(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+) -> HTMLResponse:
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    return request.app.templates.TemplateResponse(
+        request,
+        "home/consensus-visual.html",
+        {
+            "env": request.app.env,
+            "request": request,
+            "user": user,
+            "net": net,
+            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
+        },
+    )
+
+
+@router.get("/{net}/ajax_consensus_visual", response_class=HTMLResponse)
+async def ajax_consensus_visual(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+):
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    user: SiteUser | None = await get_user_detailsv2(request)
+    try:
+        latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
+        finalized_history = list(request.app.finalized_history.get(net, []))
+        new_hashes = request.app.new_block_hashes.get(net, set())
+        visualization = build_consensus_visualization(latest_consensus, finalized_history, new_hashes)
+    except Exception as error:
+        print(f"ERROR building consensus visualization for {net}: {error}")
+        visualization = None
+
+    if not visualization:
+        error = f"Request error getting the most recent consensus detailed status on {net}."
+        return request.app.templates.TemplateResponse(
+            request,
+            "base/error-request.html",
+            {
+                "request": request,
+                "error": error,
+                "env": environment,
+                "net": net,
+            },
+        )
+
+    return request.app.templates.TemplateResponse(
+        request,
+        "home/consensus_visual_partial.html",
+        {
+            "request": request,
+            "v": visualization,
+            "net": net,
+            "user": user,
         },
     )
 
