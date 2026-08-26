@@ -52,6 +52,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     create_dict_for_tabulator_display_for_blocks,
     get_url_from_api,
     millify,
+    refresh_consensus_cache,
     tx_type_translation,
     tx_type_translation_for_js,
 )
@@ -1017,6 +1018,12 @@ async def ajax_consensus_own_page(
     if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
+    request.app.consensus_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
+    if not request.app.consensus_cache.get(net):
+        # net was idle (or never watched since startup) -- don't wait for
+        # the next scheduled tick, fetch now so this first response isn't
+        # built from the empty {} placeholder
+        await refresh_consensus_cache(request.app, net)
     user: SiteUser | None = await get_user_detailsv2(request)
     try:
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
@@ -1188,6 +1195,12 @@ async def ajax_consensus_visual(
     if net not in ["mainnet", "testnet", "devnet"]:
         return RedirectResponse(url="/mainnet", status_code=302)
 
+    request.app.consensus_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
+    if not request.app.consensus_cache.get(net):
+        # net was idle (or never watched since startup) -- don't wait for
+        # the next scheduled tick, fetch now so this first response isn't
+        # built from the empty {} placeholder
+        await refresh_consensus_cache(request.app, net)
     user: SiteUser | None = await get_user_detailsv2(request)
     try:
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
