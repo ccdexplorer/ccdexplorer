@@ -2023,6 +2023,75 @@ async def get_url_from_api(url: str, httpx_client: httpx.AsyncClient) -> APIResp
     return api_response
 
 
+async def refresh_consensus_cache(app, net: str):
+    """Fetch consensus-detailed-status for `net` and update
+    app.consensus_cache / app.finalized_history / app.new_block_hashes.
+
+    Shared by factory.py's repeated_task_get_consensus (the steady-state
+    0.5s poll while someone's watching) and the consensus ajax routes in
+    home.py (an on-demand call the moment a net's cache is still the empty
+    startup placeholder, so the very first request after a net goes from
+    idle to watched doesn't race the next scheduled tick and render an
+    empty-dict validation error).
+    """
+    try:
+        api_result = await get_url_from_api(
+            f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
+        )
+        app.consensus_cache[net] = api_result.return_value if api_result.ok else None
+        if api_result.ok:
+            # track which branch blocks are brand new since the last tick, so the
+            # visual page can distinguish "a new block appeared" from "an existing
+            # slot's occupant silently changed"
+            current_branch_hashes = {
+                block_hash
+                for branch in api_result.return_value.get("branches", [])
+                for block_hash in branch.get("blocks_at_branch_height", [])
+            }
+            app.new_block_hashes[net] = current_branch_hashes - app.consensus_prev_branches[net]
+            app.consensus_prev_branches[net] = current_branch_hashes
+
+            genesis = api_result.return_value.get("genesis_block")
+            if app.consensus_genesis[net] is not None and app.consensus_genesis[net] != genesis:
+                # the network was reset (new genesis) - old finalized heights no
+                # longer belong to the same chain, so drop them instead of mixing
+                # pre-restart and post-restart heights in the same stack
+                app.finalized_history[net].clear()
+            app.consensus_genesis[net] = genesis
+
+            # last_finalized_block_height is relative to the current protocol
+            # era's genesis - add genesis_block_height for the absolute height
+            genesis_height = api_result.return_value.get("genesis_block_height", 0) or 0
+            height = genesis_height + api_result.return_value.get("last_finalized_block_height", 0)
+            block_hash = api_result.return_value.get("last_finalized_block")
+            history = app.finalized_history[net]
+
+            if block_hash and (not history or history[0]["height"] != height):
+                gap = height - history[0]["height"] if history else 1
+                if gap > 1:
+                    # more than one block finalized since the last tick (bursty
+                    # finalization, or a slow response) - GetConsensusDetailedStatus
+                    # only ever exposes the single current last-finalized block, so
+                    # backfill the missing ones from the gapless indexed blocks list
+                    # instead of just skipping straight to the newest one
+                    backfill = await get_url_from_api(
+                        f"{app.api_url}/v2/{net}/blocks/last/{min(gap, 50)}", app.httpx_client
+                    )
+                    known_height = history[0]["height"]
+                    if backfill.ok:
+                        missing = [
+                            entry for entry in backfill.return_value if entry["height"] > known_height
+                        ]
+                        for entry in reversed(missing):  # oldest-of-the-gap first
+                            history.appendleft({"hash": entry["hash"], "height": entry["height"]})
+                    else:
+                        history.appendleft({"hash": block_hash, "height": height})
+                else:
+                    history.appendleft({"hash": block_hash, "height": height})
+    except Exception as error:
+        print(f"ERROR getting consensus detailed status for {net}: {error}")
+
+
 async def post_url_from_api(url: str, httpx_client: httpx.AsyncClient, json_post_content: Any):
     api_response = APIResponseResult(status_code=-1, duration_in_sec=-1, ok=False)
     response = None

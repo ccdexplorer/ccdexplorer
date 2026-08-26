@@ -78,6 +78,12 @@ from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
 
+# how long to keep polling consensus for a net after the last client request
+# for it -- comfortably above the 0.5s client poll interval so normal
+# request jitter / a backgrounded tab's throttled timers don't cause a
+# flicker of "nobody's watching"
+CONSENSUS_IDLE_GRACE_SECONDS = 2
+
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
@@ -267,6 +273,12 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         }
         app.consensus_prev_branches = {"mainnet": set(), "testnet": set(), "devnet": set()}
         app.new_block_hashes = {"mainnet": set(), "testnet": set(), "devnet": set()}
+        # stamped by ajax_consensus_own_page / ajax_consensus_visual on every
+        # poll -- repeated_task_get_consensus only does its 0.5s fetch for a
+        # net while someone has polled it recently (see CONSENSUS_IDLE_GRACE
+        # in home.py); otherwise this job is dead weight against the API
+        # 24/7 for a page that's rarely open
+        app.consensus_last_seen = {"mainnet": None, "testnet": None, "devnet": None}
         app.plt_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.primed_suspended_cache = {}
         app.staking_pools_cache = {
@@ -446,66 +458,15 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     @scheduler.scheduled_job("interval", seconds=0.5, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):
-        # for net in ["mainnet", "testnet", "devnet"]:
+        now = dt.datetime.now().astimezone(dt.timezone.utc)
         for net in ["mainnet", "testnet", "devnet"]:
-            try:
-                api_result = await get_url_from_api(
-                    f"{app.api_url}/v2/{net}/misc/consensus-detailed-status", app.httpx_client
-                )
-                app.consensus_cache[net] = api_result.return_value if api_result.ok else None
-                if api_result.ok:
-                    # track which branch blocks are brand new since the last tick, so the
-                    # visual page can distinguish "a new block appeared" from "an existing
-                    # slot's occupant silently changed"
-                    current_branch_hashes = {
-                        block_hash
-                        for branch in api_result.return_value.get("branches", [])
-                        for block_hash in branch.get("blocks_at_branch_height", [])
-                    }
-                    app.new_block_hashes[net] = current_branch_hashes - app.consensus_prev_branches[net]
-                    app.consensus_prev_branches[net] = current_branch_hashes
-
-                    genesis = api_result.return_value.get("genesis_block")
-                    if app.consensus_genesis[net] is not None and app.consensus_genesis[net] != genesis:
-                        # the network was reset (new genesis) - old finalized heights no
-                        # longer belong to the same chain, so drop them instead of mixing
-                        # pre-restart and post-restart heights in the same stack
-                        app.finalized_history[net].clear()
-                    app.consensus_genesis[net] = genesis
-
-                    # last_finalized_block_height is relative to the current protocol
-                    # era's genesis - add genesis_block_height for the absolute height
-                    genesis_height = api_result.return_value.get("genesis_block_height", 0) or 0
-                    height = genesis_height + api_result.return_value.get("last_finalized_block_height", 0)
-                    block_hash = api_result.return_value.get("last_finalized_block")
-                    history = app.finalized_history[net]
-
-                    if block_hash and (not history or history[0]["height"] != height):
-                        gap = height - history[0]["height"] if history else 1
-                        if gap > 1:
-                            # more than one block finalized since the last tick (bursty
-                            # finalization, or a slow response) - GetConsensusDetailedStatus
-                            # only ever exposes the single current last-finalized block, so
-                            # backfill the missing ones from the gapless indexed blocks list
-                            # instead of just skipping straight to the newest one
-                            backfill = await get_url_from_api(
-                                f"{app.api_url}/v2/{net}/blocks/last/{min(gap, 50)}", app.httpx_client
-                            )
-                            known_height = history[0]["height"]
-                            if backfill.ok:
-                                missing = [
-                                    entry
-                                    for entry in backfill.return_value
-                                    if entry["height"] > known_height
-                                ]
-                                for entry in reversed(missing):  # oldest-of-the-gap first
-                                    history.appendleft({"hash": entry["hash"], "height": entry["height"]})
-                            else:
-                                history.appendleft({"hash": block_hash, "height": height})
-                        else:
-                            history.appendleft({"hash": block_hash, "height": height})
-            except Exception as error:
-                print(f"ERROR getting consensus detailed status for {net}: {error}")
+            last_seen = app.consensus_last_seen[net]
+            if last_seen is None or (now - last_seen).total_seconds() > CONSENSUS_IDLE_GRACE_SECONDS:
+                # nobody has polled a consensus page for this net recently --
+                # skip the fetch rather than hitting the API every 0.5s for
+                # an empty room
+                continue
+            await refresh_consensus_cache(app, net)
 
     @scheduler.scheduled_job("interval", seconds=60, args=[app])
     async def repeated_task_get_community_labeled_accounts(app: FastAPI):
