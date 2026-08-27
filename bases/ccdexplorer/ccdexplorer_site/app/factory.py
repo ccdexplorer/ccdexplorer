@@ -1,6 +1,7 @@
 # ruff: noqa: F403, F405, E402, E501, E722, F401
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import gc
 import uuid
 from collections import deque
 from contextlib import asynccontextmanager
@@ -11,6 +12,7 @@ import httpx2 as httpx
 import importlib
 import kaleido
 import urllib3
+from cachetools import TTLCache
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountInfo,
@@ -217,6 +219,21 @@ def read_addresses_if_available(app):
     except Exception as error:
         print(f"ERROR getting addresses: {error}")
 
+    # These pickles unpickle into millions of GC-tracked containers (one
+    # AccountInfoStable + its credentials list/dicts per account, ~70MB
+    # across the nets). They live for the whole process lifetime, but
+    # CPython's gen-2 collector still re-scans every one of them on every
+    # full collection -- measured at ~150ms of stop-the-world CPU per pass
+    # for ~400k accounts, and it only gets worse as the process runs.
+    # That pause is what starves the event loop: scheduled jobs get
+    # "skipped: maximum number of running instances reached" and wake-ups
+    # get missed by tens of seconds, while CPU climbs to 100% over hours.
+    # Moving them to the permanent generation takes them out of every
+    # future GC pass (measured: ~150ms -> ~0ms).
+    gc.collect()
+    gc.freeze()
+    print("Addresses moved to GC permanent generation.")
+
 
 class AppSettings(BaseModel):
     static_dir: Path
@@ -254,10 +271,24 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.tags = None
         app.nodes = None
         read_addresses_if_available(app)
-        app.schema_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
-        app.token_information_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
-        app.schema_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
-        app.cns_domain_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
+        # Keyed by contract address / CNS token id, i.e. unbounded cardinality
+        # for an explorer -- as plain dicts these only ever grew, so every
+        # contract ever rendered stayed live (and GC-scanned) for the lifetime
+        # of the process. A TTLCache keeps just the working set and evicts the
+        # rest.
+        #
+        # ttl is deliberately well above the 5s freshness check the consumers
+        # in dressingroom.py apply themselves: those do .get(key), check the
+        # stored timestamp, and then look key up *again* -- so if eviction
+        # could happen inside that 5s window the second lookup would raise
+        # KeyError. Keeping ttl >> 5s leaves their own check the binding one
+        # and makes this purely an eviction bound.
+        def _net_ttl_caches():
+            return {net: TTLCache(maxsize=2_000, ttl=60) for net in ["mainnet", "testnet", "devnet"]}
+
+        app.schema_cache = _net_ttl_caches()
+        app.token_information_cache = _net_ttl_caches()
+        app.cns_domain_cache = _net_ttl_caches()
         app.blocks_cache = {"mainnet": [], "testnet": [], "devnet": []}
         app.last_finalized_block = {"mainnet": 0, "testnet": 0, "devnet": 0}
 

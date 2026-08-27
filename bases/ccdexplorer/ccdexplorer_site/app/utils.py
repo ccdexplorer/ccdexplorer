@@ -2080,7 +2080,9 @@ async def refresh_consensus_cache(app, net: str):
                     known_height = history[0]["height"]
                     if backfill.ok:
                         missing = [
-                            entry for entry in backfill.return_value if entry["height"] > known_height
+                            entry
+                            for entry in backfill.return_value
+                            if entry["height"] > known_height
                         ]
                         for entry in reversed(missing):  # oldest-of-the-gap first
                             history.appendleft({"hash": entry["hash"], "height": entry["height"]})
@@ -2233,7 +2235,9 @@ def add_account_info_to_cache(account_info: CCD_AccountInfo, app: FastAPI, net: 
     app.addresses_to_indexes_complete[net][account_info.address[:29]] = (
         AccountInfoStable.from_account_info(account_info)
     )  # type: ignore
-    app.max_index_known[net] = max(app.addresses_to_indexes[net].values())  # type: ignore
+
+    if account_info.index > app.max_index_known[net]:  # type: ignore
+        app.max_index_known[net] = account_info.index  # type: ignore
 
 
 def apy_perc(value):
@@ -2376,7 +2380,9 @@ def lock_recipients_display(row: dict) -> str:
     return "Any" if recipients == "any" else str(len(recipients or []))
 
 
-def create_dict_for_tabulator_display_for_plt_locks(net: str, row: dict, token_id: str, decimals: int):
+def create_dict_for_tabulator_display_for_plt_locks(
+    net: str, row: dict, token_id: str, decimals: int
+):
     lock_id_str = row.get("_id", "")
 
     balance = 0
