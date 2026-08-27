@@ -927,6 +927,11 @@ async def staking_graphs_plotly(
     )
     d_date = yesterday
     df_pools = pd.DataFrame(all_data)
+    if df_pools.empty:
+        # no data for the requested range yet (or the statistics API call
+        # failed) -- an empty frame has no columns, so the selection below
+        # would raise KeyError instead of rendering
+        return await return_plot_response(go.Figure(), request, title)
     df_pools = df_pools[
         [
             "date",
@@ -1322,10 +1327,16 @@ async def statistics_ccd_on_exchanges_plotly(
         analysis, request.app, chain_start, yesterday
     )
     d_date = yesterday
+    title = "CCD on Exchanges"
     source = pd.DataFrame(all_data)
     columns_to_be_removed = ["total_supply", "staked", "unstaked", "delegated"]
     columns_to_stay = list(set(source.columns) - set(columns_to_be_removed))
     source = source[columns_to_stay]
+    if source.empty or "bitfinex" not in source.columns:
+        # no data for the requested range yet (or the statistics API call
+        # failed) -- the bitfinex column drives the island filter below, so
+        # without it this would raise KeyError instead of rendering
+        return await return_plot_response(go.Figure(), request, title)
     islands = (source["bitfinex"] != 0).groupby(level=0).cumsum()
     source = source[islands != 0]
     source2 = source.copy()
@@ -1363,7 +1374,6 @@ async def statistics_ccd_on_exchanges_plotly(
         "10.Kraken",
     ]
 
-    title = "CCD on Exchanges"
     fig = px.area(
         melt,
         x="date",

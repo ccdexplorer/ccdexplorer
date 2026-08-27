@@ -119,7 +119,8 @@ async def slash_tokens(
         f"{request.app.api_url}/v2/{net}/plts/overview",
         request.app.httpx_client,
     )
-    plts = api_result.return_value if api_result.ok else []
+    # tokens.html iterates this with .items() -- keep the failure fallback a dict
+    plts = api_result.return_value if api_result.ok else {}
 
     user: SiteUser | None = await get_user_detailsv2(request)
     fungible_tokens_verified = None

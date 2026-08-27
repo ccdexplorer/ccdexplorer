@@ -182,7 +182,10 @@ async def get_projects_overview(
         f"{request.app.api_url}/v2/mainnet/misc/projects/all-ids",
         httpx_client,
     )
-    projects = api_result.return_value if api_result.ok else []
+    # projects.html iterates this with .items(), so the failure fallback has
+    # to be a dict -- a list here renders as "'list object' has no attribute
+    # 'items'" the moment the API call fails.
+    projects = api_result.return_value if api_result.ok else {}
 
     return request.app.templates.TemplateResponse(
         request,
