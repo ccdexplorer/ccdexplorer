@@ -545,7 +545,6 @@ async def home_tx_graph(
     return html
 
 
-
 @router.get("/{net}/ajax_last_blocks", response_class=HTMLResponse)
 async def ajax_last_blocks(
     request: Request,
@@ -1157,7 +1156,9 @@ def build_consensus_visualization(
         "terminal_block": consensus.terminal_block,
         "non_finalized_transaction_count": consensus.non_finalized_transaction_count,
         "live_blocks_count": len(consensus.block_table.live_blocks) if consensus.block_table else 0,
-        "dead_block_cache_size": consensus.block_table.dead_block_cache_size if consensus.block_table else 0,
+        "dead_block_cache_size": consensus.block_table.dead_block_cache_size
+        if consensus.block_table
+        else 0,
         "rows": rows,
         "finalized_stack": finalized_stack,
     }
@@ -1206,7 +1207,9 @@ async def ajax_consensus_visual(
         latest_consensus = CCD_ConsensusDetailedStatus(**request.app.consensus_cache.get(net))
         finalized_history = list(request.app.finalized_history.get(net, []))
         new_hashes = request.app.new_block_hashes.get(net, set())
-        visualization = build_consensus_visualization(latest_consensus, finalized_history, new_hashes)
+        visualization = build_consensus_visualization(
+            latest_consensus, finalized_history, new_hashes
+        )
     except Exception as error:
         print(f"ERROR building consensus visualization for {net}: {error}")
         visualization = None
@@ -1283,6 +1286,27 @@ async def support_explorer(
             "env": request.app.env,
             "request": request,
             "donations_account_id": "3cunMsEt2M3o9Rwgs2pNdsCWZKB5MkhcVbQheFHrvjjcRLSoGP",
+        },
+    )
+
+
+@router.get("/{net}/partners/acn", response_class=HTMLResponse)
+async def partners_acn(
+    request: Request,
+    net: str,
+    tags: dict = Depends(get_labeled_accounts),
+):
+    if net not in ["mainnet"]:
+        return RedirectResponse(url="/mainnet", status_code=302)
+
+    request.state.api_calls = {}
+    request.state.api_calls["None"] = ""
+    return request.app.templates.TemplateResponse(
+        request,
+        "base/partners/acn.html",
+        {
+            "env": request.app.env,
+            "request": request,
         },
     )
 

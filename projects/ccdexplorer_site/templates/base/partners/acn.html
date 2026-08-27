@@ -1,0 +1,153 @@
+{% extends "base/base.html" %}
+{% block ogp %}
+<meta property="og:title" content="Concordium Identity on Forge (ACN)" />
+<meta property="og:description"
+    content="How Concordium supplies a privacy-preserving proof that a verified human published an agent on Agent Forge, part of the AITECH Cloud Network." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="{{env.SITE_URL}}/mainnet/partners/acn" />
+{% endblock %}
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+
+<h4>Concordium Identity on Forge</h4>
+
+<p class="lead">
+    Forge is part of <b>ACN (AITECH Cloud Network)</b>: a platform for building, running, and publishing AI agents.
+    Concordium supplies a privacy-preserving proof that <b>a verified human</b> published an agent — without Forge
+    collecting identity documents or storing KYC data.
+</p>
+<p class="text-secondary-emphasis">
+    This document describes the three parties, why the integration exists, what is available today, and what is planned
+    next.
+</p>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="border content curved-border">
+            {% set title = "ACN, Forge, and Concordium" %}{% include 'base/box_title.html' %}
+            <p>
+                <b>ACN</b> is AITECH’s cloud network for AI. It is the broader product surface: staking with
+                <code>$ACN</code>, subscriptions, agent discovery, on-chain registry (ERC-8004), and a marketplace for
+                agents that others can use. When someone finds an agent on ACN, they need it to be useful <i>and</i>
+                published by someone accountable.
+            </p>
+            <p>
+                <b>Forge</b> (Agent Forge) is the builder inside that network. Creators assemble workflows from blocks,
+                connect tools, deploy APIs and chat surfaces, and register agents so they appear in discovery. Forge
+                already records <i>which login</i> published an agent. A login is not the same as a person. Email and
+                OAuth accounts are inexpensive to create; they do not answer whether there is a verified human behind
+                the agent.
+            </p>
+            <p>
+                <b>Concordium is an AI infrastructure for the agentic economy</b>. Every Concordium account is backed by a credential issued 
+                by a regulated identity provider. The chain never stores the holder’s name, date of birth, or identity document. 
+                Instead, a holder can produce a zero-knowledge proof that a valid credential exists, and reveal nothing else. 
+                Concordium also runs a native agent registry (CIS-8004), aligned with Ethereum’s ERC-8004, and an external-key 
+                registry (CIS-8) that can bind a Concordium account to a public key on another chain.
+
+            </p>
+            <p class="mb-0">
+                Forge already mints agents as ERC-8004 NFTs on Ethereum. Concordium is the identity layer: cryptographic
+                evidence that the publisher is a person, not an unbounded set of disposable accounts.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="border content curved-border">
+            {% set title = "Why the integration exists" %}{% include 'base/box_title.html' %}
+            <p>
+                Discovery on Forge lists agents that other users can call, pay, and rely on. The existing
+                <span class="badge text-bg-secondary">Verified</span> chip on those listings comes from 8004scan’s view
+                of the <b>on-chain agent record</b>. It says nothing about the <b>creator</b>.
+            </p>
+            <p>That gap appears as soon as agents leave a private workspace:</p>
+            <ul>
+                <li>Forge accounts are easy to create. Without a sybil-resistant identity, “verified” on an agent is
+                    easy to game.</li>
+                <li>Running KYC inside Forge would put sensitive documents on a builder platform that should not hold
+                    them, and would discourage creators from publishing.</li>
+                <li>Identity belongs to the <b>person</b>, not to each agent. Requesting a proof in the middle of the
+                    registry deploy wizard would slow every publish and repeat a wallet flow that only needs to happen
+                    once.</li>
+            </ul>
+            <p>
+                Concordium’s model is “verify once, prove everywhere.” A creator completes identity with a Concordium
+                identity provider once, in their wallet. Forge requests a proof that the credential exists. The platform
+                stores the Concordium <b>account address</b> and a timestamp. Underlying attributes are never disclosed
+                to Forge.
+            </p>
+            <p>
+                The requested proof is minimal: the holder shows that date of birth falls in the widest range the
+                protocol allows. That statement is unprovable without a real identity credential, and it discloses
+                nothing about the holder. One Concordium account can back at most one Forge user, which gives the badge
+                sybil resistance.
+            </p>
+            <p>
+                This step has no on-chain cost. No CCD, no gas, and no contract call. The wallet signs a presentation;
+                Forge verifies it against Concordium’s public parameters and consumes the challenge so the same
+                presentation cannot be replayed.
+            </p>
+            <p class="mb-0">
+                For ACN, that is the trust signal discovery was missing: <b>the agent was published by a verified
+                human</b>, without turning Forge into an identity-document processor.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="border content curved-border">
+            {% set title = "What is available today" %}{% include 'base/box_title.html' %}
+            <p>
+                Creators opt in from <b>Settings → Identity</b>. They connect a Concordium browser extension or a mobile
+                wallet (via WalletConnect), approve a proof request, and receive a persistent
+                <b>Verified Creator</b> status.
+            </p>
+            <p>
+                That status is stored on the Forge user and shown on <b>Agent Forge</b> discovery cards as a separate
+                badge from 8004scan’s agent-level <span class="badge text-bg-secondary">Verified</span>. The Ethereum
+                staking wallet in the header is unrelated; Concordium identity does not appear there.
+            </p>
+            <p class="mb-0">
+                Unlinking is supported. Re-verifying later requires a fresh proof. Linking the same Concordium account
+                to a second Forge user is rejected.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="border content curved-border">
+            {% set title = "What is planned" %}{% include 'base/box_title.html' %}
+            <p>
+                <b>Discovery of Concordium-native agents.</b> The Concordium Agent Registry is live on mainnet
+                (CIS-8004). A later release will treat it as a third source in Discover Agents, alongside Forge and the
+                global ERC-8004 scan, with card-hash and owner-badge checks so trust is read from chain rather than
+                assumed.
+            </p>
+            <p>
+                <b>Agents that can verify other agents.</b> The registry will be exposed as a Forge workflow block so an
+                agent can ask, at runtime, whether another address is backed by a verified human.
+            </p>
+            <p>
+                <b>On-chain registration.</b> An optional path will bind the creator’s Ethereum key to their Concordium
+                account (CIS-8), then register the agent on CIS-8004. That work depends on a fee model for Concordium
+                transactions and on published testnet contract addresses. Until those are in place, Forge does not mint
+                Concordium agents on the creator’s behalf, and a platform-owned on-chain account is not labelled
+                “verified creator.”
+            </p>
+            <p class="mb-0">
+                Account-level identity is the prerequisite for all of the above: a Concordium account with a real
+                credential, linked once to the Forge user, with a badge that means the same thing on every agent that
+                user publishes.
+            </p>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
