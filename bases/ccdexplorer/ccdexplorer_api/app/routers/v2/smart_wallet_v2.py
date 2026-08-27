@@ -461,7 +461,13 @@ async def get_ccd_balances_for_public_key_from_smart_wallet_contract(
     if instance and instance.v1:
         entrypoint_ccd = instance.v1.name[5:] + ".ccdBalanceOf"
     else:
-        return []
+        # returning [] from a `-> dict` endpoint trips FastAPI's response
+        # validation and surfaces as a 500; this is a plain "not a v1
+        # contract" case, so say so
+        raise HTTPException(
+            status_code=404,
+            detail=f"'{wallet_contract_address}' is not a v1 smart wallet contract on {net}.",
+        )
 
     token_balance_ccd: dict[dict] = {}
 

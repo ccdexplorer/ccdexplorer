@@ -264,7 +264,12 @@ async def get_public_key_page(
     )
     balances = api_result.return_value if api_result.ok else {}
 
-    balance_ccd = balances.get("ccd", 0)
+    # the endpoint nests as {"ccd": {"ccd": {...,"balance": n}}}, and the
+    # inner dict is missing whenever the balanceOf invoke failed (unknown
+    # public key, node error). Keep this a dict either way -- the template
+    # subscripts it, so a scalar default renders as "'int object' has no
+    # attribute 'ccd'".
+    balance_ccd = balances.get("ccd") or {}
 
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/smart-wallet/{index}/{subindex}/public-key/{public_key}/tokens-available",
@@ -288,7 +293,9 @@ async def get_public_key_page(
         f"{request.app.api_url}/v2/{net}/smart-wallets/overview",
         httpx_client,
     )
-    smart_wallets = api_result.return_value if api_result.ok else None
+    # public_key_more_info.html does smart_wallets.get(...) and sw_overview.html
+    # iterates .items(), so None here crashes the render on API failure
+    smart_wallets = api_result.return_value if api_result.ok else {}
 
     if not tx_deployed:
         return request.app.templates.TemplateResponse(

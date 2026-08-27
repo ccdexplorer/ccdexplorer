@@ -82,11 +82,14 @@ async def get_ajax_nodes_v2(
         httpx_client,
     )
     last_payday_block = api_result.return_value if api_result.ok else None
-    len_nodes = len(nodes_validators["all_nodes_by_node_id"])
-    len_validators = len(nodes_validators["all_validators_by_validator_id"])
-    len_validator_nodes = len(nodes_validators["validator_nodes_by_account_id"])
-    len_reporting_validators = len(nodes_validators["validator_nodes_by_account_id"])
-    len_non_validator_nodes = len(nodes_validators["non_validator_nodes_by_node_id"])
+    # Two ways these keys can be absent: the API call failed (fallback {}
+    # above), or the net isn't mainnet -- nodes-validators only fills in
+    # everything beyond all_nodes_by_node_id when net == "mainnet".
+    len_nodes = len(nodes_validators.get("all_nodes_by_node_id", {}))
+    len_validators = len(nodes_validators.get("all_validators_by_validator_id", {}))
+    len_validator_nodes = len(nodes_validators.get("validator_nodes_by_account_id", {}))
+    len_reporting_validators = len(nodes_validators.get("validator_nodes_by_account_id", {}))
+    len_non_validator_nodes = len(nodes_validators.get("non_validator_nodes_by_node_id", {}))
     return request.app.templates.TemplateResponse(
         request,
         "/nodes/nodes_ajax.html",
