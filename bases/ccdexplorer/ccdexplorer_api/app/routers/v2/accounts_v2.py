@@ -467,8 +467,9 @@ async def get_last_accounts(
     db_to_use = net_db(mongomotor, net)
     count = min(50, max(count, 1))
     error_message = None
+    accounts = None
     try:
-        result = [
+        account_indexes = [
             x["account_index"]
             for x in await db_to_use[Collections.stable_address_info]
             .find({}, {"account_index": 1, "_id": 0})
@@ -476,30 +477,65 @@ async def get_last_accounts(
             .to_list(count)
         ]
 
-        accounts = []
-        for account_index in result:
-            account_info = grpcclient.get_account_info(
-                "last_final", account_index=account_index, net=NET(net)
+        # get_account_info is a blocking grpc call; run it off the event loop
+        # so all `count` accounts resolve concurrently instead of serially.
+        # Previously this loop did `count` blocking grpc calls plus `count`
+        # separate Mongo aggregations in sequence, which pinned an API worker
+        # for ~850ms per request -- and the site polls this endpoint for
+        # every net once a minute, so it was the single largest consumer of
+        # API time. Same fix as get_last_accounts_newer_than (0fef2d1).
+        account_infos = await asyncio.gather(
+            *(
+                asyncio.to_thread(
+                    grpcclient.get_account_info,
+                    "last_final",
+                    account_index=account_index,
+                    net=NET(net),
+                )
+                for account_index in account_indexes
             )
+        )
 
-            pipeline = [
-                {"$match": {"account_creation": {"$exists": True}}},
-                {"$match": {"account_creation.address": account_info.address}},
-            ]
-            result = await await_await(db_to_use, Collections.transactions, pipeline)
+        # one query for every creation tx rather than one per account
+        creation_txs = await await_await(
+            db_to_use,
+            Collections.transactions,
+            [
+                {
+                    "$match": {
+                        "account_creation.address": {
+                            "$in": [ai.address for ai in account_infos]
+                        }
+                    }
+                },
+            ],
+        )
+        deployment_tx_by_address: dict[str, dict] = {}
+        for tx in creation_txs:
+            # first match wins, matching the old per-account `result[0]`
+            deployment_tx_by_address.setdefault(tx["account_creation"]["address"], tx)
 
-            if len(result) > 0:
-                result = CCD_BlockItemSummary(**result[0])
-            else:
-                result = None
-            accounts.append({"account_info": account_info, "deployment_tx": result})
+        accounts = []
+        for account_info in account_infos:
+            deployment_tx = deployment_tx_by_address.get(account_info.address)
+            accounts.append(
+                {
+                    "account_info": account_info,
+                    "deployment_tx": (
+                        CCD_BlockItemSummary(**deployment_tx) if deployment_tx else None
+                    ),
+                }
+            )
 
     except Exception as error:  # noqa: F811
         print(error)
         error_message = str(error)
-        result = None
+        accounts = None
 
-    if result:
+    # this used to test the last account's deployment_tx (the loop reused
+    # `result` for both the index list and the per-account tx), so a final
+    # account with no creation tx 404'd an otherwise complete response
+    if accounts:
         return accounts
     else:
         raise HTTPException(
