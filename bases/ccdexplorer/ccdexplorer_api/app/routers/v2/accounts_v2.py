@@ -766,10 +766,25 @@ async def get_validator_primed_suspended_information(
 
     primed_validators_source = await await_await(db_to_use, Collections.validator_logs, pipeline)
 
+    # get_account_info is a blocking grpc call; run it off the event loop so
+    # every candidate validator resolves concurrently. This used to be a
+    # serial loop with an asyncio.sleep(0.01) between calls, which averaged
+    # ~2.4s per request -- the site polls this every 5 minutes per container,
+    # so it was one of the largest consumers of API time.
+    account_infos = await asyncio.gather(
+        *(
+            asyncio.to_thread(
+                grpcclient.get_account_info,
+                "last_final",
+                account_index=v["baker_id"],
+                net=NET(net),
+            )
+            for v in suspended_validators_source
+        )
+    )
+
     suspended_validators = []
-    for v in suspended_validators_source:
-        ai = grpcclient.get_account_info("last_final", account_index=v["baker_id"], net=NET(net))
-        await asyncio.sleep(0.01)
+    for v, ai in zip(suspended_validators_source, account_infos):
         if ai.stake:
             if ai.stake.baker:
                 if ai.stake.baker.is_suspended:
@@ -828,12 +843,26 @@ async def get_payday_pools(
             if x["consensusBakerId"] is not None
             if str(x["consensusBakerId"]) in all_validators_by_validator_id.keys()
         }
-        suspended_validators = {}
-        for validator_id in all_validators_by_validator_id.keys():
+        # get_pool_info_for_pool is a blocking grpc call; run it off the event
+        # loop so every validator resolves concurrently rather than serially.
+        # This loop averaged ~1s per request across several hundred
+        # validators, and the site polls this endpoint for all three statuses
+        # every 5 minutes per container.
+        async def _pool_info(validator_id):
             try:
-                pool = grpcclient.get_pool_info_for_pool(int(validator_id), "last_final")
+                return await asyncio.to_thread(
+                    grpcclient.get_pool_info_for_pool, int(validator_id), "last_final"
+                )
             except _InactiveRpcError:
-                pool = None
+                return None
+
+        validator_ids = list(all_validators_by_validator_id.keys())
+        pools = await asyncio.gather(*(_pool_info(vid) for vid in validator_ids))
+
+        suspended_validators = {}
+        # iterate in the original order so pools_for_status lists keep the
+        # same ordering they had when this was a serial loop
+        for validator_id, pool in zip(validator_ids, pools):
             if pool:
                 if pool.pool_info:
                     if pool.pool_info.open_status not in pools_for_status.keys():
