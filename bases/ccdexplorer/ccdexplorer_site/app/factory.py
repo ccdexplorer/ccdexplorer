@@ -254,10 +254,11 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
         app.api_url = environment["API_URL"]
         app.httpx_client = httpx.AsyncClient(
-            # event_hooks={"request": [log_request], "response": [log_response]},
             timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(max_keepalive_connections=50, keepalive_expiry=90.0),
             headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
         )
+
         app.env = environment
         app.credential_issuers = None
         app.env["API_KEY"] = str(uuid.uuid1())
@@ -271,6 +272,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.tags = None
         app.nodes = None
         read_addresses_if_available(app)
+
         # Keyed by contract address / CNS token id, i.e. unbounded cardinality
         # for an explorer -- as plain dicts these only ever grew, so every
         # contract ever rendered stayed live (and GC-scanned) for the lifetime
@@ -284,7 +286,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # KeyError. Keeping ttl >> 5s leaves their own check the binding one
         # and makes this purely an eviction bound.
         def _net_ttl_caches():
-            return {net: TTLCache(maxsize=2_000, ttl=60) for net in ["mainnet", "testnet", "devnet"]}
+            return {
+                net: TTLCache(maxsize=2_000, ttl=60) for net in ["mainnet", "testnet", "devnet"]
+            }
 
         app.schema_cache = _net_ttl_caches()
         app.token_information_cache = _net_ttl_caches()
@@ -492,7 +496,10 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         now = dt.datetime.now().astimezone(dt.timezone.utc)
         for net in ["mainnet", "testnet", "devnet"]:
             last_seen = app.consensus_last_seen[net]
-            if last_seen is None or (now - last_seen).total_seconds() > CONSENSUS_IDLE_GRACE_SECONDS:
+            if (
+                last_seen is None
+                or (now - last_seen).total_seconds() > CONSENSUS_IDLE_GRACE_SECONDS
+            ):
                 # nobody has polled a consensus page for this net recently --
                 # skip the fetch rather than hitting the API every 0.5s for
                 # an empty room
