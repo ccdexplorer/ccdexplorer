@@ -32,6 +32,12 @@ from ccdexplorer.env import RUN_ON_NET
 
 console = Console()
 
+# Returned by `determine_token_amount` when balanceOf could not be answered
+# (the invoke reverted, or came back empty). It is NOT a balance: CIS-2 token
+# amounts are LEB128 *unsigned*, so the chain can never hand us a negative.
+# Callers must never persist this value — see `update_token_accounting_v2`.
+BALANCE_LOOKUP_FAILED = -1
+
 
 async def publish_to_celery(processor: str, payload: dict[str, Any]) -> None:
     """
@@ -167,7 +173,7 @@ class TokenAccountingV2:
                 f"block={block_hash} | reason={ii.failure.reason.model_dump(exclude_none=True)}"
             )
             # this indicates that we had a lookup failure
-            return -1
+            return BALANCE_LOOKUP_FAILED
 
         if not rr:
             # Successful-looking response but no balance was parsed (empty
@@ -179,7 +185,7 @@ class TokenAccountingV2:
                 f"{contract_address.index}/{token_id} addr={address_or_public_key} "
                 f"block={block_hash} | used_energy={ii.success.used_energy}"
             )
-            return -1
+            return BALANCE_LOOKUP_FAILED
 
         token_amount = rr[0]
         if str(token_amount) == "0":
@@ -399,6 +405,18 @@ class TokenAccountingV2:
                         token_id_,
                         self.net,
                     )
+
+                    if token_amount == BALANCE_LOOKUP_FAILED:
+                        # We do not know this balance, so we have nothing to
+                        # write. Persisting the sentinel would store -1 as if
+                        # it were a real holding (and make the token look
+                        # non-compliant to the negative-balance check in the
+                        # API). Leave whatever link is already stored alone;
+                        # the next event for this address re-queries it.
+                        console.log(
+                            f"[token_amount] skipping link {_id}: balanceOf lookup failed"
+                        )
+                        continue
 
                     token_holding = MongoTypeTokenForAddress(
                         **{

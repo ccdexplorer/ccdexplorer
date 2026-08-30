@@ -5,6 +5,9 @@ import pytest
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
 from ccdexplorer.ms_token_accounting.heartbeat import Heartbeat
+from ccdexplorer.ms_token_accounting.heartbeat.token_accounting_v2 import (
+    BALANCE_LOOKUP_FAILED,
+)
 from ccdexplorer.tooter.core import Tooter
 from pymongo import ReplaceOne
 
@@ -68,3 +71,47 @@ async def test_token_accounting(
             },
         }
         mock_pub.assert_awaited
+
+
+@pytest.mark.asyncio
+async def test_failed_balance_lookup_is_not_persisted(
+    grpcclient: GRPCClient, tooter: Tooter, motormongo: MongoMotor, mongodb: MongoDB
+):
+    """A balanceOf that reverts or comes back empty yields BALANCE_LOOKUP_FAILED.
+
+    That sentinel is not a balance and must never reach tokens_links_v3 — writing
+    it stores a token_amount of "-1" as if it were a real holding. The link is
+    left untouched instead, so no bulk_write happens at all for this block.
+    """
+    mock_collection = MagicMock()
+    mock_token_addresses_collection = MagicMock()
+    mock_token_addresses_collection.bulk_write.return_value = SimpleNamespace(
+        matched_count=0, modified_count=0, upserted_count=0, deleted_count=0
+    )
+    with (
+        patch.object(tooter, "send_to_tooter") as _,
+        patch.dict(
+            mongodb.mainnet,
+            {
+                Collections.tokens_links_v3: mock_collection,
+                Collections.tokens_token_addresses_v2: mock_token_addresses_collection,
+            },
+            clear=False,
+        ),
+        patch(
+            "ccdexplorer.ms_token_accounting.heartbeat.token_accounting_v2.publish_to_celery",
+            new=AsyncMock(),
+        ),
+        patch.object(
+            Heartbeat,
+            "determine_token_amount",
+            new=AsyncMock(return_value=BALANCE_LOOKUP_FAILED),
+        ),
+    ):
+        net = "mainnet"
+        heartbeat = Heartbeat(grpcclient, tooter, mongodb, motormongo, net)  # type: ignore
+        block_height = 36841773
+        block_hash = "5199e507ffddfcb7db95b45f34ba4751ee9a6e23d68aa70137cac4388ea994ea"
+        await heartbeat.update_token_accounting_v2(net, block_height, block_hash)  # type: ignore
+
+        mock_collection.bulk_write.assert_not_called()
