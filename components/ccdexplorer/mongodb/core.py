@@ -8,7 +8,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.collection import Collection
 from rich.console import Console
 
-from ccdexplorer.env import MONGO_READ_PREFERENCE, MONGO_URI
+from ccdexplorer.env import MONGO_MAX_POOL_SIZE, MONGO_READ_PREFERENCE, MONGO_URI
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
 
 console = Console()
@@ -47,6 +47,26 @@ def _resolve_caller_name(caller_name: str | None) -> str:
         return outer_frame.f_globals.get("__name__", "<unknown>")
     finally:
         del frame
+
+
+def _client_kwargs(nearest: bool, caller_name: str) -> dict:
+    """Shared connection options for MongoDB()/MongoMotor().
+
+    `appname` is what makes a connection attributable server-side: it shows up
+    in mongod's logs and in db.currentOp(), so "which service opened these
+    connections" is answerable without guessing. caller_name was previously
+    only used for local error messages and never reached the driver.
+
+    `maxPoolSize` bounds each client's pool -- see MONGO_MAX_POOL_SIZE.
+    """
+    kwargs: dict = {
+        "appname": f"ccdexplorer:{caller_name}",
+        "maxPoolSize": MONGO_MAX_POOL_SIZE,
+    }
+    read_pref = _resolve_read_preference(nearest)
+    if read_pref is not None:
+        kwargs["read_preference"] = read_pref
+    return kwargs
 
 
 def _build_connection_error_message(client_name: str, caller_name: str, error: Exception) -> str:
@@ -230,11 +250,7 @@ class MongoDB:
         self.tooter = tooter
         self.caller_name = _resolve_caller_name(caller_name)
         try:
-            read_pref = _resolve_read_preference(nearest)
-            if read_pref is not None:
-                con = MongoClient(MONGO_URI, read_preference=read_pref)
-            else:
-                con = MongoClient(MONGO_URI)
+            con = MongoClient(MONGO_URI, **_client_kwargs(nearest, self.caller_name))
             self.connection: MongoClient = con
 
             self.mainnet_db = con["concordium_mainnet"]
@@ -279,11 +295,7 @@ class MongoMotor:
         self.tooter = tooter
         self.caller_name = _resolve_caller_name(caller_name)
         try:
-            read_pref = _resolve_read_preference(nearest)
-            if read_pref is not None:
-                con = AsyncMongoClient(MONGO_URI, read_preference=read_pref)
-            else:
-                con = AsyncMongoClient(MONGO_URI)
+            con = AsyncMongoClient(MONGO_URI, **_client_kwargs(nearest, self.caller_name))
             self.connection = con
 
             self.mainnet_db = con["concordium_mainnet"]

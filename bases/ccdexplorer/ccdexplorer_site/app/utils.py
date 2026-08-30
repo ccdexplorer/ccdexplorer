@@ -645,10 +645,17 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
                 include_plotlyjs=False,
             )
         else:
-            fig_html = fig.to_html(
-                config={"responsive": True, "displayModeBar": False},
-                full_html=True,
-                include_plotlyjs=True,
+            # include_plotlyjs=True embeds the whole plotly bundle, producing a
+            # ~5MB string (measured ~9ms, vs ~0.8ms for the POST branch above).
+            # Small, but it's pure CPU on the event loop for no reason -- the
+            # PNG branch already hands its render to an executor.
+            fig_html = await asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: fig.to_html(
+                    config={"responsive": True, "displayModeBar": False},
+                    full_html=True,
+                    include_plotlyjs=True,
+                ),
             )
 
             page_url = plot_info.get(figure_key, {}).get("page_url", "")
