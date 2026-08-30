@@ -29,6 +29,12 @@ TEST_MONGO_URI = os.environ.get("TEST_MONGO_URI", MONGO_URI)
 # otherwise reject PRIMARY-affinity reads server-side (NotPrimaryError).
 # One of: primary, primaryPreferred, secondary, secondaryPreferred, nearest.
 MONGO_READ_PREFERENCE = os.environ.get("MONGO_READ_PREFERENCE")
+# Per-client connection pool ceiling. pymongo defaults to 100, and we build a
+# client per deployable (~27 of them, most running per-net), so the fleet's
+# theoretical demand ran into the thousands against a mongod that caps
+# connections at ~80% of its file descriptor limit. Most of these clients are
+# serial workers that never need anywhere near 100 concurrent sockets.
+MONGO_MAX_POOL_SIZE = int(os.environ.get("MONGO_MAX_POOL_SIZE", "20"))
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
