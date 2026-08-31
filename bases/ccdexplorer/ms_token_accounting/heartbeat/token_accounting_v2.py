@@ -413,9 +413,7 @@ class TokenAccountingV2:
                         # non-compliant to the negative-balance check in the
                         # API). Leave whatever link is already stored alone;
                         # the next event for this address re-queries it.
-                        console.log(
-                            f"[token_amount] skipping link {_id}: balanceOf lookup failed"
-                        )
+                        console.log(f"[token_amount] skipping link {_id}: balanceOf lookup failed")
                         continue
 
                     token_holding = MongoTypeTokenForAddress(
@@ -463,7 +461,8 @@ class TokenAccountingV2:
                     repl_dict["failed_attempt"]["do_not_try_before"] = (
                         f"{repl_dict['failed_attempt']['do_not_try_before']:%Y-%m-%dT%H:%M:%S.%fZ}"
                     )
-                await self.send_metadata_to_redis(repl_dict)
+                if net == "mainnet":
+                    await self.send_metadata_to_redis(repl_dict)
 
                 if "id" in repl_dict:
                     del repl_dict["id"]
