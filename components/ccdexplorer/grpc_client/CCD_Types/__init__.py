@@ -2690,12 +2690,13 @@ class CCD_UpdatePayload(BaseModel):
         pool_parameters_cpv_1_update (Optional[CCD_PoolParametersCpv1]): The pool parameters were updated.
         time_parameters_cpv_1_update (Optional[CCD_TimeParametersCpv1]): The time parameters were updated.
         mint_distribution_cpv_1_update (Optional[CCD_MintDistributionCpv1]): The mint distribution was updated (protocol version 4+).
-        gas_rewards_cpv_2_update (Optional[CCD_GasRewardsCpv2]): The gas rewards were updated (protocol version 6+).
-        timeout_parameters_update (Optional[CCD_TimeoutParameters]): The consensus timeouts were updated.
+        gas_rewards_cpv_2_update (Optional[CCD_GasRewardsV2]): The gas rewards were updated (protocol version 6+).
+        timeout_parameters_update (Optional[CCD_TimeOutParameters]): The consensus timeouts were updated.
         min_block_time_update (Optional[CCD_Duration]): The minimum time between blocks was updated.
         block_energy_limit_update (Optional[CCD_Energy]): The block energy limit was updated.
         finalization_committee_parameters_update (Optional[CCD_FinalizationCommitteeParameters]): The finalization committee parameters were updated.
         validator_score_parameters_update (Optional[CCD_ValidatorScoreParameters]): The validator score parameters were updated.
+        create_plt_update (Optional[CCD_CreatePLT]): A new protocol-level token was created.
     """
 
     protocol_update: Optional[CCD_ProtocolUpdate] = None
@@ -2717,6 +2718,13 @@ class CCD_UpdatePayload(BaseModel):
     finalization_committee_parameters_update: Optional[CCD_FinalizationCommitteeParameters] = None
     validator_score_parameters_update: Optional[CCD_ValidatorScoreParameters] = None
     create_plt_update: Optional[CCD_CreatePLT] = None
+    gas_rewards_update: Optional[CCD_GasRewards] = None
+    min_block_time_update: Optional[CCD_Duration] = None
+    block_energy_limit_update: Optional[CCD_Energy] = None
+    # Quoted because CCD_GasRewardsV2 and CCD_TimeOutParameters are defined
+    # further down this module; resolved by the model_rebuild() call there.
+    gas_rewards_cpv_2_update: Optional["CCD_GasRewardsV2"] = None
+    timeout_parameters_update: Optional["CCD_TimeOutParameters"] = None
 
 
 class CCD_UpdateDetails(BaseModel):
@@ -3894,9 +3902,10 @@ class CCD_GasRewardsV2(BaseModel):
     chain_update: CCD_AmountFraction
 
 
-# CCD_PendingUpdate refers to CCD_GasRewardsV2 and CCD_TimeOutParameters by name
-# because both are defined below it; resolve those forward references now that
-# they exist.
+# CCD_UpdatePayload and CCD_PendingUpdate refer to CCD_GasRewardsV2 and
+# CCD_TimeOutParameters by name because both are defined below them; resolve
+# those forward references now that they exist.
+CCD_UpdatePayload.model_rebuild()
 CCD_PendingUpdate.model_rebuild()
 
 

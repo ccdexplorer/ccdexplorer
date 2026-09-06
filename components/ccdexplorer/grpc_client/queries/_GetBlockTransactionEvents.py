@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union
 
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import (
+    CreatePLT,
     MetaEffect,
     TokenCreationDetails,
     TokenEffect,
@@ -33,6 +34,7 @@ from ccdexplorer.grpc_client.types_pb2 import (
     ExchangeRate,
     FinalizationCommitteeParameters,
     GasRewards,
+    GasRewardsCpv2,
     IpInfo,
     Level1Update,
     MintDistributionCpv0,
@@ -43,10 +45,12 @@ from ccdexplorer.grpc_client.types_pb2 import (
     RegisteredData,
     RootUpdate,
     SponsorDetails,
+    TimeoutParameters,
     TimeParametersCpv1,
     TransactionFeeDistribution,
     UpdateDetails,
     UpdatePayload,
+    ValidatorScoreParameters,
 )
 
 if TYPE_CHECKING:
@@ -704,49 +708,54 @@ class Mixin(_SharedConverters):
                 elif type(value) is IpInfo:
                     result[key] = self.convertIpInfo(value)
 
-                # TODO: no test available
                 elif type(value) is ElectionDifficulty:
                     result[key] = self.convertElectionDifficulty(value)
 
-                # TODO: no test available
                 elif type(value) is MintDistributionCpv0:
                     result[key] = self.convertMintDistributionCpv0(value)
 
-                # TODO: no test available
                 elif type(value) is TransactionFeeDistribution:
                     result[key] = self.convertTransactionFeeDistribution(value)
 
-                # TODO: no test available
                 elif type(value) is GasRewards:
                     result[key] = self.convertGasRewards(value)
 
-                # TODO: no test available
+                elif type(value) is GasRewardsCpv2:
+                    result[key] = self.convertGasRewardsV2(value)
+
                 elif type(value) is RootUpdate:
                     result[key] = self.convertRootUpdate(value)
 
-                # TODO: no test available
                 elif type(value) is ArInfo:
                     result[key] = self.convertArInfo(value)
 
-                # TODO: no test available
                 elif type(value) is CooldownParametersCpv1:
                     result[key] = self.convertCooldownParametersCpv1(value)
 
-                # TODO: no test available
                 elif type(value) is PoolParametersCpv1:
                     result[key] = self.convertPoolParametersCpv1(value)
 
-                # TODO: no test available
                 elif type(value) is TimeParametersCpv1:
                     result[key] = self.convertTimeParametersCpv1(value)
 
-                # TODO: no test available
                 elif type(value) is MintDistributionCpv1:
                     result[key] = self.convertMintDistributionCpv1(value)
+
+                elif type(value) is TimeoutParameters:
+                    result[key] = self.convertTypeWithSingleValues(value)
 
                 elif type(value) is FinalizationCommitteeParameters:
                     result[key] = self.convertFinalizationCommitteeParameters(value)
 
+                elif type(value) is ValidatorScoreParameters:
+                    result[key] = self.convertValidatorScoreParameters(value)
+
+                elif type(value) is CreatePLT:
+                    result[key] = self.convertCreatePLT(value)
+
+                # Catch-all last: `simple_types` includes wrappers such as
+                # ElectionDifficulty, so testing it earlier would shadow the
+                # specific branches above.
                 elif type(value) in self.simple_types:
                     result[key] = self.convertType(value)
 
