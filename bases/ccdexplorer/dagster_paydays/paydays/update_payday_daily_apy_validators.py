@@ -57,6 +57,11 @@ def fill_daily_apy_for_validators_for_date(
             total_reward_all_pools += total_reward
 
             pool_info_for_baker = payday_info.pool_info_by_baker_id[baker_id]  # type: ignore
+            # A pool removed during this reward period still reports
+            # current_payday_info, but has no pool_info and so no commission
+            # rates to split the delegator rewards by.
+            if pool_info_for_baker.pool_info is None:
+                continue
             delegation_info_for_baker = payday_info.bakers_with_delegation_information[  # type: ignore
                 baker_id
             ]
@@ -67,15 +72,15 @@ def fill_daily_apy_for_validators_for_date(
             )
 
             delegators_baking_reward = (
-                1 - pool_info_for_baker.pool_info.commission_rates.baking  # type: ignore
+                1 - pool_info_for_baker.pool_info.commission_rates.baking
             ) * (delegator_ratio * reward_for_baker.baker_reward)
 
             delegators_transaction_reward = (
-                1 - pool_info_for_baker.pool_info.commission_rates.transaction  # type: ignore
+                1 - pool_info_for_baker.pool_info.commission_rates.transaction
             ) * (delegator_ratio * reward_for_baker.transaction_fees)
 
             delegators_finalization_reward = (
-                1 - pool_info_for_baker.pool_info.commission_rates.finalization  # type: ignore
+                1 - pool_info_for_baker.pool_info.commission_rates.finalization
             ) * (delegator_ratio * reward_for_baker.finalization_reward)
 
             delegator_reward = (

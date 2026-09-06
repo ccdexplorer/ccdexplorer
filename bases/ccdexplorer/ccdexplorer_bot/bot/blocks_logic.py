@@ -254,9 +254,7 @@ class Mixin(Utils):
                 # General feed: anyone subscribed to "any lock was created" gets notified,
                 # regardless of whether their own accounts are involved.
                 general_notification_event = self.prepare_notification_event(
-                    EventType(
-                        other=EventTypeOther(lock_create_event=meta_event.lock_create_event)
-                    ),
+                    EventType(other=EventTypeOther(lock_create_event=meta_event.lock_create_event)),
                     tx_hash=tx.hash,
                     block_info=block.block_info,
                     impacted_addresses=[],
@@ -279,9 +277,7 @@ class Mixin(Utils):
                 for account in accounts:
                     account_notification_event = self.prepare_notification_event(
                         EventType(
-                            account=EventTypeAccount(
-                                lock_create_event=meta_event.lock_create_event
-                            )
+                            account=EventTypeAccount(lock_create_event=meta_event.lock_create_event)
                         ),
                         tx_hash=tx.hash,
                         block_info=block.block_info,
@@ -309,9 +305,7 @@ class Mixin(Utils):
                 # ms_events_and_impacts's _process_lock_destroy_event.
                 account_notification_event = self.prepare_notification_event(
                     EventType(
-                        account=EventTypeAccount(
-                            lock_destroy_event=meta_event.lock_destroy_event
-                        )
+                        account=EventTypeAccount(lock_destroy_event=meta_event.lock_destroy_event)
                     ),
                     tx_hash=tx.hash,
                     block_info=block.block_info,
@@ -860,8 +854,10 @@ class Mixin(Utils):
                             block.block_info.parent_block,
                             tx.account_transaction.sender,
                         )
-                        assert account_info_parent_block.stake is not None
-                        if account_info_parent_block.stake.baker:
+                        if (
+                            account_info_parent_block.stake
+                            and account_info_parent_block.stake.baker
+                        ):
                             event_validator.previous_block_validator_info = (
                                 account_info_parent_block.stake.baker
                             )
@@ -877,8 +873,10 @@ class Mixin(Utils):
                         impacted_addresses[0].address_type = AddressType.delegator
 
                         target_pool = None
-                        assert account_info_delegator.stake is not None
-                        if account_info_delegator.stake.delegator is not None:
+                        if (
+                            account_info_delegator.stake
+                            and account_info_delegator.stake.delegator is not None
+                        ):
                             if account_info_delegator.stake.delegator.target:
                                 if account_info_delegator.stake.delegator.target.baker:
                                     target_pool = (
@@ -889,8 +887,10 @@ class Mixin(Utils):
                             block.block_info.parent_block,
                             tx.account_transaction.sender,
                         )
-                        assert account_info_parent_block.stake is not None
-                        if account_info_parent_block.stake.delegator:
+                        if (
+                            account_info_parent_block.stake
+                            and account_info_parent_block.stake.delegator
+                        ):
                             event_validator.previous_block_account_info = (
                                 account_info_parent_block.stake.delegator
                             )
@@ -1026,15 +1026,19 @@ class Mixin(Utils):
                             block.block_info.parent_block,
                             tx.account_transaction.sender,
                         )
-                        assert account_info_parent_block.stake is not None
-                        if account_info_parent_block.stake.delegator:
+                        if (
+                            account_info_parent_block.stake
+                            and account_info_parent_block.stake.delegator
+                        ):
                             event_account.previous_block_account_info = (
                                 account_info_parent_block.stake.delegator
                             )
 
                         target_pool = None
-                        assert account_info_delegator.stake is not None
-                        if account_info_delegator.stake.delegator is not None:
+                        if (
+                            account_info_delegator.stake
+                            and account_info_delegator.stake.delegator is not None
+                        ):
                             if account_info_delegator.stake.delegator.target:
                                 if account_info_delegator.stake.delegator.target.baker:
                                     target_pool = (
@@ -1058,8 +1062,10 @@ class Mixin(Utils):
                             block.block_info.parent_block,
                             tx.account_transaction.sender,
                         )
-                        assert account_info_parent_block.stake is not None
-                        if account_info_parent_block.stake.baker:
+                        if (
+                            account_info_parent_block.stake
+                            and account_info_parent_block.stake.baker
+                        ):
                             event_account.previous_block_validator_info = (
                                 account_info_parent_block.stake.baker
                             )
@@ -1135,8 +1141,10 @@ class Mixin(Utils):
                             block.block_info.parent_block,
                             tx.account_transaction.sender,
                         )
-                        assert account_info_parent_block.stake is not None
-                        if account_info_parent_block.stake.baker:
+                        if (
+                            account_info_parent_block.stake
+                            and account_info_parent_block.stake.baker
+                        ):
                             event_other.previous_block_validator_info = (
                                 account_info_parent_block.stake.baker
                             )

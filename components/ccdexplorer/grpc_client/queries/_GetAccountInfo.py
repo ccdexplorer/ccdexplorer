@@ -287,52 +287,51 @@ class Mixin(_SharedConverters):
 
         return result
 
-    def convertAccountStakingInfo(self, message) -> CCD_AccountStakingInfo:
+    def convertAccountStakingInfo(self, message) -> CCD_AccountStakingInfo | None:
         result = {}
         which_one = message.WhichOneof("staking_info")
         if not which_one:
-            return CCD_AccountStakingInfo(**{"baker": None, "delegator": None})
-        else:
-            if which_one == "baker":
-                for descriptor in getattr(message, which_one).DESCRIPTOR.fields:
-                    key, value = self.get_key_value_from_descriptor(
-                        descriptor, getattr(message, which_one)
-                    )
-                    if type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+            return None
 
-                    elif type(value) is BakerPoolInfo:
-                        result[key] = self.convertBakerPoolInfo(value)
+        staking_info = getattr(message, which_one)
+        for descriptor in staking_info.DESCRIPTOR.fields:
+            key, value = self.get_key_value_from_descriptor(descriptor, staking_info)
 
-                    elif type(value) is BakerInfo:
-                        result[key] = self.convertBakerInfo(value)
+            # `pending_change` never occurs from protocol version 7, and a
+            # validator's `pool_info` is present only while it sits in the
+            # current epoch's committee. Both are optional in the proto.
+            if descriptor.has_presence and not staking_info.HasField(key):
+                result[key] = None
 
-                    elif type(value) is StakePendingChange:
-                        result[key] = self.convertPendingChange(value)
+            elif which_one == "delegator" and type(value) not in [
+                BakerId,
+                AccountAddress,
+                Amount,
+                str,
+                int,
+                bool,
+                float,
+                DelegationTarget,
+                StakePendingChange,
+            ]:
+                continue
 
-            elif which_one == "delegator":
-                for descriptor in getattr(message, which_one).DESCRIPTOR.fields:
-                    key, value = self.get_key_value_from_descriptor(
-                        descriptor, getattr(message, which_one)
-                    )
-                    if type(value) in [
-                        BakerId,
-                        AccountAddress,
-                        Amount,
-                        str,
-                        int,
-                        bool,
-                        float,
-                    ]:
-                        result[key] = self.convertType(value)
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
-                    elif type(value) is DelegationTarget:
-                        result[key] = self.convertDelegationTarget(value)
+            elif type(value) is BakerPoolInfo:
+                result[key] = self.convertBakerPoolInfo(value)
 
-                    elif type(value) is StakePendingChange:
-                        result[key] = self.convertPendingChange(value)
+            elif type(value) is BakerInfo:
+                result[key] = self.convertBakerInfo(value)
 
-            return CCD_AccountStakingInfo(**{which_one: result})
+            elif type(value) is DelegationTarget:
+                result[key] = self.convertDelegationTarget(value)
+
+            elif type(value) is StakePendingChange:
+                result[key] = self.convertPendingChange(value)
+
+        return CCD_AccountStakingInfo(**{which_one: result})
 
     def get_account_info(
         self: GRPCClient,
@@ -392,7 +391,11 @@ class Mixin(_SharedConverters):
                 result["tokens"] = self.convertTokens(value)
 
             elif type(value) is AccountStakingInfo:
-                result[key] = self.convertAccountStakingInfo(value)
+                result[key] = (
+                    self.convertAccountStakingInfo(value)
+                    if grpc_return_value.HasField("stake")
+                    else None
+                )
 
             elif key == "cooldowns":
                 result[key] = self.convertCooldowns(value)

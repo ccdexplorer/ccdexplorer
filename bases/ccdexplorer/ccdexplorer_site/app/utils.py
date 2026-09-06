@@ -1319,6 +1319,10 @@ def account_link(
 def round_x_decimal_with_comma(value, dec: int):
     if value:
         return f"{value:,.{dec}f}"
+    elif value is None:
+        # An absent value (a pre-P6 block has no epoch, say) would otherwise be
+        # interpolated into the template as the string "None".
+        return ""
     else:
         return value
 

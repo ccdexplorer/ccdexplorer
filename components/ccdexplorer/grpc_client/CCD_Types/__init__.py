@@ -2878,8 +2878,8 @@ class CCD_AccountStakingInfo_Baker(BaseModel):
     """
 
     baker_info: CCD_BakerInfo
-    pool_info: CCD_BakerPoolInfo
-    pending_change: CCD_StakePendingChange
+    pool_info: Optional[CCD_BakerPoolInfo] = None
+    pending_change: Optional[CCD_StakePendingChange] = None
     restake_earnings: bool
     staked_amount: microCCD | str
     is_suspended: Optional[bool] = None
@@ -2903,7 +2903,7 @@ class CCD_AccountStakingInfo_Delegator(BaseModel):
     """
 
     target: CCD_DelegationTarget
-    pending_change: CCD_StakePendingChange
+    pending_change: Optional[CCD_StakePendingChange] = None
     restake_earnings: bool
     staked_amount: microCCD | str
 
