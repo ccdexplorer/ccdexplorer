@@ -466,8 +466,8 @@ const downloadBtn = document.getElementById("{{ccd_tabulator_table}}-download-cs
 function init_validator_tally_table() {
   const validator_tally_table_columns = [
   {
-        title: "Date", field: "date", 
-        minWidth: 95,
+        title: "Date", field: "date",
+        minWidth: 84,
         // maxWidth: 70,
         responsive: 0,
         
@@ -477,10 +477,10 @@ function init_validator_tally_table() {
         
       },
       {
-        title: "LP(%)", field: "lp", 
-        minWidth: 90,
+        title: "LP(%)", field: "lp",
+        minWidth: 70,
         maxWidth: 90,
-        responsive: 10,
+        responsive: 20,
         formatter: LotteryPowerFormatter,
         accessorDownload: (value, data) => data.lp*100,
         headerSort:false,
@@ -488,10 +488,10 @@ function init_validator_tally_table() {
         
       },
       {
-        title: "Expectation", field: "expectation", 
-        minWidth: 120,
+        title: "Expectation", field: "expectation",
+        minWidth: 95,
         maxWidth: 120,
-        responsive: 0,
+        responsive: 10,
         formatter: intFormatterRounded,
         headerSort:false,
         hozAlign: "right", headerHozAlign: "right",
@@ -499,7 +499,7 @@ function init_validator_tally_table() {
       },
       {
         title: "Actual", field: "actuals",
-        minWidth: 100,
+        minWidth: 78,
         maxWidth: 100,
         responsive: 0,
         formatter: intFormatterRounded,
@@ -510,7 +510,7 @@ function init_validator_tally_table() {
       },
       {
         title: "Missed", field: "missed",
-        minWidth: 90,
+        minWidth: 74,
         maxWidth: 90,
         responsive: 0,
         headerSort: false,
