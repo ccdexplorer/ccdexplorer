@@ -25,16 +25,44 @@
         
       },
       {
-        title: "Blocks", field: "count_of_blocks", 
+        title: "Blocks", field: "count_of_blocks",
         minWidth: 100,
         maxWidth: 100,
         responsive: 50,
         formatter: ccdClassFormatter,
         headerSort:false,
         hozAlign: "right", headerHozAlign: "right",
-        
+
       },
-      
+      {
+        title: "Missed", field: "missed_rounds",
+        minWidth: 90,
+        maxWidth: 100,
+        responsive: 0,
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        formatter: function(cell) {
+          const value = cell.getValue();
+          if (value === null || value === undefined) {
+            cell.getElement().title = "No round data recorded for this payday.";
+            return `<span class="ccd">-</span>`;
+          }
+          const formatted = value.toLocaleString("en-US");
+          const row = cell.getRow().getData();
+          // Rounds whose leader produced no block, so Blocks + Missed is the
+          // payday's round count. If some epochs are unrecorded the sum is a
+          // floor, not the exact figure -- say so rather than imply precision.
+          if (row.epochs_covered < row.epochs_expected) {
+            cell.getElement().title =
+              "Based on " + row.epochs_covered + " of " + row.epochs_expected +
+              " epochs in this payday; the rest were not recorded.";
+            return `<span class="ccd">${formatted}*</span>`;
+          }
+          cell.getElement().title = "Rounds whose elected validator produced no block.";
+          return `<span class="ccd">${formatted}</span>`;
+        },
+      },
+
     ];
 
   

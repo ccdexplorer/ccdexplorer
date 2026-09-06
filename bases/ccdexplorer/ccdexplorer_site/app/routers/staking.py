@@ -241,6 +241,13 @@ async def get_ajax_paydays_tabulator(
             made_up_payday["count_of_blocks"] = (
                 p["height_for_last_block"] - p["height_for_first_block"] + 1
             )
+            # Rounds whose elected leader produced no block. Every round yields a
+            # block unless it was missed, so this is exactly the gap between the
+            # payday's round count and the block count beside it. None when the
+            # payday's epochs are not recorded, so the cell shows a dash.
+            made_up_payday["missed_rounds"] = p.get("rounds_missed_total")
+            made_up_payday["epochs_covered"] = p.get("epochs_covered", 0)
+            made_up_payday["epochs_expected"] = p.get("epochs_expected", 0)
             # download
             made_up_payday["block_height_download"] = p["height_for_last_block"] + 1
             made_up_payday["payday_block_slot_time_download"] = (

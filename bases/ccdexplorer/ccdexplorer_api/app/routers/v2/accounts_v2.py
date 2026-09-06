@@ -975,6 +975,84 @@ async def get_payday_pools(
     return dd
 
 
+async def _rounds_per_payday(db_to_use, paydays: list[dict]) -> dict[str, dict]:
+    """Chain-wide round counts for each payday, keyed by payday date.
+
+    Each payday records its first and last block; the blocks collection carries
+    the epoch and genesis index for those hashes, which is what
+    paydays_v2_validators_missed is keyed on. A document there is labelled with
+    the epoch it holds the rounds of, so a payday spanning E1..E2 is covered by
+    exactly those labels.
+
+    Every round produces a block unless its leader missed it, so the missed
+    count returned here is also the difference between a payday's round count
+    and its block count -- which is what makes it meaningful next to the block
+    count the paydays table already shows.
+
+    `epochs_covered` is reported alongside so a caller can tell a real zero from
+    a payday the job has not finished recording.
+    """
+    boundary_hashes = [
+        h
+        for payday in paydays
+        for h in (payday.get("hash_for_first_block"), payday.get("hash_for_last_block"))
+        if h
+    ]
+    if not boundary_hashes:
+        return {}
+
+    blocks = await (
+        db_to_use[Collections.blocks]
+        .find({"_id": {"$in": boundary_hashes}}, {"epoch": 1, "genesis_index": 1})
+        .to_list(length=None)
+    )
+    block_by_hash = {b["_id"]: b for b in blocks}
+
+    ranges: dict[str, tuple[int, int, int]] = {}
+    for payday in paydays:
+        first = block_by_hash.get(payday.get("hash_for_first_block"))
+        last = block_by_hash.get(payday.get("hash_for_last_block"))
+        if first and last:
+            ranges[payday["date"]] = (first["genesis_index"], first["epoch"], last["epoch"])
+
+    if not ranges:
+        return {}
+
+    spans: dict[int, list[int]] = {}
+    for genesis, low, high in ranges.values():
+        span = spans.setdefault(genesis, [low, high])
+        span[0], span[1] = min(span[0], low), max(span[1], high)
+
+    by_epoch: dict[tuple[int, int], tuple[int, int]] = {}
+    for genesis, (low, high) in spans.items():
+        documents = await (
+            db_to_use[Collections.paydays_v2_validators_missed]
+            .find(
+                {"genesis_index": genesis, "epoch": {"$gte": low, "$lte": high}},
+                {"epoch": 1, "rounds_total": 1, "rounds_missed_total": 1},
+            )
+            .to_list(length=None)
+        )
+        for document in documents:
+            by_epoch[(genesis, document["epoch"])] = (
+                document.get("rounds_total", 0),
+                document.get("rounds_missed_total", 0),
+            )
+
+    result = {}
+    for date, (genesis, low, high) in ranges.items():
+        present = [e for e in range(low, high + 1) if (genesis, e) in by_epoch]
+        if not present:
+            continue
+        result[date] = {
+            "rounds_total": sum(by_epoch[(genesis, e)][0] for e in present),
+            "rounds_missed_total": sum(by_epoch[(genesis, e)][1] for e in present),
+            "epochs_covered": len(present),
+            "epochs_expected": high - low + 1,
+        }
+    return result
+
+
 @router.get(
     "/{net}/accounts/paydays/{skip}/{limit}",
     response_class=JSONResponse,
@@ -1017,6 +1095,13 @@ async def get_paydays(
         .limit(limit)
         .to_list(length=limit)
     )
+    # Rounds missed chain-wide during each payday. Absent for a payday whose
+    # epochs are not recorded, in which case the caller shows nothing rather
+    # than a zero.
+    rounds = await _rounds_per_payday(db_to_use, result)
+    for payday in result:
+        payday.update(rounds.get(payday["date"], {}))
+
     result = {
         "result": result,
         "total_rows": total_rows,
