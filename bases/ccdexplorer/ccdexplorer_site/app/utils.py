@@ -359,6 +359,11 @@ payload_translation["mint_distribution_cpv_1_update"] = "mint distribution"
 payload_translation["finalization_committee_parameters_update"] = (
     "finalization committee parameters"
 )
+payload_translation["gas_rewards_update"] = "GAS rewards"
+payload_translation["gas_rewards_cpv_2_update"] = "GAS rewards"
+payload_translation["timeout_parameters_update"] = "timeout parameters"
+payload_translation["min_block_time_update"] = "min block time"
+payload_translation["block_energy_limit_update"] = "block energy limit"
 # payload_translation["create_plt_update"] = "create PLT"
 
 
@@ -1314,6 +1319,10 @@ def account_link(
 def round_x_decimal_with_comma(value, dec: int):
     if value:
         return f"{value:,.{dec}f}"
+    elif value is None:
+        # An absent value (a pre-P6 block has no epoch, say) would otherwise be
+        # interpolated into the template as the string "None".
+        return ""
     else:
         return value
 

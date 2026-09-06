@@ -8,7 +8,7 @@ from ccdexplorer.grpc_client.CCD_Types import CCD_DelegatorRewardPeriodInfo
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
 )
-from ccdexplorer.grpc_client.types_pb2 import DelegatorInfo
+from ccdexplorer.grpc_client.types_pb2 import DelegatorRewardPeriodInfo
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
@@ -23,7 +23,7 @@ class Mixin(_SharedConverters):
         result = []
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
-        grpc_return_value: Iterator[DelegatorInfo] = self.stub_on_net(
+        grpc_return_value: Iterator[DelegatorRewardPeriodInfo] = self.stub_on_net(
             net, "GetPassiveDelegatorsRewardPeriod", blockHashInput, streaming=True
         )
 

@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_MintRate,
+    ProtocolVersions,
     CCD_TokenomicsInfo,
     CCD_TokenomicsInfo_V0,
     CCD_TokenomicsInfo_V1,
@@ -28,7 +29,10 @@ class Mixin(_SharedConverters):
             for descriptor in message.DESCRIPTOR.fields:
                 key, value = self.get_key_value_from_descriptor(descriptor, message)
 
-                if type(value) in self.simple_types:
+                if key == "protocol_version":
+                    result[key] = ProtocolVersions(value).name
+
+                elif type(value) in self.simple_types:
                     result[key] = self.convertType(value)
 
             return CCD_TokenomicsInfo_V0(**result)
@@ -41,7 +45,10 @@ class Mixin(_SharedConverters):
             for descriptor in message.DESCRIPTOR.fields:
                 key, value = self.get_key_value_from_descriptor(descriptor, message)
 
-                if type(value) in self.simple_types:
+                if key == "protocol_version":
+                    result[key] = ProtocolVersions(value).name
+
+                elif type(value) in self.simple_types:
                     result[key] = self.convertType(value)
 
                 elif type(value) is MintRate:

@@ -166,7 +166,7 @@ class TokenAccountingV2:
         # node; stub_on_net may rotate hosts on failure).
         node = self.grpc_client.current_node(NET(self.net))
 
-        if ii.failure.used_energy > 0:
+        if ii.failure is not None:
             console.log(
                 f"[token_amount] balanceOf REVERTED on {node} | "
                 f"{contract_address.index}/{token_id} addr={address_or_public_key} "

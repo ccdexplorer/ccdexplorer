@@ -102,8 +102,11 @@ def perform_payday_state_information_for_current_payday(
                         delegator.account
                     ] = delegator_account_info.stake.delegator.restake_earnings  # type: ignore
 
-        # add dictionary with payday pool status for each baker/pool
-        current_baker_pool_status = pool_info_for_baker.pool_info.open_status  # type: ignore
+        # add dictionary with payday pool status for each baker/pool.
+        # `pool_info` is absent for a pool removed during this reward period.
+        if pool_info_for_baker.pool_info is None:
+            continue
+        current_baker_pool_status = pool_info_for_baker.pool_info.open_status
 
         if current_baker_pool_status in pool_status_dict.keys():
             pool_status_dict[current_baker_pool_status].append(baker_id)
@@ -129,10 +132,11 @@ def perform_payday_state_information_for_current_payday(
             grpcclient.get_delegators_for_pool_in_reward_period(baker_id, payday_info.hash)
         )
 
-        # add dictionary with payday pool status for each baker/pool
-        current_baker_pool_status = (
-            pool_info_for_baker_current_payday.pool_info.open_status  # type: ignore
-        )
+        # add dictionary with payday pool status for each baker/pool.
+        # `pool_info` is absent for a pool removed during this reward period.
+        if pool_info_for_baker_current_payday.pool_info is None:
+            continue
+        current_baker_pool_status = pool_info_for_baker_current_payday.pool_info.open_status
 
         if current_baker_pool_status in pool_status_dict_current_payday.keys():
             pool_status_dict_current_payday[current_baker_pool_status].append(baker_id)

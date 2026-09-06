@@ -36,7 +36,12 @@ class Mixin(_SharedConverters):
         for descriptor in grpc_return_value.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
 
-            if type(value) in self.simple_types:
+            # `election_difficulty` is present only on protocol versions 1-5;
+            # converting it regardless reported a difficulty of 0.0 from 6 on.
+            if descriptor.has_presence and not grpc_return_value.HasField(key):
+                result[key] = None
+
+            elif type(value) in self.simple_types:
                 result[key] = self.convertType(value)
 
             elif key == "baker_election_info":

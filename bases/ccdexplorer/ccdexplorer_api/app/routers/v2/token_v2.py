@@ -89,7 +89,7 @@ def get_owner_history_for_provenance(
         net,
     )
 
-    result = ii.success.return_value
+    result = ii.success.return_value if ii.success else b""
     return ci.viewOwnerHistoryResponse(result)
 
 

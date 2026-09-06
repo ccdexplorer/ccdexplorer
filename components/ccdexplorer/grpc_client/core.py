@@ -1,6 +1,7 @@
 # ruff: noqa: F403, F405, E402
 from __future__ import annotations
 
+from .health_pb2_grpc import HealthStub
 from .service_pb2_grpc import QueriesStub
 from ccdexplorer.env import GRPC_MAINNET, GRPC_TESTNET, GRPC_DEVNET
 from ccdexplorer.tooter import Tooter, TooterChannel, TooterType
@@ -38,6 +39,8 @@ def _record_net_unresponsive(net: str, reason: str) -> None:
         GRPC_NET_UNRESPONSIVE_TOTAL.labels(net=net, reason=reason).inc()
     except Exception as error:
         console.log(f"Could not record ccd_grpc_net_unresponsive_total metric: {error}")
+
+
 _RETRYABLE = {
     grpc.StatusCode.UNAVAILABLE,
     grpc.StatusCode.DEADLINE_EXCEEDED,
@@ -263,10 +266,13 @@ class GRPCClient(  # type: ignore
         # Build channels/stubs if host lists exist
         self.channel_mainnet = None
         self.stub_mainnet = None
+        self.health_mainnet = None
         self.channel_testnet = None
         self.stub_testnet = None
+        self.health_testnet = None
         self.channel_devnet = None
         self.stub_devnet = None
+        self.health_devnet = None
 
         for n in (NET.MAINNET, NET.TESTNET, NET.DEVNET):
             if self.hosts.get(n):
@@ -324,7 +330,7 @@ class GRPCClient(  # type: ignore
 
                     # All readiness attempts exhausted → net considered unresponsive for this call
                     _record_net_unresponsive(net.value, "connect_not_ready")
-                    raise grpc.RpcError(f"gRPC channel not ready for {net.value}")
+                    raise ConnectionError(f"gRPC channel not ready for {net.value}")
 
             stub = getattr(self, f"stub_{net.value}")
             method = getattr(stub, method_name, None)
@@ -387,16 +393,6 @@ class GRPCClient(  # type: ignore
         except Exception:
             return False
 
-    def _pick_next_host(self, net: NET) -> None:
-        n = len(self.hosts[net])
-        now = time.monotonic()
-
-        for _ in range(n):
-            self.host_index[net] = (self.host_index[net] + 1) % n
-            if self._down_until.get((net, self.host_index[net]), 0.0) <= now:
-                return
-        # If all are cooled down, just keep current index (we'll try anyway)
-
     def _backoff(self, attempt: int) -> None:
         # Small bounded exponential backoff with jitter (keeps incidents from flapping)
         base = 0.1 * (2**attempt)  # 0.1, 0.2, 0.4 ...
@@ -454,8 +450,6 @@ class GRPCClient(  # type: ignore
         self._down_until[(net, self.host_index[net])] = time.monotonic() + self._cooldown_s
 
     def _rotate_host(self, net: NET) -> None:
-        import time
-
         n = len(self.hosts[net])
         now = time.monotonic()
         for _ in range(n):
@@ -471,13 +465,13 @@ class GRPCClient(  # type: ignore
 
     def _connect_net(self, net: NET) -> None:
         # connect ONLY this net; leave the others untouched
-        channel, stub = self._build_channel_and_stub(net)
+        channel, stub, health = self._build_channel_and_stub(net)
         if net == NET.MAINNET:
-            self.channel_mainnet, self.stub_mainnet = channel, stub
+            self.channel_mainnet, self.stub_mainnet, self.health_mainnet = channel, stub, health
         elif net == NET.TESTNET:
-            self.channel_testnet, self.stub_testnet = channel, stub
+            self.channel_testnet, self.stub_testnet, self.health_testnet = channel, stub, health
         else:
-            self.channel_devnet, self.stub_devnet = channel, stub
+            self.channel_devnet, self.stub_devnet, self.health_devnet = channel, stub, health
 
     def _build_channel_and_stub(self, net: NET):
         host_cfg = self.hosts[net][self.host_index[net]]
@@ -504,13 +498,15 @@ class GRPCClient(  # type: ignore
             channel = grpc.insecure_channel(address, options=options)
 
         stub = QueriesStub(channel)
+        # The node serves concordium.health.Health on the same channel.
+        health = HealthStub(channel)
 
         console.log(
             f"GRPCClient building channel for {net.value} on {address} "
             f"({'secure' if use_secure else 'insecure'})"
         )
 
-        return channel, stub
+        return channel, stub, health
 
     def connection_info(self, caller: str, tooter: Tooter, ADMIN_CHAT_ID: int) -> None:
         message = f"<code>{caller}</code> connection status\n<code>mainnet</code> - {self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['host']}:{self.hosts[NET.MAINNET][self.host_index[NET.MAINNET]]['port']}\n<code>testnet</code> - {self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['host']}:{self.hosts[NET.TESTNET][self.host_index[NET.TESTNET]]['port']}\n<code>devnet</code> - {self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['host']}:{self.hosts[NET.DEVNET][self.host_index[NET.DEVNET]]['port']}\n"

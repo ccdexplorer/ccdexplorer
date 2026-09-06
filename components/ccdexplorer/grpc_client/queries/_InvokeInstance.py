@@ -66,12 +66,14 @@ class Mixin(_SharedConverters):
             net, "InvokeInstance", invokeInstanceRequest
         )
 
-        for descriptor in grpc_return_value.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
-
+        # `result` is a oneof: the invocation either succeeded or failed.
+        # Converting both arms left `success` populated with an empty return
+        # value even on failure, so callers could not tell the two apart.
+        key = grpc_return_value.WhichOneof("result")
+        if key is not None:
+            value = getattr(grpc_return_value, key)
             if type(value) is InvokeInstanceResponse.Success:
                 result[key] = self.convertSuccess(value)
-
             elif type(value) is InvokeInstanceResponse.Failure:
                 result[key] = self.convertFailure(value)
 

@@ -317,7 +317,7 @@ class Mixin(_SharedConverters):
         net: Enum = NET.MAINNET,
     ) -> CCD_ConsensusDetailedStatus:
         result = {}
-        consensus_detailed_status_query = self.generate_consensus_detailed_status_query()
+        consensus_detailed_status_query = self.generate_consensus_detailed_status_query(gen_index)
 
         grpc_return_value: ConsensusDetailedStatus = self.stub_on_net(
             net, "GetConsensusDetailedStatus", consensus_detailed_status_query

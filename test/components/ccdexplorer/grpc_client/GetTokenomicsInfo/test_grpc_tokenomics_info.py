@@ -22,7 +22,7 @@ def test_tokenomics_info_v0(grpcclient: GRPCClient):
     assert ti.v0.baking_reward_account == 73606304794
     assert ti.v0.finalization_reward_account == 4
     assert ti.v0.gas_account == 3
-    assert ti.v0.protocol_version == 0
+    assert ti.v0.protocol_version == "PROTOCOL_VERSION_1"
 
 
 def test_tokenomics_info_v1(grpcclient: GRPCClient):
@@ -41,7 +41,7 @@ def test_tokenomics_info_v1(grpcclient: GRPCClient):
     assert ti.v1.next_payday_mint_rate.mantissa == 261157877
     assert ti.v1.next_payday_mint_rate.exponent == 12
     assert ti.v1.total_staked_capital == 8663567331383744
-    assert ti.v1.protocol_version == 4
+    assert ti.v1.protocol_version == "PROTOCOL_VERSION_5"
 
 
 def test_tokenomics_info_v1_last(grpcclient: GRPCClient):

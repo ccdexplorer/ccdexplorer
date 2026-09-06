@@ -73,15 +73,18 @@ class Account:
                 self.baker_id = str(ai.stake.baker.baker_info.baker_id)
                 self.staked_amount = int(ai.stake.baker.staked_amount)
                 self.restake_earnings = ai.stake.baker.restake_earnings
-                self.pool_status = ai.stake.baker.pool_info.open_status
-                self.pool_metadata_url = ai.stake.baker.pool_info.url
-                self.pool_transaction_commission = (
-                    ai.stake.baker.pool_info.commission_rates.transaction
-                )
-                self.pool_finalization_commission = (
-                    ai.stake.baker.pool_info.commission_rates.finalization
-                )
-                self.pool_baking_commission = ai.stake.baker.pool_info.commission_rates.baking
+                # `pool_info` is present only while the validator is in the
+                # current epoch's committee.
+                if ai.stake.baker.pool_info:
+                    self.pool_status = ai.stake.baker.pool_info.open_status
+                    self.pool_metadata_url = ai.stake.baker.pool_info.url
+                    self.pool_transaction_commission = (
+                        ai.stake.baker.pool_info.commission_rates.transaction
+                    )
+                    self.pool_finalization_commission = (
+                        ai.stake.baker.pool_info.commission_rates.finalization
+                    )
+                    self.pool_baking_commission = ai.stake.baker.pool_info.commission_rates.baking
                 self.is_suspended = ai.stake.baker.is_suspended
 
             else:

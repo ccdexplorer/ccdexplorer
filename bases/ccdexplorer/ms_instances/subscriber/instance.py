@@ -93,12 +93,11 @@ class Instance:
         instance_ref = instance_as_class.to_str()
         instance_info.update({"_id": instance_ref})
 
-        if instance_info["v0"]["source_module"] == "":
-            del instance_info["v0"]
-            _source_module = instance_info["v1"]["source_module"]
-        if instance_info["v1"]["source_module"] == "":
-            del instance_info["v1"]
+        # Exactly one of v0/v1 is present.
+        if "v0" in instance_info:
             _source_module = instance_info["v0"]["source_module"]
+        else:
+            _source_module = instance_info["v1"]["source_module"]
 
         instance_info.update({"source_module": _source_module})  # type: ignore
         _ = db_to_use[Collections.instances].bulk_write(

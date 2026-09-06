@@ -26,7 +26,14 @@ class Mixin(_SharedConverters):
         for descriptor in grpc_return_value.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
 
-            if key == "protocol_version":
+            # slot_duration is protocol versions 1-5; current_timeout_duration,
+            # current_round, current_epoch and trigger_block_time are 6 onwards;
+            # the moving-average doubles are absent until enough blocks have been
+            # seen. All of them read as 0 if converted unconditionally.
+            if descriptor.has_presence and not grpc_return_value.HasField(key):
+                result[key] = None
+
+            elif key == "protocol_version":
                 result[key] = ProtocolVersions(value).name
 
             elif type(value) in self.simple_types:

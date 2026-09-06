@@ -31,14 +31,18 @@ class Mixin(_SharedConverters):
         for descriptor in grpc_return_value.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
 
-            if key == "protocol_version":
+            # `baker` is absent on a (re)genesis block, and `slot_number`,
+            # `round` and `epoch` only exist on some protocol versions --
+            # slot_number up to 5, round and epoch from 6. Converting them
+            # regardless reported every one of those as 0, which is a valid
+            # round and a valid epoch.
+            if descriptor.has_presence and not grpc_return_value.HasField(key):
+                result[key] = None
+
+            elif key == "protocol_version":
                 result[key] = ProtocolVersions(value).name
 
             elif type(value) in self.simple_types:
-                result[f"{key}"] = self.convertType(value)
+                result[key] = self.convertType(value)
 
-        # TODO: fix for BakerId always producing 0
-        # even when it's not set (as is the case for genesis blocks)
-        if result["era_block_height"] == 0:
-            result["baker"] = None
         return CCD_BlockInfo(**result)

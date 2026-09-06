@@ -1247,8 +1247,9 @@ class CCD_CurrentPaydayStatus(BaseModel):
         finalization_live (bool): Whether the validator participates in finalization.
         lottery_power (float): The pool's relative probability of being selected as validator.
         transaction_fees_earned (microCCD): Transaction fees earned in the current reward period.
-        is_primed_for_suspension (Optional[bool]): Whether the validator is primed for suspension.
-        missed_rounds (Optional[int]): Number of rounds missed by the validator.
+        commission_rates (CCD_CommissionRates): The commission rates that apply for the current reward period.
+        is_primed_for_suspension (Optional[bool]): Whether the validator is primed for suspension. Absent on protocol versions without validator suspension.
+        missed_rounds (Optional[int]): Number of rounds missed by the validator. Absent on protocol versions without validator suspension.
     """
 
     baker_equity_capital: microCCD | str
@@ -1258,6 +1259,9 @@ class CCD_CurrentPaydayStatus(BaseModel):
     finalization_live: bool
     lottery_power: float
     transaction_fees_earned: microCCD | str
+    # Quoted because CCD_CommissionRates is defined just below this class;
+    # resolved by the model_rebuild() call there.
+    commission_rates: Optional["CCD_CommissionRates"] = None
     is_primed_for_suspension: Optional[bool] = None
     missed_rounds: Optional[int] = None
 
@@ -1276,6 +1280,9 @@ class CCD_CommissionRates(BaseModel):
     baking: float
     finalization: float
     transaction: float
+
+
+CCD_CurrentPaydayStatus.model_rebuild()
 
 
 class CCD_BakerRewardPeriodInfo(BaseModel):
@@ -2690,12 +2697,13 @@ class CCD_UpdatePayload(BaseModel):
         pool_parameters_cpv_1_update (Optional[CCD_PoolParametersCpv1]): The pool parameters were updated.
         time_parameters_cpv_1_update (Optional[CCD_TimeParametersCpv1]): The time parameters were updated.
         mint_distribution_cpv_1_update (Optional[CCD_MintDistributionCpv1]): The mint distribution was updated (protocol version 4+).
-        gas_rewards_cpv_2_update (Optional[CCD_GasRewardsCpv2]): The gas rewards were updated (protocol version 6+).
-        timeout_parameters_update (Optional[CCD_TimeoutParameters]): The consensus timeouts were updated.
+        gas_rewards_cpv_2_update (Optional[CCD_GasRewardsV2]): The gas rewards were updated (protocol version 6+).
+        timeout_parameters_update (Optional[CCD_TimeOutParameters]): The consensus timeouts were updated.
         min_block_time_update (Optional[CCD_Duration]): The minimum time between blocks was updated.
         block_energy_limit_update (Optional[CCD_Energy]): The block energy limit was updated.
         finalization_committee_parameters_update (Optional[CCD_FinalizationCommitteeParameters]): The finalization committee parameters were updated.
         validator_score_parameters_update (Optional[CCD_ValidatorScoreParameters]): The validator score parameters were updated.
+        create_plt_update (Optional[CCD_CreatePLT]): A new protocol-level token was created.
     """
 
     protocol_update: Optional[CCD_ProtocolUpdate] = None
@@ -2717,6 +2725,13 @@ class CCD_UpdatePayload(BaseModel):
     finalization_committee_parameters_update: Optional[CCD_FinalizationCommitteeParameters] = None
     validator_score_parameters_update: Optional[CCD_ValidatorScoreParameters] = None
     create_plt_update: Optional[CCD_CreatePLT] = None
+    gas_rewards_update: Optional[CCD_GasRewards] = None
+    min_block_time_update: Optional[CCD_Duration] = None
+    block_energy_limit_update: Optional[CCD_Energy] = None
+    # Quoted because CCD_GasRewardsV2 and CCD_TimeOutParameters are defined
+    # further down this module; resolved by the model_rebuild() call there.
+    gas_rewards_cpv_2_update: Optional["CCD_GasRewardsV2"] = None
+    timeout_parameters_update: Optional["CCD_TimeOutParameters"] = None
 
 
 class CCD_UpdateDetails(BaseModel):
@@ -2863,8 +2878,8 @@ class CCD_AccountStakingInfo_Baker(BaseModel):
     """
 
     baker_info: CCD_BakerInfo
-    pool_info: CCD_BakerPoolInfo
-    pending_change: CCD_StakePendingChange
+    pool_info: Optional[CCD_BakerPoolInfo] = None
+    pending_change: Optional[CCD_StakePendingChange] = None
     restake_earnings: bool
     staked_amount: microCCD | str
     is_suspended: Optional[bool] = None
@@ -2888,7 +2903,7 @@ class CCD_AccountStakingInfo_Delegator(BaseModel):
     """
 
     target: CCD_DelegationTarget
-    pending_change: CCD_StakePendingChange
+    pending_change: Optional[CCD_StakePendingChange] = None
     restake_earnings: bool
     staked_amount: microCCD | str
 
@@ -3181,7 +3196,7 @@ class CCD_TokenomicsInfo_V0(BaseModel):
     baking_reward_account: microCCD | str
     finalization_reward_account: microCCD | str
     gas_account: microCCD | str
-    protocol_version: int
+    protocol_version: str
 
 
 class CCD_TokenomicsInfo_V1(BaseModel):
@@ -3211,7 +3226,7 @@ class CCD_TokenomicsInfo_V1(BaseModel):
     next_payday_time: CCD_TimeStamp
     next_payday_mint_rate: CCD_MintRate
     total_staked_capital: microCCD | str
-    protocol_version: int
+    protocol_version: str
 
 
 class CCD_TokenomicsInfo(BaseModel):
@@ -3280,8 +3295,8 @@ class CCD_InstanceInfo(BaseModel):
         v1 (Optional[CCD_InstanceInfo_V1]): Version 1 smart contract instance information.
     """
 
-    v0: CCD_InstanceInfo_V0
-    v1: CCD_InstanceInfo_V1
+    v0: Optional[CCD_InstanceInfo_V0] = None
+    v1: Optional[CCD_InstanceInfo_V1] = None
 
 
 class CCD_BlocksAtHeightResponse(BaseModel):
@@ -3538,8 +3553,8 @@ class CCD_PendingUpdate(BaseModel):
         effective_time (TransactionTime): The effective time of the update.
         root_keys (Optional[CCD_HigherLevelKeys]): Updates to the root keys.
         level1_keys (Optional[CCD_HigherLevelKeys]): Updates to the level 1 keys.
-        level2_keys_cpv_0 (Optional[CCD_AuthorizationsV0]): Updates to the level 2 keys.
-        level2_keys_cpv_1 (Optional[CCD_AuthorizationsV1]): Updates to the level 2 keys.
+        level2_keys_cpv_0 (Optional[CCD_AuthorizationsV0]): Updates to the level 2 keys (chain parameters version 0).
+        level2_keys_cpv_1 (Optional[CCD_AuthorizationsV1]): Updates to the level 2 keys (chain parameters version 1).
         protocol (Optional[CCD_ProtocolUpdate]): Protocol updates.
         election_difficulty (Optional[CCD_ElectionDifficulty]): Updates to the election difficulty parameter.
         euro_per_energy (Optional[CCD_ExchangeRate]): Updates to the euro:energy exchange rate.
@@ -3555,19 +3570,21 @@ class CCD_PendingUpdate(BaseModel):
         add_identity_provider (Optional[CCD_IpInfo]): Adds a new identity provider.
         cooldown_parameters (Optional[CCD_CooldownParametersCpv1]): Updates to cooldown parameters for chain parameters.
         time_parameters (Optional[CCD_TimeParametersCpv1]): Updates to time parameters.
-        gas_rewards_cpv_2 (Optional[CCD_GasRewardsCpv2]): Updates to the GAS rewards (protocol version 6+).
-        timeout_parameters (Optional[CCD_TimeoutParameters]): Updates to the consensus timeouts.
+        gas_rewards_cpv_2 (Optional[CCD_GasRewardsV2]): Updates to the GAS rewards (protocol version 6+).
+        timeout_parameters (Optional[CCD_TimeOutParameters]): Updates to the consensus timeouts.
         min_block_time (Optional[CCD_Duration]): Updates to the minimum time between blocks.
         block_energy_limit (Optional[CCD_Energy]): Updates to the block energy limit.
         finalization_committee_parameters (Optional[CCD_FinalizationCommitteeParameters]): Updates to the finalization committee.
         validator_score_parameters (Optional[CCD_ValidatorScoreParameters]): Updates to the validator score parameters.
     """
 
+    # Every field but `effective_time` belongs to the `effect` oneof, so at most
+    # one of them is ever set: they all have to be optional.
     effective_time: CCD_TransactionTime
     root_keys: Optional[CCD_HigherLevelKeys] = None
     level1_keys: Optional[CCD_HigherLevelKeys] = None
-    level2_keys_cpc_0: Optional[CCD_AuthorizationsV0] = None
-    level2_keys_cpc_1: Optional[CCD_AuthorizationsV1] = None
+    level2_keys_cpv_0: Optional[CCD_AuthorizationsV0] = None
+    level2_keys_cpv_1: Optional[CCD_AuthorizationsV1] = None
     protocol: Optional[CCD_ProtocolUpdate] = None
     election_difficulty: Optional[CCD_ElectionDifficulty] = None
     euro_per_energy: Optional[CCD_ExchangeRate] = None
@@ -3576,14 +3593,20 @@ class CCD_PendingUpdate(BaseModel):
     mint_distribution_cpv_0: Optional[CCD_MintDistributionCpv0] = None
     mint_distribution_cpv_1: Optional[CCD_MintDistributionCpv1] = None
     transaction_fee_distribution: Optional[CCD_TransactionFeeDistribution] = None
-    gas_rewards: CCD_GasRewards
+    gas_rewards: Optional[CCD_GasRewards] = None
     pool_parameters_cpv_0: Optional[CCD_BakerStakeThreshold] = None
     pool_parameters_cpv_1: Optional[CCD_PoolParametersCpv1] = None
     add_anonymity_revoker: Optional[CCD_ArInfo] = None
     add_identity_provider: Optional[CCD_IpInfo] = None
     cooldown_parameters: Optional[CCD_CooldownParametersCpv1] = None
-    pool_parameters_cpv_1_update: Optional[CCD_PoolParametersCpv1] = None
     time_parameters: Optional[CCD_TimeParametersCpv1] = None
+    # Quoted because CCD_GasRewardsV2 and CCD_TimeOutParameters are defined
+    # further down this module; resolved by the model_rebuild() call there.
+    gas_rewards_cpv_2: Optional["CCD_GasRewardsV2"] = None
+    timeout_parameters: Optional["CCD_TimeOutParameters"] = None
+    min_block_time: Optional[CCD_Duration] = None
+    block_energy_limit: Optional[CCD_Energy] = None
+    finalization_committee_parameters: Optional[CCD_FinalizationCommitteeParameters] = None
     validator_score_parameters: Optional[CCD_ValidatorScoreParameters] = None
 
 
@@ -3886,6 +3909,13 @@ class CCD_GasRewardsV2(BaseModel):
     chain_update: CCD_AmountFraction
 
 
+# CCD_UpdatePayload and CCD_PendingUpdate refer to CCD_GasRewardsV2 and
+# CCD_TimeOutParameters by name because both are defined below them; resolve
+# those forward references now that they exist.
+CCD_UpdatePayload.model_rebuild()
+CCD_PendingUpdate.model_rebuild()
+
+
 class CCD_ChainParametersV2(BaseModel):
     """Chain parameters that apply from protocol version 6 onwards.
 
@@ -4028,8 +4058,8 @@ class CCD_InvokeInstanceResponse(BaseModel):
         failure (Optional[CCD_InvokeInstanceResponse_Failure]): Details of a failed invocation.
     """
 
-    success: CCD_InvokeInstanceResponse_Success
-    failure: CCD_InvokeInstanceResponse_Failure
+    success: Optional[CCD_InvokeInstanceResponse_Success] = None
+    failure: Optional[CCD_InvokeInstanceResponse_Failure] = None
 
 
 class CCD_BlockComplete(BaseModel):

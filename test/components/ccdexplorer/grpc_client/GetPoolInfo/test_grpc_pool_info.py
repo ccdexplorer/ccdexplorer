@@ -20,8 +20,9 @@ def test_pool_info(grpcclient: GRPCClient):
     assert pi.address == "3BFChzvx3783jGUKgHVCanFVxyDAn5xT3Y5NL5FKydVMuBa7Bm"
     assert pi.all_pool_total_capital == 8663567331383744
     assert pi.equity_capital == 1099583249741
-    assert pi.equity_pending_change.reduce is None
-    assert pi.equity_pending_change.remove is None
+    # No stake change is pending, and from protocol version 7 the field is never
+    # used at all -- so it is absent rather than an empty pending-change record.
+    assert pi.equity_pending_change is None
     assert pi.current_payday_info.baker_equity_capital == 1099037072012
     assert pi.current_payday_info.blocks_baked == 2
     assert pi.current_payday_info.delegated_capital == 892701163378
