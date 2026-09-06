@@ -523,7 +523,8 @@ function init_validator_tally_table() {
           }
           const formatted = value.toLocaleString("en-US");
           const row = cell.getRow().getData();
-          // One epoch per payday is currently never written, so say what the
+          // A payday should have every one of its epochs recorded. If some are
+          // missing -- job downtime, a rebuild still in progress -- say what the
           // number is based on rather than presenting a partial sum as exact.
           if (row.epochs_covered < row.epochs_expected) {
             cell.getElement().title =

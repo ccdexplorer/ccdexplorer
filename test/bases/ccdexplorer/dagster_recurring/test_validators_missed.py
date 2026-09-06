@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from ccdexplorer.dagster_recurring.recurring.update_validators_missed import (
     _counts_for_epoch,
+    epochs_to_record,
 )
 
 
@@ -80,3 +81,53 @@ def test_counts_are_sorted_by_count_descending():
 
     assert list(counts["missed_rounds_count"]) == ["22", "33", "11"]
     assert list(counts["rounds_won_count"]) == ["22", "33", "11"]
+
+
+def test_epochs_to_record_stops_one_short_of_the_chain():
+    """The current epoch is in progress; GetWinningBakersEpoch rejects it."""
+    assert epochs_to_record(highest_stored=100, payday_epoch=90, chain_epoch=104) == range(101, 104)
+
+
+def test_epochs_to_record_resumes_from_storage_not_the_payday():
+    """The bug this replaces: a payday-anchored lower bound skipped an epoch.
+
+    A payday running epochs 100..123 rolls over to one starting at 124. With the
+    old logic the lower bound jumped to 124 while the upper bound had only ever
+    reached 122, so epoch 123 was never recorded by either window.
+    """
+    assert epochs_to_record(highest_stored=122, payday_epoch=124, chain_epoch=126) == range(
+        123, 126
+    )
+
+
+def test_epochs_to_record_is_empty_when_caught_up():
+    # Caught up means the highest stored epoch is the frontier itself.
+    assert len(epochs_to_record(highest_stored=123, payday_epoch=100, chain_epoch=124)) == 0
+    # And a store somehow ahead of the chain must not produce a backwards range.
+    assert len(epochs_to_record(highest_stored=200, payday_epoch=100, chain_epoch=124)) == 0
+
+
+def test_epochs_to_record_catches_up_after_downtime():
+    assert epochs_to_record(highest_stored=50, payday_epoch=190, chain_epoch=200) == range(51, 200)
+
+
+def test_epochs_to_record_falls_back_to_the_payday_on_an_empty_genesis():
+    assert epochs_to_record(highest_stored=None, payday_epoch=90, chain_epoch=104) == range(90, 104)
+
+
+def test_epochs_to_record_falls_back_to_one_after_a_protocol_update():
+    """The last known payday block still belongs to the previous genesis, so its
+    epoch number is meaningless (and far ahead) in the new one."""
+    assert epochs_to_record(highest_stored=None, payday_epoch=4176, chain_epoch=6) == range(1, 6)
+
+
+def test_epochs_to_record_is_contiguous_with_the_previous_run():
+    """Successive runs must not leave a hole between them."""
+    chain, highest, seen = 200, 100, []
+    while chain <= 210:
+        epochs = epochs_to_record(highest, payday_epoch=100, chain_epoch=chain)
+        seen.extend(epochs)
+        if epochs:
+            highest = epochs[-1]
+        chain += 1
+    assert seen == list(range(101, 210))

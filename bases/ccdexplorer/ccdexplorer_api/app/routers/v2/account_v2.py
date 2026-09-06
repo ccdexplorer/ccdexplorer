@@ -1556,9 +1556,9 @@ async def _missed_rounds_per_payday(
 
     paydays_v2 records the first and last block of each payday, and the blocks
     collection carries the epoch and genesis index for those hashes -- which is
-    what paydays_v2_validators_missed is keyed on. Documents there are labelled
-    `epoch` but hold the rounds of `epoch - 1`, so a payday spanning epochs
-    E1..E2 is covered by the labels E1+1..E2+1.
+    what paydays_v2_validators_missed is keyed on. A document there is labelled
+    with the epoch it holds the rounds of, so a payday spanning epochs E1..E2 is
+    covered by exactly those labels.
 
     Returns, per date, the summed misses plus how many of the payday's epochs
     were actually present, so a caller can tell a real zero from missing data.
@@ -1596,7 +1596,7 @@ async def _missed_rounds_per_payday(
         last = block_by_hash.get(payday.get("hash_for_last_block"))
         if not first or not last:
             continue
-        ranges[payday["date"]] = (first["genesis_index"], first["epoch"] + 1, last["epoch"] + 1)
+        ranges[payday["date"]] = (first["genesis_index"], first["epoch"], last["epoch"])
 
     if not ranges:
         return {}
