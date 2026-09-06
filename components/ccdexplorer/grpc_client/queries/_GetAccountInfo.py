@@ -203,20 +203,6 @@ class Mixin(_SharedConverters):
 
         return CCD_AccountCredential(**result)
 
-    def convertCooldown(self, message) -> CCD_Cooldown:
-        result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-                if key == "status":
-                    result[key] = CoolDownStatus(value)
-
-        return CCD_Cooldown(**result)
-
     def convertTokenAccountState(self, message: message.Message) -> CCD_TokenAccountState:
         keys = {}
 
@@ -362,6 +348,19 @@ class Mixin(_SharedConverters):
             )
         elif hex_address:
             accountIdentifierInput = self.generate_account_identifier_input_from(hex_address)
+        else:
+            # Falling through left accountIdentifierInput unbound (UnboundLocalError
+            # from deep inside the client); say what is actually wrong instead.
+            raise ValueError("get_account_info: pass either hex_address or account_index")
+
+        if accountIdentifierInput is None:
+            # generate_account_identifier_input_from swallows a malformed address
+            # and returns None, which the node would reject as an opaque
+            # INVALID_ARGUMENT.
+            raise ValueError(
+                f"get_account_info: could not build an account identifier from "
+                f"{hex_address!r} / account_index={account_index!r}"
+            )
 
         account_info = AccountInfoRequest(
             block_hash=blockHashInput, account_identifier=accountIdentifierInput

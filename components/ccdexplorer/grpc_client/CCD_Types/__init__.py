@@ -1247,8 +1247,9 @@ class CCD_CurrentPaydayStatus(BaseModel):
         finalization_live (bool): Whether the validator participates in finalization.
         lottery_power (float): The pool's relative probability of being selected as validator.
         transaction_fees_earned (microCCD): Transaction fees earned in the current reward period.
-        is_primed_for_suspension (Optional[bool]): Whether the validator is primed for suspension.
-        missed_rounds (Optional[int]): Number of rounds missed by the validator.
+        commission_rates (CCD_CommissionRates): The commission rates that apply for the current reward period.
+        is_primed_for_suspension (Optional[bool]): Whether the validator is primed for suspension. Absent on protocol versions without validator suspension.
+        missed_rounds (Optional[int]): Number of rounds missed by the validator. Absent on protocol versions without validator suspension.
     """
 
     baker_equity_capital: microCCD | str
@@ -1258,6 +1259,9 @@ class CCD_CurrentPaydayStatus(BaseModel):
     finalization_live: bool
     lottery_power: float
     transaction_fees_earned: microCCD | str
+    # Quoted because CCD_CommissionRates is defined just below this class;
+    # resolved by the model_rebuild() call there.
+    commission_rates: Optional["CCD_CommissionRates"] = None
     is_primed_for_suspension: Optional[bool] = None
     missed_rounds: Optional[int] = None
 
@@ -1276,6 +1280,9 @@ class CCD_CommissionRates(BaseModel):
     baking: float
     finalization: float
     transaction: float
+
+
+CCD_CurrentPaydayStatus.model_rebuild()
 
 
 class CCD_BakerRewardPeriodInfo(BaseModel):

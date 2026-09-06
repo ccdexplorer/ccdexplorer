@@ -27,7 +27,6 @@ from ccdexplorer.grpc_client.types_pb2 import (
     TimeoutParameters,
     TimeParametersCpv1,
     TransactionFeeDistribution,
-    UpdatePayload,
     ValidatorScoreParameters,
 )
 
@@ -38,49 +37,11 @@ if TYPE_CHECKING:
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ExchangeRate,
     CCD_PendingUpdate,
-    CCD_UpdateDetails,
-    CCD_UpdatePayload,
 )
 from google.protobuf.json_format import MessageToDict
 
 
 class Mixin(_SharedConverters):
-    def convertPendingUpdatePayload(self, message) -> tuple[CCD_UpdatePayload, dict] | None:
-        if MessageToDict(message) == {}:
-            return None
-        else:
-            result = {}
-            _type = {"type": "update"}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    _type.update({"contents": key})
-
-            return CCD_UpdatePayload(**result), _type
-
-    def convertPendingUpdateDetails(self, message) -> tuple[CCD_UpdateDetails, dict] | None:
-        if MessageToDict(message) == {}:
-            return None
-        else:
-            result = {}
-            _type = {"type": "update"}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) is UpdatePayload:
-                        result[key], _type = self.convertPendingUpdatePayload(value)
-
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
-
-            return CCD_UpdateDetails(**result), _type
-
     def get_block_pending_updates(
         self: GRPCClient,
         block_hash: str,

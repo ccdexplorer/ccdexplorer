@@ -30,9 +30,17 @@ class Mixin(_SharedConverters):
         self: GRPCClient,
         net: Enum = NET.MAINNET,
     ) -> CCD_ArrivedBlockInfo | None:
-        if net == NET.MAINNET:
-            for block in self.stub_mainnet.GetBlocks(request=Empty()):
-                return self.convertBlock(block)
-        else:
-            for block in self.stub_testnet.GetBlocks(request=Empty()):
-                return self.convertBlock(block)
+        """Read the first block off the node's `GetBlocks` stream.
+
+        Every net configured on the client is addressable here; picking the stub
+        by hand previously sent anything that was not mainnet to testnet, devnet
+        included.
+        """
+        stub = getattr(self, f"stub_{NET(net).value}")
+        if stub is None:
+            return None
+
+        for block in stub.GetBlocks(request=Empty()):
+            return self.convertBlock(block)
+
+        return None

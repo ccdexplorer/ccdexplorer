@@ -92,8 +92,6 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ExchangeRate,
     CCD_NewRelease,
     CCD_SponsorDetails,
-    CCD_LockCreateEvent,
-    CCD_LockDestroyEvent,
     CCD_MetaEffect,
     CCD_TokenCreationDetails,
     CCD_TokenEffect,
@@ -531,96 +529,83 @@ class Mixin(_SharedConverters):
         result = {}
         _type: dict = {"type": "account_transaction"}
         _outcome = "success"
-        for field, value in message.ListFields():
-            key = field.name
-            _outcome = "success"
-            try:
-                if value.HasField("reject_reason"):
-                    _outcome = "reject"
-                    result[key], type_contents = self.convertRejectReasonNone(value)
-                    _type.update({"contents": type_contents})
-            except:  # noqa F403
-                if _outcome == "success":
-                    if type(value) is ContractInitializedEvent:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectContractInitializedEvent(value)
 
-                    elif type(value) is AccountTransactionEffects.ContractUpdateIssued:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectContractUpdateIssued(value)
+        # `effect` is a oneof, so exactly one field is set. Selecting it by name
+        # keeps a genuine conversion error visible: dispatching on whether
+        # `HasField("reject_reason")` raised meant any exception raised while
+        # converting a reject reason was swallowed and returned as an empty
+        # effect that still claimed to be a rejection.
+        key = message.WhichOneof("effect")
+        if key is None:
+            return CCD_AccountTransactionEffects(**result), _type, _outcome
 
-                    elif type(value) is AccountTransactionEffects.AccountTransfer:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectAccountTransfer(value)
+        value = getattr(message, key)
+        _type.update({"contents": key})
 
-                    elif type(value) is BakerEvent.BakerAdded:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectBakerAdded(value)
+        if key == "none":
+            _outcome = "reject"
+            result[key], type_contents = self.convertRejectReasonNone(value)
+            _type.update({"contents": type_contents})
 
-                    elif type(value) is BakerId:
-                        _type.update({"contents": key})
-                        result[key] = self.convertType(value)
+        elif type(value) is ContractInitializedEvent:
+            result[key] = self.convertEffectContractInitializedEvent(value)
 
-                    elif type(value) is AccountTransactionEffects.BakerStakeUpdated:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectBakerStakeUpdated(value)
+        elif type(value) is AccountTransactionEffects.ContractUpdateIssued:
+            result[key] = self.convertEffectContractUpdateIssued(value)
 
-                    elif type(value) is BakerEvent.BakerRestakeEarningsUpdated:
-                        _type.update({"contents": key})
-                        result[key] = self.convertTypeWithSingleValues(value)
+        elif type(value) is AccountTransactionEffects.AccountTransfer:
+            result[key] = self.convertEffectAccountTransfer(value)
 
-                    elif type(value) is BakerKeysEvent:
-                        _type.update({"contents": key})
-                        result[key] = self.convertBakerKeysEvent(value)
+        elif type(value) is BakerEvent.BakerAdded:
+            result[key] = self.convertEffectBakerAdded(value)
 
-                    elif type(value) is AccountTransactionEffects.EncryptedAmountTransferred:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectAccountEncryptedAmountTransferred(value)
+        elif type(value) is BakerId:
+            result[key] = self.convertType(value)
 
-                    elif type(value) is EncryptedSelfAmountAddedEvent:
-                        _type.update({"contents": key})
-                        result[key] = CCD_EncryptedSelfAmountAddedEvent(
-                            **self.convertTypeWithSingleValues(value)
-                        )
+        elif type(value) is AccountTransactionEffects.BakerStakeUpdated:
+            result[key] = self.convertEffectBakerStakeUpdated(value)
 
-                    elif type(value) is AccountTransactionEffects.TransferredToPublic:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectAccountTransferredToPublic(value)
+        elif type(value) is BakerEvent.BakerRestakeEarningsUpdated:
+            result[key] = self.convertTypeWithSingleValues(value)
 
-                    elif type(value) is AccountTransactionEffects.TransferredWithSchedule:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectAccountTransferWithSchedule(value)
+        elif type(value) is BakerKeysEvent:
+            result[key] = self.convertBakerKeysEvent(value)
 
-                    elif type(value) is AccountTransactionEffects.CredentialsUpdated:
-                        _type.update({"contents": key})
-                        result[key] = self.convertCredentialsUpdated(value)
+        elif type(value) is AccountTransactionEffects.EncryptedAmountTransferred:
+            result[key] = self.convertEffectAccountEncryptedAmountTransferred(value)
 
-                    elif type(value) is RegisteredData:
-                        _type.update({"contents": key})
-                        result[key] = self.convertType(value)
+        elif type(value) is EncryptedSelfAmountAddedEvent:
+            result[key] = CCD_EncryptedSelfAmountAddedEvent(
+                **self.convertTypeWithSingleValues(value)
+            )
 
-                    elif type(value) is AccountTransactionEffects.BakerConfigured:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectBakerConfigured(value)
+        elif type(value) is AccountTransactionEffects.TransferredToPublic:
+            result[key] = self.convertEffectAccountTransferredToPublic(value)
 
-                    elif type(value) is AccountTransactionEffects.DelegationConfigured:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectDelegationConfigured(value)
+        elif type(value) is AccountTransactionEffects.TransferredWithSchedule:
+            result[key] = self.convertEffectAccountTransferWithSchedule(value)
 
-                    elif type(value) is TokenEffect:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectTokenUpdate(value)
-                        _type.update(
-                            {"additional_data": self.get_plt_token_events_type(result[key])}
-                        )
+        elif type(value) is AccountTransactionEffects.CredentialsUpdated:
+            result[key] = self.convertCredentialsUpdated(value)
 
-                    elif type(value) is MetaEffect:
-                        _type.update({"contents": key})
-                        result[key] = self.convertEffectMetaUpdate(value)
+        elif type(value) is RegisteredData:
+            result[key] = self.convertType(value)
 
-                    elif type(value) in self.simple_types:
-                        _type.update({"contents": key})
-                        result[key] = self.convertType(value)
+        elif type(value) is AccountTransactionEffects.BakerConfigured:
+            result[key] = self.convertEffectBakerConfigured(value)
+
+        elif type(value) is AccountTransactionEffects.DelegationConfigured:
+            result[key] = self.convertEffectDelegationConfigured(value)
+
+        elif type(value) is TokenEffect:
+            result[key] = self.convertEffectTokenUpdate(value)
+            _type.update({"additional_data": self.get_plt_token_events_type(result[key])})
+
+        elif type(value) is MetaEffect:
+            result[key] = self.convertEffectMetaUpdate(value)
+
+        elif type(value) in self.simple_types:
+            result[key] = self.convertType(value)
 
         return CCD_AccountTransactionEffects(**result), _type, _outcome
 

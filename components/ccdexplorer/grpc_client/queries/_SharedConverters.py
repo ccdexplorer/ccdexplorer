@@ -25,30 +25,6 @@ class OpenStatusEnum(Enum):
     closedForAll = 2
 
 
-class TransactionType(Enum):
-    DEPLOY_MODULE = 0
-    INIT_CONTRACT = 1
-    UPDATE = 2
-    TRANSFER = 3
-    ADD_BAKER = 4
-    REMOVE_BAKER = 5
-    UPDATE_BAKER_STAKE = 6
-    UPDATE_BAKER_RESTAKE_EARNINGS = 7
-    UPDATE_BAKER_KEYS = 8
-    UPDATE_CREDENTIAL_KEYS = 9
-    ENCRYPTED_AMOUNT_TRANSFER = 10
-    TRANSFER_TO_ENCRYPTED = 11
-    TRANSFER_TO_PUBLIC = 12
-    TRANSFER_WITH_SCHEDULE = 13
-    UPDATE_CREDENTIALS = 14
-    REGISTER_DATA = 15
-    TRANSFER_WITH_MEMO = 16
-    ENCRYPTED_AMOUNT_TRANSFER_WITH_MEMO = 17
-    TRANSFER_WITH_SCHEDULE_AND_MEMO = 18
-    CONFIGURE_BAKER = 19
-    CONFIGURE_DELEGATION = 20
-
-
 class Mixin(Protocol):
     # These types should be encoded to HEX
     bytes_to_hex_types = [
@@ -161,10 +137,22 @@ class Mixin(Protocol):
         )
         return EpochRequest(relative_epoch=relative_epoch)
 
-    def generate_consensus_detailed_status_query(self):
-        return ConsensusDetailedStatusQuery()
+    def generate_consensus_detailed_status_query(self, genesis_index: int | None = None):
+        # `genesis_index` is optional in the proto: leaving it unset asks for the
+        # latest genesis index, which is why it must not be defaulted to 0.
+        if genesis_index is None:
+            return ConsensusDetailedStatusQuery()
+        return ConsensusDetailedStatusQuery(genesis_index=GenesisIndex(value=genesis_index))
 
-    def valueIsEmpty(self, value, key=None, message=None):
+    def valueIsEmpty(self, value):
+        """Whether `value` carries no content.
+
+        Note this cannot distinguish "absent" from "set to its default": a
+        message whose every field is zero serialises to `{}` either way. Where
+        the proto tracks presence -- an `optional` field, or any singular
+        message field -- prefer `HasField` on the parent, or `WhichOneof` for a
+        oneof, over this.
+        """
         if isinstance(value, int):
             return value is None
         else:
@@ -172,22 +160,7 @@ class Mixin(Protocol):
                 return False
             else:
                 if hasattr(value, "DESCRIPTOR"):
-                    if message:
-                        lll = list(message)
-                        key_in_message = key in lll[0].__str__()
-                        if key_in_message:
-                            # special case for baker_id = 0
-                            # (doesn't get transmitted in a message)
-                            if key in ["baker_removed"]:
-                                return False
-                            else:
-                                if MessageToDict(value) != {}:
-                                    return False
-                                else:
-                                    return True
-                        return MessageToDict(value) == {}
-                    else:
-                        return MessageToDict(value) == {}
+                    return MessageToDict(value) == {}
                 else:  # pragma: no cover
                     return False
 
@@ -335,10 +308,6 @@ class Mixin(Protocol):
 
         elif type(value) is TokenHolder:
             return CCD_TokenHolder(account=self.convertAccountAddress(value.account))
-        # elif type(value) is TokenModuleRef:
-        #     return CCD_TokenModuleRef(value=value.value)
-        elif type(value) is TokenId:
-            return value.value  # CCD_TokenId(value=value.value)
 
     def convertContractAddress(self, value: ContractAddress) -> CCD_ContractAddress:
         return CCD_ContractAddress(**{"index": value.index, "subindex": value.subindex})
@@ -413,38 +382,6 @@ class Mixin(Protocol):
                 resulting_dict[key] = self.convertType(value)
 
         return CCD_ReleaseSchedule(**resulting_dict)
-
-    def convertCoolDowns(self, message) -> list[CCD_Cooldown]:
-        resulting_dict = {}
-
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-
-            # if key == "schedules":
-            #     schedule = []
-            #     for entry in value:
-            #         entry_dict = {}
-            #         for descriptor in entry.DESCRIPTOR.fields:
-            #             key, value = self.get_key_value_from_descriptor(
-            #                 descriptor, entry
-            #             )
-
-            #             if key == "transactions":
-            #                 entry_dict[key] = self.convertList(value)
-
-            #             elif type(value) is Timestamp:
-            #                 entry_dict[key] = self.convertType(value)
-
-            #             elif type(value) is Amount:
-            #                 entry_dict[key] = self.convertType(value)
-
-            #         schedule.append(entry_dict)
-            #     resulting_dict["schedules"] = schedule
-
-            # elif type(value) is Amount:
-            #     resulting_dict[key] = self.convertType(value)
-
-        return CCD_Cooldown(**resulting_dict)
 
     def convertAccountIndex(self, message) -> CCD_AccountIndex:
         result = {}
@@ -540,7 +477,18 @@ class Mixin(Protocol):
 
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)
-            result[key] = self.convertType(value)
+
+            # `is_primed_for_suspension` and `missed_rounds` are optional: they
+            # are absent on protocol versions that predate validator suspension,
+            # which is not the same as "not primed" / "missed no rounds".
+            if descriptor.has_presence and not message.HasField(key):
+                result[key] = None
+
+            elif type(value) is CommissionRates:
+                result[key] = self.convertCommissionRates(value)
+
+            else:
+                result[key] = self.convertType(value)
 
         return CCD_CurrentPaydayStatus(**result)
 
@@ -913,11 +861,15 @@ class Mixin(Protocol):
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)
-            if value == "":
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
+
+            # `token_id` is optional: it is absent inside a TokenEvent, which
+            # already names the token, and present inside a MetaEvent. Reporting
+            # the absent case as an empty string would invent a token id.
+            if descriptor.has_presence and not message.HasField(key):
+                continue
+
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_TokenModuleEvent(**result)
 
@@ -925,13 +877,21 @@ class Mixin(Protocol):
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)
+
+            # `memo`, `from_lock`, `to_lock` and `token_id` are all optional.
+            # `from_lock`/`to_lock` in particular must go by presence: a lock id
+            # is a trio of integers, so one of {0, 0, 0} is indistinguishable
+            # from an unset field once serialised.
+            if descriptor.has_presence and not message.HasField(key):
+                continue
+
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key == "amount":
                 result[key] = CCD_TokenAmount(
                     **{"value": str(value.value), "decimals": value.decimals}
                 )
-            elif type(value) is LockId and not self.valueIsEmpty(value):
+            elif type(value) is LockId:
                 result[key] = self.convertLockId(value)
         return CCD_TokenTransferEvent(**result)
 
@@ -939,6 +899,11 @@ class Mixin(Protocol):
         result = {}
         for descriptor in message.DESCRIPTOR.fields:
             key, value = self.get_key_value_from_descriptor(descriptor, message)
+
+            # `token_id` is optional; see convertTokenModuleEvent.
+            if descriptor.has_presence and not message.HasField(key):
+                continue
+
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key == "amount":
@@ -1052,7 +1017,9 @@ class Mixin(Protocol):
             CCD_LockFund(
                 account=self.decode_lock_account(fund["account"]),
                 amounts=[
-                    CCD_LockFundEntry(token=entry["token"], amount=self.convertDecimal(entry["amount"]))
+                    CCD_LockFundEntry(
+                        token=entry["token"], amount=self.convertDecimal(entry["amount"])
+                    )
                     for entry in fund["amounts"]
                 ],
             )
@@ -1270,134 +1237,6 @@ class Mixin(Protocol):
         _type = None
         for field, value in message.ListFields():
             key = field.name
-
-            # Note this next section is purely to have Coverage
-            # show us that we have not covered all possible reject
-            # reasons with adequate tests...
-            if key == "module_not_wf":
-                test_me_please = True
-            if key == "module_hash_already_exists":
-                test_me_please = True
-            if key == "invalid_account_reference":
-                test_me_please = True
-            if key == "invalid_init_method":
-                test_me_please = True
-            if key == "invalid_receive_method":
-                test_me_please = True
-            if key == "invalid_module_reference":
-                test_me_please = True
-            if key == "invalid_contract_address":
-                test_me_please = True
-            if key == "runtime_failure":
-                test_me_please = True
-            if key == "amount_too_large":
-                test_me_please = True
-            if key == "serialization_failure":
-                test_me_please = True
-            if key == "out_of_energy":
-                test_me_please = True
-            if key == "rejected_init":
-                test_me_please = True
-            if key == "rejected_receive":
-                test_me_please = True
-            if key == "invalid_proof":
-                test_me_please = True
-            if key == "already_a_baker: ":
-                test_me_please = True
-            if key == "not_a_baker":
-                test_me_please = True
-            if key == "insufficient_balance_for_baker_stake":
-                test_me_please = True
-            if key == "stake_under_minimum_threshold_for_baking":
-                test_me_please = True
-            if key == "baker_in_cooldown":
-                test_me_please = True
-            if key == "duplicate_aggregation_key":
-                test_me_please = True
-            if key == "non_existent_credential_id":
-                test_me_please = True
-            if key == "key_index_already_in_use":
-                test_me_please = True
-            if key == "invalid_account_threshold":
-                test_me_please = True
-            if key == "invalid_credential_key_sign_threshold":
-                test_me_please = True
-            if key == "invalid_encrypted_amount_transfer_proof":
-                test_me_please = True
-            if key == "invalid_transfer_to_public_proof":
-                test_me_please = True
-            if key == "encrypted_amount_self_transfer":
-                test_me_please = True
-            if key == "invalid_index_on_encrypted_transfer":
-                test_me_please = True
-            if key == "zero_scheduledAmount":
-                test_me_please = True
-            if key == "non_increasing_schedule":
-                test_me_please = True
-            if key == "first_scheduled_release_expired":
-                test_me_please = True
-            if key == "scheduled_self_transfer":
-                test_me_please = True
-            if key == "invalid_credentials":
-                test_me_please = True
-            if key == "duplicate_cred_ids":
-                test_me_please = True
-            if key == "non_existent_cred_ids":
-                test_me_please = True
-            if key == "remove_first_credential":
-                test_me_please = True
-            if key == "credential_holder_did_not_sign":
-                test_me_please = True
-            if key == "not_allowed_multiple_credentials":
-                test_me_please = True
-            if key == "not_allowed_to_receive_encrypted":
-                test_me_please = True
-            if key == "not_allowed_to_handle_encrypted":
-                test_me_please = True
-            if key == "missing_baker_add_parameters":
-                test_me_please = True
-            if key == "finalization_reward_commission_not_in_range":
-                test_me_please = True
-            if key == "baking_reward_commission_not_in_range":
-                test_me_please = True
-            if key == "transaction_fee_commission_not_in_range":
-                test_me_please = True
-            if key == "already_a_delegator":
-                test_me_please = True
-            if key == "insufficient_balance_for_delegation_stake":
-                test_me_please = True
-            if key == "missing_delegation_add_parameters":
-                test_me_please = True
-            if key == "insufficient_delegation_stak":
-                test_me_please = True
-            if key == "delegator_in_cooldown":
-                test_me_please = True
-            if key == "not_a_delegator":
-                test_me_please = True
-            if key == "delegation_target_not_a_baker: ":
-                test_me_please = True
-            if key == "stake_over_maximum_threshold_for_pool":
-                test_me_please = True
-            if key == "pool_would_become_over_delegated":
-                test_me_please = True
-            if key == "pool_closed":
-                test_me_please = True
-            if key == "non_existent_lock_id":
-                test_me_please = True
-            if key == "lock_expired":
-                test_me_please = True
-            if key == "lock_fund_not_authorized":
-                test_me_please = True
-            if key == "lock_send_not_authorized":
-                test_me_please = True
-            if key == "lock_return_not_authorized":
-                test_me_please = True
-            if key == "lock_cancel_not_authorized":
-                test_me_please = True
-            if key == "lock_token_not_permitted":
-                test_me_please = True
-            if key == "lock_recipient_not_permitted":
-                test_me_please = True  # noqa: F841
 
             _type = key
             if type(value) in self.simple_types:
