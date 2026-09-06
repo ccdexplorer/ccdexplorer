@@ -498,17 +498,42 @@ function init_validator_tally_table() {
         
       },
       {
-        title: "Actual", field: "actuals", 
+        title: "Actual", field: "actuals",
         minWidth: 100,
         maxWidth: 100,
         responsive: 0,
         formatter: intFormatterRounded,
         headerSort:false,
-        
+
         hozAlign: "right", headerHozAlign: "right",
-        
+
       },
-      
+      {
+        title: "Missed", field: "missed",
+        minWidth: 90,
+        maxWidth: 90,
+        responsive: 0,
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        formatter: function(cell) {
+          const value = cell.getValue();
+          if (value === null || value === undefined) {
+            cell.getElement().title = "No round data recorded for this payday.";
+            return "-";
+          }
+          const row = cell.getRow().getData();
+          // One epoch per payday is currently never written, so say what the
+          // number is based on rather than presenting a partial sum as exact.
+          if (row.epochs_covered < row.epochs_expected) {
+            cell.getElement().title =
+              "Based on " + row.epochs_covered + " of " + row.epochs_expected +
+              " epochs in this payday; the rest were not recorded.";
+            return value + "*";
+          }
+          return String(value);
+        },
+      },
+
     ];
   window["validator_tally_table_filename"] = '{{filename}}';
 
