@@ -6,6 +6,11 @@ from ccdexplorer.dagster_recurring.recurring.update_validators_missed import (
 )
 
 
+def _filled(highest: int, lookback: int = 48) -> set[int]:
+    """Every epoch in the lookback window already stored, so no gaps to sweep."""
+    return set(range(max(1, highest - lookback + 1), highest + 1))
+
+
 def round_won_by(winner: int, present: bool):
     return SimpleNamespace(round=0, winner=winner, present=present)
 
@@ -85,7 +90,7 @@ def test_counts_are_sorted_by_count_descending():
 
 def test_epochs_to_record_stops_one_short_of_the_chain():
     """The current epoch is in progress; GetWinningBakersEpoch rejects it."""
-    assert epochs_to_record(highest_stored=100, payday_epoch=90, chain_epoch=104) == range(101, 104)
+    assert epochs_to_record(100, _filled(100), payday_epoch=90, chain_epoch=104) == [101, 102, 103]
 
 
 def test_epochs_to_record_resumes_from_storage_not_the_payday():
@@ -95,39 +100,84 @@ def test_epochs_to_record_resumes_from_storage_not_the_payday():
     old logic the lower bound jumped to 124 while the upper bound had only ever
     reached 122, so epoch 123 was never recorded by either window.
     """
-    assert epochs_to_record(highest_stored=122, payday_epoch=124, chain_epoch=126) == range(
-        123, 126
-    )
+    assert epochs_to_record(122, _filled(122), payday_epoch=124, chain_epoch=126) == [123, 124, 125]
 
 
 def test_epochs_to_record_is_empty_when_caught_up():
     # Caught up means the highest stored epoch is the frontier itself.
-    assert len(epochs_to_record(highest_stored=123, payday_epoch=100, chain_epoch=124)) == 0
+    assert epochs_to_record(123, _filled(123), payday_epoch=100, chain_epoch=124) == []
     # And a store somehow ahead of the chain must not produce a backwards range.
-    assert len(epochs_to_record(highest_stored=200, payday_epoch=100, chain_epoch=124)) == 0
+    assert epochs_to_record(200, _filled(200), payday_epoch=100, chain_epoch=124) == []
 
 
 def test_epochs_to_record_catches_up_after_downtime():
-    assert epochs_to_record(highest_stored=50, payday_epoch=190, chain_epoch=200) == range(51, 200)
+    assert epochs_to_record(50, _filled(50), payday_epoch=190, chain_epoch=200) == list(range(51, 200))
 
 
 def test_epochs_to_record_falls_back_to_the_payday_on_an_empty_genesis():
-    assert epochs_to_record(highest_stored=None, payday_epoch=90, chain_epoch=104) == range(90, 104)
+    assert epochs_to_record(None, set(), payday_epoch=90, chain_epoch=104) == list(range(90, 104))
 
 
 def test_epochs_to_record_falls_back_to_one_after_a_protocol_update():
     """The last known payday block still belongs to the previous genesis, so its
     epoch number is meaningless (and far ahead) in the new one."""
-    assert epochs_to_record(highest_stored=None, payday_epoch=4176, chain_epoch=6) == range(1, 6)
+    assert epochs_to_record(None, set(), payday_epoch=4176, chain_epoch=6) == list(range(1, 6))
 
 
 def test_epochs_to_record_is_contiguous_with_the_previous_run():
     """Successive runs must not leave a hole between them."""
     chain, highest, seen = 200, 100, []
     while chain <= 210:
-        epochs = epochs_to_record(highest, payday_epoch=100, chain_epoch=chain)
+        epochs = epochs_to_record(highest, _filled(highest), payday_epoch=100, chain_epoch=chain)
         seen.extend(epochs)
         if epochs:
             highest = epochs[-1]
         chain += 1
     assert seen == list(range(101, 210))
+
+
+def test_epochs_to_record_sweeps_up_a_hole_below_the_highest():
+    """Appending alone never revisits a hole; the bounded sweep has to."""
+    stored = _filled(120) - {117}
+
+    assert epochs_to_record(120, stored, payday_epoch=100, chain_epoch=123) == [117, 121, 122]
+
+
+def test_epochs_to_record_sweeps_the_seam_a_concurrent_rebuild_left():
+    """The real incident: a rebuild stopped at 4318 while the job resumed at
+    4320, orphaning 4319. A run must now pick it up without being told."""
+    stored = _filled(4321) - {4319}
+
+    assert epochs_to_record(4321, stored, payday_epoch=4320, chain_epoch=4323) == [4319, 4322]
+
+
+def test_epochs_to_record_sweep_is_bounded_by_the_lookback():
+    """Holes older than the window are the rebuild script's job, not this one."""
+    stored = _filled(200, lookback=48) - {160}
+    stored.discard(100)  # far older than the 48-epoch window
+
+    epochs = epochs_to_record(200, stored, payday_epoch=180, chain_epoch=202, lookback=48)
+
+    assert 160 in epochs
+    assert 100 not in epochs
+
+
+def test_epochs_to_record_returns_oldest_first():
+    """Gaps are recorded before new epochs, so a partial run stays sensible."""
+    stored = _filled(120) - {110, 118}
+
+    assert epochs_to_record(120, stored, payday_epoch=100, chain_epoch=124) == [
+        110,
+        118,
+        121,
+        122,
+        123,
+    ]
+
+
+def test_epochs_to_record_sweep_does_not_duplicate_new_epochs():
+    stored = _filled(120) - {119}
+
+    epochs = epochs_to_record(120, stored, payday_epoch=100, chain_epoch=124)
+
+    assert epochs == sorted(set(epochs))

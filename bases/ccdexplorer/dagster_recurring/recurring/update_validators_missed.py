@@ -37,20 +37,38 @@ def _counts_for_epoch(winning_bakers: list[CCD_WinningBaker]) -> dict:
     }
 
 
+# How far back a run looks for epochs it never recorded. Two paydays: long
+# enough to catch a seam left by an outage or a concurrent rebuild, short
+# enough that the check stays a single indexed query.
+GAP_LOOKBACK_EPOCHS = 48
+
+
 def epochs_to_record(
-    highest_stored: int | None, payday_epoch: int, chain_epoch: int
-) -> range:
-    """The epochs whose rounds this run should record.
+    highest_stored: int | None,
+    recent_stored: set[int],
+    payday_epoch: int,
+    chain_epoch: int,
+    lookback: int = GAP_LOOKBACK_EPOCHS,
+) -> list[int]:
+    """The epochs whose rounds this run should record, oldest first.
 
     The upper bound is `chain_epoch - 1`. The chain's current epoch is still in
     progress and GetWinningBakersEpoch rejects it as a "Future epoch", so that
     is the newest epoch there is complete data for.
 
-    The lower bound follows what is already stored, not the current payday.
-    Anchoring it to the payday orphaned exactly one epoch per payday: the upper
-    bound never reached the payday's final epoch before the lower bound jumped
-    past it at rollover, and nothing ever went back for it. Resuming from the
-    highest stored epoch also makes the job self-healing after downtime.
+    New epochs are taken from above the highest stored one rather than from the
+    current payday. Anchoring to the payday orphaned exactly one epoch per
+    payday: the upper bound never reached the payday's final epoch before the
+    lower bound jumped past it at rollover, and nothing ever went back for it.
+
+    Appending alone cannot repair a hole below the highest stored epoch, though,
+    and a hole is exactly what a concurrent writer leaves behind -- rebuilding
+    the collection while this job was still running put one at the seam between
+    the two. So each run also sweeps the last `lookback` epochs and picks up
+    anything missing. The sweep is bounded so the work per run stays constant;
+    anything older than the window is a job for the rebuild script.
+
+    `recent_stored` is the set of epochs already stored within that window.
 
     Falls back to the payday epoch when nothing is stored for this genesis, and
     to 1 when even that is out of range -- which happens right after a protocol
@@ -59,14 +77,15 @@ def epochs_to_record(
     """
     frontier = chain_epoch - 1
 
-    if highest_stored is not None:
-        start = highest_stored + 1
-    elif payday_epoch > frontier:
-        start = 1
-    else:
-        start = payday_epoch
+    if highest_stored is None:
+        start = 1 if payday_epoch > frontier else payday_epoch
+        return list(range(start, frontier + 1))
 
-    return range(start, frontier + 1)
+    fresh = range(highest_stored + 1, frontier + 1)
+    window = range(max(1, highest_stored - lookback + 1), highest_stored + 1)
+    holes = [epoch for epoch in window if epoch not in recent_stored]
+
+    return sorted(holes + list(fresh))
 
 
 def perform_validators_missed_update(
@@ -87,17 +106,34 @@ def perform_validators_missed_update(
         f"latest payday - height: {latest_payday_block.height}, genesis: {latest_payday_block.genesis_index}, epoch: {latest_payday_block.epoch}"
     )
 
-    highest = collection.find_one(
+    highest_document = collection.find_one(
         {"genesis_index": latest_block.genesis_index}, sort=[("epoch", -1)]
     )
+    highest = highest_document["epoch"] if highest_document else None
+
+    recent_stored: set[int] = set()
+    if highest is not None:
+        recent_stored = {
+            d["epoch"]
+            for d in collection.find(
+                {
+                    "genesis_index": latest_block.genesis_index,
+                    "epoch": {"$gte": max(1, highest - GAP_LOOKBACK_EPOCHS + 1)},
+                },
+                {"epoch": 1},
+            )
+        }
+
     epochs = epochs_to_record(
-        highest["epoch"] if highest else None,
+        highest,
+        recent_stored,
         latest_payday_block.epoch,  # type: ignore
         latest_block.epoch,  # type: ignore
     )
+    backfilled = [e for e in epochs if highest is not None and e <= highest]
     context.log.info(
-        f"recording epochs {epochs.start}..{epochs.stop - 1} "
-        f"({len(epochs)} to do, highest stored {highest['epoch'] if highest else 'none'})"
+        f"recording {len(epochs)} epoch(s), highest stored {highest if highest is not None else 'none'}"
+        + (f", filling gaps {backfilled}" if backfilled else "")
     )
 
     for epoch in epochs:
