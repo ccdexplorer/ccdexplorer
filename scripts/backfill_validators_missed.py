@@ -28,10 +28,8 @@ from ccdexplorer.dagster_recurring.recurring.update_validators_missed import (  
 from ccdexplorer.grpc_client import GRPCClient  # noqa: E402
 from ccdexplorer.mongodb import MongoDB  # noqa: E402
 from ccdexplorer.tooter.core import Tooter  # noqa: E402
-from pymongo import UpdateOne  # noqa: E402
 
 NEW_FIELDS = ("rounds_won_count", "rounds_total", "rounds_missed_total")
-BATCH = 200
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--write", action="store_true", help="actually write (default: dry run)")
@@ -59,17 +57,22 @@ mode = "WRITING" if args.write else "DRY RUN (no writes)"
 print(f"{mode}: {total:,} documents lack the new fields"
       f"{f' (limited to {args.limit})' if args.limit else ''}\n")
 
-pending: list[UpdateOne] = []
 done = failed = mismatched = 0
 errors: dict[str, int] = {}
 mismatches: list[str] = []
+started = time.monotonic()
+expected = min(total, args.limit) if args.limit else total
 
 
-def flush() -> None:
-    global pending
-    if pending and args.write:
-        coll.bulk_write(pending, ordered=False)
-    pending = []
+def progress(n: int) -> str:
+    """`  51/9,428   0.5%  eta 0:15:42` -- eta only once there is a rate to use."""
+    seen = done + failed + mismatched
+    pct = f"{100 * seen / expected:5.1f}%" if expected else "     "
+    if seen < 2:
+        return f"{n:>6,}/{expected:,} {pct}"
+    rate = (time.monotonic() - started) / seen
+    eta = int(rate * (expected - seen))
+    return f"{n:>6,}/{expected:,} {pct}  eta {eta // 3600}:{eta // 60 % 60:02d}:{eta % 60:02d}"
 
 
 for doc in cursor:
@@ -86,11 +89,13 @@ for doc in cursor:
             kind = "not found"
         errors[kind] = errors.get(kind, 0) + 1
         failed += 1
+        print(f"[{progress(done)}] {_id}  SKIP ({kind})", flush=True)
         continue
 
     if not winning_bakers:
         errors["empty response"] = errors.get("empty response", 0) + 1
         failed += 1
+        print(f"[{progress(done)}] {_id}  SKIP (empty response)", flush=True)
         continue
 
     counts = _counts_for_epoch(winning_bakers)
@@ -102,20 +107,33 @@ for doc in cursor:
                 f"  {_id}: stored={doc.get('missed_rounds_count')} "
                 f"recomputed={counts['missed_rounds_count']}"
             )
+        print(
+            f"[{progress(done)}] {_id}  SKIP (missed_rounds_count differs: "
+            f"stored={doc.get('missed_rounds_count')} recomputed={counts['missed_rounds_count']})",
+            flush=True,
+        )
         continue  # never overwrite a document we cannot reproduce
 
-    pending.append(UpdateOne({"_id": _id}, {"$set": {f: counts[f] for f in NEW_FIELDS}}))
+    if args.write:
+        coll.update_one({"_id": _id}, {"$set": {f: counts[f] for f in NEW_FIELDS}})
     done += 1
 
-    if len(pending) >= BATCH:
-        flush()
-        print(f"  {done:,} updated, {failed:,} unreadable, {mismatched:,} mismatched", flush=True)
+    # One line per document, printed after the write, so what you see on screen
+    # is what is in Mongo. Interrupting is safe: the query skips what is done.
+    print(
+        f"[{progress(done)}] {_id}  "
+        f"rounds {counts['rounds_total']:>5,}  "
+        f"validators {len(counts['rounds_won_count']):>3}  "
+        f"missed {counts['rounds_missed_total']:>3}"
+        f"{'' if args.write else '   (dry run)'}",
+        flush=True,
+    )
 
     time.sleep(args.sleep)
 
-flush()
-
-print(f"\n{'written' if args.write else 'would write'}: {done:,}")
+elapsed = int(time.monotonic() - started)
+print(f"\n{'written' if args.write else 'would write'}: {done:,}"
+      f"  in {elapsed // 3600}:{elapsed // 60 % 60:02d}:{elapsed % 60:02d}")
 print(f"unreadable from node:  {failed:,}")
 for kind, n in sorted(errors.items()):
     print(f"    {kind}: {n:,}")
