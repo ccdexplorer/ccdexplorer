@@ -147,6 +147,7 @@ class Collections(Enum):
     paydays_v2_rewards = "paydays_v2_rewards"
     paydays_v2_apy = "paydays_v2_apy"
     paydays_v2_current_payday = "paydays_v2_current_payday"
+    paydays_v2_validators_missed = "paydays_v2_validators_missed"
     paydays_helpers = "paydays_helpers"
     involved_accounts_transfer = "involved_accounts_transfer"
     nightly_accounts = "nightly_accounts"
