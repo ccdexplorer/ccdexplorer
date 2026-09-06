@@ -474,7 +474,7 @@ async def get_ccd_balances_for_public_key_from_smart_wallet_contract(
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint_ccd, NET(net))
     rr, ii = ci.CCDbalanceOf(block_hash, [public_key])
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         token_balance_ccd["ccd"] = {
@@ -777,7 +777,7 @@ async def get_token_balances_for_public_key_from_smart_wallet_contract(
         token_id = cis2_dict["token_id"]
         rr, ii = ci.CIS2balanceOf(block_hash, cis_2_contract_address, token_id, public_keys)
 
-        if ii.failure.used_energy > 0:
+        if ii.failure is not None:
             print(ii.failure)
         else:
             token_amount = rr[0]

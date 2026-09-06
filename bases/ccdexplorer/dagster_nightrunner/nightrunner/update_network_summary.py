@@ -1,5 +1,4 @@
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.grpc_client.CCD_Types import ProtocolVersions
 from ccdexplorer.mongodb import MongoDB
 from pymongo import ReplaceOne
 
@@ -33,7 +32,7 @@ def perform_data_for_network_summary(
     if not versioned_object:
         return {}
 
-    protocol_version = ProtocolVersions(versioned_object.protocol_version).name
+    protocol_version = versioned_object.protocol_version
     total_amount = int(versioned_object.total_amount) / 1_000_000
     total_encrypted_amount = int(versioned_object.total_encrypted_amount) / 1_000_000
     baking_reward_account = int(versioned_object.baking_reward_account) / 1_000_000

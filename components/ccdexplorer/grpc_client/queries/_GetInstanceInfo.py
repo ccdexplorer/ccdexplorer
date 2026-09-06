@@ -72,13 +72,17 @@ class Mixin(_SharedConverters):
             net, "GetInstanceInfo", instanceInfoRequest
         )
 
-        for descriptor in grpc_return_value.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
-
+        # `version` is a oneof: an instance is either V0 or V1. Converting both
+        # arms unconditionally produced a fully-formed but fictional record for
+        # whichever one the node had not sent -- an owner derived from 32 zero
+        # bytes, a zero balance and an empty source module -- which callers then
+        # had to tell apart by testing source_module against "".
+        key = grpc_return_value.WhichOneof("version")
+        if key is not None:
+            value = getattr(grpc_return_value, key)
             if type(value) is InstanceInfo.V0:
-                result[f"{key}"] = self.convertInstanceInfo_V0(value)
-
+                result[key] = self.convertInstanceInfo_V0(value)
             elif type(value) is InstanceInfo.V1:
-                result[f"{key}"] = self.convertInstanceInfo_V1(value)
+                result[key] = self.convertInstanceInfo_V1(value)
 
         return CCD_InstanceInfo(**result)

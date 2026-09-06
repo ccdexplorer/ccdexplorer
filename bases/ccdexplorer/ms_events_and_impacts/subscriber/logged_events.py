@@ -611,7 +611,7 @@ class LoggedEvent:
                     # Which node answered, for diagnosing stale/empty responses.
                     node = self.grpc_client.current_node(NET(self.net))
 
-                    if ii.failure.used_energy > 0:
+                    if ii.failure is not None:
                         console.log(
                             f"[cis5] balanceOf REVERTED on {node} | "
                             f"addr={cis5_ia.address_or_public_key} "

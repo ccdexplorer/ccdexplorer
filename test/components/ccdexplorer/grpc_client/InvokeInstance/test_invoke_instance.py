@@ -214,9 +214,14 @@ def test_invoke_instance_supports_cis2_dsid(grpcclient: GRPCClient):
         entrypoint,
         parameter_bytes,
     )
-    res = ii.success.return_value
-    support_result = ci.supports_response(res)
-    print(support_result)
+    # This contract no longer exposes `cis2_dsid.supports`, so the node rejects
+    # the call. That used to read as a success with an empty return value,
+    # because the client populated both arms of the oneof regardless.
+    if ii.success is not None:
+        print(ci.supports_response(ii.success.return_value))
+    else:
+        assert ii.failure is not None
+        assert ii.failure.reason.invalid_receive_method is not None
 
     print(ii.model_dump(exclude_none=True))
 
@@ -367,7 +372,7 @@ def test_invoke_instance_balanceOf_tranfer_before_mint(grpcclient: GRPCClient):
     account_id = "4hGN68SeYn9ZPSABU3uhS8nh8Tkv13DW2AmdZCneBzVkzeZ5Zp"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -386,7 +391,7 @@ def test_invoke_instance_balanceOf_poap(grpcclient: GRPCClient):
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -404,7 +409,7 @@ def test_invoke_instance_balanceOf_provenance(grpcclient: GRPCClient):
     account_id = "3e4k3jejVcMDKUvtbHXzey5GCrDeagJXD7UYWf1m4PiHPp84FJ"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -423,7 +428,7 @@ def test_invoke_instance_balanceOf_ft(grpcclient: GRPCClient):
     account_id = "3TisM3rj9ceja4goMHGN3oeZy7XqiGYB6GqejReFM47GqQfGfh"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -442,7 +447,7 @@ def test_invoke_instance_balanceOf_ft_9326(grpcclient: GRPCClient):
     account_id = "3TisM3rj9ceja4goMHGN3oeZy7XqiGYB6GqejReFM47GqQfGfh"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -461,7 +466,7 @@ def test_invoke_instance_balanceOf_aesirx(grpcclient: GRPCClient):
     account_id = "3sRDTnphG8eaUMfFKhQdAJUwHYTLFui3nZPVtz4ucEcym1QVfL"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -481,7 +486,7 @@ def test_invoke_instance_balanceOf_1856(grpcclient: GRPCClient):
     account_id = "3bzmSxeKVgHR4M7pF347WeehXcu43kypgHqhSfDMs9SvcP5zto"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.TESTNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -493,7 +498,7 @@ def test_invoke_instance_balanceOf_1856(grpcclient: GRPCClient):
     account_id = "3AiAikC2v4H3Rv4L58oHvdX5N8LJoarsQwN3G7oNS7BoFsmt7N"
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.TESTNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, [account_id])
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         print(
@@ -520,7 +525,7 @@ def test_invoke_instance_balanceOf_EUROe(grpcclient: GRPCClient):
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.balanceOf(block_hash, tokenID, addresses)
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         for index, address in enumerate(addresses):
@@ -572,7 +577,7 @@ def test_invoke_instance_balanceOf_CIS5(grpcclient: GRPCClient):
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.CCDbalanceOf(block_hash, public_keys)
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         for index, address in enumerate(public_keys):
@@ -598,7 +603,7 @@ def test_invoke_instance_CIS2balanceOf_CIS5(grpcclient: GRPCClient):
     ci = CIS(grpcclient, instance_index, instance_subindex, entrypoint, NET.MAINNET)
     rr, ii = ci.CIS2balanceOf(block_hash, cis_2_contract, token_id, public_keys)
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         print(ii.failure)
     else:
         for index, address in enumerate(public_keys):

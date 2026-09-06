@@ -3196,7 +3196,7 @@ class CCD_TokenomicsInfo_V0(BaseModel):
     baking_reward_account: microCCD | str
     finalization_reward_account: microCCD | str
     gas_account: microCCD | str
-    protocol_version: int
+    protocol_version: str
 
 
 class CCD_TokenomicsInfo_V1(BaseModel):
@@ -3226,7 +3226,7 @@ class CCD_TokenomicsInfo_V1(BaseModel):
     next_payday_time: CCD_TimeStamp
     next_payday_mint_rate: CCD_MintRate
     total_staked_capital: microCCD | str
-    protocol_version: int
+    protocol_version: str
 
 
 class CCD_TokenomicsInfo(BaseModel):
@@ -3295,8 +3295,8 @@ class CCD_InstanceInfo(BaseModel):
         v1 (Optional[CCD_InstanceInfo_V1]): Version 1 smart contract instance information.
     """
 
-    v0: CCD_InstanceInfo_V0
-    v1: CCD_InstanceInfo_V1
+    v0: Optional[CCD_InstanceInfo_V0] = None
+    v1: Optional[CCD_InstanceInfo_V1] = None
 
 
 class CCD_BlocksAtHeightResponse(BaseModel):
@@ -4058,8 +4058,8 @@ class CCD_InvokeInstanceResponse(BaseModel):
         failure (Optional[CCD_InvokeInstanceResponse_Failure]): Details of a failed invocation.
     """
 
-    success: CCD_InvokeInstanceResponse_Success
-    failure: CCD_InvokeInstanceResponse_Failure
+    success: Optional[CCD_InvokeInstanceResponse_Success] = None
+    failure: Optional[CCD_InvokeInstanceResponse_Failure] = None
 
 
 class CCD_BlockComplete(BaseModel):

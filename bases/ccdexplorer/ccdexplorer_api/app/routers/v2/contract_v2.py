@@ -111,7 +111,7 @@ async def get_balance_of(req: GetBalanceOfRequest):
 
     if regular_addresses:
         response_cis2, ii_cis2 = ci.balanceOf("last_final", req.token_id, regular_addresses)
-        if ii_cis2.failure.used_energy == 0:
+        if ii_cis2.failure is None:
             for i, addr in enumerate(regular_addresses):
                 response_dict[addr] = str(response_cis2[i])
 
@@ -146,7 +146,7 @@ async def get_balance_of(req: GetBalanceOfRequest):
                 "last_final", req.contract_address, req.token_id, public_key_batch
             )
 
-            if ii_cis5.failure.used_energy == 0:
+            if ii_cis5.failure is None:
                 for i, original_addr in enumerate(original_addr_batch):
                     response_dict[original_addr] = str(response_cis5[i])
 
@@ -171,7 +171,7 @@ async def get_cis5_balance_of(req: GetCIS5BalanceOfRequest):
         "last_final", req.cis2_contract_address, req.token_id, req.public_keys
     )
 
-    if ii.failure.used_energy > 0:
+    if ii.failure is not None:
         return {}
     else:
         return {req.public_keys[i]: str(response[i]) for i in range(len(req.public_keys))}
@@ -364,12 +364,11 @@ async def get_contract_information(
     result.update(
         {"_id": CCD_ContractAddress.from_index(contract_index, contract_subindex).to_str()}
     )
-    if result["v0"]["source_module"] == "":
-        source_module = result["v1"]["source_module"]
-        del result["v0"]
-    if result["v1"]["source_module"] == "":
+    # Exactly one of v0/v1 is present.
+    if "v0" in result:
         source_module = result["v0"]["source_module"]
-        del result["v1"]
+    else:
+        source_module = result["v1"]["source_module"]
 
     if result:
         module_result = await db_to_use[Collections.modules].find_one({"_id": source_module})

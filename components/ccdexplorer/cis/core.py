@@ -522,7 +522,7 @@ class CIS:
             self.net,
         )
 
-        res = ii.success.return_value
+        res = ii.success.return_value if ii.success else b""
         support_result, support_result_text = self.supports_response(res)
 
         return support_result == 1
@@ -544,7 +544,7 @@ class CIS:
                 self.net,
             )
 
-            res = ii.success.return_value
+            res = ii.success.return_value if ii.success else b""
             support_result, _ = self.supports_response(res)
 
             support = support_result == 1
@@ -580,7 +580,7 @@ class CIS:
             self.net,
         )
 
-        res = ii.success.return_value
+        res = ii.success.return_value if ii.success else b""
         support_result = self.balanceOfResponse(res)
 
         return support_result, ii
@@ -614,7 +614,7 @@ class CIS:
             self.net,
         )
 
-        res = ii.success.return_value
+        res = ii.success.return_value if ii.success else b""
         support_result = self.CCDbalanceOfResponse(res)
 
         return support_result, ii
@@ -655,7 +655,7 @@ class CIS:
             self.net,
         )
 
-        res = ii.success.return_value
+        res = ii.success.return_value if ii.success else b""
         support_result = self.CIS2balanceOfResponse(res)
 
         return support_result, ii
@@ -1022,7 +1022,7 @@ class CIS:
             self.net,
         )
 
-        res = ii.success.return_value
+        res = ii.success.return_value if ii.success else b""
         return self.tokenMetadataResultParameter(res)
 
     def viewOwnerHistoryRequest(self, tokenID: str):
