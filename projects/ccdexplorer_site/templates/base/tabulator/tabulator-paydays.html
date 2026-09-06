@@ -3,8 +3,8 @@
 <script>
   const {{ccd_tabulator_table}}_columns = [
   {
-        title: "Height", field: "block_height", 
-        minWidth: 120,
+        title: "Height", field: "block_height",
+        minWidth: 88,
         // maxWidth: 120,
         responsive: 0,
         accessorDownload: (value, data) => data.block_height_download,
@@ -14,21 +14,29 @@
         
       },
       {
-        title: "Time", field: "payday_block_slot_time", 
-        minWidth: 170,
+        title: "Time", field: "payday_block_slot_time",
+        minWidth: 84,
         maxWidth: 170,
-        responsive: 50,
+        responsive: 0,
         accessorDownload: (value, data) => data.payday_block_slot_time_download,
-        formatter: isoDateTimeFormatter,
+        formatter: isoDateWithOptionalTimeFormatter,
+        // Header follows the cell: "Date" while only the date is rendered,
+        // "Time" from md up where the clock time appears. The plain `title`
+        // above is what the CSV export uses, and that always has the full
+        // timestamp, so it stays "Time".
+        titleFormatter: function() {
+          return `<span class="d-md-none">Date</span>` +
+                 `<span class="d-none d-md-inline">Time</span>`;
+        },
         headerSort:false,
         hozAlign: "right", headerHozAlign: "right",
         
       },
       {
         title: "Blocks", field: "count_of_blocks",
-        minWidth: 100,
+        minWidth: 62,
         maxWidth: 100,
-        responsive: 50,
+        responsive: 0,
         formatter: ccdClassFormatter,
         headerSort:false,
         hozAlign: "right", headerHozAlign: "right",
@@ -36,7 +44,7 @@
       },
       {
         title: "Missed", field: "missed_rounds",
-        minWidth: 90,
+        minWidth: 62,
         maxWidth: 100,
         responsive: 0,
         headerSort: false,

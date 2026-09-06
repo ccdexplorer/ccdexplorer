@@ -225,6 +225,22 @@ function isoDateTimeFormatter(cell) {
     return "-";
   }
 }
+function isoDateWithOptionalTimeFormatter(cell) {
+  // Date always, clock time only from the md breakpoint up. Lets a narrow
+  // viewport keep the column rather than having to drop it, while a wide one
+  // still shows the full timestamp. CSV export is unaffected -- that goes
+  // through accessorDownload, not this.
+  const { DateTime } = luxon;
+  const isoString = cell.getValue();
+  if (!isoString) return `<span class="ccd">-</span>`;
+  try {
+    const dt = DateTime.fromISO(isoString, { zone: 'utc' });
+    return `<span class="ccd">${dt.toFormat("yyyy-MM-dd")}` +
+           `<span class="d-none d-md-inline"> ${dt.toFormat("HH:mm:ss")}</span></span>`;
+  } catch (err) {
+    return `<span class="ccd">-</span>`;
+  }
+}
 function ccdClassFormatter(cell) {
   const value = cell.getValue();
   // Parse as number and format with thousands separators
