@@ -503,9 +503,7 @@ async def get_last_accounts(
             [
                 {
                     "$match": {
-                        "account_creation.address": {
-                            "$in": [ai.address for ai in account_infos]
-                        }
+                        "account_creation.address": {"$in": [ai.address for ai in account_infos]}
                     }
                 },
             ],
@@ -843,6 +841,7 @@ async def get_payday_pools(
             if x["consensusBakerId"] is not None
             if str(x["consensusBakerId"]) in all_validators_by_validator_id.keys()
         }
+
         # get_pool_info_for_pool is a blocking grpc call; run it off the event
         # loop so every validator resolves concurrently rather than serially.
         # This loop averaged ~1s per request across several hundred
@@ -910,7 +909,7 @@ async def get_payday_pools(
                 / last_payday_performance[baker_id].pool_status.delegated_capital_cap
             )  # type: ignore
             * 100
-            if last_payday_performance[baker_id].pool_status.delegated_capital_cap > 0  # type: ignore
+            if (last_payday_performance[baker_id].pool_status.delegated_capital_cap or 0) > 0
             else 0
         )
 
@@ -1698,9 +1697,7 @@ async def get_net_transfers_for_accounts(
         receiver_in = receiver in set_canonical
 
         if sender_in and receiver_in:
-            internal_flows[(sender, receiver)] = (
-                internal_flows.get((sender, receiver), 0) + amount
-            )
+            internal_flows[(sender, receiver)] = internal_flows.get((sender, receiver), 0) + amount
             internal_count += 1
             continue
 

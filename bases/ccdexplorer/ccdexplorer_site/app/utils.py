@@ -2667,7 +2667,10 @@ def create_dict_for_tabulator_display_for_pools(net, pool: dict):
         "node_name": (f'<span class="ccd">{pool["node_name"]}</span>' if pool["node_name"] else ""),
         "node_name_download": (pool["node_name"] if pool["node_name"] else ""),
         "status": pool["status"],
-        "pool_remaining": f"<span  >{micro_ccd_no_decimals(pool['delegated_capital_cap'] - pool['delegated_capital'])}</span>",
+        # cap and delegated are absent for a pool removed this reward period
+        "pool_remaining": (
+            f"<span  >{micro_ccd_no_decimals((pool['delegated_capital_cap'] or 0) - (pool['delegated_capital'] or 0))}</span>"
+        ),
         "delegated_percentage": pool["delegated_percentage"],
         "delegated_percentage_remaining": pool["delegated_percentage_remaining"],
         "delegated_percentage_remaining_format": f'<span class="ccd">{round_x_decimal_with_comma(pool["delegated_percentage_remaining"], 2)}%</span>',
