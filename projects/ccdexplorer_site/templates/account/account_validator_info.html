@@ -49,8 +49,20 @@
     {% if "is_suspended" in account.stake.baker.model_fields_set %}
       {% if pool.current_payday_info %}
         <tr class="sm-text">
-            <td class="text-start text-secondary-emphasis">Missed Rounds</td>
-            <td  class="text-end text-secondary-emphasis ccd">       
+            <td class="text-start text-secondary-emphasis">Consecutive Missed Rounds
+
+            <a href="#" data-bs-toggle="popover" tabindex="0" id="missed-rounds" data-bs-trigger="focus" data-bs-title="Consecutive missed rounds explanation" data-bs-content="
+
+            The number of rounds in a row that this validator was elected to produce a block for, but did not. Rounds where the validator was not elected cannot be missed and are not counted.
+
+            This resets to zero as soon as the validator shows a sign of life: producing a block, or contributing a signature to the quorum certificate for a block. When it reaches the chain's maximum missed rounds parameter, the validator is automatically suspended.
+
+            It is not a running total of every round this validator has ever missed.
+
+            ">(i)</a>
+
+            </td>
+            <td  class="text-end text-secondary-emphasis ccd">
                     {{pool.current_payday_info.missed_rounds|round_x_decimal_with_comma(0)}}
             </td>
         </tr>
@@ -173,20 +185,21 @@
     {% endif %}
 </table>
     <script>
-      const payday = document.getElementById('payday')
-      const popover_payday = new bootstrap.Popover(payday, {trigger: 'focus'})
-    
-      const earliest = document.getElementById('earliest')
-      const popover_earliest = new bootstrap.Popover(earliest, {trigger: 'focus'})
-    
+      // Each of these rows is conditional, so the anchor may not be on the page.
+      // Constructing a Popover on null throws and aborts the rest of the script,
+      // which would silently take the other popovers down with it.
+      for (const id of ['payday', 'earliest', 'missed-rounds']) {
+        const el = document.getElementById(id)
+        if (el) new bootstrap.Popover(el, {trigger: 'focus'})
+      }
     </script>
 <script>
-    document.getElementById("earliest-win-time").addEventListener("htmx:afterRequest", function() {
-        this.setAttribute("hx-trigger", "every 2s");
-        htmx.process(this);
-    });
-    document.getElementById("current-payday-stats").addEventListener("htmx:afterRequest", function() {
-        this.setAttribute("hx-trigger", "every 2s");
-        htmx.process(this);
-    });
+    for (const id of ["earliest-win-time", "current-payday-stats"]) {
+        const el = document.getElementById(id);
+        if (!el) continue;  // row is conditional; see the popover loop above
+        el.addEventListener("htmx:afterRequest", function() {
+            this.setAttribute("hx-trigger", "every 2s");
+            htmx.process(this);
+        });
+    }
   </script>
