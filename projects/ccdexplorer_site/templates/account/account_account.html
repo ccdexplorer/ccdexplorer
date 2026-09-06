@@ -498,17 +498,44 @@ function init_validator_tally_table() {
         
       },
       {
-        title: "Actual", field: "actuals", 
+        title: "Actual", field: "actuals",
         minWidth: 100,
         maxWidth: 100,
         responsive: 0,
         formatter: intFormatterRounded,
         headerSort:false,
-        
+
         hozAlign: "right", headerHozAlign: "right",
-        
+
       },
-      
+      {
+        title: "Missed", field: "missed",
+        minWidth: 90,
+        maxWidth: 90,
+        responsive: 0,
+        headerSort: false,
+        hozAlign: "right", headerHozAlign: "right",
+        formatter: function(cell) {
+          const value = cell.getValue();
+          if (value === null || value === undefined) {
+            cell.getElement().title = "No round data recorded for this payday.";
+            return `<span class="ccd">-</span>`;
+          }
+          const formatted = value.toLocaleString("en-US");
+          const row = cell.getRow().getData();
+          // A payday should have every one of its epochs recorded. If some are
+          // missing -- job downtime, a rebuild still in progress -- say what the
+          // number is based on rather than presenting a partial sum as exact.
+          if (row.epochs_covered < row.epochs_expected) {
+            cell.getElement().title =
+              "Based on " + row.epochs_covered + " of " + row.epochs_expected +
+              " epochs in this payday; the rest were not recorded.";
+            return `<span class="ccd">${formatted}*</span>`;
+          }
+          return `<span class="ccd">${formatted}</span>`;
+        },
+      },
+
     ];
   window["validator_tally_table_filename"] = '{{filename}}';
 

@@ -37,6 +37,38 @@ def _counts_for_epoch(winning_bakers: list[CCD_WinningBaker]) -> dict:
     }
 
 
+def epochs_to_record(
+    highest_stored: int | None, payday_epoch: int, chain_epoch: int
+) -> range:
+    """The epochs whose rounds this run should record.
+
+    The upper bound is `chain_epoch - 1`. The chain's current epoch is still in
+    progress and GetWinningBakersEpoch rejects it as a "Future epoch", so that
+    is the newest epoch there is complete data for.
+
+    The lower bound follows what is already stored, not the current payday.
+    Anchoring it to the payday orphaned exactly one epoch per payday: the upper
+    bound never reached the payday's final epoch before the lower bound jumped
+    past it at rollover, and nothing ever went back for it. Resuming from the
+    highest stored epoch also makes the job self-healing after downtime.
+
+    Falls back to the payday epoch when nothing is stored for this genesis, and
+    to 1 when even that is out of range -- which happens right after a protocol
+    update, when the last known payday block still belongs to the old genesis
+    and its epoch number does not apply to the new one.
+    """
+    frontier = chain_epoch - 1
+
+    if highest_stored is not None:
+        start = highest_stored + 1
+    elif payday_epoch > frontier:
+        start = 1
+    else:
+        start = payday_epoch
+
+    return range(start, frontier + 1)
+
+
 def perform_validators_missed_update(
     context,
     grpcclient: GRPCClient,
@@ -50,25 +82,31 @@ def perform_validators_missed_update(
     latest_payday_block: CCD_BlockInfo = grpcclient.get_block_info(block_input=doc["hash"])
 
     db = mongodb.mainnet_db
+    collection = db[Collections.paydays_v2_validators_missed.value]
     context.log.info(
         f"latest payday - height: {latest_payday_block.height}, genesis: {latest_payday_block.genesis_index}, epoch: {latest_payday_block.epoch}"
     )
-    if latest_payday_block.epoch > latest_block.epoch:  # type: ignore
-        start = 1
-        end = latest_block.epoch
-    else:
-        start = latest_payday_block.epoch
-        end = latest_block.epoch
-    for epoch in range(start, end):  # type: ignore
-        local_queue = []
-        # NOTE: we query epoch - 1 but label the document `epoch`, so a doc
-        # holds the previous epoch's rounds. That predates this change and the
-        # failed-rounds API reads it as-is, so it is left alone. Every count
-        # below comes from this one call, so the fields within a document
-        # always agree with each other — they just do not agree with the label.
+
+    highest = collection.find_one(
+        {"genesis_index": latest_block.genesis_index}, sort=[("epoch", -1)]
+    )
+    epochs = epochs_to_record(
+        highest["epoch"] if highest else None,
+        latest_payday_block.epoch,  # type: ignore
+        latest_block.epoch,  # type: ignore
+    )
+    context.log.info(
+        f"recording epochs {epochs.start}..{epochs.stop - 1} "
+        f"({len(epochs)} to do, highest stored {highest['epoch'] if highest else 'none'})"
+    )
+
+    for epoch in epochs:
+        # A document is labelled with the epoch it holds the rounds of. Each
+        # epoch is written on its own, so a failure part way through leaves the
+        # collection contiguous and the next run resumes from the same place.
         winning_bakers: list[CCD_WinningBaker] = grpcclient.get_winning_bakers_epoch(
             latest_block.genesis_index,
-            epoch - 1,  # type: ignore
+            epoch,  # type: ignore
         )
 
         counts = _counts_for_epoch(winning_bakers)
@@ -86,14 +124,13 @@ def perform_validators_missed_update(
         )
         dct.update(counts)
         time.sleep(0.1)
-        local_queue.append(
-            ReplaceOne(
-                {"_id": _id},
-                replacement=dct,
-                upsert=True,
-            )
+        collection.bulk_write(
+            [
+                ReplaceOne(
+                    {"_id": _id},
+                    replacement=dct,
+                    upsert=True,
+                )
+            ]
         )
-
-        if len(local_queue) > 0:
-            _ = db["paydays_v2_validators_missed"].bulk_write(local_queue)
     return {}

@@ -1549,6 +1549,93 @@ async def get_bool_account_rewards_available(
         )
 
 
+async def _missed_rounds_per_payday(
+    db_to_use, dates: list[str], validator_id: int
+) -> dict[str, dict]:
+    """Sum one validator's missed rounds over each payday's epochs.
+
+    paydays_v2 records the first and last block of each payday, and the blocks
+    collection carries the epoch and genesis index for those hashes -- which is
+    what paydays_v2_validators_missed is keyed on. A document there is labelled
+    with the epoch it holds the rounds of, so a payday spanning epochs E1..E2 is
+    covered by exactly those labels.
+
+    Returns, per date, the summed misses plus how many of the payday's epochs
+    were actually present, so a caller can tell a real zero from missing data.
+    A date whose epochs are entirely absent is left out of the result.
+    """
+    if not dates:
+        return {}
+
+    paydays = await (
+        db_to_use[Collections.paydays_v2]
+        .find(
+            {"date": {"$in": dates}},
+            {"date": 1, "hash_for_first_block": 1, "hash_for_last_block": 1},
+        )
+        .to_list(length=None)
+    )
+
+    boundary_hashes = [
+        h
+        for payday in paydays
+        for h in (payday.get("hash_for_first_block"), payday.get("hash_for_last_block"))
+        if h
+    ]
+    blocks = await (
+        db_to_use[Collections.blocks]
+        .find({"_id": {"$in": boundary_hashes}}, {"epoch": 1, "genesis_index": 1})
+        .to_list(length=None)
+    )
+    block_by_hash = {b["_id"]: b for b in blocks}
+
+    # date -> (genesis index, first label, last label)
+    ranges: dict[str, tuple[int, int, int]] = {}
+    for payday in paydays:
+        first = block_by_hash.get(payday.get("hash_for_first_block"))
+        last = block_by_hash.get(payday.get("hash_for_last_block"))
+        if not first or not last:
+            continue
+        ranges[payday["date"]] = (first["genesis_index"], first["epoch"], last["epoch"])
+
+    if not ranges:
+        return {}
+
+    # One query per genesis index over the whole span the page needs, projected
+    # down to this validator's key so the payload stays small.
+    field = f"missed_rounds_count.{validator_id}"
+    spans: dict[int, list[int]] = {}
+    for genesis, low, high in ranges.values():
+        span = spans.setdefault(genesis, [low, high])
+        span[0], span[1] = min(span[0], low), max(span[1], high)
+
+    missed_by_epoch: dict[tuple[int, int], int] = {}
+    for genesis, (low, high) in spans.items():
+        documents = await (
+            db_to_use[Collections.paydays_v2_validators_missed]
+            .find(
+                {"genesis_index": genesis, "epoch": {"$gte": low, "$lte": high}},
+                {"epoch": 1, field: 1},
+            )
+            .to_list(length=None)
+        )
+        for document in documents:
+            missed = document.get("missed_rounds_count", {}).get(str(validator_id), 0)
+            missed_by_epoch[(genesis, document["epoch"])] = missed
+
+    result = {}
+    for date, (genesis, low, high) in ranges.items():
+        present = [e for e in range(low, high + 1) if (genesis, e) in missed_by_epoch]
+        if not present:
+            continue  # nothing recorded for this payday; leave the cell empty
+        result[date] = {
+            "missed": sum(missed_by_epoch[(genesis, e)] for e in present),
+            "epochs_covered": len(present),
+            "epochs_expected": high - low + 1,
+        }
+    return result
+
+
 @router.get("/{net}/account/{index}/validator-tally/{skip}/{limit}", response_class=JSONResponse)
 async def get_validator_tally(
     request: Request,
@@ -1629,6 +1716,22 @@ async def get_validator_tally(
                 }
                 for v in result[0]["data"]
             ]
+
+            # Rounds this validator was elected for and did not produce a block
+            # in, summed over the payday. Not the same quantity as the pool's
+            # missed_rounds, which counts consecutive misses and resets as soon
+            # as the validator shows a sign of life.
+            missed = await _missed_rounds_per_payday(
+                db_to_use, [row["date"] for row in data], validator_id
+            )
+            for row in data:
+                row.update(
+                    missed.get(
+                        row["date"],
+                        {"missed": None, "epochs_covered": 0, "epochs_expected": 0},
+                    )
+                )
+
             return {"data": data, "total_row_count": result[0]["total"]}
     except Exception as error:
         raise HTTPException(
