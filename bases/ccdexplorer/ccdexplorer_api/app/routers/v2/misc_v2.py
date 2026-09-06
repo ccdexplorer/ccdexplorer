@@ -1066,3 +1066,51 @@ async def get_validators_failed_rounds(
         entries.append(entry)
 
     return entries
+
+
+@router.get(
+    "/{net}/misc/validator-score-parameters",
+    response_class=JSONResponse,
+)
+async def get_validator_score_parameters(
+    request: Request,
+    net: str,
+    grpcclient: GRPCClient = Depends(get_grpcclient),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Return the validator score parameters in effect at the last final block.
+
+    Currently that is only `maximum_missed_rounds`: the number of consecutive
+    missed rounds at which a validator is automatically suspended. It is a
+    governance-updatable chain parameter, so callers must read it rather than
+    assume a value, but it changes rarely enough to be worth caching.
+
+    Args:
+        request: FastAPI request (unused, required by the router wrappers).
+        net: Network identifier, must be `mainnet`, `testnet` or `devnet`.
+        grpcclient: Shared gRPC client dependency.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        `{"maximum_missed_rounds": int}`.
+
+    Raises:
+        HTTPException: If the network is unsupported, or the protocol version
+            in effect has no validator score parameters (pre-suspension).
+    """
+    if net not in ["mainnet", "testnet", "devnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
+        )
+
+    chain_parameters = grpcclient.get_block_chain_parameters("last_final", net=NET(net))
+    score_parameters = getattr(chain_parameters.v3, "validator_score_parameters", None)
+
+    if not score_parameters:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No validator score parameters in effect on {net}.",
+        )
+
+    return {"maximum_missed_rounds": score_parameters.maximum_missed_rounds}

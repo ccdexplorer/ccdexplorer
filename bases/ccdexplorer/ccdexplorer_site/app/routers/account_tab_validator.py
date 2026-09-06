@@ -116,6 +116,17 @@ async def validator_tab_content(
     )
     account_apy_object = api_result.return_value if api_result.ok else None
 
+    # The suspension threshold the pane shows the missed-round count against.
+    # Absent on protocol versions without validator suspension, in which case
+    # the template drops the "/ n" and shows the bare count.
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/misc/validator-score-parameters",
+        httpx_client,
+    )
+    maximum_missed_rounds = (
+        api_result.return_value.get("maximum_missed_rounds") if api_result.ok else None
+    )
+
     return request.app.templates.get_template("account/account_validator.html").render(
         {
             "net": net,
@@ -129,6 +140,7 @@ async def validator_tab_content(
             "earliest_win_time": earliest_win_time,
             "account": account_info,
             "account_apy_object": account_apy_object,
+            "maximum_missed_rounds": maximum_missed_rounds,
         }
     )
 

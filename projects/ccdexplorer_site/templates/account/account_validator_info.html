@@ -55,7 +55,7 @@
 
             The number of rounds in a row that this validator was elected to produce a block for, but did not. Rounds where the validator was not elected cannot be missed and are not counted.
 
-            This resets to zero as soon as the validator shows a sign of life: producing a block, or contributing a signature to the quorum certificate for a block. When it reaches the chain's maximum missed rounds parameter, the validator is automatically suspended.
+            This resets to zero as soon as the validator shows a sign of life: producing a block, or contributing a signature to the quorum certificate for a block. At {% if maximum_missed_rounds %}{{maximum_missed_rounds}}{% else %}the chain's maximum missed rounds parameter{% endif %}, the validator is automatically suspended.
 
             It is not a running total of every round this validator has ever missed.
 
@@ -63,7 +63,7 @@
 
             </td>
             <td  class="text-end text-secondary-emphasis ccd">
-                    {{pool.current_payday_info.missed_rounds|round_x_decimal_with_comma(0)}}
+                    {{pool.current_payday_info.missed_rounds|round_x_decimal_with_comma(0)}}{% if maximum_missed_rounds %} / {{maximum_missed_rounds}}{% endif %}
             </td>
         </tr>
         {% endif %}
