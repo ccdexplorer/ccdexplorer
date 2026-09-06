@@ -3538,8 +3538,8 @@ class CCD_PendingUpdate(BaseModel):
         effective_time (TransactionTime): The effective time of the update.
         root_keys (Optional[CCD_HigherLevelKeys]): Updates to the root keys.
         level1_keys (Optional[CCD_HigherLevelKeys]): Updates to the level 1 keys.
-        level2_keys_cpv_0 (Optional[CCD_AuthorizationsV0]): Updates to the level 2 keys.
-        level2_keys_cpv_1 (Optional[CCD_AuthorizationsV1]): Updates to the level 2 keys.
+        level2_keys_cpv_0 (Optional[CCD_AuthorizationsV0]): Updates to the level 2 keys (chain parameters version 0).
+        level2_keys_cpv_1 (Optional[CCD_AuthorizationsV1]): Updates to the level 2 keys (chain parameters version 1).
         protocol (Optional[CCD_ProtocolUpdate]): Protocol updates.
         election_difficulty (Optional[CCD_ElectionDifficulty]): Updates to the election difficulty parameter.
         euro_per_energy (Optional[CCD_ExchangeRate]): Updates to the euro:energy exchange rate.
@@ -3555,19 +3555,21 @@ class CCD_PendingUpdate(BaseModel):
         add_identity_provider (Optional[CCD_IpInfo]): Adds a new identity provider.
         cooldown_parameters (Optional[CCD_CooldownParametersCpv1]): Updates to cooldown parameters for chain parameters.
         time_parameters (Optional[CCD_TimeParametersCpv1]): Updates to time parameters.
-        gas_rewards_cpv_2 (Optional[CCD_GasRewardsCpv2]): Updates to the GAS rewards (protocol version 6+).
-        timeout_parameters (Optional[CCD_TimeoutParameters]): Updates to the consensus timeouts.
+        gas_rewards_cpv_2 (Optional[CCD_GasRewardsV2]): Updates to the GAS rewards (protocol version 6+).
+        timeout_parameters (Optional[CCD_TimeOutParameters]): Updates to the consensus timeouts.
         min_block_time (Optional[CCD_Duration]): Updates to the minimum time between blocks.
         block_energy_limit (Optional[CCD_Energy]): Updates to the block energy limit.
         finalization_committee_parameters (Optional[CCD_FinalizationCommitteeParameters]): Updates to the finalization committee.
         validator_score_parameters (Optional[CCD_ValidatorScoreParameters]): Updates to the validator score parameters.
     """
 
+    # Every field but `effective_time` belongs to the `effect` oneof, so at most
+    # one of them is ever set: they all have to be optional.
     effective_time: CCD_TransactionTime
     root_keys: Optional[CCD_HigherLevelKeys] = None
     level1_keys: Optional[CCD_HigherLevelKeys] = None
-    level2_keys_cpc_0: Optional[CCD_AuthorizationsV0] = None
-    level2_keys_cpc_1: Optional[CCD_AuthorizationsV1] = None
+    level2_keys_cpv_0: Optional[CCD_AuthorizationsV0] = None
+    level2_keys_cpv_1: Optional[CCD_AuthorizationsV1] = None
     protocol: Optional[CCD_ProtocolUpdate] = None
     election_difficulty: Optional[CCD_ElectionDifficulty] = None
     euro_per_energy: Optional[CCD_ExchangeRate] = None
@@ -3576,14 +3578,20 @@ class CCD_PendingUpdate(BaseModel):
     mint_distribution_cpv_0: Optional[CCD_MintDistributionCpv0] = None
     mint_distribution_cpv_1: Optional[CCD_MintDistributionCpv1] = None
     transaction_fee_distribution: Optional[CCD_TransactionFeeDistribution] = None
-    gas_rewards: CCD_GasRewards
+    gas_rewards: Optional[CCD_GasRewards] = None
     pool_parameters_cpv_0: Optional[CCD_BakerStakeThreshold] = None
     pool_parameters_cpv_1: Optional[CCD_PoolParametersCpv1] = None
     add_anonymity_revoker: Optional[CCD_ArInfo] = None
     add_identity_provider: Optional[CCD_IpInfo] = None
     cooldown_parameters: Optional[CCD_CooldownParametersCpv1] = None
-    pool_parameters_cpv_1_update: Optional[CCD_PoolParametersCpv1] = None
     time_parameters: Optional[CCD_TimeParametersCpv1] = None
+    # Quoted because CCD_GasRewardsV2 and CCD_TimeOutParameters are defined
+    # further down this module; resolved by the model_rebuild() call there.
+    gas_rewards_cpv_2: Optional["CCD_GasRewardsV2"] = None
+    timeout_parameters: Optional["CCD_TimeOutParameters"] = None
+    min_block_time: Optional[CCD_Duration] = None
+    block_energy_limit: Optional[CCD_Energy] = None
+    finalization_committee_parameters: Optional[CCD_FinalizationCommitteeParameters] = None
     validator_score_parameters: Optional[CCD_ValidatorScoreParameters] = None
 
 
@@ -3884,6 +3892,12 @@ class CCD_GasRewardsV2(BaseModel):
     baker: CCD_AmountFraction
     account_creation: CCD_AmountFraction
     chain_update: CCD_AmountFraction
+
+
+# CCD_PendingUpdate refers to CCD_GasRewardsV2 and CCD_TimeOutParameters by name
+# because both are defined below it; resolve those forward references now that
+# they exist.
+CCD_PendingUpdate.model_rebuild()
 
 
 class CCD_ChainParametersV2(BaseModel):

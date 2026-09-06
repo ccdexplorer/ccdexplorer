@@ -224,8 +224,13 @@ class Mixin(_SharedConverters):
             key, value = self.get_key_value_from_descriptor(descriptor, message)
 
             if key == "module_state":
-                cbor_decoded = cbor2.loads(value.value)
-                keys[key] = CCD_ModuleAccountState(**cbor_decoded)
+                # `module_state` is optional: a token module that keeps no
+                # per-account state for this account (no allow/deny list entry,
+                # say) leaves it unset, and cbor2 raises on the empty payload
+                # the default instance hands back.
+                if message.HasField("module_state"):
+                    cbor_decoded = cbor2.loads(value.value)
+                    keys[key] = CCD_ModuleAccountState(**cbor_decoded)
 
             elif type(value) in self.simple_types:
                 keys[key] = self.convertType(value)
