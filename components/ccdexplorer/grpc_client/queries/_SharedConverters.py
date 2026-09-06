@@ -285,7 +285,18 @@ class Mixin(Protocol):
 
         elif type(value) is Empty:
             return None  # pragma: no cover
-        elif type(value) is BakerEvent.BakerResumed:
+
+        # ConfigureBaker/ConfigureDelegation events whose entire payload is a
+        # single id. Note the two cross-over events: `BakerEvent.DelegationRemoved`
+        # is emitted when a delegator switches to validating, and
+        # `DelegationEvent.BakerRemoved` when a validator switches to delegating.
+        elif type(value) in [BakerEvent.BakerResumed, BakerEvent.BakerSuspended]:
+            return value.baker_id.value
+
+        elif type(value) is BakerEvent.DelegationRemoved:
+            return value.delegator_id.id.value
+
+        elif type(value) is DelegationEvent.BakerRemoved:
             return value.baker_id.value
 
         elif type(value) is Address:

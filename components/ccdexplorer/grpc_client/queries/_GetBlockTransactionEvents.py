@@ -297,100 +297,82 @@ class Mixin(_SharedConverters):
     def convertBakerConfiguredEvents(self, message) -> list:
         events = []
         for entry in message:
-            for descriptor in entry.DESCRIPTOR.fields:
-                result = {}
-                key, value = self.get_key_value_from_descriptor(descriptor, entry)
+            # `event` is a oneof, so exactly one field is set per entry. Picking
+            # it by name rather than scanning every field for a non-empty value
+            # keeps events whose whole payload is a zero-valued id (validator 0,
+            # say), which an emptiness test on the wrapper would have discarded.
+            key = entry.WhichOneof("event")
+            if key is None:
+                continue
+            value = getattr(entry, key)
 
-                if self.valueIsEmpty(value, key, message):
-                    pass
+            if type(value) is BakerEvent.BakerStakeIncreased:
+                converted = self.convertBakerStakeIncreased(value)
 
-                else:
-                    if type(value) is BakerEvent.BakerStakeIncreased:
-                        result[key] = self.convertBakerStakeIncreased(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerStakeDecreased:
+                converted = self.convertBakerStakeDecreased(value)
 
-                    elif type(value) is BakerEvent.BakerStakeDecreased:
-                        result[key] = self.convertBakerStakeDecreased(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerSetMetadataUrl:
+                converted = self.convertBakerSetMetadataUrl(value)
 
-                    elif type(value) is BakerEvent.BakerSetMetadataUrl:
-                        result[key] = self.convertBakerSetMetadataUrl(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerSetOpenStatus:
+                converted = self.convertBakerSetOpenStatus(value)
 
-                    elif type(value) is BakerEvent.BakerSetOpenStatus:
-                        result[key] = self.convertBakerSetOpenStatus(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerRestakeEarningsUpdated:
+                converted = self.convertBakerRestakeEarningsUpdated(value)
 
-                    elif type(value) is BakerEvent.BakerRestakeEarningsUpdated:
-                        result[key] = self.convertBakerRestakeEarningsUpdated(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerSetBakingRewardCommission:
+                converted = self.convertBakerSetBakingRewardCommission(value)
 
-                    elif type(value) is BakerEvent.BakerSetBakingRewardCommission:
-                        result[key] = self.convertBakerSetBakingRewardCommission(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerSetTransactionFeeCommission:
+                converted = self.convertBakerSetTransactionFeeCommission(value)
 
-                    elif type(value) is BakerEvent.BakerSetTransactionFeeCommission:
-                        result[key] = self.convertBakerSetTransactionFeeCommission(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerSetFinalizationRewardCommission:
+                converted = self.convertBakerSetFinalizationRewardCommission(value)
 
-                    elif type(value) is BakerEvent.BakerSetFinalizationRewardCommission:
-                        result[key] = self.convertBakerSetFinalizationRewardCommission(value)
-                        events.append(result)
+            elif type(value) is BakerKeysEvent:
+                converted = self.convertBakerKeysEvent(value)
 
-                    elif type(value) is BakerKeysEvent:
-                        result[key] = self.convertBakerKeysEvent(value)
-                        events.append(result)
+            elif type(value) is BakerEvent.BakerAdded:
+                converted = self.convertBakerBakerAdded(value)
 
-                    elif key == "baker_removed":
-                        result[key] = self.convertType(value)
-                        events.append(result)
+            # baker_removed (BakerId), baker_suspended, baker_resumed and
+            # delegation_removed all reduce to a single id.
+            else:
+                converted = self.convertType(value)
 
-                    elif key == "baker_added":
-                        result[key] = self.convertBakerBakerAdded(value)
-                        events.append(result)
-
-                    elif key == "baker_suspended":
-                        result[key] = self.convertType(value)
-                        events.append(result)
-
-                    elif key == "baker_resumed":
-                        result[key] = self.convertType(value)
-                        events.append(result)
+            events.append({key: converted})
 
         return events
 
     def convertDelegationConfiguredEvents(self, message) -> list:
         events = []
         for entry in message:
-            for descriptor in entry.DESCRIPTOR.fields:
-                result = {}
-                key, value = self.get_key_value_from_descriptor(descriptor, entry)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is DelegationEvent.DelegationStakeIncreased:
-                        result[key] = self.convertDelegationStakeIncreased(value)
-                        events.append(result)
+            # See convertBakerConfiguredEvents: `event` is a oneof, selected by
+            # name so a zero-valued delegator or validator id survives.
+            key = entry.WhichOneof("event")
+            if key is None:
+                continue
+            value = getattr(entry, key)
 
-                    elif type(value) is DelegationEvent.DelegationStakeDecreased:
-                        result[key] = self.convertDelegationStakeDecreased(value)
-                        events.append(result)
+            if type(value) is DelegationEvent.DelegationStakeIncreased:
+                converted = self.convertDelegationStakeIncreased(value)
 
-                    elif type(value) is DelegationEvent.DelegationSetDelegationTarget:
-                        result[key] = self.convertDelegationSetDelegationTarget(value)
-                        events.append(result)
+            elif type(value) is DelegationEvent.DelegationStakeDecreased:
+                converted = self.convertDelegationStakeDecreased(value)
 
-                    elif type(value) is DelegationEvent.DelegationSetRestakeEarnings:
-                        result[key] = self.convertDelegationSetSetRestakeEarnings(value)
-                        events.append(result)
+            elif type(value) is DelegationEvent.DelegationSetDelegationTarget:
+                converted = self.convertDelegationSetDelegationTarget(value)
 
-                    elif key == "delegation_added":
-                        result[key] = self.convertType(value)
-                        events.append(result)
+            elif type(value) is DelegationEvent.DelegationSetRestakeEarnings:
+                converted = self.convertDelegationSetSetRestakeEarnings(value)
 
-                    elif key == "delegation_removed":
-                        result[key] = self.convertType(value)
-                        events.append(result)
+            # delegation_added, delegation_removed (both DelegatorId) and
+            # baker_removed all reduce to a single id.
+            else:
+                converted = self.convertType(value)
+
+            events.append({key: converted})
 
         return events
 
