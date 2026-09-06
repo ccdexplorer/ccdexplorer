@@ -1024,6 +1024,10 @@ async def get_validators_failed_rounds(
     doc = (mongodb.mainnet[Collections.helpers].find_one({"_id": "last_known_payday"})) or {}
     latest_payday_block: CCD_BlockInfo = grpcclient.get_block_info(block_input=doc["hash"])
 
+    # A document is labelled with the epoch it holds the rounds of, so epochs
+    # from the payday block's epoch onwards are exactly this payday's rounds.
+    # (Before the labels were corrected this window was one epoch behind: it
+    # picked up the tail of the previous payday and missed this one's newest.)
     pipeline = [
         {"$match": {"genesis_index": latest_payday_block.genesis_index}},
         {"$match": {"epoch": {"$gte": latest_payday_block.epoch}}},
