@@ -77,7 +77,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_agent_registries,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
-from ccdexplorer.env import LOGIN_SECRET, environment
+from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -158,6 +158,19 @@ def _visitor_id(request: HTTPRequest) -> str:
         ]
     )
     return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+def _is_site_owner(user) -> bool:
+    """Whether this session belongs to the site owner.
+
+    ADMIN_CHAT_ID is already configured for this service and identifies the one
+    account allowed to run the crawler. Unset means nobody qualifies, so a
+    missing variable closes the door rather than opening it.
+    """
+    if user is None or not ADMIN_CHAT_ID:
+        return False
+    chat_id = getattr(user, "telegram_chat_id", None)
+    return chat_id is not None and str(chat_id) == str(ADMIN_CHAT_ID)
 
 
 def _looks_like_bot(request: HTTPRequest) -> bool:
@@ -430,15 +443,17 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     # /static mount so this route, not StaticFiles, decides who gets it.
     # `just lottie-update` refreshes it from upstream.
     #
-    # It is behind a login because it is a crawler: served openly it would let
-    # anyone point a configurable-concurrency crawl at production. It must stay
-    # on this origin -- from a subdomain the browser downgrades every check to
-    # an opaque no-cors result, so you lose the status codes entirely.
+    # Restricted to the site owner, not merely to anyone signed in: this is a
+    # crawler with configurable concurrency, and there are hundreds of
+    # registered accounts. It must also stay on this origin -- from a subdomain
+    # the browser downgrades every check to an opaque no-cors result, so the
+    # status codes disappear and with them the point of running it.
     @app.get("/lottie.html", include_in_schema=False)
     async def lottie_tester(request: HTTPRequest) -> Response:
-        user = getattr(request.state, "user", None)
         lottie_file = app_settings.static_dir.parent / "tools" / "lottie" / "lottie.html"
-        if user is None or not lottie_file.is_file():
+        if not _is_site_owner(getattr(request.state, "user", None)):
+            return Response(status_code=404)
+        if not lottie_file.is_file():
             return Response(status_code=404)
         return FileResponse(lottie_file, media_type="text/html")
 
