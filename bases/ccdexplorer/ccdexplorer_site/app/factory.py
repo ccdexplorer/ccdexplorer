@@ -1,6 +1,7 @@
 # ruff: noqa: F403, F405, E402, E501, E722, F401
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import hashlib
 import gc
 import uuid
 from collections import deque
@@ -75,7 +76,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_agent_registries,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
-from ccdexplorer.env import environment
+from ccdexplorer.env import LOGIN_SECRET, environment
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -111,6 +112,56 @@ async def _aclose(resource) -> None:
 
 
 _SESSION_MIDDLEWARE_SKIP_PREFIXES = ("/static/", "/node/", "/addresses/", "/metrics")
+
+# Crawlers are a large share of traffic -- the account page alone is walked by
+# Baiduspider -- so tag them and let the query decide whether to count them.
+_BOT_HINTS = (
+    "bot",
+    "crawl",
+    "spider",
+    "slurp",
+    "bingpreview",
+    "headlesschrome",
+    "curl",
+    "wget",
+    "python-requests",
+    "httpx",
+    "go-http-client",
+    "monitoring",
+)
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _visitor_id(request: Request) -> str:
+    """An opaque, day-scoped identifier for an anonymous visitor.
+
+    Most visitors never log in, so a session id counts almost nobody. This
+    hashes the client IP and user agent together with LOGIN_SECRET and the
+    date: the result is stable for one visitor for one day, cannot be linked
+    across days because the date is part of the input, and cannot be turned
+    back into an IP without the secret. Only the digest reaches Sentry -- no
+    cookie is set and no address is stored.
+    """
+    material = "|".join(
+        [
+            LOGIN_SECRET or "",
+            dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d"),
+            _client_ip(request),
+            request.headers.get("user-agent", ""),
+        ]
+    )
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
+
+
+def _looks_like_bot(request: Request) -> bool:
+    ua = request.headers.get("user-agent", "").lower()
+    return (not ua) or any(hint in ua for hint in _BOT_HINTS)
 
 
 class SiteSessionMiddleware(BaseHTTPMiddleware):
@@ -149,6 +200,13 @@ class SiteSessionMiddleware(BaseHTTPMiddleware):
                 request.state.session_id = data["session_id"]
                 if data["session_token"] != cookie_token:
                     new_session_token = data["session_token"]
+
+        # A logged-in visitor is identified by their session; everyone else by a
+        # day-scoped hash, so count_unique(user) covers all traffic rather than
+        # the small logged-in slice.
+        sentry_sdk.set_user({"id": request.state.session_id or _visitor_id(request)})
+        sentry_sdk.set_tag("client_kind", "bot" if _looks_like_bot(request) else "browser")
+        sentry_sdk.set_tag("visitor_kind", "member" if request.state.session_id else "anonymous")
 
         response = await call_next(request)
 
