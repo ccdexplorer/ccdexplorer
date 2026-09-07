@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx2 import Request
+from starlette.requests import Request as HTTPRequest
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -131,14 +132,14 @@ _BOT_HINTS = (
 )
 
 
-def _client_ip(request: Request) -> str:
+def _client_ip(request: HTTPRequest) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else ""
 
 
-def _visitor_id(request: Request) -> str:
+def _visitor_id(request: HTTPRequest) -> str:
     """An opaque, day-scoped identifier for an anonymous visitor.
 
     Most visitors never log in, so a session id counts almost nobody. This
@@ -159,7 +160,7 @@ def _visitor_id(request: Request) -> str:
     return hashlib.sha256(material.encode()).hexdigest()[:16]
 
 
-def _looks_like_bot(request: Request) -> bool:
+def _looks_like_bot(request: HTTPRequest) -> bool:
     ua = request.headers.get("user-agent", "").lower()
     return (not ua) or any(hint in ua for hint in _BOT_HINTS)
 
@@ -424,15 +425,17 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     # page weight and redirect chains. It only works same-origin, so it has to
     # be served from here rather than opened locally.
     #
-    # The file is not committed: the upstream repo carries no licence, so
-    # redistributing it in this repo and in our images would not be ours to do.
-    # `just lottie-fetch` downloads it to tools/lottie/lottie.html, which is
-    # gitignored. Absent that file this route simply 404s.
+    # The file is vendored at tools/lottie/lottie.html -- upstream's install is
+    # "download it, upload it anywhere on your domain" -- and kept out of the
+    # /static mount so this route, not StaticFiles, decides who gets it.
+    # `just lottie-update` refreshes it from upstream.
     #
     # It is behind a login because it is a crawler: served openly it would let
-    # anyone point a configurable-concurrency crawl at production.
+    # anyone point a configurable-concurrency crawl at production. It must stay
+    # on this origin -- from a subdomain the browser downgrades every check to
+    # an opaque no-cors result, so you lose the status codes entirely.
     @app.get("/lottie.html", include_in_schema=False)
-    async def lottie_tester(request: Request) -> Response:
+    async def lottie_tester(request: HTTPRequest) -> Response:
         user = getattr(request.state, "user", None)
         lottie_file = app_settings.static_dir.parent / "tools" / "lottie" / "lottie.html"
         if user is None or not lottie_file.is_file():

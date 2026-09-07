@@ -122,10 +122,10 @@ help:
 
 # --- Site tooling ---
 
-# Download the Lottie website tester (github.com/asweigart/lottie-website-tester).
-# Not vendored: upstream carries no licence, so we fetch rather than redistribute.
-# Served at /lottie.html to logged-in users once present.
-lottie-fetch:
+# Refresh the vendored Lottie website tester from upstream
+# (github.com/asweigart/lottie-website-tester). The file is committed so it
+# ships in the image; run this to pull a newer version, then commit the result.
+lottie-update:
     mkdir -p projects/ccdexplorer_site/tools/lottie
     curl -fsSL -o projects/ccdexplorer_site/tools/lottie/lottie.html \
         https://raw.githubusercontent.com/asweigart/lottie-website-tester/main/lottie.html
