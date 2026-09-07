@@ -665,15 +665,21 @@ async def get_account(
     )
     # TODO
     exchange_rates = {"CCD": {"rate": 1}}
+
+    # An account that neither validates nor delegates has no `stake` at all,
+    # which is the very case this flag is asking about.
+    rewards_no_stake = (
+        account_info.stake is None
+        or (account_info.stake.baker is None and account_info.stake.delegator is None)
+    ) and rewards_for_account_available
+
     if not alias_portion:
         return request.app.templates.TemplateResponse(
             request,
             "account/account_account.html",
             {
                 "env": request.app.env,
-                "rewards_no_stake": (account_info.stake.baker is None)  # type: ignore
-                and (account_info.stake.delegator is None)  # type: ignore
-                and rewards_for_account_available,
+                "rewards_no_stake": rewards_no_stake,
                 "rewards_for_account_available": rewards_for_account_available,
                 "account_id": account_id,
                 "account_index": account_index,
@@ -713,9 +719,7 @@ async def get_account(
             "account/account_account_alias.html",
             {
                 "env": request.app.env,
-                "rewards_no_stake": (account_info.stake.baker is None)  # type: ignore
-                and (account_info.stake.delegator is None)  # type: ignore
-                and rewards_for_account_available,
+                "rewards_no_stake": rewards_no_stake,
                 "rewards_for_account_available": rewards_for_account_available,
                 "account_id": account_id,
                 "account_index": account_index,
