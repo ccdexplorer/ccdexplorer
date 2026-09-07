@@ -114,6 +114,23 @@ class Mixin(Protocol):
     def get_key_value_from_descriptor(self, descriptor, the_list):
         return descriptor.name, getattr(the_list, descriptor.name)
 
+    def iter_set_fields(self, message):
+        """Yield (name, value) for every field the node actually populated.
+
+        Unlike `ListFields()`, a proto3 scalar sitting on its default -- a zero
+        counter, a False flag, an empty string -- is still yielded, because for
+        those the wire cannot tell "absent" from "zero" and zero is the truthful
+        reading. Only fields the proto tracks presence for (an `optional` field,
+        any singular message field, any oneof member) are skipped when unset,
+        which also means a oneof yields just the arm that is set. Repeated and
+        map fields are always yielded, empty or not.
+        """
+        for descriptor in message.DESCRIPTOR.fields:
+            name = descriptor.name
+            if descriptor.has_presence and not message.HasField(name):
+                continue
+            yield name, getattr(message, name)
+
     def generate_account_identifier_input_from(self, hex_address: str):
         try:
             bin_value = base58.b58decode_check(hex_address)[1:]
@@ -326,20 +343,14 @@ class Mixin(Protocol):
         return value.value
 
     def convertDelegationTarget(self, message) -> CCD_DelegationTarget:
-        result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
+        # `target` is a oneof: `passive` (Empty) or `baker` (BakerId). Asking
+        # whether the BakerId serialised to nothing instead reported a
+        # delegation to validator 0 as passive delegation, because a BakerId of
+        # 0 is an empty message on the wire.
+        if message.WhichOneof("target") == "baker":
+            return CCD_DelegationTarget(baker=self.convertType(message.baker))
 
-            if type(value) is Empty:
-                pass
-            if type(value) is BakerId:
-                if self.valueIsEmpty(value):
-                    result["passive_delegation"] = True
-                else:
-                    # result['passive_delegation'] = False
-                    result["baker"] = self.convertType(value)
-
-        return CCD_DelegationTarget(**result)
+        return CCD_DelegationTarget(passive_delegation=True)
 
     def convertCommissionRates(self, value) -> CCD_CommissionRates:
         result = {}
@@ -1037,26 +1048,24 @@ class Mixin(Protocol):
         events = []
 
         for entry in message:
+            # A TokenEvent is `token_id` plus a oneof naming the kind of event.
             entry_dict: dict = {}
-            for descriptor in entry.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, entry)
-                if type(value) in self.simple_types:
-                    converted_value = self.convertType(value)
-                    if converted_value:
-                        entry_dict[key] = converted_value
-                elif MessageToDict(value) == {}:
-                    pass
-                elif type(value) is TokenModuleEvent:
-                    entry_dict[key] = self.convertTokenModuleEvent(value)
-                elif type(value) is TokenTransferEvent:
-                    entry_dict[key] = self.convertTokenTransferEvent(value)
-                elif type(value) is TokenSupplyUpdateEvent:
-                    entry_dict[key] = self.convertTokenSupplyUpdateEvent(value)
+            if entry.HasField("token_id"):
+                entry_dict["token_id"] = self.convertType(entry.token_id)
 
-            if entry_dict == {}:
-                pass
-            else:
-                events.append(entry_dict)
+            key = entry.WhichOneof("event")
+            if key is None:
+                continue
+            value = getattr(entry, key)
+
+            if type(value) is TokenModuleEvent:
+                entry_dict[key] = self.convertTokenModuleEvent(value)
+            elif type(value) is TokenTransferEvent:
+                entry_dict[key] = self.convertTokenTransferEvent(value)
+            elif type(value) is TokenSupplyUpdateEvent:
+                entry_dict[key] = self.convertTokenSupplyUpdateEvent(value)
+
+            events.append(entry_dict)
 
         return events
 
@@ -1064,33 +1073,31 @@ class Mixin(Protocol):
         events = []
 
         for entry in message:
-            entry_dict: dict = {}
-            for descriptor in entry.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, entry)
-                if type(value) in self.simple_types:
-                    converted_value = self.convertType(value)
-                    if converted_value:
-                        entry_dict[key] = converted_value
-                elif MessageToDict(value) == {}:
-                    pass
-                elif type(value) is TokenModuleEvent:
-                    entry_dict[key] = self.convertTokenModuleEvent(value)
-                elif type(value) is TokenTransferEvent:
-                    entry_dict[key] = self.convertTokenTransferEvent(value)
-                elif type(value) is TokenSupplyUpdateEvent:
-                    entry_dict[key] = self.convertTokenSupplyUpdateEvent(value)
-                elif type(value) is LockCreateEvent:
-                    entry_dict[key] = CCD_LockCreateEvent(
-                        lock_id=self.convertLockId(value.lock_id),
-                        lock_config=value.lock_config.value.hex(),
-                    )
-                elif type(value) is LockDestroyEvent:
-                    entry_dict[key] = CCD_LockDestroyEvent(
-                        lock_id=self.convertLockId(value.lock_id)
-                    )
+            # A MetaEvent is a bare oneof. Selecting the arm by name keeps a
+            # lock event whose lock id is {0, 0, 0} -- an empty message on the
+            # wire, and so previously discarded as "not set".
+            key = entry.WhichOneof("event")
+            if key is None:
+                continue
+            value = getattr(entry, key)
 
-            if entry_dict:
-                events.append(entry_dict)
+            if type(value) is TokenModuleEvent:
+                converted = self.convertTokenModuleEvent(value)
+            elif type(value) is TokenTransferEvent:
+                converted = self.convertTokenTransferEvent(value)
+            elif type(value) is TokenSupplyUpdateEvent:
+                converted = self.convertTokenSupplyUpdateEvent(value)
+            elif type(value) is LockCreateEvent:
+                converted = CCD_LockCreateEvent(
+                    lock_id=self.convertLockId(value.lock_id),
+                    lock_config=value.lock_config.value.hex(),
+                )
+            elif type(value) is LockDestroyEvent:
+                converted = CCD_LockDestroyEvent(lock_id=self.convertLockId(value.lock_id))
+            else:
+                continue
+
+            events.append({key: converted})
 
         return events
 
@@ -1165,30 +1172,28 @@ class Mixin(Protocol):
     def convertUpdateEvents(self, message) -> list:
         events = []
         for entry in message:
-            for descriptor in entry.DESCRIPTOR.fields:
-                entry_dict = {}
-                key, value = self.get_key_value_from_descriptor(descriptor, entry)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is InstanceUpdatedEvent:
-                        entry_dict[key] = self.convertInstanceUpdatedEvent(value)
+            # ContractTraceElement is a oneof. This runs for every trace element
+            # of every contract update in every block, and used to serialise all
+            # five arms to a dict just to find the one that was set.
+            key = entry.WhichOneof("element")
+            if key is None:
+                continue
+            value = getattr(entry, key)
 
-                    if type(value) is ContractTraceElement.Interrupted:
-                        entry_dict[key] = self.convertInstanceInterruptedEvent(value)
+            if type(value) is InstanceUpdatedEvent:
+                converted = self.convertInstanceUpdatedEvent(value)
+            elif type(value) is ContractTraceElement.Interrupted:
+                converted = self.convertInstanceInterruptedEvent(value)
+            elif type(value) is ContractTraceElement.Resumed:
+                converted = self.convertInstanceResumedEvent(value)
+            elif type(value) is ContractTraceElement.Transferred:
+                converted = self.convertInstanceTransferredEvent(value)
+            elif type(value) is ContractTraceElement.Upgraded:
+                converted = self.convertInstanceUpgradedEvent(value)
+            else:
+                continue
 
-                    if type(value) is ContractTraceElement.Resumed:
-                        entry_dict[key] = self.convertInstanceResumedEvent(value)
-
-                    if type(value) is ContractTraceElement.Transferred:
-                        entry_dict[key] = self.convertInstanceTransferredEvent(value)
-
-                    if type(value) is ContractTraceElement.Upgraded:
-                        entry_dict[key] = self.convertInstanceUpgradedEvent(value)
-                if entry_dict == {}:
-                    pass
-                else:
-                    events.append(entry_dict)
+            events.append({key: converted})
 
         return events
 
