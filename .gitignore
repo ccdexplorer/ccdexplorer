@@ -197,3 +197,6 @@ cov.xml
 .coverage
 cov.xml
 development/mising_payday_se.py
+
+# Lottie website tester -- fetched via `just lottie-fetch`, not vendored (no upstream licence)
+projects/ccdexplorer_site/tools/lottie/

@@ -20,8 +20,8 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_IpInfo,
 )
 from fastapi import FastAPI, Response
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx2 import Request
@@ -417,6 +417,28 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.add_middleware(SiteSessionMiddleware)
 
     app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
+
+    # --- Lottie website tester -------------------------------------------
+    # https://github.com/asweigart/lottie-website-tester is a single HTML file
+    # that crawls this site from the visitor's own browser, reporting 404s,
+    # page weight and redirect chains. It only works same-origin, so it has to
+    # be served from here rather than opened locally.
+    #
+    # The file is not committed: the upstream repo carries no licence, so
+    # redistributing it in this repo and in our images would not be ours to do.
+    # `just lottie-fetch` downloads it to tools/lottie/lottie.html, which is
+    # gitignored. Absent that file this route simply 404s.
+    #
+    # It is behind a login because it is a crawler: served openly it would let
+    # anyone point a configurable-concurrency crawl at production.
+    @app.get("/lottie.html", include_in_schema=False)
+    async def lottie_tester(request: Request) -> Response:
+        user = getattr(request.state, "user", None)
+        lottie_file = app_settings.static_dir.parent / "tools" / "lottie" / "lottie.html"
+        if user is None or not lottie_file.is_file():
+            return Response(status_code=404)
+        return FileResponse(lottie_file, media_type="text/html")
+
     app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
     app.mount("/addresses", StaticFiles(directory=app_settings.addresses_dir), name="addresses")
 
