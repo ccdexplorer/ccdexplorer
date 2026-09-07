@@ -19,6 +19,27 @@ from ccdexplorer.grpc_client.types_pb2 import *
 from ccdexplorer.grpc_client.CCD_Types import *
 
 
+def assert_oneof_covered(descriptor, oneof_name: str, handled) -> None:
+    """Fail at import time if a oneof has an arm nothing converts.
+
+    Every silent data loss found in this client so far had the same shape: the
+    vendored proto grew an arm and the converter quietly ignored it, so the
+    transaction carried the right type label and an empty body. Pinning the
+    dispatch table against the descriptor turns the next one into an ImportError
+    instead of months of empty payloads.
+    """
+    declared = {field.name for field in descriptor.oneofs_by_name[oneof_name].fields}
+    handled = set(handled)
+    missing = declared - handled
+    unknown = handled - declared
+    if missing or unknown:
+        raise RuntimeError(
+            f"{descriptor.name}.{oneof_name} dispatch is out of step with the proto: "
+            f"no converter for {sorted(missing)}; "
+            f"converter for non-existent {sorted(unknown)}"
+        )
+
+
 class OpenStatusEnum(Enum):
     openForAll = 0
     closedForNew = 1
@@ -290,10 +311,9 @@ class Mixin(Protocol):
             return value.baker_id.value
 
         elif type(value) is Address:
-            if MessageToDict(value.account) == {}:
-                return CCD_Address(**{"contract": self.convertContractAddress(value.contract)})
-            else:
-                return CCD_Address(**{"account": self.convertAccountAddress(value.account)})
+            if value.WhichOneof("type") == "account":
+                return CCD_Address(account=self.convertAccountAddress(value.account))
+            return CCD_Address(contract=self.convertContractAddress(value.contract))
 
         elif type(value) is AccountAddress:
             return self.convertAccountAddress(value)
@@ -313,12 +333,10 @@ class Mixin(Protocol):
             return value.enc_id_cred_pub_share.hex()
 
         elif type(value) is Timestamp:
-            if MessageToDict(value) == {}:
-                pass
-            else:
-                return dt.datetime.fromtimestamp(
-                    int(MessageToDict(value)["value"]) / 1_000, tz=timezone.utc
-                )
+            # A zero here means the field was never set -- Timestamp is a
+            # message, so the node omits it rather than sending the epoch.
+            if value.value:
+                return dt.datetime.fromtimestamp(value.value / 1_000, tz=timezone.utc)
 
         elif type(value) is DelegatorId:
             return value.id.value
@@ -337,6 +355,12 @@ class Mixin(Protocol):
             account_index=value.account_index,
             sequence_number=value.sequence_number,
             creation_order=value.creation_order,
+        )
+
+    def convertExchangeRateValue(self, message) -> CCD_ExchangeRate:
+        return CCD_ExchangeRate(
+            numerator=str(message.value.numerator),
+            denominator=str(message.value.denominator),
         )
 
     def convertAmount(self, value: Amount) -> microCCD:
@@ -516,9 +540,11 @@ class Mixin(Protocol):
     def convertTypeWithSingleValues(self, message):
         result = {}
 
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-
+        # iter_set_fields skips what the node left unset, which is what the
+        # BakerId branch used to approximate -- `pool_owner` is absent on a
+        # payday pool reward for passive delegation -- except it rebuilt the
+        # entire message as a dict on every single field to decide.
+        for key, value in self.iter_set_fields(message):
             if type(value) is InclusiveRangeAmountFraction:
                 result[key] = self.convertTypeWithSingleValues(value)
 
@@ -540,9 +566,6 @@ class Mixin(Protocol):
 
             elif type(value) is TokenId:
                 result[key] = value.value
-            elif type(value) is BakerId:
-                if descriptor.json_name in MessageToDict(message):
-                    result[key] = self.convertType(value)
             else:
                 result[key] = self.convertType(value)
 
@@ -581,22 +604,18 @@ class Mixin(Protocol):
         return CCD_BakerStakePendingChange(**result)
 
     def convertExchangeRate(self, message) -> CCD_ExchangeRate:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is Ratio:
-                        result[key] = CCD_Ratio(
-                            **{
-                                "numerator": value.numerator,
-                                "denominator": value.denominator,
-                            }
-                        )
+
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if type(value) is Ratio:
+                result[key] = CCD_Ratio(
+                    **{
+                        "numerator": value.numerator,
+                        "denominator": value.denominator,
+                    }
+                )
 
         return CCD_ExchangeRate(**result)
 
@@ -614,17 +633,17 @@ class Mixin(Protocol):
         return keys
 
     def convertHigherLevelKeys(self, message) -> CCD_HigherLevelKeys:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if key == "keys":
-                    result[key] = self.convertUpdatePublicKeys(value)
 
-                elif type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
+        result = {}
+        for descriptor in message.DESCRIPTOR.fields:
+            key, value = self.get_key_value_from_descriptor(descriptor, message)
+            if key == "keys":
+                result[key] = self.convertUpdatePublicKeys(value)
+
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_HigherLevelKeys(**result)
 
@@ -641,106 +660,86 @@ class Mixin(Protocol):
         return keys
 
     def convertAccessStructure(self, message) -> CCD_AccessStructure:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if key == "access_public_keys":
-                        result[key] = self.convertAccessPublicKeys(value)
 
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if key == "access_public_keys":
+                result[key] = self.convertAccessPublicKeys(value)
+
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_AccessStructure(**result)
 
     def convertAuthorizationsV0(self, message) -> CCD_AuthorizationsV0:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if key == "keys":
-                        result[key] = self.convertUpdatePublicKeys(value)
 
-                    elif type(value) is AccessStructure:
-                        result[key] = self.convertAccessStructure(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if key == "keys":
+                result[key] = self.convertUpdatePublicKeys(value)
 
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+            elif type(value) is AccessStructure:
+                result[key] = self.convertAccessStructure(value)
+
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_AuthorizationsV0(**result)
 
     def convertAuthorizationsV1(self, message) -> CCD_AuthorizationsV1:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) is AuthorizationsV0:
-                        result[key] = self.convertAuthorizationsV0(value)
 
-                    elif type(value) is AccessStructure:
-                        result[key] = self.convertAccessStructure(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if type(value) is AuthorizationsV0:
+                result[key] = self.convertAuthorizationsV0(value)
 
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+            elif type(value) is AccessStructure:
+                result[key] = self.convertAccessStructure(value)
+
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_AuthorizationsV1(**result)
 
-    def convertLevel1Update(self, message) -> CCD_Level1Update:
-        if MessageToDict(message) == {}:
+    def convertLevel1Update(self, message) -> CCD_Level1Update | None:
+        key = message.WhichOneof("update_type")
+        if key is None:
             return None
+
+        value = getattr(message, key)
+        if type(value) is HigherLevelKeys:
+            converted = self.convertHigherLevelKeys(value)
+        elif type(value) is AuthorizationsV0:
+            converted = self.convertAuthorizationsV0(value)
+        elif type(value) is AuthorizationsV1:
+            converted = self.convertAuthorizationsV1(value)
         else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is HigherLevelKeys:
-                        result[key] = self.convertHigherLevelKeys(value)
-
-                    elif type(value) is AuthorizationsV0:
-                        result[key] = self.convertAuthorizationsV0(value)
-
-                    elif type(value) is AuthorizationsV1:
-                        result[key] = self.convertAuthorizationsV1(value)
-
-        return CCD_Level1Update(**result)
-
-    def convertRootUpdate(self, message) -> CCD_RootUpdate:
-        if MessageToDict(message) == {}:
             return None
+
+        return CCD_Level1Update(**{key: converted})
+
+    def convertRootUpdate(self, message) -> CCD_RootUpdate | None:
+        key = message.WhichOneof("update_type")
+        if key is None:
+            return None
+
+        value = getattr(message, key)
+        if type(value) is HigherLevelKeys:
+            converted = self.convertHigherLevelKeys(value)
+        elif type(value) is AuthorizationsV0:
+            converted = self.convertAuthorizationsV0(value)
+        elif type(value) is AuthorizationsV1:
+            converted = self.convertAuthorizationsV1(value)
         else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is HigherLevelKeys:
-                        result[key] = self.convertHigherLevelKeys(value)
+            return None
 
-                    elif type(value) is AuthorizationsV0:
-                        result[key] = self.convertAuthorizationsV0(value)
-
-                    elif type(value) is AuthorizationsV1:
-                        result[key] = self.convertAuthorizationsV1(value)
-
-        return CCD_RootUpdate(**result)
+        return CCD_RootUpdate(**{key: converted})
 
     def converCommissionRanges(self, message) -> CCD_CommissionRanges:
         # TODO: no test available
@@ -749,29 +748,25 @@ class Mixin(Protocol):
         return CCD_CommissionRanges(**result)
 
     def convertPoolParametersCpv1(self, message) -> CCD_PoolParametersCpv1:
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if MessageToDict(value) == {}:
-                    pass
-                else:
-                    if type(value) is CommissionRanges:
-                        result[key] = self.converCommissionRanges(value)
 
-                    # elif type(value) in [BakerStakeThreshold, ProtocolUpdate]:
-                    #         result[key] = self.convertTypeWithSingleValues(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if type(value) is CommissionRanges:
+                result[key] = self.converCommissionRanges(value)
 
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+            # elif type(value) in [BakerStakeThreshold, ProtocolUpdate]:
+            #         result[key] = self.convertTypeWithSingleValues(value)
 
-                    elif type(value) in [CapitalBound, LeverageFactor]:
-                        result[key] = self.convertTypeWithSingleValues(value)
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
-                    elif type(value) is AmountFraction:
-                        result[key] = self.convertType(value)
+            elif type(value) in [CapitalBound, LeverageFactor]:
+                result[key] = self.convertTypeWithSingleValues(value)
+
+            elif type(value) is AmountFraction:
+                result[key] = self.convertType(value)
 
         return CCD_PoolParametersCpv1(**result)
 
@@ -799,20 +794,16 @@ class Mixin(Protocol):
 
     def convertConsensusParametersV1(self, message) -> CCD_ConsensusParametersV1:
         # TODO: no test available
-        if MessageToDict(message) == {}:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) is TimeoutParameters:
-                        result[key] = self.convertTypeWithSingleValues(value)
 
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if type(value) is TimeoutParameters:
+                result[key] = self.convertTypeWithSingleValues(value)
+
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
         # result = self.convertTypeWithSingleValues(message)
 
         return CCD_ConsensusParametersV1(**result)
@@ -849,22 +840,17 @@ class Mixin(Protocol):
 
         return CCD_MintDistributionCpv1(**result)
 
-    def convertMintDistributionCpv0(self, message) -> CCD_MintDistributionCpv0:
-        # TODO: no test available
-        if self.valueIsEmpty(message):
+    def convertMintDistributionCpv0(self, message) -> CCD_MintDistributionCpv0 | None:
+        if not message.ByteSize():
             return None
-        else:
-            result = {}
-            for descriptor in message.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, message)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) is MintRate:
-                        result[key] = self.convertMintRate(value)
 
-                    elif type(value) is AmountFraction:
-                        result[key] = self.convertType(value)
+        result = {}
+        for key, value in self.iter_set_fields(message):
+            if type(value) is MintRate:
+                result[key] = self.convertMintRate(value)
+
+            elif type(value) is AmountFraction:
+                result[key] = self.convertType(value)
 
         return CCD_MintDistributionCpv0(**result)
 
@@ -1239,43 +1225,45 @@ class Mixin(Protocol):
 
     def convertRejectReason(self, message) -> tuple[dict, str]:
         result = {}
-        _type = None
-        for field, value in message.ListFields():
-            key = field.name
+        # `reason` is a 64-arm oneof; exactly one is set.
+        key = message.WhichOneof("reason")
+        if key is None:
+            return result, None
 
-            _type = key
-            if type(value) in self.simple_types:
-                result[key] = self.convertType(value)
+        _type = key
+        value = getattr(message, key)
+        if type(value) in self.simple_types:
+            result[key] = self.convertType(value)
 
-            elif type(value) in [
-                RejectReason.InvalidInitMethod,
-                RejectReason.InvalidReceiveMethod,
-                RejectReason.AmountTooLarge,
-                RejectReason.RejectedInit,
-                RejectReason.RejectedReceive,
-            ]:
-                result[key] = self.convertTypeWithSingleValues(value)
+        elif type(value) in [
+            RejectReason.InvalidInitMethod,
+            RejectReason.InvalidReceiveMethod,
+            RejectReason.AmountTooLarge,
+            RejectReason.RejectedInit,
+            RejectReason.RejectedReceive,
+        ]:
+            result[key] = self.convertTypeWithSingleValues(value)
 
-            elif type(value) is TokenModuleRejectReason:
-                result[key] = self.convertTokenModuleRejectReason(value)
+        elif type(value) is TokenModuleRejectReason:
+            result[key] = self.convertTokenModuleRejectReason(value)
 
-            elif type(value) is RejectReason.DuplicateCredIds:
-                result[key] = self.convertDuplicateCredIds(value)
+        elif type(value) is RejectReason.DuplicateCredIds:
+            result[key] = self.convertDuplicateCredIds(value)
 
-            elif type(value) is LockId:
-                result[key] = self.convertLockId(value)
+        elif type(value) is LockId:
+            result[key] = self.convertLockId(value)
 
-            elif type(value) is RejectReason.LockOperationNotAuthorized:
-                result[key] = CCD_RejectReason_LockOperationNotAuthorized(
-                    lock_id=self.convertLockId(value.lock_id),
-                    account=self.convertAccountAddress(value.account),
-                )
+        elif type(value) is RejectReason.LockOperationNotAuthorized:
+            result[key] = CCD_RejectReason_LockOperationNotAuthorized(
+                lock_id=self.convertLockId(value.lock_id),
+                account=self.convertAccountAddress(value.account),
+            )
 
-            elif type(value) is RejectReason.LockTokenNotPermitted:
-                result[key] = CCD_RejectReason_LockTokenNotPermitted(
-                    lock_id=self.convertLockId(value.lock_id),
-                    token_id=value.token_id.value,
-                )
+        elif type(value) is RejectReason.LockTokenNotPermitted:
+            result[key] = CCD_RejectReason_LockTokenNotPermitted(
+                lock_id=self.convertLockId(value.lock_id),
+                token_id=value.token_id.value,
+            )
         return result, _type
 
     # def stringify_large_amount(self, d: dict) -> dict:

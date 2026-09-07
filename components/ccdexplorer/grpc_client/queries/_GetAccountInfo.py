@@ -46,8 +46,6 @@ from ccdexplorer.grpc_client.types_pb2 import (
     CredentialPublicKeys,
     DelegationTarget,
     EncryptedBalance,
-    InitialCredentialValues,
-    NormalCredentialValues,
     Policy,
     ReleaseSchedule,
     StakePendingChange,
@@ -190,16 +188,11 @@ class Mixin(_SharedConverters):
 
     def convertAccountCredential(self, message) -> CCD_AccountCredential:
         result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) is InitialCredentialValues:
-                    result[key] = self.convertInitialCredentialValues(value)
-
-                elif type(value) is NormalCredentialValues:
-                    result[key] = self.convertNormalCredentialValues(value)
+        key = message.WhichOneof("credential_values")
+        if key == "initial":
+            result[key] = self.convertInitialCredentialValues(message.initial)
+        elif key == "normal":
+            result[key] = self.convertNormalCredentialValues(message.normal)
 
         return CCD_AccountCredential(**result)
 

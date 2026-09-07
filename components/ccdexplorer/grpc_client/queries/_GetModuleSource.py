@@ -12,52 +12,13 @@ if TYPE_CHECKING:
 from enum import Enum
 
 from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_InstanceInfo_V0,
-    CCD_InstanceInfo_V1,
     CCD_ModuleRef,
-    CCD_ReceiveName,
     CCD_VersionedModuleSource,
 )
 from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 
 
 class Mixin(_SharedConverters):
-    def convertMethods(self, message) -> list[CCD_ReceiveName]:
-        methods = []
-        for method in message:
-            for descriptor in method.DESCRIPTOR.fields:
-                _, value = self.get_key_value_from_descriptor(descriptor, method)
-
-                methods.append(self.convertType(value))
-
-        return methods
-
-    def convertInstanceInfo_V0(self, message) -> CCD_InstanceInfo_V0:
-        result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-
-            if type(value) in self.simple_types:
-                result[key] = self.convertType(value)
-
-            elif key == "methods":
-                result[key] = self.convertMethods(value)
-
-        return CCD_InstanceInfo_V0(**result)
-
-    def convertInstanceInfo_V1(self, message) -> CCD_InstanceInfo_V1:
-        result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-
-            if type(value) in self.simple_types:
-                result[key] = self.convertType(value)
-
-            elif key == "methods":
-                result[key] = self.convertMethods(value)
-
-        return CCD_InstanceInfo_V1(**result)
-
     def get_module_source(
         self: GRPCClient,
         module_ref: CCD_ModuleRef,
@@ -71,13 +32,9 @@ class Mixin(_SharedConverters):
             net, "GetModuleSource", moduleSourceRequest
         )
 
-        for field, value in grpc_return_value.ListFields():
-            key = field.name
-            if type(value) in [
-                VersionedModuleSource.ModuleSourceV0,
-                VersionedModuleSource.ModuleSourceV1,
-            ]:
-                result[key] = self.convertType(value)
+        key = grpc_return_value.WhichOneof("module")
+        if key is not None:
+            result[key] = self.convertType(getattr(grpc_return_value, key))
 
         return CCD_VersionedModuleSource(**result)
 
@@ -94,12 +51,8 @@ class Mixin(_SharedConverters):
             net, "GetModuleSource", moduleSourceRequest
         )
 
-        for field, value in grpc_return_value.ListFields():
-            key = field.name
-            if type(value) in [
-                VersionedModuleSource.ModuleSourceV0,
-                VersionedModuleSource.ModuleSourceV1,
-            ]:
-                result[key] = value
+        key = grpc_return_value.WhichOneof("module")
+        if key is not None:
+            result[key] = getattr(grpc_return_value, key)
 
         return VersionedModuleSource(**result)

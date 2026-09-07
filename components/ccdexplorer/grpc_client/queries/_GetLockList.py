@@ -18,7 +18,5 @@ class Mixin(_SharedConverters):
         net: Enum = NET.MAINNET,
     ) -> list[CCD_LockId]:
         blockHashInput = self.generate_block_hash_input_from(block_hash)
-        grpc_return_value = self.stub_on_net(
-            net, "GetLockList", blockHashInput, streaming=True
-        )
+        grpc_return_value = self.stub_on_net(net, "GetLockList", blockHashInput, streaming=True)
         return [self.convertLockId(lock) for lock in grpc_return_value]

@@ -63,7 +63,6 @@ class Mixin(_SharedConverters):
         block_hash: str,
         net: Enum = NET.MAINNET,
     ) -> CCD_TokenomicsInfo:
-        prefix = ""
         result = {}
         blockHashInput = self.generate_block_hash_input_from(block_hash)
 
@@ -71,12 +70,9 @@ class Mixin(_SharedConverters):
             net, "GetTokenomicsInfo", blockHashInput
         )
 
-        for descriptor in grpc_return_value.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, grpc_return_value)
-
-            if type(value) is TokenomicsInfo.V0:
-                result[f"{prefix}{key}"] = self.convertTokenomicsV0(value)
-            elif type(value) is TokenomicsInfo.V1:
-                result[f"{prefix}{key}"] = self.convertTokenomicsV1(value)
+        key = grpc_return_value.WhichOneof("tokenomics")
+        if key is not None:
+            converter = self.convertTokenomicsV0 if key == "v0" else self.convertTokenomicsV1
+            result[key] = converter(getattr(grpc_return_value, key))
 
         return CCD_TokenomicsInfo(**result)

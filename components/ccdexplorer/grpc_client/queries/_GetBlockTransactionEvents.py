@@ -6,51 +6,29 @@ from typing import TYPE_CHECKING, Union
 
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import (
-    CreatePLT,
     MetaEffect,
-    TokenCreationDetails,
     TokenEffect,
 )
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
+    assert_oneof_covered,
 )
 from ccdexplorer.grpc_client.types_pb2 import (
-    AccountCreationDetails,
-    AccountTransactionDetails,
+    BlockItemSummary,
     AccountTransactionEffects,
-    ArInfo,
     BakerEvent,
     BakerId,
     BakerKeysEvent,
-    BakerStakeThreshold,
     BakerStakeUpdatedData,
     ContractInitializedEvent,
-    CooldownParametersCpv1,
     DelegationEvent,
     DelegationTarget,
-    ElectionDifficulty,
     EncryptedAmountRemovedEvent,
     EncryptedSelfAmountAddedEvent,
-    ExchangeRate,
-    FinalizationCommitteeParameters,
-    GasRewards,
-    GasRewardsCpv2,
-    IpInfo,
-    Level1Update,
-    MintDistributionCpv0,
-    MintDistributionCpv1,
     NewEncryptedAmountEvent,
-    PoolParametersCpv1,
-    ProtocolUpdate,
     RegisteredData,
-    RootUpdate,
     SponsorDetails,
-    TimeoutParameters,
-    TimeParametersCpv1,
-    TransactionFeeDistribution,
-    UpdateDetails,
     UpdatePayload,
-    ValidatorScoreParameters,
 )
 
 if TYPE_CHECKING:
@@ -89,7 +67,6 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_DelegationStakeDecreased,
     CCD_DelegationStakeIncreased,
     CCD_EncryptedSelfAmountAddedEvent,
-    CCD_ExchangeRate,
     CCD_NewRelease,
     CCD_SponsorDetails,
     CCD_MetaEffect,
@@ -101,7 +78,47 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_UpdateDetails,
     CCD_UpdatePayload,
 )
-from google.protobuf.json_format import MessageToDict
+
+
+# Every arm of UpdatePayload's `payload` oneof, mapped to the method that
+# converts it. assert_oneof_covered pins this against the proto at import.
+_UPDATE_PAYLOAD_CONVERTERS = {
+    "protocol_update": "convertTypeWithSingleValues",
+    "election_difficulty_update": "convertElectionDifficulty",
+    "euro_per_energy_update": "convertExchangeRateValue",
+    "micro_ccd_per_euro_update": "convertExchangeRateValue",
+    "foundation_account_update": "convertType",
+    "mint_distribution_update": "convertMintDistributionCpv0",
+    "transaction_fee_distribution_update": "convertTransactionFeeDistribution",
+    "gas_rewards_update": "convertGasRewards",
+    "baker_stake_threshold_update": "convertTypeWithSingleValues",
+    "root_update": "convertRootUpdate",
+    "level_1_update": "convertLevel1Update",
+    "add_anonymity_revoker_update": "convertArInfo",
+    "add_identity_provider_update": "convertIpInfo",
+    "cooldown_parameters_cpv_1_update": "convertCooldownParametersCpv1",
+    "pool_parameters_cpv_1_update": "convertPoolParametersCpv1",
+    "time_parameters_cpv_1_update": "convertTimeParametersCpv1",
+    "mint_distribution_cpv_1_update": "convertMintDistributionCpv1",
+    "gas_rewards_cpv_2_update": "convertGasRewardsV2",
+    "timeout_parameters_update": "convertTypeWithSingleValues",
+    "min_block_time_update": "convertType",
+    "block_energy_limit_update": "convertType",
+    "finalization_committee_parameters_update": "convertFinalizationCommitteeParameters",
+    "validator_score_parameters_update": "convertValidatorScoreParameters",
+    "create_plt_update": "convertCreatePLT",
+}
+assert_oneof_covered(UpdatePayload.DESCRIPTOR, "payload", _UPDATE_PAYLOAD_CONVERTERS)
+
+
+# Every arm of BlockItemSummary's `details` oneof.
+_BLOCK_ITEM_DETAILS_CONVERTERS = {
+    "account_transaction": "convertAccountTransactionDetails",
+    "account_creation": "convertAccountCreationDetails",
+    "update": "convertUpdateDetails",
+    "token_creation": "convertTokenCreationDetails",
+}
+assert_oneof_covered(BlockItemSummary.DESCRIPTOR, "details", _BLOCK_ITEM_DETAILS_CONVERTERS)
 
 
 class Mixin(_SharedConverters):
@@ -394,13 +411,9 @@ class Mixin(_SharedConverters):
 
     def convertEffectAccountTransfer(self, message) -> CCD_AccountTransfer:
         result = {}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
-            if MessageToDict(value) == {}:
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
+        for key, value in self.iter_set_fields(message):
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_AccountTransfer(**result)
 
@@ -647,121 +660,39 @@ class Mixin(_SharedConverters):
         return CCD_AccountCreationDetails(**result), CCD_TransactionType(**_type)
 
     def convertUpdatePayload(self, message) -> tuple[CCD_UpdatePayload, dict[str, str]]:
-        result = {}
         _type = {"type": "update"}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
+        key = message.WhichOneof("payload")
+        if key is None:
+            return CCD_UpdatePayload(), _type
 
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                _type.update({"contents": key})
-
-                if type(value) is ExchangeRate:
-                    value_as_dict = MessageToDict(value)
-                    result[key] = CCD_ExchangeRate(
-                        **{
-                            "numerator": value_as_dict["value"]["numerator"],
-                            "denominator": value_as_dict["value"]["denominator"],
-                        }
-                    )
-
-                elif type(value) in [BakerStakeThreshold, ProtocolUpdate]:
-                    result[key] = self.convertTypeWithSingleValues(value)
-
-                elif type(value) is Level1Update:
-                    result[key] = self.convertLevel1Update(value)
-
-                elif type(value) is IpInfo:
-                    result[key] = self.convertIpInfo(value)
-
-                elif type(value) is ElectionDifficulty:
-                    result[key] = self.convertElectionDifficulty(value)
-
-                elif type(value) is MintDistributionCpv0:
-                    result[key] = self.convertMintDistributionCpv0(value)
-
-                elif type(value) is TransactionFeeDistribution:
-                    result[key] = self.convertTransactionFeeDistribution(value)
-
-                elif type(value) is GasRewards:
-                    result[key] = self.convertGasRewards(value)
-
-                elif type(value) is GasRewardsCpv2:
-                    result[key] = self.convertGasRewardsV2(value)
-
-                elif type(value) is RootUpdate:
-                    result[key] = self.convertRootUpdate(value)
-
-                elif type(value) is ArInfo:
-                    result[key] = self.convertArInfo(value)
-
-                elif type(value) is CooldownParametersCpv1:
-                    result[key] = self.convertCooldownParametersCpv1(value)
-
-                elif type(value) is PoolParametersCpv1:
-                    result[key] = self.convertPoolParametersCpv1(value)
-
-                elif type(value) is TimeParametersCpv1:
-                    result[key] = self.convertTimeParametersCpv1(value)
-
-                elif type(value) is MintDistributionCpv1:
-                    result[key] = self.convertMintDistributionCpv1(value)
-
-                elif type(value) is TimeoutParameters:
-                    result[key] = self.convertTypeWithSingleValues(value)
-
-                elif type(value) is FinalizationCommitteeParameters:
-                    result[key] = self.convertFinalizationCommitteeParameters(value)
-
-                elif type(value) is ValidatorScoreParameters:
-                    result[key] = self.convertValidatorScoreParameters(value)
-
-                elif type(value) is CreatePLT:
-                    result[key] = self.convertCreatePLT(value)
-
-                # Catch-all last: `simple_types` includes wrappers such as
-                # ElectionDifficulty, so testing it earlier would shadow the
-                # specific branches above.
-                elif type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-
-        return CCD_UpdatePayload(**result), _type
+        _type["contents"] = key
+        converter = getattr(self, _UPDATE_PAYLOAD_CONVERTERS[key])
+        return CCD_UpdatePayload(**{key: converter(getattr(message, key))}), _type
 
     def convertTokenCreationDetails(
         self, message
     ) -> tuple[CCD_TokenCreationDetails, CCD_TransactionType]:
         result = {}
         _type = {"type": "token_creation"}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
+        for key, value in self.iter_set_fields(message):
+            if key == "events":
+                result[key] = self.convertTokenEvents(value)
 
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if key == "events":
-                    result[key] = self.convertTokenEvents(value)
-
-                elif key == "create_plt":
-                    _type.update({"contents": key})
-                    result[key] = self.convertCreatePLT(value)
+            elif key == "create_plt":
+                _type.update({"contents": key})
+                result[key] = self.convertCreatePLT(value)
 
         return CCD_TokenCreationDetails(**result), CCD_TransactionType(**_type)
 
     def convertUpdateDetails(self, message) -> tuple[CCD_UpdateDetails, CCD_TransactionType]:
         result = {}
         _type = {"type": "update"}
-        for descriptor in message.DESCRIPTOR.fields:
-            key, value = self.get_key_value_from_descriptor(descriptor, message)
+        for key, value in self.iter_set_fields(message):
+            if type(value) is UpdatePayload:
+                result[key], _type = self.convertUpdatePayload(value)
 
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) is UpdatePayload:
-                    result[key], _type = self.convertUpdatePayload(value)
-
-                elif type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
+            elif type(value) in self.simple_types:
+                result[key] = self.convertType(value)
 
         return CCD_UpdateDetails(**result), CCD_TransactionType(**_type)
 
@@ -780,25 +711,16 @@ class Mixin(_SharedConverters):
         if not grpc_return_value:
             return CCD_Block(**{"transaction_summaries": []})
 
-        for tx in list(grpc_return_value):
-            result = {}
-            for field, value in tx.ListFields():
-                key = field.name
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-
-                if type(value) is TokenCreationDetails:
-                    result[key], result["type"] = self.convertTokenCreationDetails(value)
-
-                if type(value) is UpdateDetails:
-                    result[key], result["type"] = self.convertUpdateDetails(value)
-
-                if type(value) is AccountCreationDetails:
-                    result[key], result["type"] = self.convertAccountCreationDetails(value)
-
-                if type(value) is AccountTransactionDetails:
-                    result[key], result["type"] = self.convertAccountTransactionDetails(value)
-
+        for summary in list(grpc_return_value):
+            result = {
+                "index": self.convertType(summary.index),
+                "energy_cost": self.convertType(summary.energy_cost),
+                "hash": self.convertType(summary.hash),
+            }
+            key = summary.WhichOneof("details")
+            if key is not None:
+                converter = getattr(self, _BLOCK_ITEM_DETAILS_CONVERTERS[key])
+                result[key], result["type"] = converter(getattr(summary, key))
             tx_list.append(CCD_BlockItemSummary(**result))
 
         return CCD_Block(**{"transaction_summaries": tx_list})
