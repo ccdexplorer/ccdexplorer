@@ -201,13 +201,17 @@ class MetaData(Utils):
 
         return error
 
-    def fetch_token_metadata(self, net: NET, token_address: str, httpx_client: httpx.Client):
+    def fetch_token_metadata(
+        self, net: NET, token_address: str, httpx_client: httpx.Client
+    ) -> str | None:
         """
         The message contains the token address info from the `token_addresses_v2` collection
         for which we are going to fetch the metadata.
+
+        Returns the error read_and_store_metadata recorded, or None on success --
+        swallowing it meant a caller could not tell the two apart.
         """
-        # console.log(f"{token_address} on {net.value}")
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
         db_to_use: dict[Collections, Collection] = net_db(self, net)
-        _ = self.read_and_store_metadata(db_to_use, token_address, httpx_client, net)
+        return self.read_and_store_metadata(db_to_use, token_address, httpx_client, net)
