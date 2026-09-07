@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 import httpx2 as httpx
 from ccdexplorer.domain.generic import NET
@@ -36,6 +37,9 @@ SELECT = {
 # Or set this to bypass the query entirely, e.g. ["<10082,0>-c507000000000000"]
 TOKEN_ADDRESSES: list[str] = []
 DRY_RUN = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
+# Pause between tokens. These fetches hit third-party servers -- a whole
+# contract is a couple of thousand requests at one host -- so pace them.
+DELAY_SECONDS = float(os.getenv("DELAY_SECONDS", "1.0"))
 # --------------------------------------------------------------------------
 
 
@@ -54,7 +58,9 @@ def main() -> None:
     ]
 
     print(
-        f"[local] {RUN_ON_NET}: {len(token_addresses)} token(s) to process{' (DRY RUN)' if DRY_RUN else ''}"
+        f"[local] {RUN_ON_NET}: {len(token_addresses)} token(s) to process"
+        f"{' (DRY RUN)' if DRY_RUN else ''}, {DELAY_SECONDS}s between requests",
+        flush=True,
     )
     if DRY_RUN:
         for addr in token_addresses:
@@ -66,14 +72,23 @@ def main() -> None:
     httpx_client = httpx.Client(follow_redirects=True, timeout=10.0)
 
     ok = failed = 0
+    started = time.monotonic()
     for n, addr in enumerate(token_addresses, start=1):
+        if n > 1 and DELAY_SECONDS:
+            time.sleep(DELAY_SECONDS)
         error = subscriber.fetch_token_metadata(net, addr, httpx_client)
         if error:
             failed += 1
         else:
             ok += 1
-        if n % 25 == 0 or n == len(token_addresses):
-            print(f"[local] {n}/{len(token_addresses)} — {ok} resolved, {failed} still failing")
+        if n % 50 == 0 or n == len(token_addresses):
+            elapsed = time.monotonic() - started
+            eta = (elapsed / n) * (len(token_addresses) - n)
+            print(
+                f"[local] {n}/{len(token_addresses)} — {ok} resolved, {failed} still failing"
+                f" — {elapsed / 60:.1f}m elapsed, ~{eta / 60:.0f}m left",
+                flush=True,
+            )
 
     print(f"[local] done: {ok} resolved, {failed} still failing")
 
