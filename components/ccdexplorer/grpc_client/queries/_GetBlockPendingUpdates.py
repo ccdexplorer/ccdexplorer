@@ -6,39 +6,50 @@ from typing import TYPE_CHECKING
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
+    assert_oneof_covered,
 )
-from ccdexplorer.grpc_client.types_pb2 import (
-    ArInfo,
-    AuthorizationsV0,
-    AuthorizationsV1,
-    BakerStakeThreshold,
-    CooldownParametersCpv1,
-    ElectionDifficulty,
-    ExchangeRate,
-    FinalizationCommitteeParameters,
-    GasRewards,
-    GasRewardsCpv2,
-    HigherLevelKeys,
-    IpInfo,
-    MintDistributionCpv0,
-    MintDistributionCpv1,
-    PoolParametersCpv1,
-    ProtocolUpdate,
-    TimeoutParameters,
-    TimeParametersCpv1,
-    TransactionFeeDistribution,
-    ValidatorScoreParameters,
-)
+from ccdexplorer.grpc_client.types_pb2 import PendingUpdate
 
 if TYPE_CHECKING:
     from ccdexplorer.grpc_client import GRPCClient
 
 
 from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_ExchangeRate,
     CCD_PendingUpdate,
 )
-from google.protobuf.json_format import MessageToDict
+
+
+# Every arm of PendingUpdate's `effect` oneof. Note these are not the same types
+# as the equivalent UpdatePayload arms: `root_keys`/`level1_keys` are
+# HigherLevelKeys here, not the RootUpdate/Level1Update wrappers.
+_PENDING_UPDATE_CONVERTERS = {
+    "root_keys": "convertHigherLevelKeys",
+    "level1_keys": "convertHigherLevelKeys",
+    "level2_keys_cpv_0": "convertAuthorizationsV0",
+    "level2_keys_cpv_1": "convertAuthorizationsV1",
+    "protocol": "convertTypeWithSingleValues",
+    "election_difficulty": "convertElectionDifficulty",
+    "euro_per_energy": "convertExchangeRateValue",
+    "micro_ccd_per_euro": "convertExchangeRateValue",
+    "foundation_account": "convertType",
+    "mint_distribution_cpv_0": "convertMintDistributionCpv0",
+    "mint_distribution_cpv_1": "convertMintDistributionCpv1",
+    "transaction_fee_distribution": "convertTransactionFeeDistribution",
+    "gas_rewards": "convertGasRewards",
+    "gas_rewards_cpv_2": "convertGasRewardsV2",
+    "pool_parameters_cpv_0": "convertTypeWithSingleValues",
+    "pool_parameters_cpv_1": "convertPoolParametersCpv1",
+    "add_anonymity_revoker": "convertArInfo",
+    "add_identity_provider": "convertIpInfo",
+    "cooldown_parameters": "convertCooldownParametersCpv1",
+    "time_parameters": "convertTimeParametersCpv1",
+    "timeout_parameters": "convertTypeWithSingleValues",
+    "min_block_time": "convertType",
+    "block_energy_limit": "convertType",
+    "finalization_committee_parameters": "convertFinalizationCommitteeParameters",
+    "validator_score_parameters": "convertValidatorScoreParameters",
+}
+assert_oneof_covered(PendingUpdate.DESCRIPTOR, "effect", _PENDING_UPDATE_CONVERTERS)
 
 
 class Mixin(_SharedConverters):
@@ -54,85 +65,14 @@ class Mixin(_SharedConverters):
         )
 
         events = []
-        for tx in list(grpc_return_value):
-            result = {}
-            for descriptor in tx.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, tx)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) is ExchangeRate:
-                        value_as_dict = MessageToDict(value)
-                        result[key] = CCD_ExchangeRate(
-                            **{
-                                "numerator": value_as_dict["value"]["numerator"],
-                                "denominator": value_as_dict["value"]["denominator"],
-                            }
-                        )
+        for pending_update in list(grpc_return_value):
+            result = {"effective_time": self.convertType(pending_update.effective_time)}
 
-                    elif type(value) in [BakerStakeThreshold, ProtocolUpdate]:
-                        result[key] = self.convertTypeWithSingleValues(value)
+            key = pending_update.WhichOneof("effect")
+            if key is not None:
+                converter = getattr(self, _PENDING_UPDATE_CONVERTERS[key])
+                result[key] = converter(getattr(pending_update, key))
 
-                    # `root_keys` and `level1_keys` are HigherLevelKeys, and
-                    # `level2_keys_cpv_0`/`_1` are AuthorizationsV0/V1 -- these are
-                    # not the RootUpdate/Level1Update wrappers that UpdatePayload
-                    # carries, so they need their own branches here.
-                    elif type(value) is HigherLevelKeys:
-                        result[key] = self.convertHigherLevelKeys(value)
-
-                    elif type(value) is AuthorizationsV0:
-                        result[key] = self.convertAuthorizationsV0(value)
-
-                    elif type(value) is AuthorizationsV1:
-                        result[key] = self.convertAuthorizationsV1(value)
-
-                    elif type(value) is IpInfo:
-                        result[key] = self.convertIpInfo(value)
-
-                    elif type(value) is ElectionDifficulty:
-                        result[key] = self.convertElectionDifficulty(value)
-
-                    elif type(value) is MintDistributionCpv0:
-                        result[key] = self.convertMintDistributionCpv0(value)
-
-                    elif type(value) is TransactionFeeDistribution:
-                        result[key] = self.convertTransactionFeeDistribution(value)
-
-                    elif type(value) is GasRewards:
-                        result[key] = self.convertGasRewards(value)
-
-                    elif type(value) is GasRewardsCpv2:
-                        result[key] = self.convertGasRewardsV2(value)
-
-                    elif type(value) is ArInfo:
-                        result[key] = self.convertArInfo(value)
-
-                    elif type(value) is CooldownParametersCpv1:
-                        result[key] = self.convertCooldownParametersCpv1(value)
-
-                    elif type(value) is PoolParametersCpv1:
-                        result[key] = self.convertPoolParametersCpv1(value)
-
-                    elif type(value) is TimeParametersCpv1:
-                        result[key] = self.convertTimeParametersCpv1(value)
-
-                    elif type(value) is MintDistributionCpv1:
-                        result[key] = self.convertMintDistributionCpv1(value)
-
-                    elif type(value) is TimeoutParameters:
-                        result[key] = self.convertTypeWithSingleValues(value)
-
-                    elif type(value) is FinalizationCommitteeParameters:
-                        result[key] = self.convertFinalizationCommitteeParameters(value)
-
-                    elif type(value) is ValidatorScoreParameters:
-                        result[key] = self.convertValidatorScoreParameters(value)
-
-                    # Catch-all last: `simple_types` includes wrappers such as
-                    # ElectionDifficulty, so testing it earlier would shadow the
-                    # specific branches above.
-                    elif type(value) in self.simple_types:
-                        result[key] = self.convertType(value)
             events.append(CCD_PendingUpdate(**result))
 
         return events

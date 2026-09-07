@@ -31,13 +31,10 @@ class Mixin(_SharedConverters):
                 "account": self.convertAccountAddress(delegator.account),
                 "stake": self.convertAmount(delegator.stake),
             }
-            if delegator.pending_change:
-                if self.valueIsEmpty(delegator.pending_change):
-                    pass
-                else:
-                    delegator_dict.update(
-                        {"pending_change": self.convertPendingChange(delegator.pending_change)}
-                    )
+            if delegator.HasField("pending_change"):
+                delegator_dict["pending_change"] = self.convertPendingChange(
+                    delegator.pending_change
+                )
 
             result.append(CCD_DelegatorInfo(**delegator_dict))
 

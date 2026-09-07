@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     pass
 from ccdexplorer.grpc_client.queries._SharedConverters import (
     Mixin as _SharedConverters,
+    assert_oneof_covered,
 )
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockSpecialEvent_AccountAmounts_Entry,
@@ -18,6 +19,22 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockSpecialEvent,
 )
 from enum import Enum
+
+
+# Every arm of BlockSpecialEvent's `event` oneof.
+_SPECIAL_EVENT_CONVERTERS = {
+    "baking_rewards": "convertBakingRewards",
+    "mint": "convertTypeWithSingleValues",
+    "finalization_rewards": "convertFinalizationRewards",
+    "block_reward": "convertTypeWithSingleValues",
+    "payday_foundation_reward": "convertTypeWithSingleValues",
+    "payday_account_reward": "convertTypeWithSingleValues",
+    "block_accrue_reward": "convertTypeWithSingleValues",
+    "payday_pool_reward": "convertTypeWithSingleValues",
+    "validator_suspended": "convertValidatorSuspended",
+    "validator_primed_for_suspension": "convertValidatorPrimedForSuspension",
+}
+assert_oneof_covered(BlockSpecialEvent.DESCRIPTOR, "event", _SPECIAL_EVENT_CONVERTERS)
 
 
 class Mixin(_SharedConverters):
@@ -113,35 +130,11 @@ class Mixin(_SharedConverters):
         )
 
         events = []
-        for tx in list(grpc_return_value):
-            result = {}
-            for descriptor in tx.DESCRIPTOR.fields:
-                key, value = self.get_key_value_from_descriptor(descriptor, tx)
-                if self.valueIsEmpty(value):
-                    pass
-                else:
-                    if type(value) in [
-                        BlockSpecialEvent.Mint,
-                        BlockSpecialEvent.BlockReward,
-                        BlockSpecialEvent.BlockAccrueReward,
-                        BlockSpecialEvent.PaydayFoundationReward,
-                        BlockSpecialEvent.PaydayPoolReward,
-                        BlockSpecialEvent.PaydayAccountReward,
-                    ]:
-                        result[key] = self.convertTypeWithSingleValues(value)
-
-                    elif type(value) is BlockSpecialEvent.ValidatorSuspended:
-                        result[key] = self.convertValidatorSuspended(value)
-
-                    elif type(value) is BlockSpecialEvent.ValidatorPrimedForSuspension:
-                        result[key] = self.convertValidatorPrimedForSuspension(value)
-
-                    elif type(value) is BlockSpecialEvent.BakingRewards:
-                        result[key] = self.convertBakingRewards(value)
-
-                    elif type(value) is BlockSpecialEvent.FinalizationRewards:
-                        result[key] = self.convertFinalizationRewards(value)
-
-            events.append(CCD_BlockSpecialEvent(**result))
+        for special_event in list(grpc_return_value):
+            key = special_event.WhichOneof("event")
+            if key is None:
+                continue
+            converter = getattr(self, _SPECIAL_EVENT_CONVERTERS[key])
+            events.append(CCD_BlockSpecialEvent(**{key: converter(getattr(special_event, key))}))
 
         return events

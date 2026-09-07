@@ -9,13 +9,12 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
     CCD_BlockItemSummaryInBlock,
 )
-from ccdexplorer.grpc_client.protocol_level_tokens_pb2 import TokenCreationDetails
+from ccdexplorer.grpc_client.queries._GetBlockTransactionEvents import (
+    _BLOCK_ITEM_DETAILS_CONVERTERS,
+)
 from ccdexplorer.grpc_client.queries._SharedConverters import Mixin as _SharedConverters
 from ccdexplorer.grpc_client.types_pb2 import (
-    AccountCreationDetails,
-    AccountTransactionDetails,
     TransactionHash,
-    UpdateDetails,
 )
 
 if TYPE_CHECKING:
@@ -26,23 +25,16 @@ class Mixin(_SharedConverters):
     def convertBlockItemSummaryInBlock(self, message) -> CCD_BlockItemSummaryInBlock:
         block_hash = self.convertType(message.block_hash)
 
-        result = {}
-        for field, value in message.outcome.ListFields():
-            key = field.name
-            if type(value) in self.simple_types:
-                result[key] = self.convertType(value)
-
-            if type(value) is TokenCreationDetails:
-                result[key], result["type"] = self.convertTokenCreationDetails(value)
-
-            if type(value) is UpdateDetails:
-                result[key], result["type"] = self.convertUpdateDetails(value)
-
-            if type(value) is AccountCreationDetails:
-                result[key], result["type"] = self.convertAccountCreationDetails(value)
-
-            if type(value) is AccountTransactionDetails:
-                result[key], result["type"] = self.convertAccountTransactionDetails(value)
+        summary = message.outcome
+        result = {
+            "index": self.convertType(summary.index),
+            "energy_cost": self.convertType(summary.energy_cost),
+            "hash": self.convertType(summary.hash),
+        }
+        key = summary.WhichOneof("details")
+        if key is not None:
+            converter = getattr(self, _BLOCK_ITEM_DETAILS_CONVERTERS[key])
+            result[key], result["type"] = converter(getattr(summary, key))
 
         return CCD_BlockItemSummaryInBlock(
             block_hash=block_hash, outcome=CCD_BlockItemSummary(**result)
@@ -66,8 +58,7 @@ class Mixin(_SharedConverters):
             return CCD_BlockItemStatus(received=True)
         elif which == "committed":
             outcomes = [
-                self.convertBlockItemSummaryInBlock(o)
-                for o in grpc_return_value.committed.outcomes
+                self.convertBlockItemSummaryInBlock(o) for o in grpc_return_value.committed.outcomes
             ]
             return CCD_BlockItemStatus(committed=outcomes)
         else:

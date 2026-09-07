@@ -53,9 +53,7 @@ if TYPE_CHECKING:
 class Mixin(_SharedConverters):
     def convertRoundTimeout(self, message) -> CCD_RoundTimeout:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) is RawTimeoutCertificate:
                 result[key] = self.convertRawTimeoutCertificate(value)
             elif type(value) is RawQuorumCertificate:
@@ -81,8 +79,7 @@ class Mixin(_SharedConverters):
         bakers = []
         for baker in message:
             result = {}
-            for field, value in baker.ListFields():
-                key = field.name
+            for key, value in self.iter_set_fields(baker):
                 if type(value) in self.simple_types:
                     result[key] = self.convertType(value)
 
@@ -93,8 +90,7 @@ class Mixin(_SharedConverters):
         rounds = []
         for round in message:
             result = {}
-            for field, value in round.ListFields():
-                key = field.name
+            for key, value in self.iter_set_fields(round):
                 if type(value) in self.simple_types:
                     result[key] = self.convertType(value)
                 elif key == "finalizers":
@@ -104,9 +100,7 @@ class Mixin(_SharedConverters):
 
     def convertRawTimeoutCertificate(self, message) -> CCD_RawTimeoutCertificate:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key in ["qc_rounds_first_epoch", "qc_rounds_second_epoch"]:
@@ -116,9 +110,7 @@ class Mixin(_SharedConverters):
 
     def convertRawQuorumCertificate(self, message) -> CCD_RawQuorumCertificate:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key == "signatories":
@@ -128,25 +120,19 @@ class Mixin(_SharedConverters):
 
     def convertRoundStatus(self, message) -> CCD_RoundStatus:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-                elif type(value) is RawQuorumCertificate:
-                    result[key] = self.convertRawQuorumCertificate(value)
-                elif type(value) is RoundTimeout:
-                    result[key] = self.convertRoundTimeout(value)
+        for key, value in self.iter_set_fields(message):
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
+            elif type(value) is RawQuorumCertificate:
+                result[key] = self.convertRawQuorumCertificate(value)
+            elif type(value) is RoundTimeout:
+                result[key] = self.convertRoundTimeout(value)
 
         return CCD_RoundStatus(**result)
 
     def convertQuorumMessage(self, message) -> CCD_QuorumMessage:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
 
@@ -154,9 +140,7 @@ class Mixin(_SharedConverters):
 
     def convertTimeoutMessage(self, message) -> CCD_TimeoutMessage:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif type(value) is RawQuorumCertificate:
@@ -166,19 +150,15 @@ class Mixin(_SharedConverters):
 
     def convertPersistentRoundStatus(self, message) -> CCD_PersistentRoundStatus:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-                elif type(value) is QuorumMessage:
-                    result[key] = self.convertQuorumMessage(value)
-                elif type(value) is TimeoutMessage:
-                    result[key] = self.convertTimeoutMessage(value)
-                elif type(value) is RawQuorumCertificate:
-                    result[key] = self.convertRawQuorumCertificate(value)
+        for key, value in self.iter_set_fields(message):
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
+            elif type(value) is QuorumMessage:
+                result[key] = self.convertQuorumMessage(value)
+            elif type(value) is TimeoutMessage:
+                result[key] = self.convertTimeoutMessage(value)
+            elif type(value) is RawQuorumCertificate:
+                result[key] = self.convertRawQuorumCertificate(value)
 
         return CCD_PersistentRoundStatus(**result)
 
@@ -200,8 +180,7 @@ class Mixin(_SharedConverters):
         branches = []
         for hash in message:
             blocks_at_branch_height = []
-            for field, value in hash.ListFields():
-                key = field.name
+            for key, value in self.iter_set_fields(hash):
                 if key == "blocks_at_branch_height":
                     blocks_at_branch_height = self.convertBlocksAtBranchHeight(value)
             branches.append(
@@ -212,9 +191,7 @@ class Mixin(_SharedConverters):
 
     def convertRoundExistingBlock(self, message) -> CCD_RoundExistingBlock:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
 
@@ -229,9 +206,7 @@ class Mixin(_SharedConverters):
 
     def convertRoundExistingQC(self, message) -> CCD_RoundExistingQC:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
 
@@ -246,9 +221,7 @@ class Mixin(_SharedConverters):
 
     def convertBlockTableSummary(self, message) -> CCD_BlockTableSummary:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             if key == "live_blocks":
@@ -258,9 +231,7 @@ class Mixin(_SharedConverters):
 
     def convertRawFinalizationEntry(self, message) -> CCD_RawFinalizationEntry:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif type(value) is RawQuorumCertificate:
@@ -270,9 +241,7 @@ class Mixin(_SharedConverters):
 
     def convertBakersAndFinalizers(self, message) -> CCD_BakersAndFinalizers:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key == "finalizers":
@@ -284,15 +253,11 @@ class Mixin(_SharedConverters):
 
     def convertEpochBakers(self, message) -> CCD_EpochBakers:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-                elif type(value) is BakersAndFinalizers:
-                    result[key] = self.convertBakersAndFinalizers(value)
+        for key, value in self.iter_set_fields(message):
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
+            elif type(value) is BakersAndFinalizers:
+                result[key] = self.convertBakersAndFinalizers(value)
 
         return CCD_EpochBakers(**result)
 
@@ -301,9 +266,7 @@ class Mixin(_SharedConverters):
 
     def convertTimeoutMessages(self, message) -> CCD_TimeoutMessages:
         result = {}
-        for field, value in message.ListFields():
-            key = field.name
-
+        for key, value in self.iter_set_fields(message):
             if type(value) in self.simple_types:
                 result[key] = self.convertType(value)
             elif key in ["first_epoch_timeouts", "second_epoch_timeouts"]:
@@ -323,30 +286,26 @@ class Mixin(_SharedConverters):
             net, "GetConsensusDetailedStatus", consensus_detailed_status_query
         )
 
-        for field, value in grpc_return_value.ListFields():
-            key = field.name
-            if self.valueIsEmpty(value):
-                pass
-            else:
-                if type(value) in self.simple_types:
-                    result[key] = self.convertType(value)
-                elif type(value) is PersistentRoundStatus:
-                    result[key] = self.convertPersistentRoundStatus(value)
-                elif type(value) is RoundStatus:
-                    result[key] = self.convertRoundStatus(value)
-                elif type(value) is BlockTableSummary:
-                    result[key] = self.convertBlockTableSummary(value)
-                elif key == "branches":
-                    result[key] = self.convertBranches(value)
-                elif key == "round_existing_blocks":
-                    result[key] = self.convertRoundExistingBlocks(value)
-                elif key == "round_existing_qcs":
-                    result[key] = self.convertRoundExistingQCs(value)
-                elif type(value) is RawFinalizationEntry:
-                    result[key] = self.convertRawFinalizationEntry(value)
-                elif type(value) is EpochBakers:
-                    result[key] = self.convertEpochBakers(value)
-                elif type(value) is TimeoutMessages:
-                    result[key] = self.convertTimeoutMessages(value)
+        for key, value in self.iter_set_fields(grpc_return_value):
+            if type(value) in self.simple_types:
+                result[key] = self.convertType(value)
+            elif type(value) is PersistentRoundStatus:
+                result[key] = self.convertPersistentRoundStatus(value)
+            elif type(value) is RoundStatus:
+                result[key] = self.convertRoundStatus(value)
+            elif type(value) is BlockTableSummary:
+                result[key] = self.convertBlockTableSummary(value)
+            elif key == "branches":
+                result[key] = self.convertBranches(value)
+            elif key == "round_existing_blocks":
+                result[key] = self.convertRoundExistingBlocks(value)
+            elif key == "round_existing_qcs":
+                result[key] = self.convertRoundExistingQCs(value)
+            elif type(value) is RawFinalizationEntry:
+                result[key] = self.convertRawFinalizationEntry(value)
+            elif type(value) is EpochBakers:
+                result[key] = self.convertEpochBakers(value)
+            elif type(value) is TimeoutMessages:
+                result[key] = self.convertTimeoutMessages(value)
 
         return CCD_ConsensusDetailedStatus(**result)
