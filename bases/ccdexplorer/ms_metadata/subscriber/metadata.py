@@ -131,6 +131,10 @@ class MetaData(Utils):
                 url = self.get_tokenMetadata(request)
 
             url = (url or "").strip()
+            # What the contract published, before the ipfs gateway rewrite below.
+            # That rewrite is a fetch detail; pinning a gateway into the stored
+            # document would outlive whichever gateway we happen to use today.
+            published_url = url
             do_request = False
 
             if not url:
@@ -162,6 +166,12 @@ class MetaData(Utils):
                     try:
                         metadata = TokenMetaData(**t)
                         token_address_to_process.token_metadata = metadata
+                        # Record where the metadata came from. Tokens whose URL
+                        # is only reachable through tokenMetadata -- CIS-8004
+                        # agents, which emit no CIS-2 TokenMetadata event -- had
+                        # no metadata_url stored at all, so the token page
+                        # rendered an empty href that resolved to itself.
+                        token_address_to_process.metadata_url = published_url
                         token_address_to_process.failed_attempt = None
                         self.save_token_address(token_address_to_process, db_to_use)
                         console.log(f"URL parsed for token {token_address_str}.")

@@ -23,9 +23,16 @@ from ccdexplorer.tooter import Tooter
 
 # --- what to re-run -------------------------------------------------------
 CONTRACT = "<10082,0>"
-# Only tokens that still have no metadata. Drop the token_metadata clause to
-# re-fetch every token of the contract, including the ones already resolved.
-SELECT = {"contract": CONTRACT, "token_metadata": {"$exists": False}}
+# Tokens that still need work: no metadata at all, or metadata whose source URL
+# was never recorded (see the metadata_url note in read_and_store_metadata).
+# Narrow to one clause, or drop both, to re-fetch the whole contract.
+SELECT = {
+    "contract": CONTRACT,
+    "$or": [
+        {"token_metadata": {"$exists": False}},
+        {"metadata_url": {"$exists": False}},
+    ],
+}
 # Or set this to bypass the query entirely, e.g. ["<10082,0>-c507000000000000"]
 TOKEN_ADDRESSES: list[str] = []
 DRY_RUN = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
