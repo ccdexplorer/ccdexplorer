@@ -1038,7 +1038,7 @@ async def generate_edit_html_for_user_account(
 
     validator_all_fields = ValidatorNotificationPreferences.model_fields
     validator_all_fields_dict = {}
-    if account_info.stake.baker:
+    if account_info and account_info.stake and account_info.stake.baker:
         for field in validator_all_fields:
             if not user_account.validator_notification_preferences:
                 user_account.validator_notification_preferences = ValidatorNotificationPreferences()
