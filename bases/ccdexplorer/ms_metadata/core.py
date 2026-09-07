@@ -32,7 +32,9 @@ subscriber = Subscriber(grpcclient, tooter, motormongo, mongodb)
 processor_for_consumer = "metadata"
 #################################################
 
-httpx_client = httpx.Client()
+# ipfs.io answers /ipfs/<cid> with a 301 to /ipfs/<cid>/, which without
+# follow_redirects reaches raise_for_status() as a failure.
+httpx_client = httpx.Client(follow_redirects=True, timeout=10.0)
 
 
 class GrpcLimiter:

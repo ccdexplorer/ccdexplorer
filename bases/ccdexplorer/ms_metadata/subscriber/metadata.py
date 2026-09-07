@@ -43,7 +43,7 @@ class MetaData(Utils):
         if "v1" in instance_result:
             module_name = instance_result["v1"]["name"].replace("init_", "")
         elif "v0" in instance_result:
-            module_name = instance_result["v1"]["name"].replace("init_", "")
+            module_name = instance_result["v0"]["name"].replace("init_", "")
         return module_name
 
     def save_token_address(
@@ -75,8 +75,9 @@ class MetaData(Utils):
         )
         response = ci.invoke_token_metadataUrl(req.token_id)
         if response:
-            if len(response) > 0:
-                return response[0].url
+            # A token that exists but has no URL yet parses as MetadataUrl(url=""),
+            # so collapse blank onto None rather than handing "" to the caller.
+            return response[0].url.strip() or None
         return None
 
     def split_into_url_slug(self, token_address: str):
@@ -108,6 +109,12 @@ class MetaData(Utils):
 
         url = token_address_to_process.metadata_url
         error = None
+        # A token can exist before its metadata URL does: CIS-8004 agents, for
+        # instance, are created by `register` and only get a URL later, from a
+        # separate `setAgentURI` transaction. That is a different situation from
+        # a URL that is published but broken, and it should not be punished with
+        # the same escalating backoff.
+        awaiting_url = False
 
         try:
             if url is None:
@@ -123,21 +130,33 @@ class MetaData(Utils):
                 )
                 url = self.get_tokenMetadata(request)
 
-            do_request = url is not None
-            if url is None:
-                error = f"Metadata error: No URL found for token {token_address_str}."
+            url = (url or "").strip()
+            # What the contract published, before the ipfs gateway rewrite below.
+            # That rewrite is a fetch detail; pinning a gateway into the stored
+            # document would outlive whichever gateway we happen to use today.
+            published_url = url
+            do_request = False
+
+            if not url:
+                awaiting_url = True
+                error = f"Metadata error: no metadata URL published (yet) for token {token_address_str}."
                 console.log(error)
-            if token_address_to_process.failed_attempt:
-                pass
+            else:
+                if url.startswith("ipfs://"):
+                    url = f"https://ipfs.io/ipfs/{url[len('ipfs://') :]}"
+
+                # httpx raises UnsupportedProtocol for anything else, which reads
+                # like a network fault rather than a bad URL on chain.
+                if url.startswith(("http://", "https://")):
+                    do_request = True
+                else:
+                    error = (
+                        f"Metadata error: unsupported URL scheme for token "
+                        f"{token_address_str}: {url!r}."
+                    )
+                    console.log(error)
 
             if do_request:
-                if url[:4] == "ipfs":
-                    url = f"https://ipfs.io/ipfs/{url[7:]}"
-
-                    # resp: Response = requests.get(url, timeout=timeout)
-                    # resp.raise_for_status()  # optional, raises if non-2xx
-                    # t = resp.json()
-
                 resp = httpx_client.get(url)
                 resp.raise_for_status()
                 t = resp.json()
@@ -147,6 +166,12 @@ class MetaData(Utils):
                     try:
                         metadata = TokenMetaData(**t)
                         token_address_to_process.token_metadata = metadata
+                        # Record where the metadata came from. Tokens whose URL
+                        # is only reachable through tokenMetadata -- CIS-8004
+                        # agents, which emit no CIS-2 TokenMetadata event -- had
+                        # no metadata_url stored at all, so the token page
+                        # rendered an empty href that resolved to itself.
+                        token_address_to_process.metadata_url = published_url
                         token_address_to_process.failed_attempt = None
                         self.save_token_address(token_address_to_process, db_to_use)
                         console.log(f"URL parsed for token {token_address_str}.")
@@ -165,32 +190,38 @@ class MetaData(Utils):
 
         if error is not None:
             failed_attempt = token_address_to_process.failed_attempt
-            if not failed_attempt:
-                failed_attempt = FailedAttempt(
-                    attempts=1,
-                    do_not_try_before=dt.datetime.now().astimezone(tz=timezone.utc)
-                    + dt.timedelta(hours=2),
-                    last_error=error,
-                )
-            else:
-                failed_attempt.attempts += 1
-                failed_attempt.do_not_try_before = dt.datetime.now().astimezone(
-                    tz=timezone.utc
-                ) + dt.timedelta(hours=failed_attempt.attempts * failed_attempt.attempts)
-                failed_attempt.last_error = error
+            attempts = (failed_attempt.attempts + 1) if failed_attempt else 1
 
-            token_address_to_process.failed_attempt = failed_attempt
+            if awaiting_url:
+                # Nothing is wrong yet -- the URL simply has not been published.
+                # Come back in minutes rather than hours, easing off so a token
+                # that never gets one does not get polled forever.
+                retry_in = dt.timedelta(minutes=5 * min(attempts, 12))
+            elif attempts == 1:
+                retry_in = dt.timedelta(hours=2)
+            else:
+                retry_in = dt.timedelta(hours=attempts * attempts)
+
+            token_address_to_process.failed_attempt = FailedAttempt(
+                attempts=attempts,
+                do_not_try_before=dt.datetime.now().astimezone(tz=timezone.utc) + retry_in,
+                last_error=error,
+            )
             self.save_token_address(token_address_to_process, db_to_use)
 
         return error
 
-    def fetch_token_metadata(self, net: NET, token_address: str, httpx_client: httpx.Client):
+    def fetch_token_metadata(
+        self, net: NET, token_address: str, httpx_client: httpx.Client
+    ) -> str | None:
         """
         The message contains the token address info from the `token_addresses_v2` collection
         for which we are going to fetch the metadata.
+
+        Returns the error read_and_store_metadata recorded, or None on success --
+        swallowing it meant a caller could not tell the two apart.
         """
-        # console.log(f"{token_address} on {net.value}")
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
         db_to_use: dict[Collections, Collection] = net_db(self, net)
-        _ = self.read_and_store_metadata(db_to_use, token_address, httpx_client, net)
+        return self.read_and_store_metadata(db_to_use, token_address, httpx_client, net)
