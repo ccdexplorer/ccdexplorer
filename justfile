@@ -119,3 +119,14 @@ indices *ARGS:
 help:
     @echo "\nAvailable Just recipes:\n"
     @just --summary
+
+# --- Site tooling ---
+
+# Refresh the vendored Lottie website tester from upstream
+# (github.com/asweigart/lottie-website-tester). The file is committed so it
+# ships in the image; run this to pull a newer version, then commit the result.
+lottie-update:
+    mkdir -p projects/ccdexplorer_site/tools/lottie
+    curl -fsSL -o projects/ccdexplorer_site/tools/lottie/lottie.html \
+        https://raw.githubusercontent.com/asweigart/lottie-website-tester/main/lottie.html
+    @echo "Fetched $(wc -c < projects/ccdexplorer_site/tools/lottie/lottie.html) bytes to projects/ccdexplorer_site/tools/lottie/lottie.html"

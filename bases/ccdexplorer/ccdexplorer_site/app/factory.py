@@ -20,11 +20,12 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_IpInfo,
 )
 from fastapi import FastAPI, Response
-from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx2 import Request
+from starlette.requests import Request as HTTPRequest
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -76,7 +77,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_agent_registries,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
-from ccdexplorer.env import LOGIN_SECRET, environment
+from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -131,14 +132,14 @@ _BOT_HINTS = (
 )
 
 
-def _client_ip(request: Request) -> str:
+def _client_ip(request: HTTPRequest) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else ""
 
 
-def _visitor_id(request: Request) -> str:
+def _visitor_id(request: HTTPRequest) -> str:
     """An opaque, day-scoped identifier for an anonymous visitor.
 
     Most visitors never log in, so a session id counts almost nobody. This
@@ -159,7 +160,20 @@ def _visitor_id(request: Request) -> str:
     return hashlib.sha256(material.encode()).hexdigest()[:16]
 
 
-def _looks_like_bot(request: Request) -> bool:
+def _is_site_owner(user) -> bool:
+    """Whether this session belongs to the site owner.
+
+    ADMIN_CHAT_ID is already configured for this service and identifies the one
+    account allowed to run the crawler. Unset means nobody qualifies, so a
+    missing variable closes the door rather than opening it.
+    """
+    if user is None or not ADMIN_CHAT_ID:
+        return False
+    chat_id = getattr(user, "telegram_chat_id", None)
+    return chat_id is not None and str(chat_id) == str(ADMIN_CHAT_ID)
+
+
+def _looks_like_bot(request: HTTPRequest) -> bool:
     ua = request.headers.get("user-agent", "").lower()
     return (not ua) or any(hint in ua for hint in _BOT_HINTS)
 
@@ -417,6 +431,32 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.add_middleware(SiteSessionMiddleware)
 
     app.mount("/static", StaticFiles(directory=app_settings.static_dir), name="static")
+
+    # --- Lottie website tester -------------------------------------------
+    # https://github.com/asweigart/lottie-website-tester is a single HTML file
+    # that crawls this site from the visitor's own browser, reporting 404s,
+    # page weight and redirect chains. It only works same-origin, so it has to
+    # be served from here rather than opened locally.
+    #
+    # The file is vendored at tools/lottie/lottie.html -- upstream's install is
+    # "download it, upload it anywhere on your domain" -- and kept out of the
+    # /static mount so this route, not StaticFiles, decides who gets it.
+    # `just lottie-update` refreshes it from upstream.
+    #
+    # Restricted to the site owner, not merely to anyone signed in: this is a
+    # crawler with configurable concurrency, and there are hundreds of
+    # registered accounts. It must also stay on this origin -- from a subdomain
+    # the browser downgrades every check to an opaque no-cors result, so the
+    # status codes disappear and with them the point of running it.
+    @app.get("/lottie.html", include_in_schema=False)
+    async def lottie_tester(request: HTTPRequest) -> Response:
+        lottie_file = app_settings.static_dir.parent / "tools" / "lottie" / "lottie.html"
+        if not _is_site_owner(getattr(request.state, "user", None)):
+            return Response(status_code=404)
+        if not lottie_file.is_file():
+            return Response(status_code=404)
+        return FileResponse(lottie_file, media_type="text/html")
+
     app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
     app.mount("/addresses", StaticFiles(directory=app_settings.addresses_dir), name="addresses")
 
