@@ -802,6 +802,15 @@ class LoggedEvent:
                     else:
                         token_address = ""
 
+        if req.standard == StandardIdentifiers.CIS_8004:
+            # CIS-8004 events carry `agent_token_id` rather than `token_id`, and
+            # without a token_address on the event nothing downstream can tie a
+            # URI change back to the token it belongs to.
+            agent_token_id = getattr(req.recognized_event, "agent_token_id", None)
+            if agent_token_id:
+                add_token_address_to_event_info = True
+                token_address = f"{req.instance_address}-{agent_token_id}"
+
         if req.standard == StandardIdentifiers.CIS_6:
             # We need to parse the schema to get the string versions of the status.
             (

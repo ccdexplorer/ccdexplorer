@@ -382,6 +382,31 @@ class TokenAccountingV2:
                     token_addresses_to_update[log.event_info.token_address] = token_address_as_class
                     # save_token_address = True
 
+                elif log.recognized_event.tag in (240, 241):
+                    # CIS-8004 Registered / URIUpdated. The event carries the
+                    # agent URI, but the metadata URL is not that URI -- the
+                    # contract appends `.well-known/agent-card.json` to it. So
+                    # rather than reproduce that rule here, drop what we hold and
+                    # let ms_metadata ask the contract again.
+                    #
+                    # Without this a URI change is never noticed at all: a token
+                    # that already has token_metadata and no failed_attempt
+                    # matches neither of update_metadata's pipelines, so its
+                    # metadata stays stale forever.
+                    if log.event_info.token_address not in token_addresses_as_class_initial:
+                        token_address_as_class = self.create_new_token_address_v2(
+                            log.event_info.token_address, log.tx_info.block_height
+                        )
+                    else:
+                        token_address_as_class = token_addresses_as_class_initial[
+                            log.event_info.token_address
+                        ]
+
+                    token_address_as_class.metadata_url = None
+                    token_address_as_class.token_metadata = None
+                    token_address_as_class.failed_attempt = None
+                    token_addresses_to_update[log.event_info.token_address] = token_address_as_class
+
                 unique_addresses = {
                     address["address"]: address for address in addresses_to_save
                 }.values()
