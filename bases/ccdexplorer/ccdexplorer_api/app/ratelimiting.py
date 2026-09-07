@@ -1,4 +1,6 @@
 import json
+
+import sentry_sdk
 from typing import Mapping, Tuple
 
 from ccdexplorer.env import API_KEY_HEADER
@@ -74,6 +76,11 @@ async def resolve_api_auth(scope: Scope) -> Tuple[str, str]:
             api_account_id = recognized_api_key_document["api_account_id"]
             group_name = recognized_api_key_document["api_group"]
             scope["api_auth"] = (api_account_id, group_name)
+            # Give Sentry a stable per-caller identity so traffic can be counted
+            # by API account rather than by request. This is our own opaque
+            # account id -- no key, no IP, nothing about the end user.
+            sentry_sdk.set_user({"id": api_account_id})
+            sentry_sdk.set_tag("api_group", group_name)
         else:
             raise EmptyInformation(scope)
     else:
