@@ -101,7 +101,11 @@
     // payday's own start height, which the server sends with the row.
     document.body.addEventListener("htmx:afterSwap", function (event) {
       if (!event.target || event.target.id !== "{{ccd_tabulator_table}}_head_height") return;
-      const height = parseInt(event.target.textContent.trim(), 10);
+      // "<height>|<slot time of that block>"; the time may be empty if the
+      // scheduler has not filled its cache yet.
+      const parts = event.target.textContent.trim().split("|");
+      const height = parseInt(parts[0], 10);
+      const slotTime = (parts[1] || "").trim();
       if (!Number.isFinite(height) || height <= 0) return;
 
       const rows = table.getRows();
@@ -111,13 +115,27 @@
       if (!data.is_current || !data.height_for_first_block) return;
       if (height < data.height_for_first_block) return;   // payday just rolled over
 
-      row.update({
+      const update = {
         count_of_blocks: height - data.height_for_first_block + 1,
         block_height_download: height,
         block_height:
           '<a href="/{{net}}/block/' + height + '"><span class="ccd">' +
           height.toLocaleString("en-US") + "</span></a>",
-      });
+      };
+
+      // The running row's time is "as of the head block", not "closed at", so
+      // it moves with the height. Kept in the same two shapes the server sends
+      // for finished paydays, so a CSV of both reads the same.
+      if (slotTime) {
+        const dt = luxon.DateTime.fromISO(slotTime, { zone: "utc" });
+        if (dt.isValid) {
+          update.payday_block_slot_time = dt.toISO();
+          update.payday_block_slot_time_download =
+            dt.toFormat("yyyy-MM-dd'T'HH:mm:ss.SSS") + "000Z";
+        }
+      }
+
+      row.update(update);
     });
 
     // The client cannot see a payday close -- it would keep counting into the

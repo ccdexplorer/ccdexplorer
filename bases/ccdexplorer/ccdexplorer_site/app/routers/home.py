@@ -547,17 +547,28 @@ async def home_tx_graph(
 
 @router.get("/{net}/ajax_last_finalized_height", response_class=HTMLResponse)
 async def ajax_last_finalized_height(request: Request, net: str):
-    """The last finalized height, as plain text, for pollers.
+    """The last finalized block's height and slot time, for pollers.
 
-    No gRPC call and no query: the scheduler keeps app.last_finalized_block
-    current for every net, so this is a dict lookup. Stamping chain_head_last_seen
-    is what tells repeated_task_get_chain_head to keep that value refreshing at
-    1s for this net -- without a poller it falls back to the 5s blocks job.
+    Two pipe-separated fields, because the running payday row shows both and
+    one poll is cheaper than two. No gRPC call and no query: the scheduler
+    keeps the head block in memory, so this is a dict lookup. Stamping
+    chain_head_last_seen is what tells repeated_task_get_chain_head to keep it
+    refreshing at 1s for this net -- without a poller it falls back to the 5s
+    blocks job, whose cache is the fallback read here.
     """
     if net not in ["mainnet", "testnet", "devnet"]:
-        return HTMLResponse("0")
+        return HTMLResponse("0|")
     request.app.chain_head_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
-    return HTMLResponse(str(request.app.last_finalized_block.get(net, 0)))
+
+    head = request.app.chain_head.get(net)
+    if not head:
+        blocks = request.app.blocks_cache.get(net)
+        head = blocks[0] if blocks else None
+    if not head:
+        return HTMLResponse(f"{request.app.last_finalized_block.get(net, 0)}|")
+
+    slot_time = head.get("slot_time")
+    return HTMLResponse(f"{head.get('height', 0)}|{slot_time or ''}")
 
 
 @router.get("/{net}/ajax_last_blocks", response_class=HTMLResponse)
