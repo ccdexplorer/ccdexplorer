@@ -80,3 +80,53 @@
 </script>
 {% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
 {% include 'base/tabulator/tabulator-table-download-link.html' %}
+
+<!-- Height for the running payday row. Polled every second so the block count
+     climbs one at a time; the endpoint reads the last finalized height the
+     scheduler keeps in memory, so there is no gRPC call and no query behind
+     it. Polling it is also what keeps that in-memory height refreshing at the
+     same cadence -- see repeated_task_get_chain_head in factory.py. -->
+<span id="{{ccd_tabulator_table}}_head_height"
+      hidden
+      hx-get="/{{net}}/ajax_last_finalized_height"
+      hx-trigger="load, every 1s"></span>
+
+<script>
+  (function () {
+    const table = window["{{ccd_tabulator_table}}_table"];
+    if (!table) return;
+
+    // The running row is the only one whose height moves. Rather than re-fetch
+    // the page for it, take the polled height and derive the row from the
+    // payday's own start height, which the server sends with the row.
+    document.body.addEventListener("htmx:afterSwap", function (event) {
+      if (!event.target || event.target.id !== "{{ccd_tabulator_table}}_head_height") return;
+      const height = parseInt(event.target.textContent.trim(), 10);
+      if (!Number.isFinite(height) || height <= 0) return;
+
+      const rows = table.getRows();
+      if (!rows.length) return;
+      const row = rows[0];
+      const data = row.getData();
+      if (!data.is_current || !data.height_for_first_block) return;
+      if (height < data.height_for_first_block) return;   // payday just rolled over
+
+      row.update({
+        count_of_blocks: height - data.height_for_first_block + 1,
+        block_height_download: height,
+        block_height:
+          '<a href="/{{net}}/block/' + height + '"><span class="ccd">' +
+          height.toLocaleString("en-US") + "</span></a>",
+      });
+    });
+
+    // The client cannot see a payday close -- it would keep counting into the
+    // next one off a stale start height. A slow full refresh picks up the new
+    // boundary, and page one only, so paging is never yanked away.
+    setInterval(function () {
+      if (document.hidden) return;
+      if (typeof table.getPage === "function" && table.getPage() !== 1) return;
+      Promise.resolve(table.replaceData()).catch(function () {});
+    }, 60000);
+  })();
+</script>

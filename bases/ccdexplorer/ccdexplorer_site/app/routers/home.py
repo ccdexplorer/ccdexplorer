@@ -545,6 +545,21 @@ async def home_tx_graph(
     return html
 
 
+@router.get("/{net}/ajax_last_finalized_height", response_class=HTMLResponse)
+async def ajax_last_finalized_height(request: Request, net: str):
+    """The last finalized height, as plain text, for pollers.
+
+    No gRPC call and no query: the scheduler keeps app.last_finalized_block
+    current for every net, so this is a dict lookup. Stamping chain_head_last_seen
+    is what tells repeated_task_get_chain_head to keep that value refreshing at
+    1s for this net -- without a poller it falls back to the 5s blocks job.
+    """
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return HTMLResponse("0")
+    request.app.chain_head_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
+    return HTMLResponse(str(request.app.last_finalized_block.get(net, 0)))
+
+
 @router.get("/{net}/ajax_last_blocks", response_class=HTMLResponse)
 async def ajax_last_blocks(
     request: Request,
@@ -556,6 +571,9 @@ async def ajax_last_blocks(
         return RedirectResponse(url="/mainnet", status_code=302)
 
     user: SiteUser | None = await get_user_detailsv2(request)
+    # tells repeated_task_get_home_tables to keep these caches on a 2s refresh
+    # while someone is here; otherwise the 5s baseline job covers them
+    request.app.home_tables_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
     latest_blocks = request.app.blocks_cache.get(net)
     if latest_blocks is None:
         error = f"Request error getting the most recent blocks on {net}."
@@ -603,6 +621,9 @@ async def ajax_last_txs(
     #     f"{request.app.api_url}/v2/{net}/transactions/last/10", httpx_client
     # )
     # latest_txs = api_result.return_value if api_result.ok else None
+    # tells repeated_task_get_home_tables to keep these caches on a 2s refresh
+    # while someone is here; otherwise the 5s baseline job covers them
+    request.app.home_tables_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
     latest_txs = request.app.transactions_cache.get(net)
     if not latest_txs:
         error = f"Request error getting the most recent transactions on {net}."
