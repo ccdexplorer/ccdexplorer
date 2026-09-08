@@ -446,6 +446,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # same, for repeated_task_get_chain_head; stamped by
         # ajax_last_finalized_height
         app.chain_head_last_seen = {"mainnet": None, "testnet": None, "devnet": None}
+        # the head block itself, for pollers that want more than its height --
+        # the running payday row also shows the head's slot time
+        app.chain_head = {"mainnet": None, "testnet": None, "devnet": None}
         # same, for repeated_task_get_home_tables; stamped by ajax_last_blocks
         # and ajax_last_txs
         app.home_tables_last_seen = {"mainnet": None, "testnet": None, "devnet": None}
@@ -714,7 +717,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 f"{app.api_url}/v2/{net}/blocks/last/1", app.httpx_client
             )
             if api_result.ok and api_result.return_value:
-                app.last_finalized_block[net] = api_result.return_value[0]["height"]
+                head = api_result.return_value[0]
+                app.chain_head[net] = head
+                app.last_finalized_block[net] = head["height"]
 
     @scheduler.scheduled_job("interval", seconds=0.5, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):
