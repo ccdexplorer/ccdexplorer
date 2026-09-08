@@ -549,12 +549,14 @@ async def home_tx_graph(
 async def ajax_last_finalized_height(request: Request, net: str):
     """The last finalized height, as plain text, for pollers.
 
-    No gRPC call and no query: the scheduler already keeps
-    app.last_finalized_block current for every net, so this is a dict lookup.
-    Cheap enough to poll on the same 2s cadence as the blocks table.
+    No gRPC call and no query: the scheduler keeps app.last_finalized_block
+    current for every net, so this is a dict lookup. Stamping chain_head_last_seen
+    is what tells repeated_task_get_chain_head to keep that value refreshing at
+    1s for this net -- without a poller it falls back to the 5s blocks job.
     """
     if net not in ["mainnet", "testnet", "devnet"]:
         return HTMLResponse("0")
+    request.app.chain_head_last_seen[net] = dt.datetime.now().astimezone(dt.timezone.utc)
     return HTMLResponse(str(request.app.last_finalized_block.get(net, 0)))
 
 

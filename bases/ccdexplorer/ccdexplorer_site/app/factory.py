@@ -88,6 +88,11 @@ scheduler = AsyncIOScheduler(timezone=dt.UTC)
 # flicker of "nobody's watching"
 CONSENSUS_IDLE_GRACE_SECONDS = 2
 
+# same idea for the chain head: repeated_task_get_chain_head only refreshes
+# last_finalized_block for a net while ajax_last_finalized_height has been
+# polled for it recently. Above the 1s client poll for the same jitter reason.
+CHAIN_HEAD_IDLE_GRACE_SECONDS = 3
+
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
@@ -433,6 +438,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # in home.py); otherwise this job is dead weight against the API
         # 24/7 for a page that's rarely open
         app.consensus_last_seen = {"mainnet": None, "testnet": None, "devnet": None}
+        # same, for repeated_task_get_chain_head; stamped by
+        # ajax_last_finalized_height
+        app.chain_head_last_seen = {"mainnet": None, "testnet": None, "devnet": None}
         app.plt_cache = {"mainnet": {}, "testnet": {}, "devnet": {}}
         app.primed_suspended_cache = {}
         app.staking_pools_cache = {
@@ -635,6 +643,29 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 f"{app.api_url}/v2/{net}/transactions/last/50", app.httpx_client
             )
             app.transactions_cache[net] = api_result.return_value if api_result.ok else []
+
+    @scheduler.scheduled_job("interval", seconds=1, args=[app])
+    async def repeated_task_get_chain_head(app: FastAPI):
+        """Keep last_finalized_block fresh for the pollers that read it.
+
+        repeated_task_get_blocks_and_transactions also sets it, but only every
+        5s, so anything polling it faster than that sees the same height four
+        times and then a jump of four. This asks for one block instead of
+        fifty, and only for nets someone is actually watching.
+        """
+        now = dt.datetime.now().astimezone(dt.timezone.utc)
+        for net in ["mainnet", "testnet", "devnet"]:
+            last_seen = app.chain_head_last_seen[net]
+            if (
+                last_seen is None
+                or (now - last_seen).total_seconds() > CHAIN_HEAD_IDLE_GRACE_SECONDS
+            ):
+                continue
+            api_result = await get_url_from_api(
+                f"{app.api_url}/v2/{net}/blocks/last/1", app.httpx_client
+            )
+            if api_result.ok and api_result.return_value:
+                app.last_finalized_block[net] = api_result.return_value[0]["height"]
 
     @scheduler.scheduled_job("interval", seconds=0.5, args=[app])
     async def repeated_task_get_consensus(app: FastAPI):

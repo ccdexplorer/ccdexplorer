@@ -239,15 +239,6 @@ async def get_ajax_paydays_tabulator(
                 f'<a href="/{net}/block/{linked_height}"><span class="ccd">'
                 f"{round_x_decimal_with_comma(linked_height, 0)}</span></a>"
             )
-            if is_current:
-                # The breathing green dot this repo already uses for live values,
-                # on the node page and the validator payday panel.
-                made_up_payday["block_height"] += (
-                    ' <img hx-ext="class-tools" class="breathing" classes="toggle faded:1s"'
-                    ' width="10px" src="/static/misc/green_dot.png"'
-                    ' title="Payday in progress. Blocks track the last finalized block;'
-                    ' missed rounds are recorded hourly and may trail by an epoch."/>'
-                )
             made_up_payday["payday_block_slot_time"] = parser.parse(
                 p["payday_block_slot_time"]
             ).isoformat()
