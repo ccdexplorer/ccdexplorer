@@ -545,6 +545,19 @@ async def home_tx_graph(
     return html
 
 
+@router.get("/{net}/ajax_last_finalized_height", response_class=HTMLResponse)
+async def ajax_last_finalized_height(request: Request, net: str):
+    """The last finalized height, as plain text, for pollers.
+
+    No gRPC call and no query: the scheduler already keeps
+    app.last_finalized_block current for every net, so this is a dict lookup.
+    Cheap enough to poll on the same 2s cadence as the blocks table.
+    """
+    if net not in ["mainnet", "testnet", "devnet"]:
+        return HTMLResponse("0")
+    return HTMLResponse(str(request.app.last_finalized_block.get(net, 0)))
+
+
 @router.get("/{net}/ajax_last_blocks", response_class=HTMLResponse)
 async def ajax_last_blocks(
     request: Request,

@@ -240,10 +240,13 @@ async def get_ajax_paydays_tabulator(
                 f"{round_x_decimal_with_comma(linked_height, 0)}</span></a>"
             )
             if is_current:
+                # The breathing green dot this repo already uses for live values,
+                # on the node page and the validator payday panel.
                 made_up_payday["block_height"] += (
-                    ' <span class="badge text-bg-secondary" '
-                    'title="Payday in progress. Blocks are current; missed rounds are '
-                    'recorded hourly and may trail by an epoch.">live</span>'
+                    ' <img hx-ext="class-tools" class="breathing" classes="toggle faded:1s"'
+                    ' width="10px" src="/static/misc/green_dot.png"'
+                    ' title="Payday in progress. Blocks track the last finalized block;'
+                    ' missed rounds are recorded hourly and may trail by an epoch."/>'
                 )
             made_up_payday["payday_block_slot_time"] = parser.parse(
                 p["payday_block_slot_time"]
@@ -251,6 +254,9 @@ async def get_ajax_paydays_tabulator(
             made_up_payday["count_of_blocks"] = (
                 p["height_for_last_block"] - p["height_for_first_block"] + 1
             )
+            # Carried so the running row can recompute its own block count from
+            # a polled chain height without asking the server to do it again.
+            made_up_payday["height_for_first_block"] = p["height_for_first_block"]
             # Rounds whose elected leader produced no block. Every round yields a
             # block unless it was missed, so this is exactly the gap between the
             # payday's round count and the block count beside it. None when the

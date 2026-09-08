@@ -81,29 +81,59 @@
 {% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
 {% include 'base/tabulator/tabulator-table-download-link.html' %}
 
-<script>
-  // The first row is the payday still running, so it goes stale as soon as it
-  // is drawn. Re-fetch the page periodically to keep its block count moving.
-  //
-  // Only while page one is showing and the tab is visible: this refetches the
-  // whole page, so polling a backgrounded tab or someone reading page 40 would
-  // be load with nothing to show for it. Missed rounds come from an hourly job
-  // and will not move between polls -- it is the block count that changes.
-  (function () {
-    const REFRESH_MS = 15000;
-    const table = window["{{ccd_tabulator_table}}_table"];
-    if (!table || typeof table.replaceData !== "function") return;
+<!-- Height for the running payday row. Polled on the same 2s cadence as the
+     blocks table, and just as cheap: the endpoint reads the last finalized
+     height the scheduler already keeps in memory, so there is no gRPC call and
+     no query behind it. -->
+<span id="{{ccd_tabulator_table}}_head_height"
+      hidden
+      hx-get="/{{net}}/ajax_last_finalized_height"
+      hx-trigger="load, every 2s"></span>
 
-    let inFlight = false;
-    setInterval(function () {
-      if (document.hidden || inFlight) return;
-      if (typeof table.getPage === "function" && table.getPage() !== 1) return;
-      inFlight = true;
-      // A failed refresh is not worth surfacing: the row on screen simply stays
-      // as it was until the next tick.
-      Promise.resolve(table.replaceData()).catch(function () {}).finally(function () {
-        inFlight = false;
+<script>
+  (function () {
+    const table = window["{{ccd_tabulator_table}}_table"];
+    if (!table) return;
+
+    // Tabulator draws its cells itself, long after htmx scanned the page, so
+    // the breathing dot in the live row is inert until htmx is pointed at it.
+    table.on("renderComplete", function () {
+      if (window.htmx) window.htmx.process(table.element);
+    });
+
+    // The running row is the only one whose height moves. Rather than re-fetch
+    // the page for it, take the polled height and derive the row from the
+    // payday's own start height, which the server sends with the row.
+    document.body.addEventListener("htmx:afterSwap", function (event) {
+      if (!event.target || event.target.id !== "{{ccd_tabulator_table}}_head_height") return;
+      const height = parseInt(event.target.textContent.trim(), 10);
+      if (!Number.isFinite(height) || height <= 0) return;
+
+      const rows = table.getRows();
+      if (!rows.length) return;
+      const row = rows[0];
+      const data = row.getData();
+      if (!data.is_current || !data.height_for_first_block) return;
+      if (height < data.height_for_first_block) return;   // payday just rolled over
+
+      row.update({
+        count_of_blocks: height - data.height_for_first_block + 1,
+        block_height_download: height,
+        block_height:
+          '<a href="/{{net}}/block/' + height + '"><span class="ccd">' +
+          height.toLocaleString("en-US") + "</span></a>" +
+          ' <img hx-ext="class-tools" class="breathing" classes="toggle faded:1s"' +
+          ' width="10px" src="/static/misc/green_dot.png"/>',
       });
-    }, REFRESH_MS);
+    });
+
+    // The client cannot see a payday close -- it would keep counting into the
+    // next one off a stale start height. A slow full refresh picks up the new
+    // boundary, and page one only, so paging is never yanked away.
+    setInterval(function () {
+      if (document.hidden) return;
+      if (typeof table.getPage === "function" && table.getPage() !== 1) return;
+      Promise.resolve(table.replaceData()).catch(function () {});
+    }, 60000);
   })();
 </script>
