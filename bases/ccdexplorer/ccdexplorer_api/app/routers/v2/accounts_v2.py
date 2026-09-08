@@ -1052,6 +1052,42 @@ async def _rounds_per_payday(db_to_use, paydays: list[dict]) -> dict[str, dict]:
     return result
 
 
+async def _current_payday_row(db_to_use) -> dict | None:
+    """The payday now in progress, shaped like a completed one.
+
+    paydays_v2 only gains a document once a payday closes, so the running one
+    is invisible to the table. It can be reconstructed though: it starts at the
+    block after the last recorded payday ended and runs to the chain head, and
+    those two hashes are all _rounds_per_payday needs to count missed rounds
+    over the same epochs.
+
+    Block count is exact. Missed rounds are only as fresh as the hourly job
+    that records epochs, so `epochs_covered` will normally trail
+    `epochs_expected` by one -- which is the signal the table already uses to
+    mark a figure as a floor rather than a total.
+    """
+    last = await db_to_use[Collections.paydays_v2].find_one(sort=[("date", -1)])
+    if not last or not last.get("height_for_last_block"):
+        return None
+
+    first_height = last["height_for_last_block"] + 1
+    first_block = await db_to_use[Collections.blocks].find_one({"height": first_height})
+    head = await db_to_use[Collections.blocks].find_one(sort=[("height", -1)])
+    if not first_block or not head or head.get("height", 0) < first_height:
+        return None
+
+    return {
+        "date": "current",
+        "is_current": True,
+        "height_for_first_block": first_height,
+        "height_for_last_block": head["height"],
+        "hash_for_first_block": first_block["_id"],
+        "hash_for_last_block": head["_id"],
+        # No payday block exists yet, so this is "as of", not "closed at".
+        "payday_block_slot_time": head.get("slot_time"),
+    }
+
+
 @router.get(
     "/{net}/accounts/paydays/{skip}/{limit}",
     response_class=JSONResponse,
@@ -1087,13 +1123,28 @@ async def get_paydays(
 
     db_to_use = net_db(mongomotor, net)
     total_rows = await db_to_use[Collections.paydays_v2].count_documents({})
+
+    # The running payday is prepended as a synthetic first row. It occupies a
+    # slot in the sequence, so everything after it shifts by one -- otherwise
+    # page one would be a row longer than the rest and page two would repeat
+    # whatever page one pushed off the end.
+    current = await _current_payday_row(db_to_use)
+    if current:
+        total_rows += 1
+
+    db_skip = max(skip - 1, 0) if current else skip
+    db_limit = limit - 1 if (current and skip == 0) else limit
     result = (
         await db_to_use[Collections.paydays_v2]
         .find(sort=[("date", -1)])
-        .skip(skip)
-        .limit(limit)
-        .to_list(length=limit)
+        .skip(db_skip)
+        .limit(db_limit)
+        .to_list(length=db_limit)
+        if db_limit > 0
+        else []
     )
+    if current and skip == 0:
+        result = [current] + result
     # Rounds missed chain-wide during each payday. Absent for a payday whose
     # epochs are not recorded, in which case the caller shows nothing rather
     # than a zero.

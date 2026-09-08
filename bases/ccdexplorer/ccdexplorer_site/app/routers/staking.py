@@ -41,12 +41,8 @@ async def staking(
     account_apy_object = api_result.return_value if api_result.ok else {}
 
     request.state.api_calls = {}
-    request.state.api_calls["Paydays"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_paydays"
-    )
-    request.state.api_calls["Pools"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_payday_pools"
-    )
+    request.state.api_calls["Paydays"] = f"{request.app.api_url}/docs#/Accounts/get_paydays"
+    request.state.api_calls["Pools"] = f"{request.app.api_url}/docs#/Accounts/get_payday_pools"
     request.state.api_calls["Passive Delegation Info"] = (
         f"{request.app.api_url}/docs#/Accounts/get_payday_passive_info"
     )
@@ -232,9 +228,23 @@ async def get_ajax_paydays_tabulator(
             if not p.get("height_for_last_block"):
                 continue
             made_up_payday = {}
+            # A completed payday is labelled with its payday block, which is the
+            # block after its last -- that block does not exist yet for the
+            # payday still running, so that row points at the chain head instead
+            # and says so.
+            is_current = bool(p.get("is_current"))
+            made_up_payday["is_current"] = is_current
+            linked_height = p["height_for_last_block"] + (0 if is_current else 1)
             made_up_payday["block_height"] = (
-                f'<a href="/{net}/block/{p["height_for_last_block"] + 1}"><span class="ccd">{round_x_decimal_with_comma(p["height_for_last_block"] + 1, 0)}</span></a>'
+                f'<a href="/{net}/block/{linked_height}"><span class="ccd">'
+                f"{round_x_decimal_with_comma(linked_height, 0)}</span></a>"
             )
+            if is_current:
+                made_up_payday["block_height"] += (
+                    ' <span class="badge text-bg-secondary" '
+                    'title="Payday in progress. Blocks are current; missed rounds are '
+                    'recorded hourly and may trail by an epoch.">live</span>'
+                )
             made_up_payday["payday_block_slot_time"] = parser.parse(
                 p["payday_block_slot_time"]
             ).isoformat()
@@ -249,7 +259,7 @@ async def get_ajax_paydays_tabulator(
             made_up_payday["epochs_covered"] = p.get("epochs_covered", 0)
             made_up_payday["epochs_expected"] = p.get("epochs_expected", 0)
             # download
-            made_up_payday["block_height_download"] = p["height_for_last_block"] + 1
+            made_up_payday["block_height_download"] = linked_height
             made_up_payday["payday_block_slot_time_download"] = (
                 f"{parser.parse(p['payday_block_slot_time']):%Y-%m-%dT%H:%M:%S.%fZ}"
             )
