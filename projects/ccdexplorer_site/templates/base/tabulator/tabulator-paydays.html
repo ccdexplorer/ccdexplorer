@@ -80,3 +80,30 @@
 </script>
 {% include 'base/tabulator/tabulator-table-full-width-with-totals-remote.html' %}
 {% include 'base/tabulator/tabulator-table-download-link.html' %}
+
+<script>
+  // The first row is the payday still running, so it goes stale as soon as it
+  // is drawn. Re-fetch the page periodically to keep its block count moving.
+  //
+  // Only while page one is showing and the tab is visible: this refetches the
+  // whole page, so polling a backgrounded tab or someone reading page 40 would
+  // be load with nothing to show for it. Missed rounds come from an hourly job
+  // and will not move between polls -- it is the block count that changes.
+  (function () {
+    const REFRESH_MS = 15000;
+    const table = window["{{ccd_tabulator_table}}_table"];
+    if (!table || typeof table.replaceData !== "function") return;
+
+    let inFlight = false;
+    setInterval(function () {
+      if (document.hidden || inFlight) return;
+      if (typeof table.getPage === "function" && table.getPage() !== 1) return;
+      inFlight = true;
+      // A failed refresh is not worth surfacing: the row on screen simply stays
+      // as it was until the next tick.
+      Promise.resolve(table.replaceData()).catch(function () {}).finally(function () {
+        inFlight = false;
+      });
+    }, REFRESH_MS);
+  })();
+</script>
