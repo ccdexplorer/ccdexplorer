@@ -116,20 +116,46 @@ _SESSION_MIDDLEWARE_SKIP_PREFIXES = ("/static/", "/node/", "/addresses/", "/metr
 
 # Crawlers are a large share of traffic -- the account page alone is walked by
 # Baiduspider -- so tag them and let the query decide whether to count them.
-_BOT_HINTS = (
+# A user agent that says it is a bot. The list is deliberately literal: the
+# previous version matched only on "bot"/"crawl"/"spider", which let
+# facebookexternalhit and GoogleOther through -- Sentry's own UA parser
+# identified both as crawlers while ours called them browsers.
+_BOT_UA_HINTS = (
     "bot",
     "crawl",
     "spider",
     "slurp",
+    "scrapy",
     "bingpreview",
+    "facebookexternalhit",
+    "googleother",
+    "google-inspectiontool",
     "headlesschrome",
+    "phantomjs",
     "curl",
     "wget",
+    "libwww",
     "python-requests",
+    "python-urllib",
+    "aiohttp",
     "httpx",
+    "okhttp",
     "go-http-client",
+    "java/",
+    "apache-httpclient",
     "monitoring",
+    "uptime",
+    "pingdom",
+    "lighthouse",
 )
+
+# Fetch Metadata (Sec-Fetch-*) and Client Hints (Sec-CH-UA) are sent by the
+# browser itself, not by whatever wrote the user agent string. Chrome has sent
+# them since 76, Firefox since 90, Safari since 16.4. A request claiming to be
+# one of those while sending neither is very likely forged -- which is the
+# shape of the traffic that inflated the visitor count: thousands of one-shot
+# "Chrome" clients, each on a different IP, each fetching a single block page.
+_BROWSER_ONLY_HEADERS = ("sec-fetch-mode", "sec-fetch-dest", "sec-ch-ua")
 
 
 def _client_ip(request: HTTPRequest) -> str:
@@ -173,9 +199,28 @@ def _is_site_owner(user) -> bool:
     return chat_id is not None and str(chat_id) == str(ADMIN_CHAT_ID)
 
 
-def _looks_like_bot(request: HTTPRequest) -> bool:
+def _classify_client(request: HTTPRequest) -> tuple[str, str]:
+    """Classify the caller as (client_kind, bot_confidence).
+
+    `client_kind` is decided by the user agent alone, so it can only improve on
+    what came before and cannot regress if a proxy ever strips headers.
+
+    `bot_confidence` is the sharper, less certain signal, kept separate on
+    purpose: `declared` when the user agent admits it, `likely` when it claims
+    to be a browser yet sends none of the headers a browser adds by itself, and
+    `none` otherwise. `likely` is a lead to slice on, not a verdict -- a
+    genuinely old browser looks the same, and the header evidence has to be
+    checked against real traffic before anyone leans on it.
+
+    So `client_kind:browser` is the safe filter, and
+    `client_kind:browser bot_confidence:none` the strict one.
+    """
     ua = request.headers.get("user-agent", "").lower()
-    return (not ua) or any(hint in ua for hint in _BOT_HINTS)
+    if not ua or any(hint in ua for hint in _BOT_UA_HINTS):
+        return "bot", "declared"
+    if not any(h in request.headers for h in _BROWSER_ONLY_HEADERS):
+        return "browser", "likely"
+    return "browser", "none"
 
 
 class SiteSessionMiddleware(BaseHTTPMiddleware):
@@ -219,7 +264,9 @@ class SiteSessionMiddleware(BaseHTTPMiddleware):
         # day-scoped hash, so count_unique(user) covers all traffic rather than
         # the small logged-in slice.
         sentry_sdk.set_user({"id": request.state.session_id or _visitor_id(request)})
-        sentry_sdk.set_tag("client_kind", "bot" if _looks_like_bot(request) else "browser")
+        client_kind, bot_confidence = _classify_client(request)
+        sentry_sdk.set_tag("client_kind", client_kind)
+        sentry_sdk.set_tag("bot_confidence", bot_confidence)
         sentry_sdk.set_tag("visitor_kind", "member" if request.state.session_id else "anonymous")
 
         response = await call_next(request)
