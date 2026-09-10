@@ -33,6 +33,20 @@ async def test_new_contract(
         ops = args[0]
         op = ops[0]
         assert isinstance(op, ReplaceOne)
+
+        # Resolved when the instance is created, so the API never has to invoke
+        # `supports` on the request path. This module exports no `supports`
+        # entrypoint, so the answer is settled from what ms_modules parsed out
+        # of the wasm -- no gRPC call was made to reach it.
+        cis_support = op._doc.pop("cis_support")
+        assert cis_support["has_supports_entrypoint"] is False
+        assert cis_support["standards"] == []
+        assert (
+            cis_support["source_module"]
+            == "7f64dfb3555d6f24afce8f157e6dce0c0823226f1775a26360b9294e54f7ec9f"
+        )
+        assert cis_support["checked_at"] is not None
+
         assert op._doc == {
             "_id": "<9958,0>",
             "v1": {
@@ -81,6 +95,20 @@ async def test_new_contract2(
         ops = args[0]
         op = ops[0]
         assert isinstance(op, ReplaceOne)
+
+        # Resolved when the instance is created, so the API never has to invoke
+        # `supports` on the request path. This module exports no `supports`
+        # entrypoint, so the answer is settled from what ms_modules parsed out
+        # of the wasm -- no gRPC call was made to reach it.
+        cis_support = op._doc.pop("cis_support")
+        assert cis_support["has_supports_entrypoint"] is False
+        assert cis_support["standards"] == []
+        assert (
+            cis_support["source_module"]
+            == "7f64dfb3555d6f24afce8f157e6dce0c0823226f1775a26360b9294e54f7ec9f"
+        )
+        assert cis_support["checked_at"] is not None
+
         assert op._doc == {
             "_id": "<9958,0>",
             "v1": {

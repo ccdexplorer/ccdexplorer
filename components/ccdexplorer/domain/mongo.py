@@ -728,6 +728,29 @@ class MongoTypeModule(BaseModel):
     verification: Optional[ModuleVerification] = None
 
 
+class CISSupport(BaseModel):
+    """Which CIS standards a contract instance reports supporting.
+
+    Cached on the instance rather than on the module because `supports` is
+    invoked on an instance: CIS-0's `SupportBy` answer names contract
+    addresses, and nothing in the standard stops an implementation from
+    reading instance state. Modules that carry a `supports` entrypoint average
+    under two instances each, so deduplicating by module would buy nothing.
+
+    `source_module` is the module the answer was obtained from. An instance can
+    be upgraded to a different module, which can change the answer, so a reader
+    compares this against the instance's current `source_module` and treats a
+    mismatch as a miss.
+    """
+
+    standards: list[str] = []
+    source_module: Optional[str] = None
+    #: False when the module exports no `supports` entrypoint at all, in which
+    #: case `standards` is empty without any node call having been made.
+    has_supports_entrypoint: bool = True
+    checked_at: Optional[dt.datetime] = None
+
+
 class MongoTypeInstance(BaseModel):
     """
     Instance. This type is stored in the collection `instances`.
@@ -744,6 +767,7 @@ class MongoTypeInstance(BaseModel):
     v1: Optional[CCD_InstanceInfo_V1] = None  # noqa: F405
     source_module: Optional[str] = None
     module_verification: Optional[ModuleVerification] = None
+    cis_support: Optional[CISSupport] = None
 
 
 class MongoTypeReward(BaseModel):

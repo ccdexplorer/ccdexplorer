@@ -2,6 +2,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_ContractAddress,
     CCD_ContractTraceElement_Upgraded,
 )
+from ccdexplorer.cis import build_cis_support
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, net_db
@@ -75,6 +76,39 @@ class Instance:
             console.log(tooter_message)
             self.tooter.send_to_tooter(tooter_message)
 
+    def add_cis_support(
+        self,
+        net: NET,
+        db_to_use: dict[Collections, Collection],
+        instance_info: dict,
+        instance_as_class: CCD_ContractAddress,
+    ) -> None:
+        """Resolve which CIS standards this instance supports and store it on it.
+
+        Doing it here is what keeps it off the request path: the API would
+        otherwise invoke `supports` once per standard on every contract page
+        view, nine blocking gRPC calls for an answer that only changes when the
+        instance is upgraded.
+
+        Most instances cost nothing to resolve -- if the module exports no
+        `supports` entrypoint, ms_modules already recorded that and no node
+        call is made. A resolution that fails writes nothing, so the next
+        reader retries rather than caching a failure as an answer.
+        """
+        module = db_to_use[Collections.modules].find_one(
+            {"_id": instance_info.get("source_module")}
+        )
+        cis_support = build_cis_support(
+            self.grpc_client,
+            net,
+            instance_info,
+            module,
+            instance_as_class.index,
+            instance_as_class.subindex,
+        )
+        if cis_support is not None:
+            instance_info["cis_support"] = cis_support
+
     async def process_new_instance(self, net: NET, instance_as_class: CCD_ContractAddress):
         self.mainnet: dict[Collections, Collection]
         self.testnet: dict[Collections, Collection]
@@ -100,6 +134,7 @@ class Instance:
             _source_module = instance_info["v1"]["source_module"]
 
         instance_info.update({"source_module": _source_module})  # type: ignore
+        self.add_cis_support(net, db_to_use, instance_info, instance_as_class)
         _ = db_to_use[Collections.instances].bulk_write(
             [ReplaceOne({"_id": instance_ref}, instance_info, upsert=True)]
         )
@@ -136,11 +171,19 @@ class Instance:
         elif instance_as_class.v1:
             instance_as_class.v1.source_module = upgraded_effect.to_module
 
+        # The entrypoint that answers `supports` is code, and the code just
+        # changed -- so whatever was cached describes the old module. Drop it
+        # first, so a failed re-resolve leaves no answer rather than a stale
+        # one, then resolve against the module now in force.
+        instance_as_class.cis_support = None
+        instance_info = instance_as_class.model_dump(exclude_none=True)
+        self.add_cis_support(net, db_to_use, instance_info, upgraded_effect.address)
+
         _ = db_to_use[Collections.instances].bulk_write(
             [
                 ReplaceOne(
                     {"_id": upgraded_effect.address.to_str()},
-                    instance_as_class.model_dump(exclude_none=True),
+                    instance_info,
                     upsert=True,
                 )
             ]

@@ -785,12 +785,16 @@ async def smart_contract_page(
     request.state.api_calls = {}
     user: SiteUser | None = await get_user_detailsv2(request)
     instance_address = f"<{instance_index},{subindex}>"
+    # One call for every standard, and CIS-6 read out of the answer. Asking for
+    # CIS-6 on its own first meant two round trips for overlapping questions --
+    # and the standards list already contains it.
     api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/contract/{instance_index}/{subindex}/supports-cis-standard/CIS-6",
+        f"{request.app.api_url}/v2/{net}/contract/{instance_index}/{subindex}/supports-cis-standards",
         httpx_client,
     )
     if api_result.ok:
-        supports_cis6 = api_result.return_value
+        supports_cis_standards = api_result.return_value or []
+        supports_cis6 = "CIS-6" in supports_cis_standards
         if supports_cis6:
             api_result = await get_url_from_api(
                 f"{request.app.api_url}/v2/{net}/contract/{instance_index}/{subindex}/tnt/ids",
@@ -831,12 +835,6 @@ async def smart_contract_page(
             httpx_client,
         )
         tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None
-
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/contract/{instance_index}/{subindex}/supports-cis-standards",
-            httpx_client,
-        )
-        supports_cis_standards = api_result.return_value if api_result.ok else []
 
         request.state.api_calls["Instance Info"] = (
             f"{request.app.api_url}/docs#/Contract/get_contract_information"
