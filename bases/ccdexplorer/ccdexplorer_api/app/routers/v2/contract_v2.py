@@ -15,7 +15,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 )
 from ccdexplorer.grpc_client.types_pb2 import VersionedModuleSource
 from ccdexplorer.domain.cis import StandardIdentifiers
-from ccdexplorer.cis import CIS
+from ccdexplorer.cis import CIS, build_cis_support, cached_standards
 from ccdexplorer.mongodb import (
     Collections,
     MongoMotor,
@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import JSONResponse
+import asyncio
 import json
 import base64
 from pymongo import DESCENDING
@@ -177,15 +178,62 @@ async def get_cis5_balance_of(req: GetCIS5BalanceOfRequest):
         return {req.public_keys[i]: str(response[i]) for i in range(len(req.public_keys))}
 
 
-async def find_cis_standards_support(cis: CIS) -> list[StandardIdentifiers]:
+async def resolve_cis_standards(
+    db_to_use, grpcclient: GRPCClient, net: NET, contract_index: int, contract_subindex: int
+) -> list[str]:
+    """Every CIS standard an instance supports, from the cache where possible.
+
+    ms_instances resolves this when an instance is created or upgraded and
+    stores it on the instance document, because asking the node costs one
+    blocking `invoke_instance` per standard -- nine of them -- for an answer
+    that only changes on upgrade.
+
+    Three outcomes, in order of cost:
+
+    * the instance carries an answer obtained from the module it runs now:
+      free, one document read that this endpoint already needed;
+    * the module exports no `supports` entrypoint: also free, decided from
+      what ms_modules parsed out of the wasm at deploy time;
+    * otherwise ask the node, off the event loop. Nothing is written back:
+      this API reads from the nearest replica, not the primary, so it cannot
+      write. Instances predating this cache are filled in by
+      `scripts/backfill_cis_support.py`; after that only ms_instances writes
+      here, which is the right shape anyway -- the read path should not be
+      mutating the indexer's collections.
+
+    Raises HTTPException(404) if the instance is unknown.
     """
-    This lists all Standards that are said to be supported.
-    """
-    standards_supported = []
-    for standard in reversed(StandardIdentifiers):
-        if cis.supports_standards([standard]):
-            standards_supported.append(standard)
-    return standards_supported
+    instance_address = f"<{contract_index},{contract_subindex}>"
+    instance = await db_to_use[Collections.instances].find_one({"_id": instance_address})
+    if not instance:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Requested smart contract '{instance_address}' not found on {net.value}.",
+        )
+
+    cached = cached_standards(instance)
+    if cached is not None:
+        return cached
+
+    module = await db_to_use[Collections.modules].find_one({"_id": instance.get("source_module")})
+    # Blocking gRPC: `supports_standard` is synchronous, so calling it inline
+    # would stall the event loop for every other request on this worker.
+    cis_support = await asyncio.to_thread(
+        build_cis_support,
+        grpcclient,
+        net,
+        instance,
+        module,
+        contract_index,
+        contract_subindex,
+    )
+    if cis_support is None:
+        # Undetermined -- a contract with no name, or a node that would not
+        # answer. Report no support rather than failing the page; the next
+        # request retries.
+        return []
+
+    return cis_support["standards"]
 
 
 @router.get(
@@ -427,28 +475,10 @@ async def get_instance_CIS_support(
         net_to_use = NET(net)
 
     db_to_use = net_db(mongomotor, net)
-    instance_address = f"<{contract_index},{contract_subindex}>"
-    result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
-    if result:
-        if result.get("v0"):
-            module_name = result["v0"]["name"][5:]
-        if result.get("v1"):
-            module_name = result["v1"]["name"][5:]
-        cis: CIS = CIS(
-            grpcclient,
-            contract_index,
-            contract_subindex,
-            f"{module_name}.supports",
-            net_to_use,
-        )
-        supports_cis_standard = cis.supports_standard(StandardIdentifiers(cis_standard))
-
-        return supports_cis_standard
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' not found on {net_to_use.value}.",
-        )
+    standards = await resolve_cis_standards(
+        db_to_use, grpcclient, net_to_use, contract_index, contract_subindex
+    )
+    return StandardIdentifiers(cis_standard).value in standards
 
 
 @router.get(
@@ -493,28 +523,9 @@ async def get_instance_CIS_support_multiple(
         net_to_use = NET(net)
 
     db_to_use = net_db(mongomotor, net)
-    instance_address = f"<{contract_index},{contract_subindex}>"
-    result = await db_to_use[Collections.instances].find_one({"_id": instance_address})
-    if result:
-        if result.get("v0"):
-            module_name = result["v0"]["name"][5:]
-        if result.get("v1"):
-            module_name = result["v1"]["name"][5:]
-        cis: CIS = CIS(
-            grpcclient,
-            contract_index,
-            contract_subindex,
-            f"{module_name}.supports",
-            net_to_use,
-        )
-        supports_cis_standards = await find_cis_standards_support(cis)
-        supports_cis_standards = [x.value for x in supports_cis_standards]
-        return supports_cis_standards
-    else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Requested smart contract '<{contract_index},{contract_subindex}>' not found on {net_to_use.value}.",
-        )
+    return await resolve_cis_standards(
+        db_to_use, grpcclient, net_to_use, contract_index, contract_subindex
+    )
 
 
 @router.get(

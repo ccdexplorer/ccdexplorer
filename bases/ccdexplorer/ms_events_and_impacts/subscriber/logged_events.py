@@ -38,6 +38,7 @@ from ccdexplorer.domain.cis import (
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.cis import (
     CIS,
+    cached_standards,
 )
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
@@ -1284,13 +1285,37 @@ class LoggedEvent:
     def find_cis_standards_support(
         self, cis: CIS, instance_address: str
     ) -> list[StandardIdentifiers]:
-        # This lists all Standards that are said to be supported
+        """Standards this instance supports, from the cheapest source available.
+
+        Three layers, and the process memo stays first: this runs per logged
+        event, so the common case must not touch Mongo at all.
+
+        Below it sits the `cis_support` ms_instances stores on the instance
+        document, which survives restarts and is shared with the API. It is
+        allowed to miss here more often than elsewhere -- an instance created
+        in the block being processed right now may not have been written yet,
+        since ms_instances and this service consume blocks independently. A
+        miss just means asking the node, which is what this always did.
+        """
         self.contract_supports: dict
         if instance_address not in self.contract_supports:
-            standards_supported = []
-            for standard in reversed(StandardIdentifiers):
-                if cis.supports_standards([standard]):
-                    standards_supported.append(standard)
+            standards_supported = None
+
+            db: dict[Collections, Collection] = net_db(self, self.net)
+            instance = db[Collections.instances].find_one({"_id": instance_address})
+            cached = cached_standards(instance)
+            if cached is not None:
+                # Stored as the standard's value; the callers here compare
+                # against enum members.
+                by_value = {standard.value: standard for standard in StandardIdentifiers}
+                standards_supported = [by_value[x] for x in cached if x in by_value]
+
+            if standards_supported is None:
+                standards_supported = []
+                for standard in reversed(StandardIdentifiers):
+                    if cis.supports_standards([standard]):
+                        standards_supported.append(standard)
+
             self.contract_supports[instance_address] = standards_supported
         return self.contract_supports[instance_address]
 
