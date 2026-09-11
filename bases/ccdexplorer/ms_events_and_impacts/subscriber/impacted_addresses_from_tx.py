@@ -22,6 +22,25 @@ from .utils import Utils
 
 
 ########### Impacted Addresses
+
+def _token_id_for(event) -> str | None:
+    """The token id for a PLT event, whichever wrapper it arrived in.
+
+    `TokenEvent` carries it at the top level and omits it from the sub-event;
+    `MetaEvent` has no top-level field and puts it on the sub-event. Taking the
+    first one present covers both. `getattr` is needed because `MetaEvent` has
+    no `token_id` attribute at all.
+    """
+    top_level = getattr(event, "token_id", None)
+    if top_level:
+        return top_level
+    for name in ("module_event", "transfer_event", "mint_event", "burn_event"):
+        sub_event = getattr(event, name, None)
+        if sub_event is not None and getattr(sub_event, "token_id", None):
+            return sub_event.token_id
+    return None
+
+
 class ImpactedAddresses(Utils):
     def file_a_balance_movement(
         self,
@@ -395,10 +414,18 @@ class ImpactedAddresses(Utils):
         """File impacted addresses for the module/transfer/mint/burn event variants shared by
         `CCD_TokenEvent` (token_update_effect) and `CCD_MetaEvent` (meta_update_effect).
 
-        `CCD_MetaEvent` has no top-level `token_id` (unlike `CCD_TokenEvent`), so token_id is
-        always read off the specific sub-event instead - that field is populated identically
-        by the gRPC converter regardless of which wrapper the sub-event is nested under.
+        The two wrappers carry the token id in different places, and exactly one of them
+        has it. `CCD_TokenEvent` names the token once at the top and the node leaves it off
+        the sub-event; `CCD_MetaEvent` has no top-level field, so the sub-event carries it.
+        protocol-level-tokens.proto states this for both sub-event types: "In the context of
+        a `TokenEvent`, which already specifies the token, this is absent. In the context of
+        a `MetaEvent`, it must be present."
+
+        So it is read from the wrapper first and the sub-event second. Reading only the
+        sub-event leaves it None for every ordinary PLT transfer, mint and burn, which then
+        fails validation on `PLTTransferType.token_id`.
         """
+        token_id = _token_id_for(event)
         if event.module_event:
             # no impacted addresses other than governance address, which is captured by the fee in CCD
             # but need to update to add plt_token_id!
@@ -413,7 +440,7 @@ class ImpactedAddresses(Utils):
                 impacted_addresses_in_tx,
                 tx.account_transaction.sender,
                 None,
-                plt_token_id=event.module_event.token_id,
+                plt_token_id=token_id,
             )
 
         elif event.transfer_event:
@@ -421,11 +448,10 @@ class ImpactedAddresses(Utils):
                 tx,
                 impacted_addresses_in_tx,
                 event.transfer_event,
-                plt_token_id=event.transfer_event.token_id,
+                plt_token_id=token_id,
             )
         elif event.mint_event:
             impacted_address = event.mint_event.target.account
-            token_id = event.mint_event.token_id
             balance_movement = AccountStatementEntryType(
                 plt_transfer_in=[PLTTransferType(event=event.mint_event, token_id=token_id)]
             )
@@ -438,7 +464,6 @@ class ImpactedAddresses(Utils):
             )
         elif event.burn_event:
             impacted_address = event.burn_event.target.account
-            token_id = event.burn_event.token_id
             balance_movement = AccountStatementEntryType(
                 plt_transfer_out=[PLTTransferType(event=event.burn_event, token_id=token_id)]
             )
