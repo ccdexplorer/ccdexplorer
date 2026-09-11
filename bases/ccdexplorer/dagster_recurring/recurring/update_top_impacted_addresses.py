@@ -8,27 +8,36 @@ def update_top_impacted_addresses(context, mongodb: MongoDB, net: str):
     dct = {}
     db: dict[Collections, Collection] = net_db(mongodb, net)
 
-    # this is the block we last processed making the top list
-    last_processed_block_for_top_list = db[Collections.helpers].find_one(
-        {"_id": "heartbeat_last_block_processed_impacted_addresses_all_top_list"}
-    )
-
-    if not last_processed_block_for_top_list:
-        context.log.info(f"{net} | No last processed block found for top impacted addresses.")
-        raise Exception(f"{net} | No last processed block found for top impacted addresses.")
-
-    last_processed_block_for_top_list_height = last_processed_block_for_top_list["height"]
-
-    # this is the last finalized block in the collection of blocks
+    # This job runs once per net as a partition, and a net does not have to be
+    # indexed for the partition to be scheduled -- a devnet is replaced every so
+    # often and starts empty. "This net has nothing to index yet" is a normal
+    # state, not a failure, and raising for it turned a fresh devnet into a
+    # failed run every five minutes indefinitely.
     heartbeat_last_processed_block = db[Collections.helpers].find_one(
         {"_id": "heartbeat_last_processed_block"}
     )
-
     if not heartbeat_last_processed_block:
-        context.log.info(f"{net} | No last processed block found for top impacted addresses.")
-        raise Exception(f"{net} | No last processed block found for top impacted addresses.")
+        context.log.info(f"{net} | Not indexed yet, nothing to do for top impacted addresses.")
+        return {"sorted_totals": [], "skipped": "net not indexed"}
 
     heartbeat_last_processed_block_height = heartbeat_last_processed_block["height"]
+
+    # The marker for how far this job itself has got. Absent on the first run
+    # for a net, which is not an error either -- start from the chain's own
+    # position, record the marker, and let the next run do real work. Failing
+    # instead meant the marker could never be written, so the first run could
+    # never succeed.
+    last_processed_block_for_top_list = db[Collections.helpers].find_one(
+        {"_id": "heartbeat_last_block_processed_impacted_addresses_all_top_list"}
+    )
+    if last_processed_block_for_top_list:
+        last_processed_block_for_top_list_height = last_processed_block_for_top_list["height"]
+    else:
+        context.log.info(
+            f"{net} | No top-list marker yet; seeding it at "
+            f"{heartbeat_last_processed_block_height:,} and starting from there."
+        )
+        last_processed_block_for_top_list_height = heartbeat_last_processed_block_height
 
     context.log.info(
         f"{net} | Calculating tx count for {(heartbeat_last_processed_block_height - last_processed_block_for_top_list_height):,.0f} blocks."
