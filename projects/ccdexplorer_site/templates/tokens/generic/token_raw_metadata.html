@@ -1,0 +1,57 @@
+{# Metadata that is published and valid, but not CIS-2.
+
+   TokenMetaData describes name/symbol/description/thumbnail/display/artifact.
+   Plenty of issuers publish something else entirely -- RocketFuel's vouchers
+   are {amount, currency, transactionId, url, voucherCode}, agent registries
+   publish agent cards -- and pydantic ignores keys it does not recognise, so
+   those parse into an empty model. The document is not malformed; it simply
+   answers a different question.
+
+   Rather than invent a mapping per issuer, show what was published. Scalars
+   become rows in the order the issuer wrote them, nested values stay in the
+   document block below, and a key that looks like an image is rendered as
+   one -- that much is safe to infer from the value, not from the schema. #}
+
+{% set card = stored_token_address.raw_metadata %}
+{% set image = card.get('url') or card.get('image') or card.get('imageUrl') %}
+
+{% if image and image.split('?')[0].lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')) %}
+  <div class="text-center mb-3">
+    <img src="{{ image }}" alt="Token image" class="img-fluid" style="max-height: 220px;">
+  </div>
+{% endif %}
+
+<table class="table table-borderless">
+  {% for key, value in card.items() %}
+    {% if value is not mapping and value is not sequence or value is string %}
+      <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">{{ key }}</td>
+        <td class="text-end text-secondary-emphasis word-break">
+          {% if value is string and value.startswith('http') %}
+            <a href="{{ value }}">{{ value }}</a>
+          {% else %}
+            {{ value }}
+          {% endif %}
+        </td>
+      </tr>
+    {% endif %}
+  {% endfor %}
+
+  {% if stored_token_address.metadata_url %}
+    <tr class="table-row-line-height sm-text">
+      <td class="text-start text-secondary-emphasis">Metadata URL</td>
+      <td class="text-end text-secondary-emphasis word-break">
+        <a href="{{ stored_token_address.metadata_url }}">{{ stored_token_address.metadata_url }}</a>
+      </td>
+    </tr>
+  {% endif %}
+</table>
+
+{# Anything nested is only visible here, and the promoted rows above are a
+   best-effort reading of a schema nobody agreed on -- so the document stays
+   available as the authority. #}
+<details class="sm-text">
+  <summary class="text-secondary-emphasis">Published document</summary>
+  <pre class="sm-text text-secondary-emphasis word-break"
+       style="white-space: pre-wrap; overflow-x: auto;">{{ card | tojson(indent=2) }}</pre>
+</details>

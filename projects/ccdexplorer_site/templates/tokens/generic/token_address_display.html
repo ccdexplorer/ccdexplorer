@@ -56,6 +56,14 @@
           {% set title= "Agent Card" %}{% include 'base/box_title.html' %}
           {% include "tokens/generic/token_agent_card.html" %}</div>
     </div>
+    {% elif stored_token_address.raw_metadata %}
+    {# Published, valid, and not CIS-2 -- a voucher record, an invoice, some
+       issuer's own schema. Show what was published rather than an empty box. #}
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Published Metadata" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_raw_metadata.html" %}</div>
+    </div>
     {% endif %}
     
     <div class="col-md-6  col-sm-12 ">
