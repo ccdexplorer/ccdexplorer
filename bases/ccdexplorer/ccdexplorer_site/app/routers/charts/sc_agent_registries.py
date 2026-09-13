@@ -116,7 +116,15 @@ async def statistics_agent_registries(
         analysis, request.app, post_data.start_date, post_data.end_date
     )
 
+    # Which contracts were counted is recorded per day by the nightrunner, from
+    # what the contracts themselves report supporting -- so the title can name
+    # the registries actually behind the bars rather than a number typed in
+    # here. Read before the frame is built: it is a list column, and summing
+    # it during the groupby would just concatenate one copy per day.
+    registries = sorted({c for row in all_data for c in (row.get("registries") or []) if c})
+
     df_per_day = pd.json_normalize(all_data).fillna(0)
+    df_per_day = df_per_day.drop(columns=["registries"], errors="ignore")
 
     df_per_day["date"] = pd.to_datetime(df_per_day["date"])
     agg_map = {col: "agents_registered" for col in df_per_day.columns if col != "date"}
@@ -128,7 +136,12 @@ async def statistics_agent_registries(
     )
     fig = go.Figure()
 
-    title = "Agent Registries (Contract 10082)"
+    if len(registries) == 1:
+        title = f"Agent Registries (Contract {registries[0].strip('<>').split(',')[0]})"
+    elif registries:
+        title = f"Agent Registries ({len(registries)} CIS-8004 contracts)"
+    else:
+        title = "Agent Registries"
     fig.add_trace(
         go.Bar(
             x=df_per_day["date"].to_list(),

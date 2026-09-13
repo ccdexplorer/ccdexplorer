@@ -26,6 +26,13 @@ from ccdexplorer.domain.generic import NET, StandardIdentifiers
 
 from .core import CIS
 
+#: A contract that reports supporting this is an agent registry: CIS-8004 is
+#: the standard that defines agent registration, so the set of registries is
+#: not a list anyone has to maintain -- it is a consequence of what the
+#: contracts themselves report. New registries appear without a code change,
+#: and a contract that never claimed the standard cannot be mistaken for one.
+AGENT_REGISTRY_STANDARD = "CIS-8004"
+
 #: The method name ms_modules records for a `supports` entrypoint. It stores
 #: the bare method, having split `<contract>.supports` on the dot.
 SUPPORTS_METHOD = "supports"
@@ -150,3 +157,32 @@ def cached_standards(
         return None
     standards = cached.get("standards")
     return standards if isinstance(standards, list) else None
+
+
+def agent_registry_filter() -> dict[str, Any]:
+    """Mongo filter matching instances that are agent registries.
+
+    Returned as a filter rather than a list so it composes with whatever query
+    the caller already has, and works the same against sync pymongo and async
+    motor -- the callers span both.
+    """
+    return {"cis_support.standards": AGENT_REGISTRY_STANDARD}
+
+
+def is_agent_registry(instance: dict[str, Any] | None) -> bool:
+    """Whether one instance document is an agent registry."""
+    if not instance:
+        return False
+    cached = instance.get("cis_support")
+    if not isinstance(cached, dict):
+        return False
+    return AGENT_REGISTRY_STANDARD in (cached.get("standards") or [])
+
+
+def agent_registry_contracts(instances_collection) -> list[str]:
+    """Every agent registry contract address, for synchronous callers.
+
+    Empty is a meaningful answer -- no registry has been resolved yet -- and
+    callers should treat it as "nothing to count", not as "count everything".
+    """
+    return [doc["_id"] for doc in instances_collection.find(agent_registry_filter(), {"_id": 1})]

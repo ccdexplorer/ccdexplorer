@@ -1,0 +1,75 @@
+{# An agent registered under CIS-8004, not a CIS-2 token.
+
+   Agent cards are published by whichever registry the agent belongs to, and
+   each registry uses its own vocabulary -- agentcards.site emits name and
+   description, registry.modernmiracle.org emits agent_index and
+   agent_metadata, agentverse.ai emits status and endpoints. None of those
+   are CIS-2 fields, so parsing one as token metadata yields nothing at all.
+
+   Rather than guess at a schema that varies per registry, show the document
+   as published: the handful of keys worth promoting, then everything else. #}
+
+{% set card = stored_token_address.raw_metadata %}
+<table class="table table-borderless">
+  {% for label, value in [
+      ('Agent', card.get('name')),
+      ('Description', card.get('description')),
+      ('Agent index', card.get('agent_index')),
+      ('Address', card.get('address')),
+      ('Status', card.get('status')),
+      ('Model', (card.get('agent_metadata') or {}).get('model')),
+      ('Version', card.get('version')),
+      ('Protocol version', card.get('mcp_protocol_version')),
+      ('Document version', card.get('doc_version')),
+    ] %}
+    {% if value %}
+      <tr class="table-row-line-height sm-text">
+        <td class="text-start text-secondary-emphasis">{{ label }}</td>
+        <td class="text-end text-secondary-emphasis word-break">{{ value }}</td>
+      </tr>
+    {% endif %}
+  {% endfor %}
+
+  {% set tools = (card.get('agent_metadata') or {}).get('tools') %}
+  {% if tools %}
+    <tr class="table-row-line-height sm-text">
+      <td class="text-start text-secondary-emphasis">Tools</td>
+      <td class="text-end text-secondary-emphasis word-break">{{ tools | join(', ') }}</td>
+    </tr>
+  {% endif %}
+
+  {# A2A-style cards (agentcards.site) describe capability as named skills
+     rather than as a tools array; registries do not agree on which. #}
+  {% set skills = card.get('skills') %}
+  {% if skills %}
+    <tr class="table-row-line-height sm-text">
+      <td class="text-start text-secondary-emphasis">Skills</td>
+      <td class="text-end text-secondary-emphasis word-break">
+        {{ skills | map(attribute='name') | select | join(', ') or skills | length ~ ' defined' }}
+      </td>
+    </tr>
+  {% endif %}
+
+  {% set counterparties = (card.get('agent_metadata') or {}).get('counterparties') %}
+  {% if counterparties %}
+    <tr class="table-row-line-height sm-text">
+      <td class="text-start text-secondary-emphasis">Counterparties</td>
+      <td class="text-end text-secondary-emphasis word-break">{{ counterparties | join(', ') }}</td>
+    </tr>
+  {% endif %}
+
+  <tr class="table-row-line-height sm-text">
+    <td class="text-start text-secondary-emphasis">Agent card</td>
+    <td class="text-end text-secondary-emphasis">
+      <a href="{{ stored_token_address.metadata_url }}">{{ stored_token_address.metadata_url }}</a>
+    </td>
+  </tr>
+</table>
+
+{# The registries do not agree on a schema, so anything promoted above is a
+   best effort. The published document is the authority and stays visible. #}
+<details class="sm-text">
+  <summary class="text-secondary-emphasis">Published document</summary>
+  <pre class="sm-text text-secondary-emphasis word-break"
+       style="white-space: pre-wrap; overflow-x: auto;">{{ card | tojson(indent=2) }}</pre>
+</details>

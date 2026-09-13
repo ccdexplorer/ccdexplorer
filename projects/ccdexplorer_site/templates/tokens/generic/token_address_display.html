@@ -41,11 +41,30 @@
   </div>  
 
   <div class="row row-flex">
-    {% if md %}
+    {# On a CIS-8004 registry the token is an agent, so the agent card leads --
+       even when CIS-2 parsing found something. The overlap is coincidental:
+       some registries publish `name` and `description`, which TokenMetaData
+       happens to recognise, but that is a fraction of what the card says and
+       showing only those two would be the smaller truth. #}
+    {% if is_agent_registry and stored_token_address.raw_metadata %}
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Agent Card" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_agent_card.html" %}</div>
+    </div>
+    {% elif md %}
     <div class="col-md-6  col-sm-12 ">
       <div class="border content curved-border " >
           {% set title= "Token Metadata" %}{% include 'base/box_title.html' %}
           {% include "tokens/generic/token_metadata.html" %}</div>
+    </div>
+    {% elif stored_token_address.raw_metadata %}
+    {# Published, valid, and not CIS-2 -- a voucher record, an invoice, some
+       issuer's own schema. Show what was published rather than an empty box. #}
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Published Metadata" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_raw_metadata.html" %}</div>
     </div>
     {% endif %}
     

@@ -839,6 +839,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.templates.env.filters["hex_to_rgba"] = hex_to_rgba  # noqa: F405
         app.templates.env.filters["token_value_no_decimals"] = token_value_no_decimals  # noqa: F405
         app.templates.env.filters["uptime"] = uptime  # noqa: F405
+        # The token heading and the tabulator tables must agree on what a token
+        # is called; one helper, used by both.
+        app.templates.env.globals["token_display_name"] = token_display_name  # noqa: F405
         app.templates.env.filters["round_x_decimal_with_comma"] = round_x_decimal_with_comma  # noqa: F405
         app.templates.env.filters["round_x_decimal_no_comma"] = round_x_decimal_no_comma  # noqa: F405
         app.templates.env.filters["lottery_power"] = lottery_power  # noqa: F405
