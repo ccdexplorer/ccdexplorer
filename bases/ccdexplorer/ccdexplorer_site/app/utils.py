@@ -2520,15 +2520,20 @@ def create_dict_for_tabulator_display_for_nft_tokens(
     tags: dict,
     row: dict,
 ):
-    token_id = ""
-    if row.get("token_metadata"):
-        token_id = f'<a href="/{net}/token/{split_contract_into_url_slug_and_token_id(row["contract"], row["token_id"])}"><span class="ccd text-secondary-emphasis">{row["token_metadata"]["name"]}</span></a>'
-    else:
-        token_id = f'<a href="/{net}/token/{split_contract_into_url_slug_and_token_id(row["contract"], row["token_id"])}"><span class="ccd text-secondary-emphasis">{row["token_id"]}</span></a>'
+    # `row` is the token document itself here, so the name may be in its CIS-2
+    # metadata or in the agent card a registry published. Was
+    # row["token_metadata"]["name"], which raises on metadata with a
+    # description and no name, and showed the token id for every agent.
+    display_name = token_display_name(row, row["token_id"])
+    slug = split_contract_into_url_slug_and_token_id(row["contract"], row["token_id"])
+    token_id = (
+        f'<a href="/{net}/token/{slug}">'
+        f'<span class="ccd text-secondary-emphasis">{display_name}</span></a>'
+    )
     return {
         "contract": f"<span class='ccd text-secondary-emphasis'>{row['contract']}</span>",
         "token_id": token_id,
-        "token_id_download": f"{row['token_id']}",
+        "token_id_download": display_name,
         "last_height_processed": f'<a href="/{net}/block/{row["last_height_processed"]}"><span class="ccd">{round_x_decimal_with_comma(row["last_height_processed"], 0)}</span></a>',
         "last_height_processed_download": row["last_height_processed"],
     }
@@ -2604,7 +2609,15 @@ def token_display_name(address_information: dict | None, token_id: str | None = 
     ai = address_information or {}
     metadata = ai.get("token_metadata") or {}
     card = ai.get("raw_metadata") or {}
-    name = metadata.get("name") or card.get("name") or card.get("address")
+    agent_metadata = card.get("agent_metadata") or {}
+    name = (
+        metadata.get("name")
+        or card.get("name")
+        # Some registries name the agent inside agent_metadata instead, and
+        # agentverse publishes no name at all -- only the agent's address.
+        or agent_metadata.get("label")
+        or card.get("address")
+    )
     return str(name or token_id or ai.get("token_id") or ai.get("_id") or "")
 
 

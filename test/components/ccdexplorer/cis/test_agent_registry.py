@@ -94,3 +94,41 @@ def test_token_display_name_survives_metadata_without_a_name():
     assert token_display_name(None, "99") == "99"
     # No token id either: fall back to whatever identifies the document.
     assert token_display_name({"_id": "<1,0>-99"}, None) == "<1,0>-99"
+
+
+def test_token_display_name_finds_a_label_inside_agent_metadata():
+    """Some registries name the agent one level down, not at the top."""
+    from ccdexplorer.ccdexplorer_site.app.utils import token_display_name
+
+    card = {
+        "token_metadata": {},
+        "raw_metadata": {
+            "agent_index": 1682,
+            "agent_metadata": {"label": "mainnet-dryrun-claims-status", "model": "claude-sonnet-5"},
+        },
+    }
+    assert token_display_name(card, "9206") == "mainnet-dryrun-claims-status"
+
+
+def test_nft_table_names_agents_the_same_way_as_the_heading():
+    """The tag table and the token page must not disagree about a name."""
+    from ccdexplorer.ccdexplorer_site.app.utils import (
+        create_dict_for_tabulator_display_for_nft_tokens,
+        token_display_name,
+    )
+
+    row = {
+        "contract": "<10082,0>",
+        "token_id": "0300000000000000",
+        "last_height_processed": 1,
+        "token_metadata": {},
+        "raw_metadata": {"name": "PersonalAgent"},
+    }
+    cell = create_dict_for_tabulator_display_for_nft_tokens("mainnet", None, None, {}, row)
+    assert "PersonalAgent" in cell["token_id"]
+    assert cell["token_id_download"] == token_display_name(row, row["token_id"])
+
+    # An agent whose card carries no name is still identifiable by its id.
+    unnamed = {**row, "token_id": "5e09000000000000", "raw_metadata": {"agent_index": 2398}}
+    cell = create_dict_for_tabulator_display_for_nft_tokens("mainnet", None, None, {}, unnamed)
+    assert "5e09000000000000" in cell["token_id"]
