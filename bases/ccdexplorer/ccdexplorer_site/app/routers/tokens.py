@@ -15,6 +15,7 @@
 import math
 from typing import Optional
 
+from ccdexplorer.cis import AGENT_REGISTRY_STANDARD
 from ccdexplorer.env import *
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
@@ -311,6 +312,18 @@ async def show_token_address(
     request.state.api_calls["CIS-2 Compliance"] = (
         f"{request.app.api_url}/docs#/Token/get_token_cis_2_compliance"
     )
+    # An agent registry is not a list anyone maintains: it is any contract that
+    # reports supporting CIS-8004. ms_instances resolves that once per instance
+    # and the API serves it from the instance document, so this is a cached
+    # read, not nine gRPC calls.
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/contract/{contract_index}/{contract_subindex}"
+        "/supports-cis-standards",
+        request.app.httpx_client,
+    )
+    contract_standards = (api_result.return_value if api_result.ok else []) or []
+    is_agent_registry = AGENT_REGISTRY_STANDARD in contract_standards
+
     template_dict = {
         "env": request.app.env,
         "request": request,
@@ -318,6 +331,8 @@ async def show_token_address(
         "contract": contract,
         "tx_deployed": tx_deployed,
         "stored_token_address": stored_token_address,
+        "is_agent_registry": is_agent_registry,
+        "contract_standards": contract_standards,
         "token_id": use_token_id,
         "compliant_contract": compliant_contract,
         # "stored_tag": tokens_tag,

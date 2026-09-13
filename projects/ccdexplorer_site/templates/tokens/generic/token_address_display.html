@@ -47,6 +47,15 @@
           {% set title= "Token Metadata" %}{% include 'base/box_title.html' %}
           {% include "tokens/generic/token_metadata.html" %}</div>
     </div>
+    {% elif is_agent_registry and stored_token_address.raw_metadata %}
+    {# CIS-2 metadata parsed to nothing because this is not a CIS-2 token.
+       The contract reports supporting CIS-8004, so show the agent card the
+       registry actually published instead of an empty box. #}
+    <div class="col-md-6  col-sm-12 ">
+      <div class="border content curved-border " >
+          {% set title= "Agent Card" %}{% include 'base/box_title.html' %}
+          {% include "tokens/generic/token_agent_card.html" %}</div>
+    </div>
     {% endif %}
     
     <div class="col-md-6  col-sm-12 ">

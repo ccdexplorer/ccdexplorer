@@ -165,6 +165,18 @@ class MetaData(Utils):
                 if resp.status_code == 200:
                     try:
                         metadata = TokenMetaData(**t)
+                        # Pydantic ignores keys it does not know, so a document
+                        # that shares no field with TokenMetaData parses
+                        # cleanly into nothing. A CIS-8004 agent card is
+                        # exactly that: valid, published, and describing the
+                        # token -- but in its own vocabulary. Keeping the raw
+                        # document is the difference between "this token has no
+                        # name" and "this token is not the kind of thing
+                        # TokenMetaData describes".
+                        if isinstance(t, dict) and t and not metadata.model_dump(exclude_none=True):
+                            token_address_to_process.raw_metadata = t
+                        else:
+                            token_address_to_process.raw_metadata = None
                         token_address_to_process.token_metadata = metadata
                         # Record where the metadata came from. Tokens whose URL
                         # is only reachable through tokenMetadata -- CIS-8004

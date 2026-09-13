@@ -411,6 +411,12 @@ class MongoTypeTokenAddress(BaseModel):
     exchange_rate: Optional[float] = None
     domain_name: Optional[str] = None
     token_metadata: Optional[TokenMetaData] = None
+    #: The metadata document exactly as published, kept only when parsing it as
+    #: CIS-2 produced nothing. A CIS-8004 agent card is a valid document that
+    #: shares no field with TokenMetaData, so pydantic ignores every key and
+    #: yields an empty model -- discarding the only description the token has.
+    #: Storing it raw is what lets the token page render an agent as an agent.
+    raw_metadata: Optional[dict] = None
     failed_attempt: Optional[FailedAttempt] = None
     hidden: Optional[bool] = None
 
