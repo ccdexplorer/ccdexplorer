@@ -20,7 +20,7 @@ import httpx2 as httpx
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.env import RUN_ON_NET
 from ccdexplorer.grpc_client import GRPCClient
-from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor
+from ccdexplorer.mongodb import Collections, MongoDB, MongoMotor, net_db
 from ccdexplorer.ms_metadata.subscriber import Subscriber
 from ccdexplorer.tooter import Tooter
 
@@ -39,6 +39,10 @@ SELECT = {
         {"token_metadata": {"$exists": False}},
         {"metadata_url": {"$exists": False}},
         {"token_metadata": {}, "raw_metadata": {"$exists": False}},
+        # On an agent registry the card is kept even when CIS-2 parsing found
+        # a name, because the page leads with the card there. Tokens fetched
+        # before that rule existed have the name but not the card.
+        {"raw_metadata": {"$exists": False}, "token_metadata.name": {"$exists": True}},
     ],
 }
 # Or set this to bypass the query entirely, e.g. ["<10082,0>-c507000000000000"]
@@ -67,17 +71,21 @@ def main() -> None:
     mongodb = MongoDB(tooter, caller_name="ms_metadata")
     motormongo = MongoMotor(tooter, nearest=True, caller_name="ms_metadata")
     subscriber = Subscriber(GRPCClient(), tooter, motormongo, mongodb)
-    net = NET(RUN_ON_NET)
+    # NET picks which database is read as well as which chain is queried. The
+    # selection used to read mainnet regardless, so a testnet run would fetch
+    # for tokens that do not exist on the net it was writing to.
+    net = NET(os.getenv("NET", RUN_ON_NET or "mainnet"))
+    db = net_db(mongodb, net)
 
     token_addresses = TOKEN_ADDRESSES or [
         x["_id"]
-        for x in mongodb.mainnet[Collections.tokens_token_addresses_v2].aggregate(
+        for x in db[Collections.tokens_token_addresses_v2].aggregate(
             [{"$match": SELECT}, {"$project": {"_id": 1}}]
         )
     ]
 
     print(
-        f"[local] {RUN_ON_NET}: {len(token_addresses)} token(s) to process"
+        f"[local] {net.value}: {len(token_addresses)} token(s) to process"
         f"{' (DRY RUN)' if DRY_RUN else ''}, {DELAY_SECONDS}s delay, "
         f"{CONCURRENCY} at a time",
         flush=True,

@@ -4,6 +4,7 @@ from datetime import timezone
 import httpx2 as httpx
 from ccdexplorer.cis import (
     CIS,
+    is_agent_registry,
 )
 from ccdexplorer.domain.mongo import (
     FailedAttempt,
@@ -84,6 +85,24 @@ class MetaData(Utils):
         contract = CCD_ContractAddress.from_str(token_address.split("-")[0])
         token_id = token_address.split("-")[1]
         return f"{contract.index}/{contract.subindex}/{token_id}"
+
+    def contract_is_agent_registry(
+        self, db_to_use: dict[Collections, Collection], contract: str
+    ) -> bool:
+        """Whether a contract reports supporting CIS-8004.
+
+        Resolved once per contract per process: a registry mints thousands of
+        tokens, and the answer only changes when the instance is upgraded --
+        which ms_instances handles by re-resolving it at the source.
+        """
+        cache = getattr(self, "_agent_registry_cache", None)
+        if cache is None:
+            cache = {}
+            self._agent_registry_cache = cache
+        if contract not in cache:
+            instance = db_to_use[Collections.instances].find_one({"_id": contract})
+            cache[contract] = is_agent_registry(instance)
+        return cache[contract]
 
     def read_and_store_metadata(
         self,
@@ -173,10 +192,18 @@ class MetaData(Utils):
                         # document is the difference between "this token has no
                         # name" and "this token is not the kind of thing
                         # TokenMetaData describes".
-                        if isinstance(t, dict) and t and not metadata.model_dump(exclude_none=True):
-                            token_address_to_process.raw_metadata = t
-                        else:
-                            token_address_to_process.raw_metadata = None
+                        keep_raw = isinstance(t, dict) and bool(t)
+                        if keep_raw and metadata.model_dump(exclude_none=True):
+                            # Something did parse. Normally that is all the
+                            # token page needs -- except on an agent registry,
+                            # where the CIS-2 fields that happen to overlap
+                            # (name, description) are a fraction of what the
+                            # card says. The page leads with the card there, so
+                            # the card has to be kept even when parsing worked.
+                            keep_raw = self.contract_is_agent_registry(
+                                db_to_use, token_address_to_process.contract
+                            )
+                        token_address_to_process.raw_metadata = t if keep_raw else None
                         token_address_to_process.token_metadata = metadata
                         # Record where the metadata came from. Tokens whose URL
                         # is only reachable through tokenMetadata -- CIS-8004

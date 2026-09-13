@@ -1,12 +1,23 @@
+{# What this thing is called, and what to call it.
+
+   On a CIS-8004 registry the token is an agent, so it is labelled as one --
+   and its name comes from the agent card, which is where a registry actually
+   publishes it. Some cards carry a `name` that CIS-2 parsing also picked up;
+   most do not, and falling back to the token address is better than a label
+   with nothing after it.
+
+   The old test here was `"token_metadata" in stored_token_address`, which is
+   true even when the parse produced an empty object -- so every agent token
+   rendered the word "Token" followed by a blank. #}
+
+{% set card = stored_token_address.raw_metadata or {} %}
+{% set metadata_name = (stored_token_address.token_metadata or {}).get('name') %}
+{% set display_name = metadata_name or card.get('name') or card.get('address') %}
 
 <div class="row mb-3 ps-3">
     <div class="col-sm-12">
-        Token
+        {{ "Agent" if is_agent_registry else "Token" }}
         <span class="text-end text-secondary-emphasis" ></span>
-        <span class="ms-2 text-success">{% if "token_metadata" in stored_token_address %}
-            {{ stored_token_address.token_metadata.name }}
-        {% else %}{{stored_token_address._id}}
-        {% endif%}</span>
-
-</div>      
+        <span class="ms-2 text-success">{{ display_name or stored_token_address._id }}</span>
+</div>
         </div>

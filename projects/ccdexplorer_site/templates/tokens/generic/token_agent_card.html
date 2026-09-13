@@ -13,10 +13,12 @@
 <table class="table table-borderless">
   {% for label, value in [
       ('Agent', card.get('name')),
+      ('Description', card.get('description')),
       ('Agent index', card.get('agent_index')),
       ('Address', card.get('address')),
       ('Status', card.get('status')),
       ('Model', (card.get('agent_metadata') or {}).get('model')),
+      ('Version', card.get('version')),
       ('Protocol version', card.get('mcp_protocol_version')),
       ('Document version', card.get('doc_version')),
     ] %}
@@ -33,6 +35,18 @@
     <tr class="table-row-line-height sm-text">
       <td class="text-start text-secondary-emphasis">Tools</td>
       <td class="text-end text-secondary-emphasis word-break">{{ tools | join(', ') }}</td>
+    </tr>
+  {% endif %}
+
+  {# A2A-style cards (agentcards.site) describe capability as named skills
+     rather than as a tools array; registries do not agree on which. #}
+  {% set skills = card.get('skills') %}
+  {% if skills %}
+    <tr class="table-row-line-height sm-text">
+      <td class="text-start text-secondary-emphasis">Skills</td>
+      <td class="text-end text-secondary-emphasis word-break">
+        {{ skills | map(attribute='name') | select | join(', ') or skills | length ~ ' defined' }}
+      </td>
     </tr>
   {% endif %}
 

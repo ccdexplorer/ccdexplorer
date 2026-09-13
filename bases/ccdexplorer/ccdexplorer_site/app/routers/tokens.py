@@ -324,6 +324,13 @@ async def show_token_address(
     contract_standards = (api_result.return_value if api_result.ok else []) or []
     is_agent_registry = AGENT_REGISTRY_STANDARD in contract_standards
 
+    # The callers build og_title before anything knows what kind of contract
+    # this is. Correct it here rather than duplicating the lookup at both call
+    # sites -- a shared link that reads "Token" for an agent is the same
+    # mislabelling as the page heading, just somewhere harder to notice.
+    if is_agent_registry and og_title.startswith("Token "):
+        og_title = "Agent " + og_title[len("Token ") :]
+
     template_dict = {
         "env": request.app.env,
         "request": request,
