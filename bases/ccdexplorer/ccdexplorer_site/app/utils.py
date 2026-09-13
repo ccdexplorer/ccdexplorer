@@ -2589,22 +2589,41 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
     }
 
 
+def token_display_name(address_information: dict | None, token_id: str | None = None) -> str:
+    """What to call a token, in descending order of how much it tells you.
+
+    CIS-2 `name` first, then the agent card a registry published -- where the
+    name may be under `name`, or only as the agent's `address` -- and the token
+    id last. The id is unique and useless: it distinguishes rows without saying
+    anything about them, so it is the fallback rather than the default.
+
+    Shared by the tabulator tables and the token heading. The two disagreeing
+    about what a token is called is the kind of drift that starts with one of
+    them being "just a small fix".
+    """
+    ai = address_information or {}
+    metadata = ai.get("token_metadata") or {}
+    card = ai.get("raw_metadata") or {}
+    name = metadata.get("name") or card.get("name") or card.get("address")
+    return str(name or token_id or ai.get("token_id") or ai.get("_id") or "")
+
+
 def create_dict_for_tabulator_display_for_unverified_token(net, row: dict):
     ai = row["address_information"] or {}
     token_address = ai.get("_id", row["token_address"])
     token_id = ai.get("token_id", row["token_id"])
     return {
         "issuer": f'<span class="ccd text-secondary-emphasis">{row["contract"]}</span>',
+        # Was `ai["token_metadata"]["name"]` guarded only by the presence of
+        # token_metadata -- which raises on metadata carrying a description but
+        # no name, and showed nothing for an agent whose name is in its card.
         "token": (
-            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{ai["token_metadata"]["name"]}</a>'
-            if ai.get("token_metadata")
-            else f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{token_id}</a>'
+            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">'
+            f"{token_display_name(ai, token_id)}</a>"
         ),
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
         "issuer_download": f"{row['contract']}",
-        "token_download": (
-            f"{token_id}" if not ai.get("token_metadata") else f"{ai['token_metadata']['name']}"
-        ),
+        "token_download": token_display_name(ai, token_id),
         "balance_download": f"{row['token_amount']}",
     }
 

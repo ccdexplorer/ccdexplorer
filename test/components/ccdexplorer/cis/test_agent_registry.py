@@ -55,3 +55,42 @@ def test_contracts_helper_returns_ids(monkeypatch):
     collection = FakeCollection()
     assert agent_registry_contracts(collection) == ["<10082,0>", "<20000,0>"]
     assert collection.query == agent_registry_filter()
+
+
+def test_token_display_name_prefers_the_most_informative_source():
+    """The token id is unique and useless -- it must be the last resort.
+
+    A name can live in three places depending on who published it: CIS-2
+    metadata, an agent card's `name`, or -- for registries that publish no
+    name at all -- the agent's address. Falling back to the token id means a
+    row can always be told apart, but only after every name has been tried.
+    """
+    from ccdexplorer.ccdexplorer_site.app.utils import token_display_name
+
+    cis2 = {"token_metadata": {"name": "Some NFT"}}
+    assert token_display_name(cis2, "01") == "Some NFT"
+
+    # An agent registry that publishes an A2A-style card.
+    card = {"token_metadata": {}, "raw_metadata": {"name": "PersonalAgent"}}
+    assert token_display_name(card, "0300") == "PersonalAgent"
+
+    # agentverse publishes no name, only the agent's address.
+    address_only = {"token_metadata": {}, "raw_metadata": {"address": "agent1qv5"}}
+    assert token_display_name(address_only, "3300") == "agent1qv5"
+
+    # CIS-2 wins over the card when both carry a name -- they agree in
+    # practice, and the parsed field is the one the rest of the site uses.
+    both = {"token_metadata": {"name": "quiet_ledger_63"}, "raw_metadata": {"name": "other"}}
+    assert token_display_name(both, "0000") == "quiet_ledger_63"
+
+
+def test_token_display_name_survives_metadata_without_a_name():
+    """Metadata carrying a description but no name used to raise KeyError."""
+    from ccdexplorer.ccdexplorer_site.app.utils import token_display_name
+
+    assert token_display_name({"token_metadata": {"description": "d"}}, "02") == "02"
+    assert token_display_name({"raw_metadata": {"agent_index": 2398}}, "5e09") == "5e09"
+    assert token_display_name({}, "99") == "99"
+    assert token_display_name(None, "99") == "99"
+    # No token id either: fall back to whatever identifies the document.
+    assert token_display_name({"_id": "<1,0>-99"}, None) == "<1,0>-99"
