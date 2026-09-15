@@ -1,3 +1,4 @@
+import functools
 import os
 
 import dagster as dg
@@ -20,13 +21,26 @@ class GRPCResource(dg.ConfigurableResource):
         return grpc
 
 
+@functools.cache
+def shared_mongodb() -> MongoDB:
+    """One MongoDB client per process, built on first use.
+
+    Each MongoDB() opens a fresh MongoClient: three server connections on the
+    replica set plus a server_info() round trip before any query runs. Built
+    per get_client() call, as this used to be, that was a new client for every
+    asset execution, never closed. Caching per process keeps one for the life
+    of a run worker, and one for the long-lived code server where schedules
+    evaluate. Lazy rather than at import, so importing the definitions opens
+    nothing.
+    """
+    return MongoDB(Tooter(), nearest=True, caller_name="dagster_nightrunner")
+
+
 class MongoDBResource(dg.ConfigurableResource):
     """Resource to access the shared MongoDB database"""
 
     def get_client(self) -> MongoDB:
-        tooter: Tooter = Tooter()
-        mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_nightrunner")
-        return mongodb
+        return shared_mongodb()
 
 
 class CCDScanResource(dg.ConfigurableResource):

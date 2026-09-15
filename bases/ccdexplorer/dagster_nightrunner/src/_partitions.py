@@ -1,12 +1,14 @@
 import dagster as dg
-from ccdexplorer.mongodb import (
-    Collections,
-    MongoDB,
-)
-from ccdexplorer.tooter import Tooter
+from ccdexplorer.mongodb import Collections
 
-tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="dagster_paydays")
+from ._resources import shared_mongodb
+
+# The token partitions below still need a query at import, but it now reuses
+# the process's shared client instead of building a second one. It also stops
+# introducing itself to mongod as "dagster_paydays": this is the nightrunner
+# code location, and the wrong appName sent its connections to the wrong
+# service in every attribution.
+mongodb = shared_mongodb()
 
 token_list = [
     x["_id"].replace("w", "")

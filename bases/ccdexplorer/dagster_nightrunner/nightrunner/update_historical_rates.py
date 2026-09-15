@@ -7,16 +7,19 @@ from ccdexplorer.mongodb import (
     CollectionsUtilities,
     MongoDB,
 )
-from ccdexplorer.tooter import Tooter
+from ccdexplorer.dagster_nightrunner.src._resources import shared_mongodb
 from pymongo import ReplaceOne
 
-tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="historical_rates")
+# No client at import: every nightrunner run worker imports this module, so a
+# module-level client was a fresh connection set per run whether or not it was
+# used. The one query that needed it now uses the process's shared client.
 
 
 async def get_token_translations_from_mongo() -> dict[str, str]:
-    result = mongodb.utilities[CollectionsUtilities.token_api_translations].find(
-        {"service": "coingecko"}
+    result = (
+        shared_mongodb()
+        .utilities[CollectionsUtilities.token_api_translations]
+        .find({"service": "coingecko"})
     )
     coingecko_token_translation = {x["token"]: x["translation"] for x in list(result)}
     return coingecko_token_translation
