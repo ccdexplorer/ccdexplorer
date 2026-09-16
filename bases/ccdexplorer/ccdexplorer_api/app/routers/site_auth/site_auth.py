@@ -23,7 +23,10 @@ from pymongo import ReplaceOne
 
 from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_api_auth
 from ccdexplorer.ccdexplorer_api.app.security import hash_password, verify_password
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
+from ccdexplorer.ccdexplorer_api.app.state_getters import (
+    get_mongo_motor,
+    site_users_collection_name,
+)
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from ccdexplorer.env import environment
 from ccdexplorer.mongodb import CollectionsUtilities, MongoMotor
@@ -42,6 +45,28 @@ router = APIRouter(
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 
 SITE_URL = environment["SITE_URL"]
+
+
+def _site_link(path: str) -> str:
+    """An absolute link back to the site, for use in an email.
+
+    SITE_URL is read from this process's environment, and it has been absent
+    from the API's environment while present in the site's. Nothing failed:
+    the f-strings below interpolated None, and users were emailed links to
+    "None/auth/verify-email/<token>", which is what a white page at the URL
+    "None" looks like when the mail client resolves it.
+
+    A setting that is missing must not reach someone's inbox, so this raises
+    rather than formatting whatever it was given.
+    """
+    base = (SITE_URL or "").strip()
+    if not base:
+        raise RuntimeError(
+            "SITE_URL is not set in this process's environment, so links back "
+            "to the site cannot be built. Set it wherever the API is deployed."
+        )
+    return f"{base.rstrip('/')}/{path.lstrip('/')}"
+
 
 # --- Brute-force / abuse throttling (fixed window, Redis-backed) ------------- #
 # The site proxies every call under one shared API key, so the real client IP is
@@ -464,7 +489,8 @@ def send_verification_email(request: Request, user: SiteUser) -> None:
         title="CCDExplorer.io - Verify your email",
         body=(
             "Welcome to CCDExplorer! Please confirm your email address by clicking "
-            f"<a href='{SITE_URL}/auth/verify-email/{user.verification_token}'>Verify email</a>. "
+            f"<a href='{_site_link(f'auth/verify-email/{user.verification_token}')}'>"
+            "Verify email</a>. "
             "If this wasn't you, please ignore this email."
         ),
         email_address=user.email_address,
@@ -481,9 +507,7 @@ async def register(
     """Create a new email/password SiteUser and send a verification email."""
     # Throttle to prevent verification-email bombing / registration spam.
     if await _too_many_attempts(request, "register", body.email, EMAIL_MAX_PER_WINDOW):
-        raise HTTPException(
-            status_code=429, detail="Too many attempts. Please try again later."
-        )
+        raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
     await _record_attempt(request, "register", body.email, EMAIL_WINDOW_SECONDS)
     existing = await get_site_user_by_field("email_address", body.email, mongomotor)
     if existing:
@@ -567,7 +591,8 @@ async def forgot_password(
             body=(
                 f"Someone requested a password reset for your account on {SITE_URL}. "
                 f"If this was you, click "
-                f"<a href='{SITE_URL}/auth/reset-password/{user.reset_password_token}'>Reset password</a>. "
+                f"<a href='{_site_link(f'auth/reset-password/{user.reset_password_token}')}'>"
+                "Reset password</a>. "
                 "If this wasn't you, please ignore this email."
             ),
             email_address=user.email_address,
@@ -582,7 +607,9 @@ async def reset_password(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """Set a new password from a reset token and return the token to log the user in."""
-    user = await get_site_user_by_field("reset_password_token", body.reset_password_token, mongomotor)
+    user = await get_site_user_by_field(
+        "reset_password_token", body.reset_password_token, mongomotor
+    )
     if user is None or not _expiry_ok(user.reset_password_token_expires):
         raise HTTPException(status_code=404, detail="Invalid or expired reset link.")
     user.password = hash_password(body.password)
@@ -676,7 +703,9 @@ async def set_password(
         user.email_verified = False
 
     if not user.email_address:
-        raise HTTPException(status_code=400, detail="An email address is required to set a password.")
+        raise HTTPException(
+            status_code=400, detail="An email address is required to set a password."
+        )
 
     user.password = hash_password(body.password)
 
@@ -759,7 +788,7 @@ async def revoke_other_sessions_endpoint(
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
-    """"Log out of all other devices"."""
+    """ "Log out of all other devices"."""
     await revoke_other_sessions(token, body.keep_session_id, "logout_others", mongomotor)
     await _append_audit_entry(token, "logout_others", mongomotor)
     return {"ok": True}
@@ -831,9 +860,7 @@ async def export_account(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
     data = json.loads(
-        user.model_dump_json(
-            exclude={"password", "reset_password_token", "verification_token"}
-        )
+        user.model_dump_json(exclude={"password", "reset_password_token", "verification_token"})
     )
 
     data["other_notification_preferences"] = _prune_disabled_notifications(
