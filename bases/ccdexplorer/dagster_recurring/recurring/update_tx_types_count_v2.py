@@ -101,11 +101,14 @@ def update_tx_types_count_hourly(
     return dd
 
 
-tooter: Tooter = Tooter()
-mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="update_tx_types_count_hourly")
-
-
 if __name__ == "__main__":
+    # Built here, not at module level. Dagster imports this module in every run
+    # worker of the recurring code location -- several a minute -- and the asset
+    # passes in its own client, so a module-level one was a fresh MongoClient
+    # per import that nothing in Dagster ever used.
+    tooter: Tooter = Tooter()
+    mongodb: MongoDB = MongoDB(tooter, nearest=True, caller_name="update_tx_types_count_hourly")
+
     # d_date = "2025-12-25"
     # for start_hour in range(24):
     #     dd: dict = update_tx_types_count_hourly(

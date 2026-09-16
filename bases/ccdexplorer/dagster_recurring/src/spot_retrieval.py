@@ -1,7 +1,7 @@
 import dagster as dg
 
 from ..recurring.update_spot_retrieval import perform_spot_retrieval_update
-from ._partitions import partitions_def_tokens
+from ._partitions import current_token_keys, partitions_def_tokens
 from ._resources import MongoDBResource, mongodb_resource_instance
 
 asset_name = "spot_retrieval"
@@ -51,7 +51,16 @@ def schedule(context):
         return dg.SkipReason(
             "Skipping this run because another run of the same job is already running"
         )
-    partition_keys = partitions_def_tokens.get_partition_keys()
+    # Sync the partitions here rather than listing them at import. Schedules
+    # evaluate in the long-lived code server, so this query reuses one client
+    # for the life of the server and run workers open nothing just by loading
+    # the definitions. Keys are only ever added: deleting one would detach that
+    # token's history, and a token no longer configured simply stops getting
+    # runs below.
+    partition_keys = current_token_keys()
+    if not partition_keys:
+        return dg.SkipReason("No tokens have a price source configured.")
+    context.instance.add_dynamic_partitions(partitions_def_tokens.name, partition_keys)
 
     return [
         dg.RunRequest(
