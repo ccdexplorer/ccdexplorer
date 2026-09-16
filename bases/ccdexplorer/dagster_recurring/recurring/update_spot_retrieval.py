@@ -1,5 +1,6 @@
 import datetime as dt
 import time
+from collections.abc import Sequence
 from datetime import timezone
 
 import dateutil
@@ -11,57 +12,57 @@ from ccdexplorer.mongodb import (
 )
 from pymongo import ReplaceOne
 
+# Spread the per-token calls out a little so a cycle does not hit either API as
+# one burst. This replaces a flat 10 second sleep that used to end every token's
+# own run: with all tokens fetched in a single run, that would add four minutes
+# of pure waiting, and it only ever paced one request anyway.
+PACING_SECONDS = 0.25
 
-def coinapi(token: str):
-    status = -1
 
+def coinapi(token: str, client: httpx.Client) -> tuple[int, dict | None]:
     url = f"https://rest.coinapi.io/v1/exchangerate/{token}/USD/apikey-{COIN_API_KEY}/"
-    with httpx.Client() as client:
-        response = client.get(url)
+    response = client.get(url)
 
-        if response.status_code == 200:
-            result = response.json()
-            return_dict = {
-                "_id": f"USD/{token}",
-                "token": token,
-                "timestamp": dateutil.parser.parse(result["time"]),
-                "rate": result["rate"],
-                "source": "CoinAPI",
-            }
-        else:
-            return_dict = None
+    if response.status_code == 200:
+        result = response.json()
+        return response.status_code, {
+            "_id": f"USD/{token}",
+            "token": token,
+            "timestamp": dateutil.parser.parse(result["time"]),
+            "rate": result["rate"],
+            "source": "CoinAPI",
+        }
 
-    return status, return_dict
+    return response.status_code, None
 
 
-def coingecko(token: str, token_translation: dict):
+def coingecko(token: str, token_translation: dict, client: httpx.Client) -> tuple[int, dict | None]:
     token_to_request = token_translation.get(token)
-    status = -2
-    if token_to_request:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_to_request}&vs_currencies=usd&include_last_updated_at=true"
-        with httpx.Client() as client:
-            response = client.get(url)
+    if not token_to_request:
+        # No CoinGecko id configured for this token, so there is nothing to ask for.
+        return -2, None
 
-            if response.status_code == 200:
-                result = response.json()
-                result = result[token_to_request]
-                return_dict = {
-                    "_id": f"USD/{token}",
-                    "token": token,
-                    "timestamp": (
-                        dt.datetime.fromtimestamp(result["last_updated_at"], tz=timezone.utc)
-                        if "last_updated_at" in result
-                        else dt.datetime.now(tz=timezone.utc)
-                    ),
-                    "rate": result["usd"],
-                    "source": "CoinGecko",
-                }
-            else:
-                status = response.status_code
-                return_dict = None
-    else:
-        return_dict = None
-    return status, return_dict
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_to_request}&vs_currencies=usd&include_last_updated_at=true"
+    response = client.get(url)
+
+    if response.status_code != 200:
+        return response.status_code, None
+
+    result = response.json()[token_to_request]
+    return response.status_code, {
+        "_id": f"USD/{token}",
+        "token": token,
+        # CoinGecko's own timestamp for the price, not the time we fetched it:
+        # a thinly traded token keeps an old timestamp here while still being
+        # refreshed every cycle.
+        "timestamp": (
+            dt.datetime.fromtimestamp(result["last_updated_at"], tz=timezone.utc)
+            if "last_updated_at" in result
+            else dt.datetime.now(tz=timezone.utc)
+        ),
+        "rate": result["usd"],
+        "source": "CoinGecko",
+    }
 
 
 def get_token_translations_from_mongo(mongodb: MongoDB):
@@ -73,53 +74,77 @@ def get_token_translations_from_mongo(mongodb: MongoDB):
     return {x["token"]: x["translation"] for x in list(result)}
 
 
-def perform_spot_retrieval_update(
-    context, token: str, mongodb: MongoDB
-) -> tuple[bool, dict | None]:
-    coingecko_token_translation = get_token_translations_from_mongo(mongodb)
-    queue = []
+def fetch_rate(
+    context, token: str, coingecko_token_translation: dict, client: httpx.Client
+) -> dict | None:
+    """One token's spot rate: CoinAPI first, CoinGecko as the fallback.
 
-    status_coinapi = 0
-    status_coingecko = 0
-    result: dict | None = None
+    Returns None when neither source yields a rate, which is the caller's signal
+    that this token produced no write. A failure of one source falls through to
+    the other rather than stranding the token, so an expired CoinAPI key alone
+    cannot stop prices being stored.
+    """
+    status_coinapi: int | str = "not called"
+    status_coingecko: int | str = "not called"
+
     try:
-        status_coinapi, result = coinapi(token)
+        status_coinapi, result = coinapi(token, client)
         if result:
             context.log.info(f"CoinAPI result: {result['rate']} {result['_id']}")
-            queue.append(
-                ReplaceOne(
-                    {"_id": f"USD/{token}"},
-                    result,
-                    upsert=True,
-                )
-            )
+            return result
     except Exception as e:
-        context.log.error(
-            f"Recurring: Error in CoinAPI call for {token} with status {status_coinapi}. Error: {e}"
-        )
-        return False, None
+        status_coinapi = f"error: {e}"
+        context.log.error(f"Recurring: Error in CoinAPI call for {token}. Error: {e}")
 
-    if not result:
-        try:
-            status_coingecko, result = coingecko(token, coingecko_token_translation)
-            if result:
-                context.log.info(f"Coingecko result: {result['rate']} {result['_id']}")
-                queue.append(
-                    ReplaceOne(
-                        {"_id": f"USD/{token}"},
-                        result,
-                        upsert=True,
-                    )
-                )
+    try:
+        status_coingecko, result = coingecko(token, coingecko_token_translation, client)
+        if result:
+            context.log.info(f"Coingecko result: {result['rate']} {result['_id']}")
+            return result
+    except Exception as e:
+        status_coingecko = f"error: {e}"
+        context.log.error(f"Recurring: Error in Coingecko call for {token}. Error: {e}")
 
-        except Exception as e:
-            context.log.error(
-                f"Recurring: Error in Coingecko call for {token} with status {status_coingecko}. Error: {e}"
-            )
-            return False, None
+    context.log.error(
+        f"Recurring: No spot rate for {token} "
+        f"(CoinAPI: {status_coinapi}, CoinGecko: {status_coingecko})."
+    )
+    return None
 
-    if len(queue) > 0:
+
+def perform_spot_retrieval_update(
+    context, tokens: Sequence[str], mongodb: MongoDB
+) -> tuple[list[str], list[str]]:
+    """Fetch the spot rate for every token and store them all in one write.
+
+    Takes the whole set of tokens rather than one, because this now runs once
+    per cycle instead of once per token: the translation table is read once, a
+    single HTTP client is reused across the calls, and the rates land in one
+    bulk_write.
+
+    Returns (written, failed) -- the tokens whose rate was stored, and those
+    that yielded nothing from either source.
+    """
+    coingecko_token_translation = get_token_translations_from_mongo(mongodb)
+
+    queue: list[ReplaceOne] = []
+    written: list[str] = []
+    failed: list[str] = []
+
+    with httpx.Client() as client:
+        for index, token in enumerate(tokens):
+            if index:
+                time.sleep(PACING_SECONDS)
+
+            result = fetch_rate(context, token, coingecko_token_translation, client)
+            if result is None:
+                failed.append(token)
+                continue
+
+            queue.append(ReplaceOne({"_id": f"USD/{token}"}, result, upsert=True))
+            written.append(token)
+
+    if queue:
         _ = mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_write(queue)
 
-    time.sleep(10)
-    return len(queue) > 0, result
+    return written, failed

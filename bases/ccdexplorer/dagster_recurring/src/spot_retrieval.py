@@ -6,22 +6,50 @@ from ._resources import MongoDBResource, mongodb_resource_instance
 
 asset_name = "spot_retrieval"
 
+# Dagster reads a run's partition range from these two tags. There is no public
+# constant for them -- dagster._core.storage.tags is private -- so they are
+# spelled out here rather than imported from under the private namespace.
+PARTITION_RANGE_START_TAG = "dagster/asset_partition_range_start"
+PARTITION_RANGE_END_TAG = "dagster/asset_partition_range_end"
+
 
 ######### spot_retrieval #########
 @dg.asset(
     group_name="source_coinmarketcap",
     partitions_def=partitions_def_tokens,
+    backfill_policy=dg.BackfillPolicy.single_run(),
     tags={"reserved": "critical_job"},
 )
 def spot_retrieval(
     context: dg.AssetExecutionContext, mongo_resource: dg.ResourceParam[MongoDBResource]
-) -> dict | None:
+) -> None:
     """
-    Retrieving spot price data for selected CIS-2 tokens and all PLTs."""
+    Retrieving spot price data for selected CIS-2 tokens and all PLTs.
+
+    Every token in the run's partition range is handled by this one process. The
+    partitions themselves are unchanged, so a single token can still be re-run on
+    its own from the UI; what changed is that the scheduled cycle no longer pays
+    a process start, a definitions import and a Mongo client per token.
+
+    Returns None deliberately: an IO manager cannot persist one output across
+    several partitions, and nothing consumes the value -- the rates are the
+    write to Mongo.
+    """
     mongodb = mongo_resource.get_client()
-    partition_key = context.partition_key
-    retrieval_success, dct = perform_spot_retrieval_update(context, partition_key, mongodb)
-    return dct
+    tokens = list(context.partition_keys)
+
+    written, failed = perform_spot_retrieval_update(context, tokens, mongodb)
+    context.log.info(f"Stored {len(written)} of {len(tokens)} spot rates.")
+
+    if failed:
+        # The rates that did come back are already written; failing the run is
+        # what makes a token that yielded nothing visible at all. Re-run just
+        # that token on its own partition to retry it.
+        raise dg.Failure(
+            description=(
+                f"No spot rate for {len(failed)} of {len(tokens)} tokens: {', '.join(failed)}"
+            )
+        )
 
 
 job = dg.define_asset_job(f"j_{asset_name}", selection=[asset_name])
@@ -62,13 +90,19 @@ def schedule(context):
         return dg.SkipReason("No tokens have a price source configured.")
     context.instance.add_dynamic_partitions(partitions_def_tokens.name, partition_keys)
 
-    return [
-        dg.RunRequest(
-            run_key=f"{context.scheduled_execution_time.isoformat()}_{partition_key}",
-            partition_key=partition_key,
-        )
-        for partition_key in partition_keys
-    ]
+    # One run covering every token, rather than one run per token. Twenty-odd
+    # runs a cycle each cost more in process start than in work, and four at a
+    # time is the whole queue -- they crowded out every other recurring job.
+    # The range is expressed over the stored partition order, so it spans all
+    # of them however many there are.
+    stored_keys = context.instance.get_dynamic_partitions(partitions_def_tokens.name)
+    return dg.RunRequest(
+        run_key=context.scheduled_execution_time.isoformat(),
+        tags={
+            PARTITION_RANGE_START_TAG: stored_keys[0],
+            PARTITION_RANGE_END_TAG: stored_keys[-1],
+        },
+    )
 
 
 defs = dg.Definitions(
