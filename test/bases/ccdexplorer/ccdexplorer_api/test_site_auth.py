@@ -294,7 +294,9 @@ async def test_register_throttled_returns_429():
     body = site_auth.RegisterRequest(email=email, password="whatever")
 
     with pytest.raises(HTTPException) as exc:
-        await site_auth.register(request=request, body=body, mongomotor=FakeMongo(FakeCollection([])))
+        await site_auth.register(
+            request=request, body=body, mongomotor=FakeMongo(FakeCollection([]))
+        )
     assert exc.value.status_code == 429
 
 
@@ -318,7 +320,9 @@ def _user_doc(**overrides):
 @pytest.mark.asyncio
 async def test_reset_password_accepts_unexpired_token():
     mongo = FakeMongo(
-        FakeCollection([_user_doc(reset_password_token="rt", reset_password_token_expires=_future())])
+        FakeCollection(
+            [_user_doc(reset_password_token="rt", reset_password_token_expires=_future())]
+        )
     )
     result = await site_auth.reset_password(
         body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-pw"),
@@ -356,7 +360,13 @@ async def test_reset_password_rejects_token_without_expiry():
 async def test_verify_email_accepts_unexpired_token():
     mongo = FakeMongo(
         FakeCollection(
-            [_user_doc(verification_token="vt", verification_token_expires=_future(), email_verified=False)]
+            [
+                _user_doc(
+                    verification_token="vt",
+                    verification_token_expires=_future(),
+                    email_verified=False,
+                )
+            ]
         )
     )
     result = await site_auth.verify_email(verification_token="vt", mongomotor=mongo)
@@ -367,7 +377,13 @@ async def test_verify_email_accepts_unexpired_token():
 async def test_verify_email_rejects_expired_token():
     mongo = FakeMongo(
         FakeCollection(
-            [_user_doc(verification_token="vt", verification_token_expires=_past(), email_verified=False)]
+            [
+                _user_doc(
+                    verification_token="vt",
+                    verification_token_expires=_past(),
+                    email_verified=False,
+                )
+            ]
         )
     )
     with pytest.raises(HTTPException) as exc:
@@ -714,3 +730,84 @@ async def test_login_success_writes_audit_entry_without_pii():
     assert audit.docs[0]["event"] == "login_success"
     assert audit.docs[0]["user_token"] == "tok"
     assert set(audit.docs[0].keys()) == {"user_token", "event", "at"}
+
+
+# --------------------------------------------------------------------------- #
+# Links back to the site in emails
+#
+# Reported as "the validate your email link leads to a white page with url
+# None". SITE_URL is read from this process's environment and was set for the
+# site but never for the API, so the f-strings that built these links
+# interpolated None and users were emailed "None/auth/verify-email/<token>".
+# Nothing failed at the time: the email sent, and the link was broken.
+# --------------------------------------------------------------------------- #
+def test_site_link_builds_an_absolute_url(monkeypatch):
+    monkeypatch.setattr(site_auth, "SITE_URL", "https://ccdexplorer.io")
+
+    assert (
+        site_auth._site_link("auth/verify-email/vt")
+        == "https://ccdexplorer.io/auth/verify-email/vt"
+    )
+
+
+def test_site_link_does_not_double_the_separator(monkeypatch):
+    """A trailing slash on the setting is not the caller's problem."""
+    monkeypatch.setattr(site_auth, "SITE_URL", "https://ccdexplorer.io/")
+
+    assert (
+        site_auth._site_link("/auth/verify-email/vt")
+        == "https://ccdexplorer.io/auth/verify-email/vt"
+    )
+
+
+@pytest.mark.parametrize("unset", [None, "", "   "])
+def test_site_link_refuses_to_build_a_link_without_site_url(monkeypatch, unset):
+    """The bug itself: no SITE_URL must mean no link, not the text "None"."""
+    monkeypatch.setattr(site_auth, "SITE_URL", unset)
+
+    with pytest.raises(RuntimeError) as exc:
+        site_auth._site_link("auth/verify-email/vt")
+    assert "SITE_URL" in str(exc.value)
+
+
+def test_verification_email_carries_an_absolute_link(monkeypatch):
+    monkeypatch.setattr(site_auth, "SITE_URL", "https://ccdexplorer.io")
+    tooter = FakeTooter()
+    user = SimpleNamespace(verification_token="vt", email_address="u@example.com")
+
+    site_auth.send_verification_email(make_request(tooter=tooter), user)
+
+    body = tooter.emails[0]["body"]
+    assert "https://ccdexplorer.io/auth/verify-email/vt" in body
+    assert "None/auth" not in body
+
+
+def test_no_verification_email_is_sent_when_the_link_cannot_be_built(monkeypatch):
+    """Better to fail loudly here than to put a dead link in someone's inbox."""
+    monkeypatch.setattr(site_auth, "SITE_URL", None)
+    tooter = FakeTooter()
+    user = SimpleNamespace(verification_token="vt", email_address="u@example.com")
+
+    with pytest.raises(RuntimeError):
+        site_auth.send_verification_email(make_request(tooter=tooter), user)
+    assert tooter.emails == []
+
+
+@pytest.mark.asyncio
+async def test_reset_password_email_carries_an_absolute_link(monkeypatch):
+    """The same f-string bug was in the reset email, twice."""
+    monkeypatch.setattr(site_auth, "SITE_URL", "https://ccdexplorer.io")
+    email = "reset-link@example.com"
+    tooter = FakeTooter()
+    users = FakeCollection([{"token": "tok", "email_address": email}])
+
+    await site_auth.forgot_password(
+        request=make_request(tooter=tooter),
+        body=site_auth.ForgotPasswordRequest(email=email),
+        mongomotor=FakeMongo(users),
+    )
+
+    body = tooter.emails[0]["body"]
+    assert "https://ccdexplorer.io/auth/reset-password/" in body
+    assert "None/auth" not in body
+    assert "on https://ccdexplorer.io." in body
