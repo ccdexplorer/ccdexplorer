@@ -132,3 +132,20 @@ def test_nft_table_names_agents_the_same_way_as_the_heading():
     unnamed = {**row, "token_id": "5e09000000000000", "raw_metadata": {"agent_index": 2398}}
     cell = create_dict_for_tabulator_display_for_nft_tokens("mainnet", None, None, {}, unnamed)
     assert "5e09000000000000" in cell["token_id"]
+
+
+def test_short_url_keeps_host_and_tail():
+    """Long metadata URLs must fit a table cell and stay recognisable."""
+    from ccdexplorer.ccdexplorer_site.app.utils import short_url
+
+    assert short_url("https://registry.modernmiracle.org/cards/v1/2398") == (
+        "registry.modernmiracle.org/…/2398"
+    )
+    long_seg = "agent1qv5a58k6nnrn24fdmj5cvm84wsps4g4l06zqk7n5j90tc8h25m6n5ma58gd"
+    shortened = short_url(f"https://agentverse.ai/v1/almanac/agents/{long_seg}")
+    assert shortened.startswith("agentverse.ai/…/agent1qv5a5")
+    assert shortened.endswith("n5ma58gd")
+    assert len(shortened) < 45
+    assert short_url("https://example.com/") == "example.com"
+    assert short_url("https://example.com/one") == "example.com/one"
+    assert short_url(None) == ""

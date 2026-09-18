@@ -28,7 +28,7 @@
         <td class="text-start text-secondary-emphasis">{{ key }}</td>
         <td class="text-end text-secondary-emphasis word-break">
           {% if value is string and value.startswith('http') %}
-            <a href="{{ value }}">{{ value }}</a>
+            <a href="{{ value }}" title="{{ value }}" style="overflow-wrap:anywhere">{{ value | short_url }}</a>
           {% else %}
             {{ value }}
           {% endif %}
@@ -41,7 +41,8 @@
     <tr class="table-row-line-height sm-text">
       <td class="text-start text-secondary-emphasis">Metadata URL</td>
       <td class="text-end text-secondary-emphasis word-break">
-        <a href="{{ stored_token_address.metadata_url }}">{{ stored_token_address.metadata_url }}</a>
+        <a href="{{ stored_token_address.metadata_url }}"
+           title="{{ stored_token_address.metadata_url }}" style="overflow-wrap:anywhere">{{ stored_token_address.metadata_url | short_url }}</a>
       </td>
     </tr>
   {% endif %}

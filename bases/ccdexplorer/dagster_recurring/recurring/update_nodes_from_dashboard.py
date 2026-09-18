@@ -33,8 +33,31 @@ def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> 
 
                 queue.append(ReplaceOne({"_id": node.nodeId}, d, upsert=True))
 
-            _ = db[Collections.dashboard_nodes].delete_many({})
+            # Upsert first, then remove only what is no longer reporting.
+            #
+            # This used to delete_many({}) and then bulk_write. Those are two
+            # separate operations, so between them the collection was empty --
+            # every minute, for as long as the write took. Readers get no
+            # error from that, just nothing: the nodes page renders an empty
+            # table, the API returns [], and a refresh a second later looks
+            # fine, which is exactly how it was reported.
+            #
+            # An empty response from the dashboard must not empty the
+            # collection either: bulk_write([]) raises, and deleting on the
+            # strength of a bad fetch would throw away every node until the
+            # next successful run.
+            if not queue:
+                context.log.warning(
+                    f"{net} | dashboard returned no nodes; keeping the existing "
+                    f"{db[Collections.dashboard_nodes].count_documents({})} on record"
+                )
+                return len_nodes
+
             _ = db[Collections.dashboard_nodes].bulk_write(queue)
+            reporting_ids = [op._filter["_id"] for op in queue]
+            removed = db[Collections.dashboard_nodes].delete_many({"_id": {"$nin": reporting_ids}})
+            if removed.deleted_count:
+                context.log.info(f"{net} | {removed.deleted_count} node(s) stopped reporting")
             #
             #
             # update nodes status retrieval

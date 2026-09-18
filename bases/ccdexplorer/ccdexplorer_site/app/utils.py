@@ -2594,6 +2594,39 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
     }
 
 
+def short_url(url: str | None, tail: int = 24) -> str:
+    """A URL short enough to sit in a table cell, still recognisable.
+
+    Metadata URLs are long and unbroken -- an agentverse address is a 60-plus
+    character path segment with nothing to wrap at -- so shown whole they push
+    the box wider than its column. Keep the host, which says who publishes it,
+    and the end of the path, which is what tells two tokens' URLs apart; the
+    middle is what nobody reads. The full URL stays in the link itself.
+    """
+    if not url:
+        return ""
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if not parts.netloc:
+        return url if len(url) <= tail * 2 else f"{url[:tail]}…{url[-tail:]}"
+    host = parts.netloc
+    # An S3 virtual-hosted bucket name alone can run past 50 characters, and
+    # dots are not break points either. Keep both ends of the host: the start
+    # names the bucket or service, the end names the provider.
+    if len(host) > tail + 8:
+        keep = (tail + 8) // 2
+        host = f"{host[:keep]}…{host[-keep:]}"
+    segments = [seg for seg in parts.path.split("/") if seg]
+    last = segments[-1] if segments else ""
+    if len(last) > tail:
+        last = f"{last[: tail // 2]}…{last[-(tail // 2) :]}"
+    if not last:
+        return host
+    middle = "/…/" if len(segments) > 1 else "/"
+    return f"{host}{middle}{last}"
+
+
 def token_display_name(address_information: dict | None, token_id: str | None = None) -> str:
     """What to call a token, in descending order of how much it tells you.
 
