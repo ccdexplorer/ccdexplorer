@@ -36,6 +36,25 @@ async def nodes(
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
 ):
     user: SiteUser | None = await get_user_detailsv2(request)
+
+    # Mainnet only, and it has to say so. The node list comes from Concordium's
+    # mainnet dashboard, and the table's endpoint is itself mainnet-only
+    # (/mainnet/ajax_nodes_tabulator), so on any other net this page used to
+    # render mainnet nodes under a testnet heading -- worse than refusing,
+    # because it looks like an answer.
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            request,
+            "testnet/not-available.html",
+            {
+                "env": environment,
+                "request": request,
+                "user": user,
+                "net": net,
+                "message": "Node reporting is collected from Concordium's mainnet dashboard.",
+            },
+        )
+
     request.state.api_calls = {}
     request.state.api_calls["Nodes and Validators"] = (
         f"{request.app.api_url}/docs#/Accounts/get_nodes_and_validators"

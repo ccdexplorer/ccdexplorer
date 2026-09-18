@@ -1,0 +1,22 @@
+{# Shown where a page exists only for mainnet.
+
+   Several routers already rendered this template and it was never created,
+   so those paths raised TemplateNotFound instead of explaining themselves.
+   Kept deliberately plain, and it states which net you are on -- the usual
+   way to land here is not noticing you switched. #}
+
+{% extends "base/base.html" %}
+
+{% block content %}
+{% include '/base/search_bar_non_home_inclusion.html' %}
+<div class="row">
+  <div class="col-lg-12">
+    <p class="bg-warning-subtle border curved-border">
+      This page is not available on <span class="ccd">{{ net }}</span>.
+      {% if message %}{{ message }}{% endif %}
+      <a href="/mainnet{{ request.url.path.split('/', 2)[2] if request.url.path.count('/') > 1 else '' }}">
+        View it on mainnet</a>.
+    </p>
+  </div>
+</div>
+{% endblock %}
