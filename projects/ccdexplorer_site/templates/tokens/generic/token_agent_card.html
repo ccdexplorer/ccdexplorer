@@ -61,7 +61,7 @@
   <tr class="table-row-line-height sm-text">
     <td class="text-start text-secondary-emphasis">Agent card</td>
     <td class="text-end text-secondary-emphasis">
-      <a href="{{ stored_token_address.metadata_url }}"
+      <a href="{{ stored_token_address.metadata_url | safe_url }}"
          title="{{ stored_token_address.metadata_url }}" style="overflow-wrap:anywhere">{{ stored_token_address.metadata_url | short_url }}</a>
     </td>
   </tr>

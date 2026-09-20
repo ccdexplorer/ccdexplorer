@@ -843,6 +843,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # is called; one helper, used by both.
         app.templates.env.globals["token_display_name"] = token_display_name  # noqa: F405
         app.templates.env.filters["short_url"] = short_url  # noqa: F405
+        app.templates.env.filters["safe_url"] = safe_url  # noqa: F405
         app.templates.env.filters["round_x_decimal_with_comma"] = round_x_decimal_with_comma  # noqa: F405
         app.templates.env.filters["round_x_decimal_no_comma"] = round_x_decimal_no_comma  # noqa: F405
         app.templates.env.filters["lottery_power"] = lottery_power  # noqa: F405

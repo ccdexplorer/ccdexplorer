@@ -2610,6 +2610,42 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
     }
 
 
+#: Schemes a metadata URL may use in a link. Everything else -- javascript:,
+#: data:, vbscript:, file: -- either runs code on this origin when clicked or
+#: opens something the browser should not be opening on our say-so.
+LINKABLE_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def safe_url(url: str | None) -> str:
+    """A metadata URL that is safe to put in an href, or "" if it is not.
+
+    metadata_url is whatever the contract returned, so it is attacker-supplied
+    in the same way a token's name is. Escaping is not enough here: it stops
+    the value breaking out of the attribute, but `href="javascript:..."` needs
+    no quotes to break out of, and one click runs script on this origin.
+
+    Browsers are lenient about what counts as a scheme -- leading whitespace,
+    and tabs or newlines *inside* the word, are all ignored, so "java\tscript:"
+    parses as javascript:. Those characters are stripped before the scheme is
+    read rather than after, otherwise the check reads a different string than
+    the browser will.
+
+    Returns "" rather than raising: a token with an unusable metadata URL
+    should still render, just without a live link.
+    """
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    cleaned = "".join(ch for ch in raw if ch >= " " and ch not in "\t\r\n")
+    from urllib.parse import urlsplit
+
+    try:
+        scheme = urlsplit(cleaned).scheme.lower()
+    except ValueError:
+        return ""
+    return cleaned if scheme in LINKABLE_URL_SCHEMES else ""
+
+
 def short_url(url: str | None, tail: int = 24) -> str:
     """A URL short enough to sit in a table cell, still recognisable.
 

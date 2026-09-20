@@ -24,7 +24,7 @@
         {% endif %}
         <tr class="table-row-line-height sm-text">
             <td class="text-start text-secondary-emphasis">Metadata URL</td>
-            <td class="text-end text-secondary-emphasis"><a href="{{stored_token_address.metadata_url}}">Metadata URL</a>
+            <td class="text-end text-secondary-emphasis"><a href="{{stored_token_address.metadata_url|safe_url}}">Metadata URL</a>
                 
                 </td>
         </tr>

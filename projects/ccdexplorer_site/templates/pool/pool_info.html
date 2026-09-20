@@ -12,7 +12,7 @@
         {% if pool.pool_info.url %}
         <tr class="sm-text">
             <td class=" text-secondary-emphasis">URL</td>
-            <td class=" text-end align-middle"> <a href="{{pool.pool_info.url}}">{{ pool.pool_info.url}}</a></td>
+            <td class=" text-end align-middle"> <a href="{{pool.pool_info.url|safe_url}}">{{ pool.pool_info.url}}</a></td>
         </tr>
         {% endif %}
         {% if pool.current_payday_info %}
