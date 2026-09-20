@@ -26,18 +26,35 @@ partitions_def_tokens = dg.DynamicPartitionsDefinition(name="spot_retrieval_toke
 
 
 def current_token_keys() -> list[str]:
-    """Tokens and PLTs that currently have a price source configured.
+    """The symbols a USD rate has to be fetched for.
 
-    The key format is unchanged from the static list this replaces, so existing
-    materialisations stay attached to the same partitions.
+    `get_price_from` names the symbol that prices a token; it is not a flag.
+    wETH and tETH both carry "ETH", because both are worth whatever ETH is
+    worth. Consumers look a rate up by that symbol and never by the token's own
+    id -- account_v2 does `exchange_rates[token_tag["get_price_from"]]` -- so
+    the symbols are what this needs to fetch.
+
+    Reading the field as a flag and keying on `_id` instead had it fetching
+    rates nobody reads (tETH, tUSDC, tWBTC and seven more, none of which any
+    price source lists, so each one failed the run every ten minutes) while
+    never fetching three that consumers do read: BNB, MATIC and UMB. Holders of
+    tBNB, tPOL and tUMB had no USD value at all.
+
+    Dropping the `_id`-based keys also retires `.replace("w", "")`, which
+    removed every "w" in an id rather than a wrapped-token prefix.
+
+    Sorted so the partition range the schedule builds from the stored order
+    stays stable as symbols are added.
     """
     mongodb = shared_mongodb()
-    tokens = [
-        x["_id"].replace("w", "")
+    symbols = {
+        x["get_price_from"]
         for x in mongodb.mainnet[Collections.tokens_tags].find({"token_type": "fungible"})
         if x.get("get_price_from")
-    ]
-    plts = [
-        x["_id"] for x in mongodb.mainnet[Collections.plts_tags].find({}) if x.get("get_price_from")
-    ]
-    return tokens + plts
+    }
+    symbols |= {
+        x["get_price_from"]
+        for x in mongodb.mainnet[Collections.plts_tags].find({})
+        if x.get("get_price_from")
+    }
+    return sorted(symbols)
