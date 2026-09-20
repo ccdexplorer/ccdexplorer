@@ -2,8 +2,8 @@ repos:
   - repo: local
     hooks:
       - id: just-test
-        name: run test suite (just test)
-        entry: just test
+        name: run test suite (just test-fast)
+        entry: just test-fast
         language: system
         pass_filenames: false
         always_run: true
