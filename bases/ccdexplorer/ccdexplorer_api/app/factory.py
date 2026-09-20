@@ -419,9 +419,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         "http://localhost:6274",
         "http://127.0.0.1:6277",
         "http://localhost:6277",
-        "http://api.ccdexplorer.io",
         "https://api.ccdexplorer.io",
-        "http://dev-api.ccdexplorer.io",
         "https://dev-api.ccdexplorer.io",
     ]
     app.add_middleware(

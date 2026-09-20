@@ -2111,12 +2111,23 @@ async def refresh_consensus_cache(app, net: str):
         print(f"ERROR getting consensus detailed status for {net}: {error}")
 
 
-async def post_url_from_api(url: str, httpx_client: httpx.AsyncClient, json_post_content: Any):
+async def post_url_from_api(
+    url: str,
+    httpx_client: httpx.AsyncClient,
+    json_post_content: Any,
+    headers: dict[str, str] | None = None,
+):
+    """POST to the API. `headers` carries anything the API cannot work out itself.
+
+    The only use so far is the end user's IP on the auth routes: every call
+    reaches the API from this one host under one shared key, so the API's own
+    view of the peer is always the site and useless for throttling.
+    """
     api_response = APIResponseResult(status_code=-1, duration_in_sec=-1, ok=False)
     response = None
     now = dt.datetime.now().astimezone(dt.UTC)
     try:
-        response = await httpx_client.post(url, json=json_post_content)
+        response = await httpx_client.post(url, json=json_post_content, headers=headers)
         try:
             api_response.return_value = response.json()
         except:  # noqa: E722

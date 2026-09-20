@@ -158,9 +158,19 @@ class FakeTooter:
         self.emails.append(kwargs)
 
 
-def make_request(redis=None, tooter=None):
+def make_request(redis=None, tooter=None, headers=None, client_host="198.51.100.1"):
+    """A stand-in Request.
+
+    `headers` and `client` are part of it because the auth routes now read the
+    caller's address to throttle on -- a request object without them is not
+    one these routes can handle.
+    """
     app = SimpleNamespace(r=redis or FakeRedis(), tooter=tooter or FakeTooter())
-    return SimpleNamespace(app=app)
+    return SimpleNamespace(
+        app=app,
+        headers=headers if headers is not None else {},
+        client=SimpleNamespace(host=client_host) if client_host else None,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -811,3 +821,84 @@ async def test_reset_password_email_carries_an_absolute_link(monkeypatch):
     assert "https://ccdexplorer.io/auth/reset-password/" in body
     assert "None/auth" not in body
     assert "on https://ccdexplorer.io." in body
+
+
+# --------------------------------------------------------------------------- #
+# Session expiry
+#
+# Sessions carried no expiry at all: created_at, last_seen_at, a revoked flag,
+# and no TTL index. The cookie's 30-day max_age is a hint to the browser and
+# nothing more, so a captured session token stayed valid until somebody
+# revoked it by hand. Rotation was already in place, but rotating a token that
+# never expires does not bound anything.
+# --------------------------------------------------------------------------- #
+def test_a_fresh_session_is_not_expired():
+    assert site_auth._session_expiry_reason(_session_doc(), _utc_now()) is None
+
+
+def test_a_session_past_its_absolute_lifetime_is_expired():
+    old = _utc_now() - site_auth.SESSION_ABSOLUTE_LIFETIME - dt.timedelta(minutes=1)
+    doc = _session_doc(created_at=old, last_seen_at=_utc_now())
+
+    assert site_auth._session_expiry_reason(doc, _utc_now()) == "expired"
+
+
+def test_an_actively_used_session_still_expires_eventually():
+    """Use does not extend it past the absolute lifetime -- that is the point."""
+    old = _utc_now() - site_auth.SESSION_ABSOLUTE_LIFETIME - dt.timedelta(days=5)
+    doc = _session_doc(created_at=old, last_seen_at=_utc_now(), last_rotated_at=_utc_now())
+
+    assert site_auth._session_expiry_reason(doc, _utc_now()) == "expired"
+
+
+def test_a_session_left_unused_goes_idle_before_the_absolute_limit():
+    unused_since = _utc_now() - site_auth.SESSION_IDLE_TIMEOUT - dt.timedelta(minutes=1)
+    doc = _session_doc(created_at=unused_since, last_seen_at=unused_since)
+
+    assert site_auth._session_expiry_reason(doc, _utc_now()) == "idle"
+
+
+def test_the_idle_window_is_shorter_than_the_absolute_one():
+    assert site_auth.SESSION_IDLE_TIMEOUT < site_auth.SESSION_ABSOLUTE_LIFETIME
+
+
+def test_a_session_with_no_timestamps_is_not_treated_as_expired():
+    """Missing fields must not log everyone out on deploy."""
+    doc = _session_doc(created_at=None, last_seen_at=None)
+
+    assert site_auth._session_expiry_reason(doc, _utc_now()) is None
+
+
+# --------------------------------------------------------------------------- #
+# Throttling on the caller, not only the target
+#
+# Every call reaches the API from the site, under one shared API key, so
+# request.client is the same for everybody. Keyed only on the target email,
+# ten attempts each against ten thousand addresses cost an attacker nothing.
+# --------------------------------------------------------------------------- #
+def test_the_forwarded_client_ip_is_used_when_present():
+    request = make_request()
+    request.headers = {"x-client-ip": "203.0.113.7"}
+
+    assert site_auth._client_ip(request) == "203.0.113.7"
+
+
+def test_only_the_first_hop_of_a_forwarded_chain_is_used():
+    request = make_request()
+    request.headers = {"x-client-ip": "203.0.113.7, 10.0.0.1"}
+
+    assert site_auth._client_ip(request) == "203.0.113.7"
+
+
+def test_the_peer_address_is_the_fallback():
+    request = make_request()
+    request.headers = {}
+    request.client = SimpleNamespace(host="198.51.100.4")
+
+    assert site_auth._client_ip(request) == "198.51.100.4"
+
+
+def test_the_per_caller_limits_are_looser_than_the_per_target_ones():
+    """They bound a sweep across accounts; the email keys bound one account."""
+    assert site_auth.LOGIN_MAX_ATTEMPTS_PER_IP > site_auth.LOGIN_MAX_ATTEMPTS
+    assert site_auth.EMAIL_MAX_PER_IP > site_auth.EMAIL_MAX_PER_WINDOW
