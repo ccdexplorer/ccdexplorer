@@ -75,7 +75,9 @@ def test_every_token_lands_in_a_single_bulk_write(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _rate_from("CoinAPI"))
     mongodb = _mongodb()
 
-    written, failed = perform_spot_retrieval_update(_context(), ["BTC", "ETH", "EUROe"], mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BTC", "ETH", "EUROe"], mongodb
+    )
 
     rates = mongodb.utilities[CollectionsUtilities.exchange_rates]
     assert written == ["BTC", "ETH", "EUROe"]
@@ -106,7 +108,9 @@ def test_a_token_without_a_rate_is_reported_and_the_rest_still_store(monkeypatch
     monkeypatch.setattr(update_spot_retrieval, "coingecko", only_eth)
     mongodb = _mongodb()
 
-    written, failed = perform_spot_retrieval_update(_context(), ["BTC", "ETH"], mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BTC", "ETH"], mongodb
+    )
 
     assert written == ["ETH"]
     assert failed == ["BTC"]
@@ -118,9 +122,9 @@ def test_coingecko_is_the_fallback_when_coinapi_has_nothing(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coingecko", _rate_from("CoinGecko"))
     mongodb = _mongodb()
 
-    written, failed = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
 
-    assert (written, failed) == (["BTC"], [])
+    assert (written, failed, unpriceable) == (["BTC"], [], [])
     stored = mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_writes[0]
     assert len(stored) == 1
 
@@ -135,9 +139,9 @@ def test_a_raising_coinapi_still_falls_through_to_coingecko(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coingecko", _rate_from("CoinGecko"))
     mongodb = _mongodb()
 
-    written, failed = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
 
-    assert (written, failed) == (["BTC"], [])
+    assert (written, failed, unpriceable) == (["BTC"], [], [])
 
 
 def test_nothing_is_written_when_no_token_yields_a_rate(monkeypatch):
@@ -145,11 +149,91 @@ def test_nothing_is_written_when_no_token_yields_a_rate(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(500))
     mongodb = _mongodb()
 
-    written, failed = perform_spot_retrieval_update(_context(), ["BTC", "ETH"], mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BTC", "ETH"], mongodb
+    )
 
     assert written == []
     assert failed == ["BTC", "ETH"]
     assert mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_writes == []
+
+
+# --------------------------------------------------------------------------- #
+# Tokens nothing can price
+#
+# Found in production on 2026-09-20: 10 of the 24 configured tokens (tBNB,
+# tETH, tMANA, tPOL, tUMB, tUNI, tUSDC, tUSDT, tVNXAU, tWBTC) have no CoinGecko
+# id, and CoinAPI answers 401 for everything. They yield nothing every cycle, so
+# treating "no rate" as a failure turned this job red every ten minutes -- on a
+# job tagged critical_job, for a condition no run can do anything about.
+#
+# A token with a CoinGecko id that comes back empty is a different thing and
+# still fails: that means the provider is down or dropped the listing.
+# --------------------------------------------------------------------------- #
+def test_a_token_with_no_coingecko_id_is_unpriceable_not_failed(monkeypatch):
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(-2))
+    mongodb = _mongodb(translations=("BTC",))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["tUSDC", "tWBTC"], mongodb
+    )
+
+    assert written == []
+    assert failed == []
+    assert unpriceable == ["tUSDC", "tWBTC"]
+
+
+def test_a_token_with_a_coingecko_id_that_yields_nothing_still_fails(monkeypatch):
+    """Provider down or listing dropped -- that is worth an alert."""
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(500))
+    mongodb = _mongodb(translations=("BTC",))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
+
+    assert failed == ["BTC"]
+    assert unpriceable == []
+
+
+def test_the_two_kinds_of_miss_are_separated_in_one_run(monkeypatch):
+    """The real production shape: some priced, some dead, some unpriceable."""
+
+    def only_btc(token, translation, client):
+        if token == "BTC":
+            return 200, {"_id": "USD/BTC", "token": "BTC", "rate": 1.0, "source": "CoinGecko"}
+        return 404, None
+
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko", only_btc)
+    mongodb = _mongodb(translations=("BTC", "ETH"))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BTC", "ETH", "tUSDC"], mongodb
+    )
+
+    assert written == ["BTC"]
+    assert failed == ["ETH"]
+    assert unpriceable == ["tUSDC"]
+    # The one rate that did come back is still stored.
+    assert len(mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_writes[0]) == 1
+
+
+def test_an_unpriceable_token_is_still_offered_to_coinapi(monkeypatch):
+    """Skipping them up front would lose them when the CoinAPI key works again."""
+    asked = []
+
+    def coinapi(token, client):
+        asked.append(token)
+        return 200, {"_id": f"USD/{token}", "token": token, "rate": 3.0, "source": "CoinAPI"}
+
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", coinapi)
+    mongodb = _mongodb(translations=("BTC",))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["tUSDC"], mongodb)
+
+    assert asked == ["tUSDC"]
+    assert (written, failed, unpriceable) == (["tUSDC"], [], [])
 
 
 SCHEDULED_AT = datetime(2026, 9, 16, 7, 0, tzinfo=timezone.utc)
@@ -269,3 +353,81 @@ def test_a_configured_token_is_never_skipped(monkeypatch):
 def test_the_asset_covers_a_whole_partition_range_in_one_run():
     """The backfill policy is what lets a single run span every token."""
     assert spot_retrieval_src.spot_retrieval.backfill_policy == dg.BackfillPolicy.single_run()
+
+
+# --------------------------------------------------------------------------- #
+# Which symbols get a rate fetched
+#
+# get_price_from names the symbol that prices a token, not whether to price it.
+# Read as a flag, with the token's own _id used as the key, the job fetched
+# rates nobody reads and missed ones consumers need. Reported from production on
+# 2026-09-20 as: "No spot rate for 10 of 24 tokens: tWBTC, tVNXAU, tUSDT,
+# tUSDC, tUNI, tMANA, tETH, tUMB, tBNB, tPOL".
+# --------------------------------------------------------------------------- #
+class _TagCollection:
+    def __init__(self, docs):
+        self.docs = docs
+
+    def find(self, *args, **kwargs):
+        return list(self.docs)
+
+
+def _partition_mongo(monkeypatch, token_docs, plt_docs=()):
+    from ccdexplorer.dagster_recurring.src import _partitions
+    from ccdexplorer.mongodb import Collections
+
+    mongodb = SimpleNamespace(
+        mainnet={
+            Collections.tokens_tags: _TagCollection(token_docs),
+            Collections.plts_tags: _TagCollection(plt_docs),
+        }
+    )
+    monkeypatch.setattr(_partitions, "shared_mongodb", lambda: mongodb)
+    return _partitions
+
+
+def test_a_wrapped_token_is_fetched_under_the_symbol_that_prices_it(monkeypatch):
+    _partitions = _partition_mongo(
+        monkeypatch,
+        [
+            {"_id": "tETH", "get_price_from": "ETH"},
+            {"_id": "tUSDC", "get_price_from": "USDC"},
+            {"_id": "ETH", "get_price_from": "ETH"},
+        ],
+    )
+
+    keys = _partitions.current_token_keys()
+
+    # One fetch for ETH, not one for ETH and another for tETH that no consumer
+    # reads and no price source lists.
+    assert keys == ["ETH", "USDC"]
+
+
+def test_a_symbol_no_token_is_named_after_is_still_fetched(monkeypatch):
+    """tPOL is priced by MATIC; nothing is called MATIC, so _id never found it."""
+    _partitions = _partition_mongo(monkeypatch, [{"_id": "tPOL", "get_price_from": "MATIC"}])
+
+    assert _partitions.current_token_keys() == ["MATIC"]
+
+
+def test_tokens_without_a_price_source_are_left_out(monkeypatch):
+    _partitions = _partition_mongo(
+        monkeypatch,
+        [
+            {"_id": "CCD", "get_price_from": "CCD"},
+            {"_id": "NOPRICE"},
+            {"_id": "X", "get_price_from": None},
+        ],
+    )
+
+    assert _partitions.current_token_keys() == ["CCD"]
+
+
+def test_plts_are_included_by_their_symbol_too(monkeypatch):
+    _partitions = _partition_mongo(
+        monkeypatch,
+        [{"_id": "CCD", "get_price_from": "CCD"}],
+        [{"_id": "EURR", "get_price_from": "EURR"}],
+    )
+
+    assert _partitions.current_token_keys() == ["CCD", "EURR"]
