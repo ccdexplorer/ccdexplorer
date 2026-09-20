@@ -33,6 +33,7 @@ from .settings import (
     API_NET,
     LOGIN_SECRET,
     COIN_API_KEY,
+    COIN_GECKO_API_KEY,
     REPO_DIR,
     ON_SERVER,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "LOGIN_SECRET",
     "COIN_MARKET_CAP_API_KEY",
     "COIN_API_KEY",
+    "COIN_GECKO_API_KEY",
     "REPO_DIR",
     "ON_SERVER",
 ]

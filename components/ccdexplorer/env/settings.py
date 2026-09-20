@@ -83,6 +83,9 @@ DEBUG = False if os.environ.get("DEBUG", False) == "False" else True
 BLOCK_COUNT_SPECIALS_CHECK = int(os.environ.get("BLOCK_COUNT_SPECIALS_CHECK", 2000))
 TX_REQUEST_LIMIT_DISPLAY = int(os.environ.get("TX_REQUEST_LIMIT_DISPLAY", 4999))
 COIN_API_KEY = os.environ.get("COIN_API_KEY")
+# Set in the recurring stack since before this was read anywhere. CoinGecko
+# throttles keyless callers hard, which is what made the spot job fail.
+COIN_GECKO_API_KEY = os.environ.get("COIN_GECKO_API_KEY")
 REPO_DIR = os.environ.get("REPO_DIR", "/Users/sander/Developer/open_source/ccdexplorer-accounts")
 ON_SERVER = os.environ.get("ON_SERVER", False)
 
