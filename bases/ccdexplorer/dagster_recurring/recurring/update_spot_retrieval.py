@@ -5,23 +5,16 @@ from datetime import timezone
 
 import dateutil
 import httpx2 as httpx
-from ccdexplorer.env import COIN_API_KEY
+from ccdexplorer.env import COIN_API_KEY, COIN_GECKO_API_KEY
 from ccdexplorer.mongodb import (
     CollectionsUtilities,
     MongoDB,
 )
 from pymongo import ReplaceOne
 
-# Space the per-token calls out. Both providers rate-limit, and this delay is
-# what keeps a cycle under their thresholds -- it is deliberate protection
-# against 429s, not leftover overhead.
-#
-# It used to sit at the end of every token's own run, which is why collapsing
-# those runs into one looked like it was removing four minutes of pure waiting.
-# It was not: the waiting is the point. The delay now paces the tokens inside
-# the single run instead. Roughly 24 tokens is roughly four minutes, which fits
-# inside the ten-minute schedule, and it no longer comes on top of 24 process
-# starts.
+# Space out the CoinAPI calls, which are still one per token. CoinGecko is no
+# longer paced because it is no longer asked more than once -- see
+# coingecko_rates below.
 PACING_SECONDS = 10
 
 
@@ -42,33 +35,63 @@ def coinapi(token: str, client: httpx.Client) -> tuple[int, dict | None]:
     return response.status_code, None
 
 
-def coingecko(token: str, token_translation: dict, client: httpx.Client) -> tuple[int, dict | None]:
-    token_to_request = token_translation.get(token)
-    if not token_to_request:
-        # No CoinGecko id configured for this token, so there is nothing to ask for.
-        return -2, None
+def coingecko_rates(
+    tokens: Sequence[str], token_translation: dict, client: httpx.Client
+) -> tuple[int | str, dict[str, dict]]:
+    """Every token's rate from CoinGecko, in one request.
 
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={token_to_request}&vs_currencies=usd&include_last_updated_at=true"
-    response = client.get(url)
+    /simple/price takes a comma-separated list of ids, so a cycle needs one
+    call rather than one per token. That is not just cheaper, it is the
+    difference between working and not: paced at 10s a token, a cycle made
+    about six requests a minute, and the keyless endpoint began answering 429
+    after roughly ten of them. The tokens at the back of the queue -- CCD among
+    them -- got nothing, every single run.
 
+    Returns (status, {token: rate document}). A token missing from the mapping
+    was either not asked for (no id) or not answered for.
+    """
+    wanted = {token: token_translation[token] for token in tokens if token_translation.get(token)}
+    if not wanted:
+        return "not called", {}
+
+    ids = ",".join(sorted(set(wanted.values())))
+    url = (
+        f"https://api.coingecko.com/api/v3/simple/price"
+        f"?ids={ids}&vs_currencies=usd&include_last_updated_at=true"
+    )
+    # COIN_GECKO_API_KEY has been set in the recurring stack all along without
+    # anything reading it, so every call so far went out as an anonymous one
+    # against the shared-IP rate limit. A demo key is sent as this header
+    # against the public host; a Pro key needs pro-api.coingecko.com and
+    # x-cg-pro-api-key instead, so if one is ever issued this has to change.
+    headers = {"x-cg-demo-api-key": COIN_GECKO_API_KEY} if COIN_GECKO_API_KEY else None
+    response = client.get(url, headers=headers)
     if response.status_code != 200:
-        return response.status_code, None
+        return response.status_code, {}
 
-    result = response.json()[token_to_request]
-    return response.status_code, {
-        "_id": f"USD/{token}",
-        "token": token,
-        # CoinGecko's own timestamp for the price, not the time we fetched it:
-        # a thinly traded token keeps an old timestamp here while still being
-        # refreshed every cycle.
-        "timestamp": (
-            dt.datetime.fromtimestamp(result["last_updated_at"], tz=timezone.utc)
-            if "last_updated_at" in result
-            else dt.datetime.now(tz=timezone.utc)
-        ),
-        "rate": result["usd"],
-        "source": "CoinGecko",
-    }
+    payload = response.json()
+    rates: dict[str, dict] = {}
+    for token, coingecko_id in wanted.items():
+        quote = payload.get(coingecko_id)
+        if not quote or "usd" not in quote:
+            # Asked for, not answered for: CoinGecko knows the id but has no
+            # USD price right now. CoinAPI still gets its turn below.
+            continue
+        rates[token] = {
+            "_id": f"USD/{token}",
+            "token": token,
+            # CoinGecko's own timestamp for the price, not the time we fetched
+            # it: a thinly traded token keeps an old timestamp here while still
+            # being refreshed every cycle.
+            "timestamp": (
+                dt.datetime.fromtimestamp(quote["last_updated_at"], tz=timezone.utc)
+                if "last_updated_at" in quote
+                else dt.datetime.now(tz=timezone.utc)
+            ),
+            "rate": quote["usd"],
+            "source": "CoinGecko",
+        }
+    return response.status_code, rates
 
 
 def get_token_translations_from_mongo(mongodb: MongoDB):
@@ -80,41 +103,23 @@ def get_token_translations_from_mongo(mongodb: MongoDB):
     return {x["token"]: x["translation"] for x in list(result)}
 
 
-def fetch_rate(
-    context, token: str, coingecko_token_translation: dict, client: httpx.Client
-) -> dict | None:
-    """One token's spot rate: CoinAPI first, CoinGecko as the fallback.
+def fetch_rate_from_coinapi(context, token: str, client: httpx.Client) -> dict | None:
+    """One token's spot rate from CoinAPI, for what CoinGecko did not cover.
 
-    Returns None when neither source yields a rate, which is the caller's signal
-    that this token produced no write. A failure of one source falls through to
-    the other rather than stranding the token, so an expired CoinAPI key alone
-    cannot stop prices being stored.
+    CoinGecko goes first now, because it answers for every token in one call.
+    CoinAPI is what is left for tokens it has no id for, and it is still one
+    request each, so it stays paced.
     """
-    status_coinapi: int | str = "not called"
-    status_coingecko: int | str = "not called"
-
     try:
-        status_coinapi, result = coinapi(token, client)
+        status, result = coinapi(token, client)
         if result:
             context.log.info(f"CoinAPI result: {result['rate']} {result['_id']}")
             return result
     except Exception as e:
-        status_coinapi = f"error: {e}"
         context.log.error(f"Recurring: Error in CoinAPI call for {token}. Error: {e}")
+        return None
 
-    try:
-        status_coingecko, result = coingecko(token, coingecko_token_translation, client)
-        if result:
-            context.log.info(f"Coingecko result: {result['rate']} {result['_id']}")
-            return result
-    except Exception as e:
-        status_coingecko = f"error: {e}"
-        context.log.error(f"Recurring: Error in Coingecko call for {token}. Error: {e}")
-
-    context.log.error(
-        f"Recurring: No spot rate for {token} "
-        f"(CoinAPI: {status_coinapi}, CoinGecko: {status_coingecko})."
-    )
+    context.log.error(f"Recurring: No spot rate for {token} from CoinAPI (status {status}).")
     return None
 
 
@@ -151,16 +156,32 @@ def perform_spot_retrieval_update(
     unpriceable: list[str] = []
 
     with httpx.Client() as client:
-        for index, token in enumerate(tokens):
-            if index:
-                time.sleep(PACING_SECONDS)
+        # One request covers every token CoinGecko has an id for.
+        status, from_coingecko = coingecko_rates(tokens, coingecko_token_translation, client)
+        if from_coingecko:
+            context.log.info(
+                f"CoinGecko returned {len(from_coingecko)} rate(s) in one request: "
+                f"{', '.join(sorted(from_coingecko))}"
+            )
+        elif status != "not called":
+            context.log.error(f"Recurring: the CoinGecko batch request returned {status}.")
 
-            result = fetch_rate(context, token, coingecko_token_translation, client)
+        coinapi_calls = 0
+        for token in tokens:
+            result = from_coingecko.get(token)
+
+            if result is None:
+                # Anything CoinGecko did not answer for still gets its turn at
+                # CoinAPI, which can price a token that has no CoinGecko id.
+                # These are one request each, so they stay paced.
+                if coinapi_calls:
+                    time.sleep(PACING_SECONDS)
+                coinapi_calls += 1
+                result = fetch_rate_from_coinapi(context, token, client)
+
             if result is None:
                 # Whether this is worth an alert depends on whether the token
-                # had anywhere left to go. Still fetched either way: CoinAPI can
-                # price a token that has no CoinGecko id, so skipping these up
-                # front would lose that the moment CoinAPI works again.
+                # had anywhere left to go.
                 if token in coingecko_token_translation:
                     failed.append(token)
                 else:

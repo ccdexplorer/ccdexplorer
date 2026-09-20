@@ -56,7 +56,30 @@ def sleeps(monkeypatch):
     return recorded
 
 
+# Captured before no_live_coingecko can stub it, so the tests that exercise the
+# batch request itself get the real implementation.
+coingecko_rates = update_spot_retrieval.coingecko_rates
+
+
+@pytest.fixture(autouse=True)
+def no_live_coingecko(monkeypatch):
+    """Nothing here may reach the real CoinGecko.
+
+    The batch request runs before CoinAPI does, so a test that only stubs
+    coinapi would otherwise send a live request every run -- and pass or fail
+    depending on what the shared-IP rate limit happened to be doing. Tests that
+    care about CoinGecko override this with their own stub.
+    """
+
+    def _unstubbed(tokens, translation, client):
+        return "not called", {}
+
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _unstubbed)
+
+
 def _rate_from(source: str):
+    """A per-token source (CoinAPI), which is still one call each."""
+
     def _fake(token, *args, **kwargs):
         return 200, {"_id": f"USD/{token}", "token": token, "rate": 1.0, "source": source}
 
@@ -66,6 +89,40 @@ def _rate_from(source: str):
 def _no_rate(status: int):
     def _fake(token, *args, **kwargs):
         return status, None
+
+    return _fake
+
+
+def _gecko_batch(*priced, status: int = 200):
+    """CoinGecko answers for a whole set of tokens in one call."""
+    named = set(priced)
+
+    def _fake(tokens, translation, client):
+        return status, {
+            token: {"_id": f"USD/{token}", "token": token, "rate": 1.0, "source": "CoinGecko"}
+            for token in tokens
+            if token in named and translation.get(token)
+        }
+
+    return _fake
+
+
+def _gecko_all(status: int = 200):
+    """CoinGecko answers for every token it has an id for."""
+
+    def _fake(tokens, translation, client):
+        return status, {
+            token: {"_id": f"USD/{token}", "token": token, "rate": 1.0, "source": "CoinGecko"}
+            for token in tokens
+            if translation.get(token)
+        }
+
+    return _fake
+
+
+def _gecko_none(status: int = 200):
+    def _fake(tokens, translation, client):
+        return status, {}
 
     return _fake
 
@@ -100,12 +157,7 @@ def test_a_token_without_a_rate_is_reported_and_the_rest_still_store(monkeypatch
     """One dead token must not cost the others their prices."""
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(429))
 
-    def only_eth(token, translation, client):
-        if token == "ETH":
-            return 200, {"_id": "USD/ETH", "token": "ETH", "rate": 2.0, "source": "CoinGecko"}
-        return 404, None
-
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", only_eth)
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_batch("ETH"))
     mongodb = _mongodb()
 
     written, failed, unpriceable = perform_spot_retrieval_update(
@@ -119,7 +171,7 @@ def test_a_token_without_a_rate_is_reported_and_the_rest_still_store(monkeypatch
 
 def test_coingecko_is_the_fallback_when_coinapi_has_nothing(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(500))
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", _rate_from("CoinGecko"))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_all())
     mongodb = _mongodb()
 
     written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
@@ -136,7 +188,7 @@ def test_a_raising_coinapi_still_falls_through_to_coingecko(monkeypatch):
         raise RuntimeError("CoinAPI unreachable")
 
     monkeypatch.setattr(update_spot_retrieval, "coinapi", boom)
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", _rate_from("CoinGecko"))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_all())
     mongodb = _mongodb()
 
     written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
@@ -146,7 +198,7 @@ def test_a_raising_coinapi_still_falls_through_to_coingecko(monkeypatch):
 
 def test_nothing_is_written_when_no_token_yields_a_rate(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(500))
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(500))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_none())
     mongodb = _mongodb()
 
     written, failed, unpriceable = perform_spot_retrieval_update(
@@ -172,7 +224,7 @@ def test_nothing_is_written_when_no_token_yields_a_rate(monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_a_token_with_no_coingecko_id_is_unpriceable_not_failed(monkeypatch):
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(-2))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_none())
     mongodb = _mongodb(translations=("BTC",))
 
     written, failed, unpriceable = perform_spot_retrieval_update(
@@ -187,7 +239,7 @@ def test_a_token_with_no_coingecko_id_is_unpriceable_not_failed(monkeypatch):
 def test_a_token_with_a_coingecko_id_that_yields_nothing_still_fails(monkeypatch):
     """Provider down or listing dropped -- that is worth an alert."""
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", _no_rate(500))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_none(429))
     mongodb = _mongodb(translations=("BTC",))
 
     written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["BTC"], mongodb)
@@ -199,13 +251,8 @@ def test_a_token_with_a_coingecko_id_that_yields_nothing_still_fails(monkeypatch
 def test_the_two_kinds_of_miss_are_separated_in_one_run(monkeypatch):
     """The real production shape: some priced, some dead, some unpriceable."""
 
-    def only_btc(token, translation, client):
-        if token == "BTC":
-            return 200, {"_id": "USD/BTC", "token": "BTC", "rate": 1.0, "source": "CoinGecko"}
-        return 404, None
-
     monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(401))
-    monkeypatch.setattr(update_spot_retrieval, "coingecko", only_btc)
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_batch("BTC"))
     mongodb = _mongodb(translations=("BTC", "ETH"))
 
     written, failed, unpriceable = perform_spot_retrieval_update(
@@ -431,3 +478,139 @@ def test_plts_are_included_by_their_symbol_too(monkeypatch):
     )
 
     assert _partitions.current_token_keys() == ["CCD", "EURR"]
+
+
+# --------------------------------------------------------------------------- #
+# The batched CoinGecko request
+#
+# /simple/price takes a comma-separated list of ids. Asking per token instead
+# made about six requests a minute at 10s pacing, and the keyless endpoint
+# started answering 429 after roughly ten of them -- so on 2026-09-20 the run
+# priced ETH, USDC, BTC, USDT, UNI, MANA, BUSD, VNXAU, DOGE and SHIB, then
+# failed CCD, EUROe and EURR with "CoinGecko: 429" and marked the run failed.
+# --------------------------------------------------------------------------- #
+class _FakeResponse:
+    def __init__(self, payload, status_code=200):
+        self._payload = payload
+        self.status_code = status_code
+
+    def json(self):
+        return self._payload
+
+
+class _RecordingClient:
+    def __init__(self, payload, status_code=200):
+        self._response = _FakeResponse(payload, status_code)
+        self.calls = []
+
+    def get(self, url, headers=None):
+        self.calls.append((url, headers))
+        return self._response
+
+
+TRANSLATIONS = {"BTC": "bitcoin", "ETH": "ethereum", "CCD": "concordium"}
+
+
+def test_every_token_is_priced_in_a_single_request():
+    client = _RecordingClient(
+        {
+            "bitcoin": {"usd": 80323, "last_updated_at": 1789893740},
+            "ethereum": {"usd": 2576.44, "last_updated_at": 1789893750},
+            "concordium": {"usd": 0.00323024, "last_updated_at": 1789893760},
+        }
+    )
+
+    status, rates = coingecko_rates(["BTC", "ETH", "CCD"], TRANSLATIONS, client)
+
+    assert status == 200
+    assert len(client.calls) == 1
+    assert sorted(rates) == ["BTC", "CCD", "ETH"]
+    assert rates["CCD"]["rate"] == 0.00323024
+    assert rates["CCD"]["source"] == "CoinGecko"
+
+
+def test_the_ids_are_comma_joined_and_deduplicated():
+    client = _RecordingClient({"bitcoin": {"usd": 1.0}})
+
+    coingecko_rates(["BTC", "BTC"], {"BTC": "bitcoin"}, client)
+
+    url = client.calls[0][0]
+    assert "ids=bitcoin&" in url
+    assert url.count("bitcoin") == 1
+
+
+def test_a_token_with_no_coingecko_id_is_not_asked_for():
+    client = _RecordingClient({"bitcoin": {"usd": 1.0}})
+
+    _, rates = coingecko_rates(["BTC", "tUSDC"], {"BTC": "bitcoin"}, client)
+
+    assert "tUSDC" not in client.calls[0][0]
+    assert sorted(rates) == ["BTC"]
+
+
+def test_no_request_is_made_when_no_token_has_an_id():
+    client = _RecordingClient({})
+
+    status, rates = coingecko_rates(["tUSDC", "tETH"], {}, client)
+
+    assert (status, rates) == ("not called", {})
+    assert client.calls == []
+
+
+def test_a_token_asked_for_but_not_answered_for_is_absent():
+    """CoinGecko knows the id but has no USD price right now."""
+    client = _RecordingClient({"bitcoin": {"usd": 1.0}, "ethereum": {}})
+
+    _, rates = coingecko_rates(["BTC", "ETH"], TRANSLATIONS, client)
+
+    assert sorted(rates) == ["BTC"]
+
+
+def test_a_non_200_yields_no_rates(caplog):
+    client = _RecordingClient({}, status_code=429)
+
+    status, rates = coingecko_rates(["BTC"], TRANSLATIONS, client)
+
+    assert (status, rates) == (429, {})
+
+
+def test_the_api_key_is_sent_when_one_is_configured(monkeypatch):
+    """It was set in the recurring stack all along and never read."""
+    monkeypatch.setattr(update_spot_retrieval, "COIN_GECKO_API_KEY", "cg-demo-key")
+    client = _RecordingClient({"bitcoin": {"usd": 1.0}})
+
+    coingecko_rates(["BTC"], TRANSLATIONS, client)
+
+    assert client.calls[0][1] == {"x-cg-demo-api-key": "cg-demo-key"}
+
+
+def test_no_key_header_is_sent_when_none_is_configured(monkeypatch):
+    monkeypatch.setattr(update_spot_retrieval, "COIN_GECKO_API_KEY", None)
+    client = _RecordingClient({"bitcoin": {"usd": 1.0}})
+
+    coingecko_rates(["BTC"], TRANSLATIONS, client)
+
+    assert client.calls[0][1] is None
+
+
+def test_coinapi_is_only_asked_about_what_coingecko_missed(monkeypatch, sleeps):
+    """One batch call, then one CoinAPI call for the leftover -- not four."""
+    asked = []
+
+    def coinapi(token, client):
+        asked.append(token)
+        return 200, {"_id": f"USD/{token}", "token": token, "rate": 9.0, "source": "CoinAPI"}
+
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", coinapi)
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_batch("BTC", "ETH"))
+    mongodb = _mongodb(translations=("BTC", "ETH"))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BTC", "ETH", "tUSDC"], mongodb
+    )
+
+    assert asked == ["tUSDC"]
+    assert written == ["BTC", "ETH", "tUSDC"]
+    assert (failed, unpriceable) == ([], [])
+    # Only one CoinAPI call, so nothing to pace.
+    assert sleeps == []
