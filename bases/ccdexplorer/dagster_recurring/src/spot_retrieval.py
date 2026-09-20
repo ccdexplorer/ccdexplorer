@@ -68,12 +68,23 @@ def spot_retrieval(
         return
 
     mongodb = mongo_resource.get_client()
-    written, failed = perform_spot_retrieval_update(context, tokens, mongodb)
+    written, failed, unpriceable = perform_spot_retrieval_update(context, tokens, mongodb)
     context.log.info(f"Stored {len(written)} of {len(tokens)} spot rates.")
 
+    if unpriceable:
+        # Configured for pricing but with no CoinGecko id, so CoinAPI was the
+        # only route and it did not answer. Nothing this run can do, and it is
+        # the same set every ten minutes -- logged, not raised.
+        context.log.warning(
+            f"No price source answers for {len(unpriceable)} token(s), so they were not "
+            f"stored: {', '.join(unpriceable)}. Add a CoinGecko id for them, or clear "
+            f"get_price_from if they are not meant to be priced."
+        )
+
     if failed:
-        # The rates that did come back are already written; failing the run is
-        # what makes a token that yielded nothing visible at all. Re-run just
+        # These have a CoinGecko id and still came back empty, which means
+        # something is wrong rather than missing. The rates that did come back
+        # are already written; failing is what makes this visible. Re-run just
         # that token on its own partition to retry it.
         raise dg.Failure(
             description=(

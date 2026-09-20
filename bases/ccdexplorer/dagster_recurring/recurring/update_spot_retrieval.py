@@ -128,14 +128,27 @@ def perform_spot_retrieval_update(
     single HTTP client is reused across the calls, and the rates land in one
     bulk_write.
 
-    Returns (written, failed) -- the tokens whose rate was stored, and those
-    that yielded nothing from either source.
+    Returns (written, failed, unpriceable):
+
+    * written      -- the tokens whose rate was stored
+    * failed       -- tokens that have a CoinGecko id configured and still came
+                      back with nothing. Something is wrong: the provider is
+                      down, rate-limiting, or no longer lists the token.
+    * unpriceable  -- tokens with no CoinGecko id at all. CoinAPI was their only
+                      route to a price and it did not answer, so there is
+                      nothing left to ask. That is a gap in configuration, not a
+                      failure of this run, and it is the same every cycle.
+
+    The split exists because failing the run is an alert, and an alert that
+    fires every ten minutes for a condition nobody is going to fix this morning
+    stops being read.
     """
     coingecko_token_translation = get_token_translations_from_mongo(mongodb)
 
     queue: list[ReplaceOne] = []
     written: list[str] = []
     failed: list[str] = []
+    unpriceable: list[str] = []
 
     with httpx.Client() as client:
         for index, token in enumerate(tokens):
@@ -144,7 +157,14 @@ def perform_spot_retrieval_update(
 
             result = fetch_rate(context, token, coingecko_token_translation, client)
             if result is None:
-                failed.append(token)
+                # Whether this is worth an alert depends on whether the token
+                # had anywhere left to go. Still fetched either way: CoinAPI can
+                # price a token that has no CoinGecko id, so skipping these up
+                # front would lose that the moment CoinAPI works again.
+                if token in coingecko_token_translation:
+                    failed.append(token)
+                else:
+                    unpriceable.append(token)
                 continue
 
             queue.append(ReplaceOne({"_id": f"USD/{token}"}, result, upsert=True))
@@ -153,4 +173,4 @@ def perform_spot_retrieval_update(
     if queue:
         _ = mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_write(queue)
 
-    return written, failed
+    return written, failed, unpriceable
