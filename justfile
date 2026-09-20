@@ -57,6 +57,16 @@ format:
 test:
 	uv run pytest -n auto
 
+# Everything that does not need a Concordium node. This is what the pre-commit
+# hook runs: the live tests depend on a remote host, and one of them has taken
+# 220s inside a full run while taking 2s on its own.
+test-fast:
+	uv run pytest -n auto -m "not live"
+
+# Only the tests that reach a real node.
+test-live:
+	uv run pytest -n auto -m live
+
 test-coverage:
 	uv run pytest --cov=. --cov-report=xml:cov.xml --cov-report=term -n auto && \
 	uv run coverage html

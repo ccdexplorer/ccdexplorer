@@ -200,3 +200,33 @@ async def client(live_app):
         headers={"x-ccdexplorer-key": "test-key"},
     ) as ac:
         yield ac
+
+
+# --------------------------------------------------------------------------- #
+# The `live` marker
+#
+# Some tests here take a GRPCClient and talk to a real Concordium node. They are
+# worth having -- they are the only thing that catches the node returning
+# something the client cannot parse -- but they do not belong in a hook that runs
+# on every commit: they depend on a remote host, and their cost is not their own.
+#
+# Measured on 2026-09-20: test_block_special_event_pool_reward runs in 1.98s on
+# its own and took 220.08s inside the full suite, which was 220 of that run's 910
+# seconds. Two unrelated tests were failing with it, not because anything was
+# wrong with them but because they were starved while it held the process.
+#
+# Marking by fixture rather than by path or by hand: taking one of these fixtures
+# is exactly what makes a test reach the network, and a new test that takes one
+# is marked without anyone remembering to.
+# --------------------------------------------------------------------------- #
+# Only the fixture that hands a test its own GRPCClient. The ASGI app fixtures
+# (test_app/live_app/client) are deliberately not here: they build a client
+# lazily and most routes never dial a node, so the 180 API smoke tests cost
+# ~9s and stay in the hook where they are useful.
+LIVE_FIXTURES = frozenset({"grpcclient"})
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if LIVE_FIXTURES.intersection(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.live)

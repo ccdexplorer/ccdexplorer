@@ -134,6 +134,12 @@ skip-magic-trailing-comma = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 timeout = 150
+markers = [
+    # Applied automatically -- see pytest_collection_modifyitems in test/conftest.py.
+    # A test carries it when it takes a fixture that talks to a Concordium node over
+    # gRPC, which means its result depends on a remote host and on the network.
+    "live: reaches a real node over gRPC; excluded from the pre-commit hook",
+]
 
 [tool.ty.rules]
 possibly-missing-attribute = "ignore"
