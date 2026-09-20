@@ -2690,6 +2690,20 @@ def short_url(url: str | None, tail: int = 24) -> str:
     return f"{host}{middle}{last}"
 
 
+def client_ip(request) -> str:
+    """The end user's address, from the proxy header or the peer.
+
+    Lives here rather than in factory because the auth router needs it too, to
+    forward on to the API: importing it from factory made a cycle -- factory
+    imports the routers at module level, so the router's import of factory ran
+    against a half-built module and failed on startup.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
 def h(value) -> str:
     """HTML-escape a value that came from outside this codebase.
 

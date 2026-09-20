@@ -10,9 +10,9 @@ endpoints (the site has no DB/email of its own). On success we set the existing
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ccdexplorer.ccdexplorer_site.app.factory import _client_ip
 from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    client_ip,
     post_url_from_api,
     get_url_from_api,
     delete_url_from_api,
@@ -32,7 +32,7 @@ def _caller_headers(request: Request) -> dict[str, str]:
     an attack on one account, and does nothing about the same ten attempts
     spread across ten thousand addresses.
     """
-    ip = _client_ip(request)
+    ip = client_ip(request)
     return {"x-client-ip": ip} if ip else {}
 
 

@@ -168,13 +168,6 @@ _BOT_UA_HINTS = (
 _BROWSER_ONLY_HEADERS = ("sec-fetch-mode", "sec-fetch-dest", "sec-ch-ua")
 
 
-def _client_ip(request: HTTPRequest) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else ""
-
-
 def _visitor_id(request: HTTPRequest) -> str:
     """An opaque, day-scoped identifier for an anonymous visitor.
 
@@ -189,7 +182,7 @@ def _visitor_id(request: HTTPRequest) -> str:
         [
             LOGIN_SECRET or "",
             dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d"),
-            _client_ip(request),
+            client_ip(request),  # noqa: F405
             request.headers.get("user-agent", ""),
         ]
     )
@@ -479,7 +472,19 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     app = FastAPI(
         lifespan=lifespan,
-        # docs_url=None,
+        # No API docs on the site. This is a server-rendered app, not an API:
+        # the documented API is a separate service, and the docs people are
+        # meant to read are at docs.ccdexplorer.io.
+        #
+        # /docs and /redoc were both serving their UI shells with a 200. They
+        # looked broken rather than useful only because /openapi.json falls
+        # through to the catch-all and returns the site's own HTML, so swagger
+        # fetched a page instead of a schema. Looking broken is not the same as
+        # being off, and the route inventory is not something to publish by
+        # accident.
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
         swagger_ui_parameters={"syntaxHighlight.theme": "obsidian"},
         separate_input_output_schemas=False,
         title="ccdexplorer.io",
