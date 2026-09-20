@@ -52,6 +52,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer.schema_parser import Schema
 from dateutil.relativedelta import relativedelta
+from markupsafe import escape
 from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -2528,10 +2529,10 @@ def create_dict_for_tabulator_display_for_nft_tokens(
     slug = split_contract_into_url_slug_and_token_id(row["contract"], row["token_id"])
     token_id = (
         f'<a href="/{net}/token/{slug}">'
-        f'<span class="ccd text-secondary-emphasis">{display_name}</span></a>'
+        f'<span class="ccd text-secondary-emphasis">{h(display_name)}</span></a>'
     )
     return {
-        "contract": f"<span class='ccd text-secondary-emphasis'>{row['contract']}</span>",
+        "contract": f"<span class='ccd text-secondary-emphasis'>{h(row['contract'])}</span>",
         "token_id": token_id,
         "token_id_download": display_name,
         "last_height_processed": f'<a href="/{net}/block/{row["last_height_processed"]}"><span class="ccd">{round_x_decimal_with_comma(row["last_height_processed"], 0)}</span></a>',
@@ -2550,7 +2551,13 @@ def create_dict_for_tabulator_display_for_fungible_token(net, row: dict):
             token_decimals = ai["decimals"]
 
     return {
-        "token_display": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><a href="/{net}/tokens/{vi["_id"]}"><span class="ccd text-secondary-emphasis">{vi["_id"]}</span></a><br/><span class="ccd_decimals text-secondary-emphasis">{round_x_decimal_with_comma(row["token_value"], token_decimals)} {vi["_id"]}</span>',
+        "token_display": (
+            f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
+            f'<a href="/{net}/tokens/{h(vi["_id"])}">'
+            f'<span class="ccd text-secondary-emphasis">{h(vi["_id"])}</span></a><br/>'
+            f'<span class="ccd_decimals text-secondary-emphasis">'
+            f"{round_x_decimal_with_comma(row['token_value'], token_decimals)} {h(vi['_id'])}</span>"
+        ),
         "token_balance_usd": (
             f'<span class="ccd text-secondary-emphasis">${round_x_decimal_with_comma(row["token_value_USD"], 0)}</span><br/><span class="ccd_decimals text-secondary-emphasis">@{round_x_decimal_with_comma(ai["exchange_rate"], 3)}</span>'
             if row["token_value_USD"] > 0.0
@@ -2571,16 +2578,25 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
     if ai.get("special_type"):
         contract_index = CCD_ContractAddress.from_str(row["contract"]).index
         contract_subindex = CCD_ContractAddress.from_str(row["contract"]).subindex
-        token_link = f'<a href="/{net}/token/{contract_index}/{contract_subindex}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
+        token_link = (
+            f'<a href="/{net}/token/{contract_index}/{contract_subindex}/'
+            f'{h(row["token_id"])}">{h(ai["token_metadata"]["name"])}</a>'
+        )
     else:
         token_link = (
-            f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
+            f'<a href="/{net}/tokens/{h(vi["_id"])}/{h(row["token_id"])}">'
+            f"{h(ai['token_metadata']['name'])}</a>"
             if ai.get("token_metadata")
-            else f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{row["token_id"]}</a>'
+            else f'<a href="/{net}/tokens/{h(vi["_id"])}/{h(row["token_id"])}">'
+            f"{h(row['token_id'])}</a>"
         )
 
     return {
-        "issuer": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><span class="ccd text-secondary-emphasis">{vi["display_name"]}{" (non-CIS)" if ai.get("special_type") else ""}</span>',
+        "issuer": (
+            f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
+            f'<span class="ccd text-secondary-emphasis">{h(vi["display_name"])}'
+            f"{' (non-CIS)' if ai.get('special_type') else ''}</span>"
+        ),
         "token": token_link,
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>{holder_link}',
         "issuer_download": f"{vi['display_name']}",
@@ -2627,6 +2643,25 @@ def short_url(url: str | None, tail: int = 24) -> str:
     return f"{host}{middle}{last}"
 
 
+def h(value) -> str:
+    """HTML-escape a value that came from outside this codebase.
+
+    The functions below build HTML with f-strings and hand it to Tabulator
+    columns declared `formatter: "html"`, which insert it as markup. Anything
+    interpolated into that is executed if it contains a tag, and a token's
+    metadata is written by whoever deployed the contract -- permissionless, and
+    already carrying markup: token descriptions in production contain <p> tags
+    today. A name is one `<img src=x onerror=...>` away from running script on
+    this origin, which on a block explorer means rewriting the addresses and
+    amounts a reader is trusting.
+
+    Applied to the data going into the HTML, never to the markup around it, and
+    never to the `_download` fields -- those are exported as CSV, where an
+    escaped ampersand is corruption rather than safety.
+    """
+    return str(escape("" if value is None else value))
+
+
 def token_display_name(address_information: dict | None, token_id: str | None = None) -> str:
     """What to call a token, in descending order of how much it tells you.
 
@@ -2659,13 +2694,13 @@ def create_dict_for_tabulator_display_for_unverified_token(net, row: dict):
     token_address = ai.get("_id", row["token_address"])
     token_id = ai.get("token_id", row["token_id"])
     return {
-        "issuer": f'<span class="ccd text-secondary-emphasis">{row["contract"]}</span>',
+        "issuer": f'<span class="ccd text-secondary-emphasis">{h(row["contract"])}</span>',
         # Was `ai["token_metadata"]["name"]` guarded only by the presence of
         # token_metadata -- which raises on metadata carrying a description but
         # no name, and showed nothing for an agent whose name is in its card.
         "token": (
             f'<a href="/{net}/token/{split_into_url_slug(token_address)}">'
-            f"{token_display_name(ai, token_id)}</a>"
+            f"{h(token_display_name(ai, token_id))}</a>"
         ),
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
         "issuer_download": f"{row['contract']}",
@@ -2883,10 +2918,10 @@ def create_dict_for_tabulator_display_smart_wallet_events(
     else:
         if vi:
             token_display = (
-                f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt="">'
+                f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
             )
         token_display += (
-            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{token_name}</a>'
+            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{h(token_name)}</a>'
         )
         token_display_download = f"{split_into_url_slug(token_address)}-{token_name}"
     if "ccd_amount" in event["recognized_event"]:
