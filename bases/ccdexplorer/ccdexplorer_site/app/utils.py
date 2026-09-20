@@ -52,6 +52,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
 from ccdexplorer.site_user import SiteUser
 from ccdexplorer.schema_parser import Schema
 from dateutil.relativedelta import relativedelta
+from markupsafe import escape
 from fastapi import FastAPI, Request, Response
 from plotly.graph_objs.layout._template import Template
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -2110,12 +2111,23 @@ async def refresh_consensus_cache(app, net: str):
         print(f"ERROR getting consensus detailed status for {net}: {error}")
 
 
-async def post_url_from_api(url: str, httpx_client: httpx.AsyncClient, json_post_content: Any):
+async def post_url_from_api(
+    url: str,
+    httpx_client: httpx.AsyncClient,
+    json_post_content: Any,
+    headers: dict[str, str] | None = None,
+):
+    """POST to the API. `headers` carries anything the API cannot work out itself.
+
+    The only use so far is the end user's IP on the auth routes: every call
+    reaches the API from this one host under one shared key, so the API's own
+    view of the peer is always the site and useless for throttling.
+    """
     api_response = APIResponseResult(status_code=-1, duration_in_sec=-1, ok=False)
     response = None
     now = dt.datetime.now().astimezone(dt.UTC)
     try:
-        response = await httpx_client.post(url, json=json_post_content)
+        response = await httpx_client.post(url, json=json_post_content, headers=headers)
         try:
             api_response.return_value = response.json()
         except:  # noqa: E722
@@ -2528,10 +2540,10 @@ def create_dict_for_tabulator_display_for_nft_tokens(
     slug = split_contract_into_url_slug_and_token_id(row["contract"], row["token_id"])
     token_id = (
         f'<a href="/{net}/token/{slug}">'
-        f'<span class="ccd text-secondary-emphasis">{display_name}</span></a>'
+        f'<span class="ccd text-secondary-emphasis">{h(display_name)}</span></a>'
     )
     return {
-        "contract": f"<span class='ccd text-secondary-emphasis'>{row['contract']}</span>",
+        "contract": f"<span class='ccd text-secondary-emphasis'>{h(row['contract'])}</span>",
         "token_id": token_id,
         "token_id_download": display_name,
         "last_height_processed": f'<a href="/{net}/block/{row["last_height_processed"]}"><span class="ccd">{round_x_decimal_with_comma(row["last_height_processed"], 0)}</span></a>',
@@ -2550,7 +2562,13 @@ def create_dict_for_tabulator_display_for_fungible_token(net, row: dict):
             token_decimals = ai["decimals"]
 
     return {
-        "token_display": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><a href="/{net}/tokens/{vi["_id"]}"><span class="ccd text-secondary-emphasis">{vi["_id"]}</span></a><br/><span class="ccd_decimals text-secondary-emphasis">{round_x_decimal_with_comma(row["token_value"], token_decimals)} {vi["_id"]}</span>',
+        "token_display": (
+            f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
+            f'<a href="/{net}/tokens/{h(vi["_id"])}">'
+            f'<span class="ccd text-secondary-emphasis">{h(vi["_id"])}</span></a><br/>'
+            f'<span class="ccd_decimals text-secondary-emphasis">'
+            f"{round_x_decimal_with_comma(row['token_value'], token_decimals)} {h(vi['_id'])}</span>"
+        ),
         "token_balance_usd": (
             f'<span class="ccd text-secondary-emphasis">${round_x_decimal_with_comma(row["token_value_USD"], 0)}</span><br/><span class="ccd_decimals text-secondary-emphasis">@{round_x_decimal_with_comma(ai["exchange_rate"], 3)}</span>'
             if row["token_value_USD"] > 0.0
@@ -2571,16 +2589,25 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
     if ai.get("special_type"):
         contract_index = CCD_ContractAddress.from_str(row["contract"]).index
         contract_subindex = CCD_ContractAddress.from_str(row["contract"]).subindex
-        token_link = f'<a href="/{net}/token/{contract_index}/{contract_subindex}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
+        token_link = (
+            f'<a href="/{net}/token/{contract_index}/{contract_subindex}/'
+            f'{h(row["token_id"])}">{h(ai["token_metadata"]["name"])}</a>'
+        )
     else:
         token_link = (
-            f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{ai["token_metadata"]["name"]}</a>'
+            f'<a href="/{net}/tokens/{h(vi["_id"])}/{h(row["token_id"])}">'
+            f"{h(ai['token_metadata']['name'])}</a>"
             if ai.get("token_metadata")
-            else f'<a href="/{net}/tokens/{vi["_id"]}/{row["token_id"]}">{row["token_id"]}</a>'
+            else f'<a href="/{net}/tokens/{h(vi["_id"])}/{h(row["token_id"])}">'
+            f"{h(row['token_id'])}</a>"
         )
 
     return {
-        "issuer": f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt=""><span class="ccd text-secondary-emphasis">{vi["display_name"]}{" (non-CIS)" if ai.get("special_type") else ""}</span>',
+        "issuer": (
+            f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
+            f'<span class="ccd text-secondary-emphasis">{h(vi["display_name"])}'
+            f"{' (non-CIS)' if ai.get('special_type') else ''}</span>"
+        ),
         "token": token_link,
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>{holder_link}',
         "issuer_download": f"{vi['display_name']}",
@@ -2592,6 +2619,42 @@ def create_dict_for_tabulator_display_for_non_fungible_token(
         ),
         "balance_download": f"{row['token_amount']}",
     }
+
+
+#: Schemes a metadata URL may use in a link. Everything else -- javascript:,
+#: data:, vbscript:, file: -- either runs code on this origin when clicked or
+#: opens something the browser should not be opening on our say-so.
+LINKABLE_URL_SCHEMES = frozenset({"http", "https"})
+
+
+def safe_url(url: str | None) -> str:
+    """A metadata URL that is safe to put in an href, or "" if it is not.
+
+    metadata_url is whatever the contract returned, so it is attacker-supplied
+    in the same way a token's name is. Escaping is not enough here: it stops
+    the value breaking out of the attribute, but `href="javascript:..."` needs
+    no quotes to break out of, and one click runs script on this origin.
+
+    Browsers are lenient about what counts as a scheme -- leading whitespace,
+    and tabs or newlines *inside* the word, are all ignored, so "java\tscript:"
+    parses as javascript:. Those characters are stripped before the scheme is
+    read rather than after, otherwise the check reads a different string than
+    the browser will.
+
+    Returns "" rather than raising: a token with an unusable metadata URL
+    should still render, just without a live link.
+    """
+    raw = str(url or "").strip()
+    if not raw:
+        return ""
+    cleaned = "".join(ch for ch in raw if ch >= " " and ch not in "\t\r\n")
+    from urllib.parse import urlsplit
+
+    try:
+        scheme = urlsplit(cleaned).scheme.lower()
+    except ValueError:
+        return ""
+    return cleaned if scheme in LINKABLE_URL_SCHEMES else ""
 
 
 def short_url(url: str | None, tail: int = 24) -> str:
@@ -2627,6 +2690,39 @@ def short_url(url: str | None, tail: int = 24) -> str:
     return f"{host}{middle}{last}"
 
 
+def client_ip(request) -> str:
+    """The end user's address, from the proxy header or the peer.
+
+    Lives here rather than in factory because the auth router needs it too, to
+    forward on to the API: importing it from factory made a cycle -- factory
+    imports the routers at module level, so the router's import of factory ran
+    against a half-built module and failed on startup.
+    """
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def h(value) -> str:
+    """HTML-escape a value that came from outside this codebase.
+
+    The functions below build HTML with f-strings and hand it to Tabulator
+    columns declared `formatter: "html"`, which insert it as markup. Anything
+    interpolated into that is executed if it contains a tag, and a token's
+    metadata is written by whoever deployed the contract -- permissionless, and
+    already carrying markup: token descriptions in production contain <p> tags
+    today. A name is one `<img src=x onerror=...>` away from running script on
+    this origin, which on a block explorer means rewriting the addresses and
+    amounts a reader is trusting.
+
+    Applied to the data going into the HTML, never to the markup around it, and
+    never to the `_download` fields -- those are exported as CSV, where an
+    escaped ampersand is corruption rather than safety.
+    """
+    return str(escape("" if value is None else value))
+
+
 def token_display_name(address_information: dict | None, token_id: str | None = None) -> str:
     """What to call a token, in descending order of how much it tells you.
 
@@ -2659,13 +2755,13 @@ def create_dict_for_tabulator_display_for_unverified_token(net, row: dict):
     token_address = ai.get("_id", row["token_address"])
     token_id = ai.get("token_id", row["token_id"])
     return {
-        "issuer": f'<span class="ccd text-secondary-emphasis">{row["contract"]}</span>',
+        "issuer": f'<span class="ccd text-secondary-emphasis">{h(row["contract"])}</span>',
         # Was `ai["token_metadata"]["name"]` guarded only by the presence of
         # token_metadata -- which raises on metadata carrying a description but
         # no name, and showed nothing for an agent whose name is in its card.
         "token": (
             f'<a href="/{net}/token/{split_into_url_slug(token_address)}">'
-            f"{token_display_name(ai, token_id)}</a>"
+            f"{h(token_display_name(ai, token_id))}</a>"
         ),
         "balance": f'<span class="ccd_decimals  text-secondary-emphasis">{row["token_amount"]}</span>',
         "issuer_download": f"{row['contract']}",
@@ -2883,10 +2979,10 @@ def create_dict_for_tabulator_display_smart_wallet_events(
     else:
         if vi:
             token_display = (
-                f'<img src="{vi["logo_url"]}"  style=" max-width: 16px;max-height: 16px;"  alt="">'
+                f'<img src="{h(vi["logo_url"])}" style="max-width: 16px;max-height: 16px;" alt="">'
             )
         token_display += (
-            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{token_name}</a>'
+            f'<a href="/{net}/token/{split_into_url_slug(token_address)}">{h(token_name)}</a>'
         )
         token_display_download = f"{split_into_url_slug(token_address)}-{token_name}"
     if "ccd_amount" in event["recognized_event"]:

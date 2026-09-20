@@ -27,9 +27,11 @@ import sentry_sdk
 
 sentry_sdk.init(
     dsn="https://9e4d7daa546f8e53fae6a8ce4ba6cac0@o4503924901347328.ingest.us.sentry.io/4510815580389376",
-    # Add data like request headers and IP for users,
-    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
-    send_default_pii=True,
+    # No send_default_pii here. This process handles Telegram messages, so
+    # "request headers and IP for users" means named people's chat identifiers
+    # and message content going to a third party. The site and the API both
+    # attach an opaque id instead -- an api_account_id or a session id -- and
+    # this is the only one of the three that was sending the real thing.
 )
 
 if __name__ == "__main__":

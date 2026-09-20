@@ -72,10 +72,37 @@ def _site_link(path: str) -> str:
 # The site proxies every call under one shared API key, so the real client IP is
 # not visible here; the target email is the meaningful throttle key. All helpers
 # fail open if Redis is unavailable so authentication never hard-breaks.
+def _client_ip(request: Request) -> str:
+    """The browser's address, as the site reported it.
+
+    request.client is always the site here: every call arrives from one host
+    under one shared API key, so the peer address is the same for everybody
+    and useless as a throttle key. The site sends the real one in X-Client-IP.
+
+    A forwarded header is forgeable, and a caller holding an API key could put
+    anything in it. That is accepted deliberately: this is a second key
+    alongside the email one, there to make spreading an attack across many
+    accounts cost something. It is not an authorization decision, and nothing
+    is granted on the strength of it.
+    """
+    forwarded = request.headers.get("x-client-ip", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
 LOGIN_MAX_ATTEMPTS = 10  # failed logins per email...
 LOGIN_WINDOW_SECONDS = 15 * 60  # ...within 15 minutes
 EMAIL_MAX_PER_WINDOW = 5  # reset/registration emails per email...
 EMAIL_WINDOW_SECONDS = 60 * 60  # ...within 1 hour
+
+# The same two windows, keyed on the caller instead of the target. Set well
+# above what a household or an office behind one NAT gets through in normal
+# use, because the point is not to bound one account -- the per-email limits
+# already do that -- but to stop one caller working through a list of
+# addresses at ten attempts each.
+LOGIN_MAX_ATTEMPTS_PER_IP = 50
+EMAIL_MAX_PER_IP = 20
 
 
 def _throttle_key(bucket: str, key: str) -> str:
@@ -233,6 +260,32 @@ async def save_user(user: SiteUser, mongomotor: MongoMotor) -> None:
 # the current token instead of getting logged out.
 ROTATE_THROTTLE = dt.timedelta(seconds=30)
 
+# How long a session may live, and how long it may sit unused.
+#
+# Sessions used to carry no expiry at all: created_at, last_seen_at and a
+# revoked flag, with no TTL index behind them. The cookie's 30-day max_age is
+# a hint to the browser and nothing more -- a captured session token stayed
+# valid for ever, until somebody thought to revoke it by hand. Rotation was
+# already in place, but rotating a token that never expires does not bound
+# anything; it only changes which string the holder has to keep.
+#
+# The absolute lifetime matches the cookie, so the two agree on when a login
+# ends. The idle timeout is the shorter of the two on purpose: it is what
+# closes a session left open on a machine the owner has walked away from.
+SESSION_ABSOLUTE_LIFETIME = dt.timedelta(days=30)
+SESSION_IDLE_TIMEOUT = dt.timedelta(days=14)
+
+
+def _session_expiry_reason(doc: dict, now: dt.datetime) -> Optional[str]:
+    """Why this session is no longer usable, or None while it still is."""
+    created = _as_utc(doc.get("created_at"))
+    if created is not None and now - created >= SESSION_ABSOLUTE_LIFETIME:
+        return "expired"
+    last_seen = _as_utc(doc.get("last_seen_at")) or created
+    if last_seen is not None and now - last_seen >= SESSION_IDLE_TIMEOUT:
+        return "idle"
+    return None
+
 
 def _device_label(user_agent: Optional[str]) -> Optional[str]:
     """Coarse "Browser on OS" label from a User-Agent string, e.g. "Chrome on
@@ -338,6 +391,16 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
 
     doc = await sessions.find_one({"token": session_token, "revoked": False})
     if doc is not None:
+        expired = _session_expiry_reason(doc, now)
+        if expired:
+            # Mark it rather than just refusing, so it leaves the owner's
+            # "Active sessions" list and cannot be resurrected by a request
+            # still holding the previous token.
+            await sessions.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"revoked": True, "revoked_reason": expired}},
+            )
+            return {"ok": False, "reason": expired}
         last_rotated = _as_utc(doc.get("last_rotated_at")) or _as_utc(doc["created_at"])
         if now - last_rotated >= ROTATE_THROTTLE:
             new_token = str(uuid4())
@@ -372,6 +435,13 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
 
     doc = await sessions.find_one({"previous_token": session_token, "revoked": False})
     if doc is not None:
+        expired = _session_expiry_reason(doc, now)
+        if expired:
+            await sessions.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"revoked": True, "revoked_reason": expired}},
+            )
+            return {"ok": False, "reason": expired}
         # In-flight request racing a rotation that already happened --
         # converge on the current token instead of forcing a re-login.
         return await _resolved(doc["user_token"], doc["_id"], doc["token"], mongomotor)
@@ -506,9 +576,13 @@ async def register(
 ) -> dict:
     """Create a new email/password SiteUser and send a verification email."""
     # Throttle to prevent verification-email bombing / registration spam.
-    if await _too_many_attempts(request, "register", body.email, EMAIL_MAX_PER_WINDOW):
+    caller = _client_ip(request)
+    if await _too_many_attempts(request, "register", body.email, EMAIL_MAX_PER_WINDOW) or (
+        await _too_many_attempts(request, "register-ip", caller, EMAIL_MAX_PER_IP)
+    ):
         raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
     await _record_attempt(request, "register", body.email, EMAIL_WINDOW_SECONDS)
+    await _record_attempt(request, "register-ip", caller, EMAIL_WINDOW_SECONDS)
     existing = await get_site_user_by_field("email_address", body.email, mongomotor)
     if existing:
         raise HTTPException(status_code=409, detail="Email address already registered.")
@@ -534,7 +608,10 @@ async def login(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """Verify email/password and return the SiteUser token on success."""
-    if await _too_many_attempts(request, "login", body.email, LOGIN_MAX_ATTEMPTS):
+    caller = _client_ip(request)
+    if await _too_many_attempts(request, "login", body.email, LOGIN_MAX_ATTEMPTS) or (
+        await _too_many_attempts(request, "login-ip", caller, LOGIN_MAX_ATTEMPTS_PER_IP)
+    ):
         raise HTTPException(
             status_code=429,
             detail="Too many login attempts. Please wait a few minutes and try again.",
@@ -542,6 +619,10 @@ async def login(
     user = await get_site_user_by_field("email_address", body.email, mongomotor)
     if (user is None) or (not user.password) or (not verify_password(body.password, user.password)):
         await _record_attempt(request, "login", body.email, LOGIN_WINDOW_SECONDS)
+        # Counted per caller as well, and deliberately not cleared on success:
+        # a run of failures against many accounts is the thing being bounded,
+        # and one success in the middle of it should not reset the count.
+        await _record_attempt(request, "login-ip", caller, LOGIN_WINDOW_SECONDS)
         if user is not None:
             await _append_audit_entry(user.token, "login_failed", mongomotor)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -579,9 +660,13 @@ async def forgot_password(
     """Email a reset link if the address is known. Always returns ok (no enumeration)."""
     # Throttle to prevent reset-email bombing. Stay silent (still return ok) so
     # this can't be turned into an enumeration or error oracle either.
-    if await _too_many_attempts(request, "forgot", body.email, EMAIL_MAX_PER_WINDOW):
+    caller = _client_ip(request)
+    if await _too_many_attempts(request, "forgot", body.email, EMAIL_MAX_PER_WINDOW) or (
+        await _too_many_attempts(request, "forgot-ip", caller, EMAIL_MAX_PER_IP)
+    ):
         return {"ok": True}
     await _record_attempt(request, "forgot", body.email, EMAIL_WINDOW_SECONDS)
+    await _record_attempt(request, "forgot-ip", caller, EMAIL_WINDOW_SECONDS)
     user = await get_site_user_by_field("email_address", body.email, mongomotor)
     if user is not None:
         _issue_reset_token(user)

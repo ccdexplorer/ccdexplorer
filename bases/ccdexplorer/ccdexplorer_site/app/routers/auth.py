@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    client_ip,
     post_url_from_api,
     get_url_from_api,
     delete_url_from_api,
@@ -20,6 +21,19 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
 )
 
 router = APIRouter()
+
+
+def _caller_headers(request: Request) -> dict[str, str]:
+    """Tell the API which browser is asking, so it can throttle on it.
+
+    Every call reaches the API from this one host under one shared API key, so
+    the API's own view of the peer is always the site. Without this, the only
+    throttle key available there is the target email address -- which bounds
+    an attack on one account, and does nothing about the same ten attempts
+    spread across ten thousand addresses.
+    """
+    ip = client_ip(request)
+    return {"x-client-ip": ip} if ip else {}
 
 
 def set_login_cookie(request: Request, response: Response, token: str) -> None:
@@ -73,6 +87,7 @@ async def login_post(
         f"{request.app.api_url}/site-auth/login",
         request.app.httpx_client,
         {"email": email, "password": password},
+        headers=_caller_headers(request),
     )
     if api_response.ok:
         response = RedirectResponse(url="/settings/user/overview", status_code=303)
@@ -101,6 +116,7 @@ async def register_post(
         f"{request.app.api_url}/site-auth/register",
         request.app.httpx_client,
         {"email": email, "password": password},
+        headers=_caller_headers(request),
     )
     if api_response.ok:
         return request.app.templates.TemplateResponse(
@@ -142,6 +158,7 @@ async def forgot_password_post(request: Request, email: str = Form(...)):
         f"{request.app.api_url}/site-auth/forgot-password",
         request.app.httpx_client,
         {"email": email},
+        headers=_caller_headers(request),
     )
     # Always show the same confirmation (no account enumeration).
     return request.app.templates.TemplateResponse(

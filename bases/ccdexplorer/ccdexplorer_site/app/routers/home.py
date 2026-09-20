@@ -364,6 +364,17 @@ class SearchRequest(BaseModel):
     response_class=RedirectResponse,
 )
 async def search(request: Request, search_request: SearchRequest):
+    # `net` is the first path segment of every url built below, and it arrives
+    # straight from the request body. Unvalidated, "/evil.example.com" made
+    # this answer with
+    #     location: //evil.example.com/search_all/...
+    # a protocol-relative url that takes the browser off this origin, from a
+    # link that genuinely starts https://ccdexplorer.io/. Every other route in
+    # this file already checks the same three values; this one did not.
+    if search_request.net not in ["mainnet", "testnet", "devnet"]:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    url = None
     if search_request.selector == "all":
         url = f"/{search_request.net}/search_all/{search_request.value}"
     if search_request.selector == "account":
