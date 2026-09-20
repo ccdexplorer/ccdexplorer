@@ -44,9 +44,16 @@ def _context():
 
 
 @pytest.fixture(autouse=True)
-def _no_pacing(monkeypatch):
-    """The pacing sleep is real time; tests do not need to wait it out."""
-    monkeypatch.setattr(update_spot_retrieval, "PACING_SECONDS", 0)
+def sleeps(monkeypatch):
+    """Record the pacing instead of waiting it out.
+
+    Patching the sleep rather than the constant keeps PACING_SECONDS readable in
+    tests, so its value can be asserted -- it is rate-limit protection, and it
+    has been lowered by accident before.
+    """
+    recorded: list[float] = []
+    monkeypatch.setattr(update_spot_retrieval.time, "sleep", recorded.append)
+    return recorded
 
 
 def _rate_from(source: str):
@@ -191,6 +198,72 @@ def test_schedule_skips_when_no_token_has_a_price_source(monkeypatch):
         result = spot_retrieval_src.schedule(_schedule_context(instance))
 
         assert isinstance(result, dg.SkipReason)
+
+
+# --------------------------------------------------------------------------- #
+# Pacing
+#
+# The delay between tokens is what keeps a cycle under both providers' rate
+# limits. Collapsing the per-token runs into one made it look like dead time --
+# it was cut to 0.25s on the first pass -- so these pin down that it is still
+# applied, and still long enough.
+# --------------------------------------------------------------------------- #
+def test_calls_are_paced_between_tokens_but_not_after_the_last(monkeypatch, sleeps):
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _rate_from("CoinAPI"))
+
+    perform_spot_retrieval_update(_context(), ["BTC", "ETH", "EUROe"], _mongodb())
+
+    assert sleeps == [10, 10]
+
+
+def test_a_single_token_is_not_paced_at_all(monkeypatch, sleeps):
+    """Nothing to space out, so a one-token re-run from the UI does not wait."""
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _rate_from("CoinAPI"))
+
+    perform_spot_retrieval_update(_context(), ["BTC"], _mongodb())
+
+    assert sleeps == []
+
+
+def test_pacing_is_long_enough_to_stay_under_provider_rate_limits():
+    """Sander set this to 10s deliberately; 24 tokens at 0.25s draws 429s."""
+    assert update_spot_retrieval.PACING_SECONDS == 10
+
+
+# --------------------------------------------------------------------------- #
+# Tokens that lost their price source
+#
+# Partitions are never deleted, so the range a scheduled run covers includes
+# every token that ever had a price source. Fetching one whose get_price_from
+# has since been cleared yields nothing, and a token that yields nothing fails
+# the run -- which would fail this job every ten minutes, for ever.
+# --------------------------------------------------------------------------- #
+def test_a_token_whose_price_source_was_removed_is_dropped_from_the_range(monkeypatch):
+    monkeypatch.setattr(spot_retrieval_src, "current_token_keys", lambda: ["BTC", "ETH"])
+
+    to_fetch, skipped = spot_retrieval_src.tokens_still_configured(["BTC", "RETIRED", "ETH"])
+
+    assert to_fetch == ["BTC", "ETH"]
+    assert skipped == ["RETIRED"]
+
+
+def test_a_range_of_only_retired_tokens_leaves_nothing_to_fetch(monkeypatch):
+    monkeypatch.setattr(spot_retrieval_src, "current_token_keys", lambda: ["BTC"])
+
+    to_fetch, skipped = spot_retrieval_src.tokens_still_configured(["OLD", "OLDER"])
+
+    assert to_fetch == []
+    assert skipped == ["OLD", "OLDER"]
+
+
+def test_a_configured_token_is_never_skipped(monkeypatch):
+    """The guard must not quietly stop fetching tokens that do have a source."""
+    monkeypatch.setattr(spot_retrieval_src, "current_token_keys", lambda: ["BTC", "ETH", "EUROe"])
+
+    to_fetch, skipped = spot_retrieval_src.tokens_still_configured(["BTC", "ETH", "EUROe"])
+
+    assert to_fetch == ["BTC", "ETH", "EUROe"]
+    assert skipped == []
 
 
 def test_the_asset_covers_a_whole_partition_range_in_one_run():

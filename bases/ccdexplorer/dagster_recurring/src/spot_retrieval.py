@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import dagster as dg
 
 from ..recurring.update_spot_retrieval import perform_spot_retrieval_update
@@ -13,6 +15,25 @@ PARTITION_RANGE_START_TAG = "dagster/asset_partition_range_start"
 PARTITION_RANGE_END_TAG = "dagster/asset_partition_range_end"
 
 
+def tokens_still_configured(requested: Sequence[str]) -> tuple[list[str], list[str]]:
+    """Split a run's partition range into the tokens to fetch and those to skip.
+
+    Partition keys are only ever added -- deleting one would detach that token's
+    history -- so the range a scheduled run covers spans every token that has
+    ever had a price source, including any whose `get_price_from` has since been
+    cleared. Those must not be fetched: there is no source left to ask, so they
+    would yield nothing, and a token that yields nothing fails the run. One
+    cleared setting would otherwise fail this job every ten minutes, and spend
+    rate-limited requests doing it.
+
+    Returns (to_fetch, skipped), both in the order they were requested.
+    """
+    configured = set(current_token_keys())
+    to_fetch = [token for token in requested if token in configured]
+    skipped = [token for token in requested if token not in configured]
+    return to_fetch, skipped
+
+
 ######### spot_retrieval #########
 @dg.asset(
     group_name="source_coinmarketcap",
@@ -26,18 +47,27 @@ def spot_retrieval(
     """
     Retrieving spot price data for selected CIS-2 tokens and all PLTs.
 
-    Every token in the run's partition range is handled by this one process. The
-    partitions themselves are unchanged, so a single token can still be re-run on
-    its own from the UI; what changed is that the scheduled cycle no longer pays
-    a process start, a definitions import and a Mongo client per token.
+    Every token in the run's partition range that still has a price source is
+    handled by this one process. The partitions themselves are unchanged, so a
+    single token can still be re-run on its own from the UI; what changed is
+    that the scheduled cycle no longer pays a process start, a definitions
+    import and a Mongo client per token.
 
     Returns None deliberately: an IO manager cannot persist one output across
     several partitions, and nothing consumes the value -- the rates are the
     write to Mongo.
     """
-    mongodb = mongo_resource.get_client()
-    tokens = list(context.partition_keys)
+    tokens, skipped = tokens_still_configured(context.partition_keys)
+    if skipped:
+        context.log.info(
+            f"Skipping {len(skipped)} token(s) with no price source configured: "
+            f"{', '.join(skipped)}"
+        )
+    if not tokens:
+        context.log.info("No token in this run's range has a price source configured.")
+        return
 
+    mongodb = mongo_resource.get_client()
     written, failed = perform_spot_retrieval_update(context, tokens, mongodb)
     context.log.info(f"Stored {len(written)} of {len(tokens)} spot rates.")
 
@@ -83,8 +113,8 @@ def schedule(context):
     # evaluate in the long-lived code server, so this query reuses one client
     # for the life of the server and run workers open nothing just by loading
     # the definitions. Keys are only ever added: deleting one would detach that
-    # token's history, and a token no longer configured simply stops getting
-    # runs below.
+    # token's history. The range below therefore spans tokens that are no longer
+    # configured too, and the asset drops those before fetching anything.
     partition_keys = current_token_keys()
     if not partition_keys:
         return dg.SkipReason("No tokens have a price source configured.")

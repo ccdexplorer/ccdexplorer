@@ -12,11 +12,17 @@ from ccdexplorer.mongodb import (
 )
 from pymongo import ReplaceOne
 
-# Spread the per-token calls out a little so a cycle does not hit either API as
-# one burst. This replaces a flat 10 second sleep that used to end every token's
-# own run: with all tokens fetched in a single run, that would add four minutes
-# of pure waiting, and it only ever paced one request anyway.
-PACING_SECONDS = 0.25
+# Space the per-token calls out. Both providers rate-limit, and this delay is
+# what keeps a cycle under their thresholds -- it is deliberate protection
+# against 429s, not leftover overhead.
+#
+# It used to sit at the end of every token's own run, which is why collapsing
+# those runs into one looked like it was removing four minutes of pure waiting.
+# It was not: the waiting is the point. The delay now paces the tokens inside
+# the single run instead. Roughly 24 tokens is roughly four minutes, which fits
+# inside the ten-minute schedule, and it no longer comes on top of 24 process
+# starts.
+PACING_SECONDS = 10
 
 
 def coinapi(token: str, client: httpx.Client) -> tuple[int, dict | None]:
