@@ -5,7 +5,6 @@ from ccdexplorer.tooter.core import Tooter, TooterChannel, TooterType
 from pydantic import BaseModel
 from pymongo import ReplaceOne
 from pymongo.collection import Collection
-import dagster as dg
 
 
 class FailureRecord(BaseModel):
