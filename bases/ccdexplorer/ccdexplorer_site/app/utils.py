@@ -21,6 +21,11 @@ import plotly.graph_objects as go
 
 # from urllib import request
 import plotly.io as pio
+
+# og_cards imports nothing from this module (only PIL and the stdlib), so
+# this direction is safe; the cards and the chart images want the same
+# bounded store of finished PNGs.
+from ccdexplorer.ccdexplorer_site.app.og_cards import PngCache
 from ccdexplorer.cis.core import CIS
 from ccdexplorer.domain.generic import NET, AccountInfoStable
 from ccdexplorer.domain.mongo import (
@@ -632,16 +637,45 @@ plot_info = {
 # actual (serial) throughput, so there's no concurrency to give up.
 _KALEIDO_RENDER_LOCK = asyncio.Lock()
 
+# Measured against production: ~0.9s per chart image, every single time, and
+# the lock above means concurrent callers queue behind each other. That is fine
+# for one person sharing one link and bad for a link going around a group,
+# where the tenth crawler waits nine seconds and ten identical Chromium renders
+# have been paid for.
+#
+# The figures behind these only move when the nightly statistics do, and the
+# image branch is a GET with no body, so `get_theme_from_request` always
+# returns "dark" and `add_watermark_to_plot` always adds the watermark. The
+# path is therefore the whole of the input, which makes it the whole of the
+# cache key.
+_PLOT_IMAGES = PngCache()
+PLOT_IMAGE_TTL = 3600
+
 
 async def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
-        async with _KALEIDO_RENDER_LOCK:
-            img_bytes = await asyncio.get_running_loop().run_in_executor(
-                None, lambda: pio.to_image(fig, format="png", width=720)
-            )
-        return Response(content=img_bytes, media_type="image/png")
+        cache_key = request.url.path
+        cached = _PLOT_IMAGES.get(cache_key)
+        if cached is None:
+            async with _KALEIDO_RENDER_LOCK:
+                # Checked again under the lock. A burst of crawlers for the
+                # same link all miss together, and without this each would go
+                # on to render the identical figure in turn.
+                cached = _PLOT_IMAGES.get(cache_key)
+                if cached is None:
+                    img_bytes = await asyncio.get_running_loop().run_in_executor(
+                        None, lambda: pio.to_image(fig, format="png", width=720)
+                    )
+                    _PLOT_IMAGES.put(cache_key, img_bytes, PLOT_IMAGE_TTL)
+                    cached = (img_bytes, PLOT_IMAGE_TTL)
+        img_bytes, max_age = cached
+        return Response(
+            content=img_bytes,
+            media_type="image/png",
+            headers={"Cache-Control": f"public, max-age={max_age}"},
+        )
 
     else:
         if request.method == "POST":
