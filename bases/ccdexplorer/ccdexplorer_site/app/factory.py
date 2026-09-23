@@ -55,6 +55,7 @@ from ccdexplorer.ccdexplorer_site.app.routers import (
     home,
     node,
     nodes,
+    og,
     projects,
     smart_contract_tab_tokens,
     smart_contracts,
@@ -600,6 +601,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(account_tab_validator.router)
     app.include_router(account_pool.router)
     app.include_router(node.router)
+    app.include_router(og.router)
     app.include_router(smart_contracts.router)
     app.include_router(smart_contract_tab_tokens.router)
     app.include_router(tools.router)

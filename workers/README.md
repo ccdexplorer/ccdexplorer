@@ -27,32 +27,24 @@ HTTP API, or that need to be somewhere our own machines are not.
 | Worker | What it does |
 |---|---|
 | [`watchdog/`](watchdog/) | Checks that the site and API answer and that the indexer is current, from outside the estate, and alerts Telegram directly. The one monitor that survives ccd-1 going down. |
-| [`og-cards/`](og-cards/) | Renders a PNG social preview per block, account and transaction, so a shared link previews with live chain data. |
 
 ## Which Cloudflare plan you need
 
-Short answer: the **Workers Paid** plan, $5/month, for `og-cards`. The free
-plan's ceiling is not the request count — it is CPU time.
+The free plan, and the watchdog fits inside it. The ceiling that matters is
+not the request count, it is CPU: **10 ms per invocation** on free, against a
+measured ~2 ms here, nearly all of it parsing the network dashboard.
 
-| Free plan limit | What it means here |
+| Free plan limit | Where the watchdog sits |
 |---|---|
-| 10 ms CPU per request *and* per cron invocation | the binding constraint |
-| 100,000 requests/day | never close; a tick a minute is 1,440 |
-| 1,000 KV writes/day | `watchdog` was over this and was rewritten to fit |
-| 5 cron triggers per account | one is used |
+| 10 ms CPU per request and per cron invocation | ~2 ms |
+| 100,000 requests/day | 1,440 (one tick a minute) |
+| 1,000 KV writes/day | ~144, see the README |
+| 5 cron triggers per account | 1 |
 
-Measured on this machine, in native CPython, warm:
-
-- `og-cards` spends **~12 ms** rendering and encoding one card. That is over
-  the free ceiling before any of Pyodide's WebAssembly overhead is counted, and
-  every request pays it — the KV cache saves the API call, not the drawing.
-  This Worker needs the paid plan.
-- `watchdog` spends **~2 ms**, nearly all of it parsing the 259 KB network
-  dashboard. That should fit inside 10 ms, but not by much, so treat the free
-  plan as something to try rather than something to rely on.
-
-On the paid plan CPU defaults to 30 s and KV writes are unmetered, and neither
-Worker comes anywhere near either.
+That 10 ms is also why the social preview cards are **not** here. Drawing one
+costs ~12 ms before any WebAssembly overhead, so they are rendered by the site
+instead, off the event loop and cached in process. See
+`bases/ccdexplorer/ccdexplorer_site/app/og_cards.py`.
 
 ## Deploying
 
@@ -90,9 +82,10 @@ with the real ones on first deploy.
 - `compatibility_date` is **pinned**, not set to today. It selects the Pyodide
   build, so changing it is a runtime upgrade and belongs in its own commit
   with its own deploy.
-- Rendering and formatting live in module-level functions that take no runtime
-  objects, so they can be exercised locally with `workers` and `pyodide.ffi`
-  stubbed. See the note at the bottom of `og-cards/README.md`.
+- Logic lives in module-level functions that take no runtime objects, so it
+  can be exercised locally with `workers` and `js` stubbed -- which is how
+  the watchdog's alert state machine was checked without a KV namespace or a
+  Telegram token.
 - Anything reaching the API sends `x-ccdexplorer-key`, from a secret, using a
   key scoped for `api.ccdexplorer.io`.
 
