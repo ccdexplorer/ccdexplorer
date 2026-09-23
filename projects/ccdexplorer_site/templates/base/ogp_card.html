@@ -1,0 +1,33 @@
+{#
+  One place that decides what a shared ccdexplorer link looks like.
+
+  `entity` is the same `<net>/<kind>/<identifier>` triple the page already
+  lives at. That is deliberate: the Worker in workers/og-cards takes the same
+  shape, so a page's preview image is always derivable from the page's own
+  address and the two can never drift apart.
+
+  og:image appears only when OG_IMAGE_BASE is set. The card Worker deploys
+  separately from the site, so the site has to run before it exists -- and
+  keep running if it is ever taken away. Unset, these tags simply do not
+  appear and previews look exactly as they did before.
+#}
+{% macro ogp_card(env, entity, title, description=None, type="website") -%}
+<meta property="og:title" content="{{ title }}" />
+<meta property="og:type" content="{{ type }}" />
+<meta property="og:url" content="{{ env.SITE_URL }}/{{ entity }}" />
+{%- if description %}
+<meta property="og:description" content="{{ description }}" />
+{%- endif %}
+{%- if env.OG_IMAGE_BASE %}
+<meta property="og:image" content="{{ env.OG_IMAGE_BASE }}/{{ entity }}.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ title }}" />
+{%- if description %}
+<meta name="twitter:description" content="{{ description }}" />
+{%- endif %}
+<meta name="twitter:image" content="{{ env.OG_IMAGE_BASE }}/{{ entity }}.png" />
+{%- endif %}
+{%- endmacro %}

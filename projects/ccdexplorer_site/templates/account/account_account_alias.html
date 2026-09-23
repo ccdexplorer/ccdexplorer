@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% from "base/ogp_card.html" import ogp_card %}
 
 {% block js %}
 <script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script>
@@ -76,9 +77,12 @@ document.addEventListener("DOMContentLoaded", () => {
 {% endblock %}
 
 {% block ogp %}
-<meta property="og:title" content="Account {{account_index}} with alias {{alias_portion}} on Concordium {{net}}" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="{{env.SITE_URL}}/{{net}}/account/{{account_index}}" />
+{{ ogp_card(
+     env,
+     net ~ "/account/" ~ account_index,
+     "Account " ~ account_index ~ " with alias " ~ alias_portion ~ " on Concordium " ~ net,
+     "Balance, staking, transactions and tokens for this account on Concordium " ~ net
+   ) }}
 {% endblock %}
 
 {% block content %}

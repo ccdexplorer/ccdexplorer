@@ -10,6 +10,11 @@ BRANCH = os.environ.get("BRANCH", "dev")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "prod")
 NOTIFIER_API_TOKEN = os.environ.get("NOTIFIER_API_TOKEN")
 SITE_URL = os.environ.get("SITE_URL")
+# Origin of the Worker in workers/og-cards, which renders the PNG shown when a
+# link is shared. Unset on purpose by default: the Worker deploys separately
+# from the site, so the templates emit no og:image at all until this points
+# somewhere, and go quietly back to plain previews if it is ever removed.
+OG_IMAGE_BASE = os.environ.get("OG_IMAGE_BASE", "").rstrip("/")
 API_TOKEN = os.environ.get("API_TOKEN", "api_token")
 FASTMAIL_TOKEN = os.environ.get("FASTMAIL_TOKEN")
 CCDEXPLORER_API_KEY = os.environ.get("CCDEXPLORER_API_KEY")
@@ -91,6 +96,7 @@ ON_SERVER = os.environ.get("ON_SERVER", False)
 
 environment = {
     "SITE_URL": SITE_URL,
+    "OG_IMAGE_BASE": OG_IMAGE_BASE,
     "CCDEXPLORER_API_KEY": CCDEXPLORER_API_KEY,
     "API_ACCOUNT_TESTNET": API_ACCOUNT_TESTNET,
     "API_ACCOUNT_MAINNET": API_ACCOUNT_MAINNET,

@@ -1,8 +1,12 @@
 {% extends "base/base.html" %}
+{% from "base/ogp_card.html" import ogp_card %}
 {% block ogp %}
-<meta property="og:title" content="Transaction {{tx.hash}} on Concordium {{net}}" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="{{env.SITE_URL}}/{{net}}/transaction/{{tx.hash}}" />
+{{ ogp_card(
+     env,
+     net ~ "/transaction/" ~ tx.hash,
+     "Transaction " ~ tx.hash ~ " on Concordium " ~ net,
+     "A " ~ tx.type.contents ~ " transaction on Concordium " ~ net
+   ) }}
 {% endblock %}
 {% block content %}
 
