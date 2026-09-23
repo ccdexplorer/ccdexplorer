@@ -1,0 +1,13 @@
+[project]
+name = "ccdexplorer-watchdog"
+version = "0.1.0"
+description = "Liveness and indexing-lag watchdog for ccdexplorer, hosted off-estate"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk",
+]
