@@ -1,31 +1,35 @@
 {#
   One place that decides what a shared ccdexplorer link looks like.
 
-  `entity` is the same `<net>/<kind>/<identifier>` triple the page already
-  lives at. That is deliberate: the card route takes the same shape, so a
-  page's preview image is always derivable from the page's own address and the
-  two can never drift apart.
+  `path` is the page's own address after the net -- `block/52029165`,
+  `instance/9337/0`. That is deliberate: the card route takes the same shape
+  with `og` after the net, so a page's preview image is always derivable from
+  the page's own address and the two cannot drift apart.
 
-  The card itself is rendered by the site at /og/<entity>/image.png -- see
-  app/routers/og.py. That is the same shape the statistics charts already use
-  (/plots/<net>/<name>/image.png, tagged by base/plots_og.html), and the tag
-  set below matches that template's. It deploys with these templates, so
-  there is nothing to feature-flag: if the route is there, the image is.
+      page   /mainnet/instance/9337/0
+      card   /mainnet/og/instance/9337/0/image.png
+
+  The card is rendered by the site -- see app/routers/og.py -- and deploys
+  with these templates, so there is nothing to feature-flag: if the route is
+  there, the image is. The statistics charts already end their image URLs the
+  same way (/plots/<net>/<name>/image.png, tagged by base/plots_og.html), and
+  the tag set below matches that template's.
+
+  SITE_URL is unset in a local .env, and Jinja renders None as the literal
+  string "None" -- which is how a verification email once went out pointing at
+  None/verify/... . An empty base gives relative URLs instead: not what the OG
+  spec wants, but nothing crawls a laptop, and it can never become a link to a
+  host called None.
 #}
-{% macro ogp_card(env, entity, title, description=None, type="website") -%}
-{#- SITE_URL is unset in a local .env, and Jinja renders None as the literal
-    string "None" -- which is how a verification email once went out pointing
-    at None/verify/... . An empty base gives relative URLs instead: not what
-    the OG spec wants, but nothing crawls a laptop, and it can never become a
-    link to a host called None. #}
+{% macro ogp_card(env, net, path, title, description=None, type="website") -%}
 {%- set base = env.SITE_URL or "" %}
+{%- set card = base ~ "/" ~ net ~ "/og/" ~ path ~ "/image.png" %}
 <meta property="og:title" content="{{ title }}" />
 <meta property="og:type" content="{{ type }}" />
-<meta property="og:url" content="{{ base }}/{{ entity }}" />
+<meta property="og:url" content="{{ base }}/{{ net }}/{{ path }}" />
 {%- if description %}
 <meta property="og:description" content="{{ description }}" />
 {%- endif %}
-{%- set card = base ~ "/og/" ~ entity ~ "/image.png" %}
 <meta property="og:image" content="{{ card }}" />
 <meta property="og:image:secure_url" content="{{ card }}" />
 <meta property="og:image:type" content="image/png" />
@@ -38,4 +42,18 @@
 <meta name="twitter:description" content="{{ description }}" />
 {%- endif %}
 <meta name="twitter:image" content="{{ card }}" />
+{%- endmacro %}
+
+{#
+  For pages whose canonical URL is exactly the page being rendered -- tokens,
+  PLTs, locks, contract instances. Saves each template having to know which of
+  its own variables reconstruct its address, which is how those get out of step
+  with the router.
+
+  Not for the account alias page: its URL carries an /alias/... suffix the card
+  route does not draw, so that one passes its path explicitly.
+#}
+{% macro ogp_card_here(env, request, title, description=None, type="website") -%}
+{%- set segments = request.url.path.strip("/").split("/", 1) %}
+{{- ogp_card(env, segments[0], segments[1] if segments|length > 1 else "", title, description, type) }}
 {%- endmacro %}

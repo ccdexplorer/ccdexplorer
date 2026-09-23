@@ -3,7 +3,8 @@
 {% block ogp %}
 {{ ogp_card(
      env,
-     net ~ "/block/" ~ block_info.height,
+     net,
+     "block/" ~ block_info.height,
      "Block " ~ block_info.height|round_x_decimal_with_comma(0) ~ " (" ~ block_info.hash ~ ") on Concordium " ~ net,
      block_info.transaction_count ~ " transactions on Concordium " ~ net
    ) }}

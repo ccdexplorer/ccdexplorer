@@ -1,4 +1,10 @@
 {% extends "base/base.html" %}
+{% from "base/ogp_card.html" import ogp_card, ogp_card_here %}
+{% block ogp %}
+{{ ogp_card_here(env, request,
+     "Smart contract " ~ instance_address ~ " on Concordium " ~ net,
+     "Balance, methods and module verification for this contract instance on Concordium " ~ net) }}
+{% endblock %}
 {% block js %}
 <!-- <script src="/node/plotly.js-strict-dist-min/plotly-strict.min.js"></script> -->
 {% endblock %}

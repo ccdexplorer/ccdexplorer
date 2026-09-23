@@ -35,6 +35,8 @@ exercised from a REPL with a fixture.
 import datetime as dt
 import re
 from collections import OrderedDict
+from collections.abc import Callable
+from dataclasses import dataclass
 from functools import lru_cache
 from io import BytesIO
 from time import monotonic
@@ -74,35 +76,89 @@ CACHE_MAX_ENTRIES = 256
 
 #: Identifiers arrive from a public URL, so they are attacker-controlled and
 #: are matched against the shape they must have before any work is done.
-#: Heights and account indices are decimal, block and transaction hashes are
-#: 32 bytes of hex, and account addresses are base58 without the ambiguous
-#: characters.
+#: Heights, account indices and contract indices are decimal; block and
+#: transaction hashes are 32 bytes of hex; account addresses and lock ids are
+#: base58 without the ambiguous characters.
 _DECIMAL = re.compile(r"\A[0-9]{1,15}\Z")
 _HASH = re.compile(r"\A[0-9a-fA-F]{64}\Z")
 _ADDRESS = re.compile(r"\A[1-9A-HJ-NP-Za-km-z]{40,60}\Z")
+_LOCK_ID = re.compile(r"\A[1-9A-HJ-NP-Za-km-z]{6,64}\Z")
+#: A PLT symbol, e.g. t-USDT or eGOLD.
+_TAG = re.compile(r"\A[0-9a-zA-Z._-]{1,32}\Z")
+#: A CIS-2 token id is hex, and is legitimately empty for a single-token
+#: contract -- wGBM's is -- so this has to admit the empty string.
+_TOKEN_ID = re.compile(r"\A[0-9a-fA-F]{0,64}\Z")
 
-#: kind -> (accepted identifier shapes, API path, cache TTL)
-KINDS = {
-    "block": ((_DECIMAL, _HASH), "/v2/{net}/block/{ident}", TTL_IMMUTABLE),
-    "account": ((_DECIMAL, _ADDRESS), "/v2/{net}/account/{ident}/info", TTL_MUTABLE),
-    "transaction": ((_HASH,), "/v2/{net}/transaction/{ident}", TTL_IMMUTABLE),
-}
-
-
-def accepts(net: str, kind: str, ident: str) -> bool:
-    """Is this a request worth spending an API call and a render on?"""
-    if net not in NETS or kind not in KINDS:
-        return False
-    shapes, _, _ = KINDS[kind]
-    return any(shape.match(ident) for shape in shapes)
+#: No real identifier here is longer than a 64-character hash.
+MAX_SEGMENT = 80
 
 
-def api_path(net: str, kind: str, ident: str) -> str:
-    return KINDS[kind][1].format(net=net, ident=ident)
+@dataclass(frozen=True)
+class Kind:
+    """One sort of page that gets a card.
+
+    ``api`` turns the identifier parts into the path to ask the API for;
+    ``build`` turns what came back into an image.
+    """
+
+    name: str
+    api: Callable[[str, tuple[str, ...]], str]
+    build: Callable
+    ttl: int
+    #: Tried when the first endpoint has nothing. /<net>/tokens/<tag> serves
+    #: both a protocol-level token and a CIS-2 tag, and which one a tag is
+    #: cannot be told from the path -- the site itself decides by asking.
+    alt: "Kind | None" = None
 
 
-def ttl_for(kind: str) -> int:
-    return KINDS[kind][2]
+def _is(value, *shapes):
+    return any(shape.match(value) for shape in shapes)
+
+
+def resolve(entity: str):
+    """Map a page path to (net, kind, parts), or None if it is not a card we draw.
+
+    ``entity`` is the page's own path -- ``mainnet/block/52029165``,
+    ``mainnet/instance/9337/0`` -- so a card URL is always derivable from the
+    address of the page it belongs to, and the two cannot drift apart.
+
+    Everything is validated here, before a single request is made. The route is
+    public and unauthenticated and a miss costs an API call plus ~12 ms of
+    drawing, so anything that is not a plausible identifier is refused on its
+    shape and never reaches the API.
+    """
+    segments = [segment for segment in str(entity).split("/") if segment]
+    if len(segments) < 3 or segments[0] not in NETS:
+        return None
+    net, head, rest = segments[0], segments[1], tuple(segments[2:])
+    if any(len(segment) > MAX_SEGMENT for segment in rest):
+        return None
+
+    if head == "block" and len(rest) == 1 and _is(rest[0], _DECIMAL, _HASH):
+        return net, KINDS["block"], rest
+    if head == "transaction" and len(rest) == 1 and _is(rest[0], _HASH):
+        return net, KINDS["transaction"], rest
+    if head == "account" and rest and _is(rest[0], _DECIMAL, _ADDRESS):
+        # The validator view has no URL of its own -- that tab is fetched by
+        # ajax -- so this is a card to link to deliberately rather than one a
+        # page points at. Pools get shared often enough to be worth having.
+        if len(rest) == 2 and rest[1] == "validator":
+            return net, KINDS["validator"], (rest[0],)
+        if len(rest) == 1:
+            return net, KINDS["account"], rest
+        return None
+    if head == "instance" and len(rest) == 2 and all(_DECIMAL.match(s) for s in rest):
+        return net, KINDS["contract"], rest
+    if head == "token" and len(rest) in (2, 3) and all(_DECIMAL.match(s) for s in rest[:2]):
+        token_id = rest[2] if len(rest) == 3 else ""
+        if _TOKEN_ID.match(token_id):
+            return net, KINDS["token"], (rest[0], rest[1], token_id)
+        return None
+    if head == "tokens" and len(rest) == 3 and rest[:2] == ("plt", "lock"):
+        return (net, KINDS["lock"], (rest[2],)) if _LOCK_ID.match(rest[2]) else None
+    if head == "tokens" and len(rest) == 1 and _TAG.match(rest[0]):
+        return net, KINDS["plt"], rest
+    return None
 
 
 @lru_cache(maxsize=32)
@@ -139,11 +195,22 @@ def shorten_hash(value, head=10, tail=8):
 
 
 def ccd(micro):
-    """microCCD as a readable CCD amount, or None if it was not a number."""
+    """microCCD as a readable CCD amount, or None if it was not a number.
+
+    Large stakes are abbreviated because a stat column is about 330px wide and
+    "420,000,000.00 CCD" is not: it came back from the first validator card as
+    "420,000,000.00 C...", which is worse than losing the pennies nobody reads
+    on a social card anyway.
+    """
     try:
-        return f"{int(micro) / 1_000_000:,.2f} CCD"
+        amount = int(micro) / 1_000_000
     except (TypeError, ValueError):
         return None
+    if abs(amount) >= 1_000_000_000:
+        return f"{amount / 1_000_000_000:,.2f}B CCD"
+    if abs(amount) >= 1_000_000:
+        return f"{amount / 1_000_000:,.2f}M CCD"
+    return f"{amount:,.2f} CCD"
 
 
 def when(value):
@@ -230,13 +297,41 @@ def render_card(net, kicker, headline, subline=None, stats=(), footer=None):
     return image
 
 
-def block_card(net, ident, block):
+def token_amount(amount):
+    """A PLT amount, which the API sends as {"value": "...", "decimals": n}."""
+    if not isinstance(amount, dict):
+        return None
+    try:
+        value = int(amount["value"])
+        decimals = int(amount.get("decimals") or 0)
+    except (KeyError, TypeError, ValueError):
+        return None
+    return f"{value / (10**decimals):,.{min(decimals, 6)}f}"
+
+
+def scaled_amount(raw, decimals):
+    """A raw token amount divided by its own decimals.
+
+    The API returns CIS-2 supply in base units and the decimals separately, so
+    printing token_amount as-is overstates it by 10**decimals. wGBM has seven
+    of them: 2,239,000,001 base units is a supply of 223.90, and the first
+    version of this card claimed 2.24 billion.
+    """
+    try:
+        value = int(raw)
+        places = int(decimals or 0)
+    except (TypeError, ValueError):
+        return None
+    return f"{value / (10**places):,.{2 if places else 0}f}"
+
+
+def block_card(net, parts, block):
     height = block.get("height")
     validator = block.get("baker")
     return render_card(
         net,
         "Block",
-        f"{height:,}" if isinstance(height, int) else str(height or ident),
+        f"{height:,}" if isinstance(height, int) else str(height or parts[0]),
         shorten_hash(block.get("hash")),
         [
             ("Transactions", f"{block.get('transaction_count', 0):,}"),
@@ -247,7 +342,13 @@ def block_card(net, ident, block):
     )
 
 
-def account_card(net, ident, account):
+def account_card(net, parts, account):
+    """The account as an account: what it holds.
+
+    A validator gets named in the footer but not given the headline -- these
+    links are shared for the account far more often than for the pool, and the
+    pool has a card of its own at .../account/<index>/validator.
+    """
     index = account.get("index")
     stake = account.get("stake") or {}
     validator = stake.get("baker") or {}
@@ -266,7 +367,7 @@ def account_card(net, ident, account):
     return render_card(
         net,
         "Account",
-        f"#{index:,}" if isinstance(index, int) else str(index or ident),
+        f"#{index:,}" if isinstance(index, int) else str(index or parts[0]),
         shorten_hash(account.get("address"), head=12, tail=10),
         [
             ("Balance", ccd(account.get("amount"))),
@@ -277,7 +378,40 @@ def account_card(net, ident, account):
     )
 
 
-def transaction_card(net, ident, transaction):
+def validator_card(net, parts, pool):
+    """The pool behind an account: what it stakes and how it is doing."""
+    baker = pool.get("baker")
+    payday = pool.get("current_payday_info") or {}
+    lottery = payday.get("lottery_power")
+    blocks = payday.get("blocks_baked")
+
+    footer = []
+    if isinstance(blocks, int):
+        footer.append(f"{blocks:,} blocks this payday")
+    open_status = (pool.get("pool_info") or {}).get("open_status")
+    if open_status:
+        footer.append(str(open_status).replace("_", " ").capitalize())
+    if pool.get("is_suspended"):
+        footer.append("SUSPENDED")
+
+    return render_card(
+        net,
+        "Validator",
+        f"#{baker}" if baker is not None else str(parts[0]),
+        shorten_hash(pool.get("address"), head=12, tail=10),
+        [
+            ("Staked", ccd(pool.get("equity_capital"))),
+            ("Delegated", ccd(pool.get("delegated_capital"))),
+            (
+                "Lottery power",
+                f"{lottery * 100:.4f}%" if isinstance(lottery, (int, float)) else None,
+            ),
+        ],
+        " · ".join(footer) or None,
+    )
+
+
+def transaction_card(net, parts, transaction):
     details = transaction.get("account_transaction") or {}
     block = transaction.get("block_info") or {}
     kind = transaction.get("type") or {}
@@ -301,15 +435,173 @@ def transaction_card(net, ident, transaction):
     )
 
 
-BUILDERS = {"block": block_card, "account": account_card, "transaction": transaction_card}
+def plt_card(net, parts, plt):
+    """A protocol-level token: supply and what the module allows."""
+    state = plt.get("token_state") or {}
+    module = state.get("module_state") or {}
+    token_id = plt.get("token_id") or parts[0]
+    name = module.get("name")
+
+    flags = [
+        label
+        for label, on in (
+            ("Mintable", module.get("mintable")),
+            ("Burnable", module.get("burnable")),
+            ("Allow list", module.get("allow_list")),
+            ("Deny list", module.get("deny_list")),
+            ("PAUSED", module.get("paused")),
+        )
+        if on
+    ]
+
+    return render_card(
+        net,
+        "Protocol-level token",
+        str(token_id),
+        name if name and name != token_id else None,
+        [
+            ("Supply", token_amount(state.get("total_supply"))),
+            ("Decimals", str(state.get("decimals")) if state.get("decimals") is not None else None),
+            (
+                "Governance",
+                shorten_hash((module.get("governance_account") or {}).get("account"), 6, 6),
+            ),
+        ],
+        " · ".join(flags) or None,
+    )
+
+
+def token_card(net, parts, token):
+    """A CIS-2 token, named from its metadata where it has any."""
+    metadata = token.get("token_metadata") or {}
+    tag = token.get("tag_information") or {}
+    # This builder serves two paths: /token/<index>/<subindex>/<id>, which has
+    # three parts, and /tokens/<tag>, which has one. The payload carries both
+    # values either way, so the parts are only a last resort -- and must not be
+    # indexed blindly.
+    contract = token.get("contract") or (f"<{parts[0]},{parts[1]}>" if len(parts) > 1 else "")
+    token_id = token.get("token_id") or (parts[2] if len(parts) > 2 else "")
+    holders = token.get("current_holders_count")
+    if not isinstance(holders, int) and isinstance(token.get("token_holders"), dict):
+        holders = len(token["token_holders"])
+
+    decimals = metadata.get("decimals")
+    if decimals is None:
+        decimals = (token.get("verified_information") or {}).get("decimals")
+
+    headline = metadata.get("name") or tag.get("_id") or token_id or contract
+    subline = contract if not token_id else f"{contract} · {shorten_hash(token_id, 8, 6)}"
+
+    return render_card(
+        net,
+        "Token",
+        str(headline),
+        subline,
+        [
+            ("Symbol", metadata.get("symbol")),
+            ("Holders", f"{holders:,}" if isinstance(holders, int) else None),
+            ("Supply", scaled_amount(token.get("token_amount"), decimals)),
+        ],
+        metadata.get("description"),
+    )
+
+
+def lock_card(net, parts, lock):
+    """A PLT lock: what it holds, for whom, and until when."""
+    controller = lock.get("controller") or {}
+    tokens = controller.get("tokens") or []
+    funds = lock.get("funds") or []
+    status = lock.get("status")
+
+    return render_card(
+        net,
+        "PLT lock",
+        str(parts[0]),
+        " · ".join(str(token) for token in tokens) or None,
+        [
+            ("Status", str(status).title() if status else None),
+            ("Funded by", f"{len(funds):,}" if funds else None),
+            ("Recipients", str(lock.get("recipients") or "").title() or None),
+        ],
+        f"Expires {when(lock.get('expiry'))}" if lock.get("expiry") else None,
+    )
+
+
+def contract_card(net, parts, contract):
+    """A smart contract instance: its name, balance and whether it is verified."""
+    v1 = contract.get("v1") or {}
+    methods = v1.get("methods") or []
+    name = str(v1.get("name") or "").removeprefix("init_")
+    verified = (contract.get("module_verification") or {}).get("verified")
+
+    return render_card(
+        net,
+        "Smart contract",
+        name or f"<{parts[0]},{parts[1]}>",
+        contract.get("_id") or f"<{parts[0]},{parts[1]}>",
+        [
+            ("Balance", ccd(v1.get("amount"))),
+            ("Methods", f"{len(methods):,}" if methods else None),
+            ("Verified", "Yes" if verified else "No"),
+        ],
+        f"Owner {shorten_hash(v1.get('owner'), 12, 10)}" if v1.get("owner") else None,
+    )
+
+
+KINDS = {
+    "block": Kind("block", lambda net, p: f"/v2/{net}/block/{p[0]}", block_card, TTL_IMMUTABLE),
+    "account": Kind(
+        "account", lambda net, p: f"/v2/{net}/account/{p[0]}/info", account_card, TTL_MUTABLE
+    ),
+    "validator": Kind(
+        "validator",
+        lambda net, p: f"/v2/{net}/account/{p[0]}/pool-info",
+        validator_card,
+        TTL_MUTABLE,
+    ),
+    "transaction": Kind(
+        "transaction",
+        lambda net, p: f"/v2/{net}/transaction/{p[0]}",
+        transaction_card,
+        TTL_IMMUTABLE,
+    ),
+    "tag": Kind("tag", lambda net, p: f"/v2/{net}/token/tag/{p[0]}/info", token_card, TTL_MUTABLE),
+    "token": Kind(
+        "token",
+        # A single-token contract has an empty token id -- wGBM does -- and the
+        # API spells that "_", the same placeholder the site's own handler uses.
+        lambda net, p: f"/v2/{net}/token/{p[0]}/{p[1]}/{p[2] or '_'}/info",
+        token_card,
+        TTL_MUTABLE,
+    ),
+    "lock": Kind("lock", lambda net, p: f"/v2/{net}/plt/lock/{p[0]}", lock_card, TTL_MUTABLE),
+    "contract": Kind(
+        "contract",
+        lambda net, p: f"/v2/{net}/contract/{p[0]}/{p[1]}/info",
+        contract_card,
+        TTL_MUTABLE,
+    ),
+}
+
+
+#: Added after the table, because it points at an entry in it: a tag is tried
+#: as a protocol-level token first and as a CIS-2 token second, which is the
+#: same order the site's own /<net>/tokens/<tag> handler tries them in.
+KINDS["plt"] = Kind(
+    "plt",
+    lambda net, p: f"/v2/{net}/plt/{p[0]}/info",
+    plt_card,
+    TTL_MUTABLE,
+    alt=KINDS["tag"],
+)
 
 
 def fallback_card(net="mainnet"):
     """What a crawler gets when the entity is unknown or the API said no.
 
-    Served with 200, not 404. A preview consumer that gets an error falls back
-    to showing the bare link, which looks worse than a plain branded card --
-    and a mistyped or deleted link is not a reason to make somebody's whole
+    Served with 200, not 404. A preview consumer that receives an error falls
+    back to showing the bare link, which looks worse than a plain branded card
+    -- and a mistyped or deleted link is not a reason to make somebody's whole
     message look broken.
     """
     return render_card(
@@ -326,14 +618,14 @@ def to_png(image) -> bytes:
     return buffer.getvalue()
 
 
-def build_png(net: str, kind: str, ident: str, payload) -> bytes:
+def build_png(net: str, kind, parts, payload) -> bytes:
     """Render a card to PNG bytes. Blocking; call it off the event loop."""
-    builder = BUILDERS.get(kind)
-    if builder is None or not payload:
+    if kind is None or not payload:
         return to_png(fallback_card(net))
     try:
-        return to_png(builder(net, ident, payload))
-    except Exception:  # noqa: BLE001 - a card that cannot be drawn is still a card
+        return to_png(kind.build(net, parts, payload))
+    except Exception as error:  # a card that cannot be drawn is still a card
+        print(f"og-cards: failed to draw {kind.name} {parts} on {net} ({error})")
         return to_png(fallback_card(net))
 
 

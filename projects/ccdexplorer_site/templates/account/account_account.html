@@ -79,7 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
 {% block ogp %}
 {{ ogp_card(
      env,
-     net ~ "/account/" ~ account_index,
+     net,
+     "account/" ~ account_index,
      "Account " ~ account_index ~ " on Concordium " ~ net,
      "Balance, staking, transactions and tokens for this account on Concordium " ~ net
    ) }}

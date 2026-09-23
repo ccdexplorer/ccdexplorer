@@ -1,8 +1,7 @@
 {% extends "base/base.html" %}
+{% from "base/ogp_card.html" import ogp_card, ogp_card_here %}
 {% block ogp %}
-<meta property="og:title" content="{{ogp_title}}" />
-<meta property="og:type" content="website" />
-<meta property="og:url" content="{{ogp_url}}" />
+{{ ogp_card_here(env, request, ogp_title, "Status, funds and expiry for this PLT lock on Concordium " ~ net) }}
 {% endblock %}
 {% block content %}
 
