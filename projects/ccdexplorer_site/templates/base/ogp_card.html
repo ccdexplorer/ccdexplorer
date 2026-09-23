@@ -2,9 +2,9 @@
   One place that decides what a shared ccdexplorer link looks like.
 
   `entity` is the same `<net>/<kind>/<identifier>` triple the page already
-  lives at. That is deliberate: the Worker in workers/og-cards takes the same
-  shape, so a page's preview image is always derivable from the page's own
-  address and the two can never drift apart.
+  lives at. That is deliberate: the card route takes the same shape, so a
+  page's preview image is always derivable from the page's own address and the
+  two can never drift apart.
 
   The card itself is rendered by the site at /og/<entity>/image.png -- see
   app/routers/og.py. That is the same shape the statistics charts already use
