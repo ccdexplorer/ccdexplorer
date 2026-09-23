@@ -105,9 +105,21 @@ Vars live in `wrangler.jsonc`; secrets are set with `wrangler secret put`.
 - **Keep it on `workers.dev`.** Putting it on a route under `ccdexplorer.io`
   would give it a dependency on the zone it is meant to judge, and a `fetch`
   to the site could loop back into the Worker.
-- **Cost.** One cron tick a minute is 1,440 requests a day, inside the free
-  plan's 100,000. The network dashboard is ~265KB per tick; there is no
-  smaller endpoint, and independence is worth the bytes.
+- **Budget.** A tick a minute is 1,440 requests a day against a free-plan
+  allowance of 100,000, so requests are never the constraint. Two things are:
+
+  - **KV writes**, capped at 1,000/day on the free plan. Writing the state on
+    every tick would have been 1,440 before anything else — so nothing is
+    written unless a check changed or the stored document is 10 minutes old,
+    which measures at **144 writes a day**. The cost is that `/status` can be
+    up to 10 minutes behind; it carries a `checked_at` so a reader can see so.
+  - **CPU**, capped at 10 ms per cron invocation on the free plan. The work
+    here is ~2 ms in native CPython, almost all of it parsing the 259 KB
+    dashboard. It should fit under Pyodide; it is not comfortable. See the
+    plan table in `../README.md`.
+
+  The dashboard is ~259 KB per tick. There is no smaller endpoint for "what
+  height is the network at", and independence is worth the bytes.
 - **It cannot see inside.** This Worker answers "is it up and is it current",
   not "why". That is still `live-everything`'s job; the two are complementary
   and neither replaces the other.

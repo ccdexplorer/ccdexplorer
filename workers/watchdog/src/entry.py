@@ -57,8 +57,10 @@ DASHBOARDS = {
     "testnet": "https://dashboard.testnet.concordium.com/nodesSummary",
 }
 
-STATE_KEY = "watchdog:state:v1"
-SNAPSHOT_KEY = "watchdog:snapshot:v1"
+#: One key, not two. Workers KV allows 1,000 writes a day on the free plan and
+#: a tick a minute is 1,440 of them before anything else is counted, so the
+#: per-check state and the /status snapshot share a document and a write.
+STATE_KEY = "watchdog:v1"
 
 #: Blocks arrive about every two seconds, so the default threshold is roughly
 #: a hundred seconds of indexing lag. Low enough to catch a stopped indexer
@@ -73,9 +75,15 @@ DEFAULT_REMINDER_MINUTES = 60
 #: it, which is the failure this Worker most needs to report.
 FETCH_TIMEOUT_MS = 10_000
 
-#: The /status snapshot outlives a few ticks, so a reader can tell "the last
-#: check said everything was fine" from "there has been no check".
-SNAPSHOT_TTL_SECONDS = 3600
+#: Nothing is written unless a check changed state or the stored document has
+#: gone this stale, which puts a quiet day at around 150 writes instead of
+#: 2,880. The cost is that /status can be up to this far behind; it carries a
+#: checked_at so a reader can see that for themselves.
+MIN_WRITE_INTERVAL_SECONDS = 600
+
+#: The stored document outlives a few ticks, so a reader can tell "the last
+#: check said everything was fine" from "there has been no check at all".
+STATE_TTL_SECONDS = 3600
 
 
 def _timeout_signal(timeout_ms):
@@ -277,6 +285,42 @@ async def send_telegram(token, chat_id, text):
     return True
 
 
+def reconcile(previous, checks, now, reminder_s):
+    """Fold this tick into the stored state.
+
+    Returns (transitions, state). Each transition is (check, kind, seconds),
+    where kind is "down", "recovered" or "still-down". Kept free of I/O so the
+    part most easily got wrong -- when an alert fires and when it does not --
+    can be exercised without a KV namespace or a Telegram token.
+    """
+    transitions = []
+    state = {}
+    for check in checks:
+        check_id = check["id"]
+        before = previous.get(check_id) or {}
+        was_ok = before.get("ok")
+        since = before.get("since", now)
+        notified_at = before.get("notified_at", 0)
+
+        if was_ok is None or bool(was_ok) != check["ok"]:
+            # First sighting counts as a transition only when it is bad; a
+            # Worker's first tick should not announce that all is well.
+            since = now
+            if not check["ok"]:
+                transitions.append((check, "down", 0))
+                notified_at = now
+            elif was_ok is False:
+                transitions.append((check, "recovered", now - before.get("since", now)))
+                notified_at = 0
+        elif not check["ok"] and now - notified_at >= reminder_s:
+            transitions.append((check, "still-down", now - since))
+            notified_at = now
+
+        state[check_id] = {"ok": check["ok"], "since": since, "notified_at": notified_at}
+
+    return transitions, state
+
+
 class Default(WorkerEntrypoint):
     """The Cron-triggered watchdog, plus a /status endpoint for the dashboard."""
 
@@ -291,17 +335,14 @@ class Default(WorkerEntrypoint):
         """
         path = urlsplit(request.url).path
         if path in ("/status", "/"):
-            raw = await self.env.WATCHDOG_STATE.get(SNAPSHOT_KEY)
-            if raw is None:
+            snapshot = (await self._load()).get("snapshot")
+            if not snapshot:
                 return Response.json(
                     {"ok": None, "detail": "no check has run yet"},
                     status=503,
                     headers={"cache-control": "no-store"},
                 )
-            return Response(
-                raw,
-                headers={"content-type": "application/json", "cache-control": "no-store"},
-            )
+            return Response.json(snapshot, headers={"cache-control": "no-store"})
         if path == "/check":
             # Useful once, after deploying, to prove the whole path works
             # without waiting for the cron to come round.
@@ -328,7 +369,12 @@ class Default(WorkerEntrypoint):
             checks.append(check_lag(net, api.get("height"), await network_height(net), threshold))
 
         now = int(time.time())
-        transitions = await self._reconcile(checks, now, reminder_s)
+        stored = await self._load()
+        previous = stored.get("checks") or {}
+        transitions, current = reconcile(previous, checks, now, reminder_s)
+
+        if transitions:
+            await self._announce(transitions, now)
 
         snapshot = {
             "ok": all(check["ok"] for check in checks),
@@ -336,52 +382,28 @@ class Default(WorkerEntrypoint):
             "checks": checks,
             "source": "cloudflare-worker",
         }
-        await self.env.WATCHDOG_STATE.put(
-            SNAPSHOT_KEY, json.dumps(snapshot), expirationTtl=SNAPSHOT_TTL_SECONDS
-        )
-        if transitions:
-            await self._announce(transitions, now)
+        # A tick where nothing moved is the overwhelmingly common case, and
+        # rewriting an identical document 1,440 times a day is how a watchdog
+        # runs itself out of KV budget and then cannot record the one tick
+        # that mattered.
+        stale = now - int(stored.get("written_at") or 0) >= MIN_WRITE_INTERVAL_SECONDS
+        if transitions or current != previous or stale:
+            await self._save({"checks": current, "snapshot": snapshot, "written_at": now})
         return snapshot
 
-    async def _reconcile(self, checks, now, reminder_s):
-        """Fold this tick into the stored state, returning what deserves a message.
-
-        Each entry is (check, kind, seconds_in_state) where kind is "down",
-        "recovered" or "still-down".
-        """
+    async def _load(self):
         raw = await self.env.WATCHDOG_STATE.get(STATE_KEY)
         try:
-            state = json.loads(raw) if raw else {}
+            return json.loads(raw) if raw else {}
         except ValueError:
-            state = {}
+            # A corrupt document is not worth a crash: start again and the
+            # next tick re-establishes everything except the outage clock.
+            return {}
 
-        transitions = []
-        updated = {}
-        for check in checks:
-            check_id = check["id"]
-            previous = state.get(check_id) or {}
-            was_ok = previous.get("ok")
-            since = previous.get("since", now)
-            notified_at = previous.get("notified_at", 0)
-
-            if was_ok is None or bool(was_ok) != check["ok"]:
-                # First sighting counts as a transition only when it is bad;
-                # a Worker's first tick should not announce that all is well.
-                since = now
-                if not check["ok"]:
-                    transitions.append((check, "down", 0))
-                    notified_at = now
-                elif was_ok is False:
-                    transitions.append((check, "recovered", now - previous.get("since", now)))
-                    notified_at = 0
-            elif not check["ok"] and now - notified_at >= reminder_s:
-                transitions.append((check, "still-down", now - since))
-                notified_at = now
-
-            updated[check_id] = {"ok": check["ok"], "since": since, "notified_at": notified_at}
-
-        await self.env.WATCHDOG_STATE.put(STATE_KEY, json.dumps(updated))
-        return transitions
+    async def _save(self, document):
+        await self.env.WATCHDOG_STATE.put(
+            STATE_KEY, json.dumps(document), expirationTtl=STATE_TTL_SECONDS
+        )
 
     async def _announce(self, transitions, now):
         token = self._var("TELEGRAM_BOT_TOKEN", "")

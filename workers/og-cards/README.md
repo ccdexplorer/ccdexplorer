@@ -58,6 +58,18 @@ Two layers, for two different reasons:
 The KV binding is optional. Without it the Worker still works and simply asks
 the API every time.
 
+## This one needs the paid plan
+
+Rendering and encoding a card measures at ~12 ms of CPU in native CPython,
+warm. The free plan allows 10 ms per request, and Pyodide's WebAssembly is
+slower than native, so this Worker wants **Workers Paid** ($5/month, where the
+default is 30 s).
+
+The KV cache does not change that: it saves the API round-trip, not the
+drawing, and every request still renders. Caching the finished PNG rather than
+the JSON would — it is the obvious optimisation if the paid plan is not wanted,
+at the cost of a 25 MiB-per-value store filling up with images.
+
 ## Setup
 
 ```sh

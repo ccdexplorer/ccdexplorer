@@ -29,6 +29,31 @@ HTTP API, or that need to be somewhere our own machines are not.
 | [`watchdog/`](watchdog/) | Checks that the site and API answer and that the indexer is current, from outside the estate, and alerts Telegram directly. The one monitor that survives ccd-1 going down. |
 | [`og-cards/`](og-cards/) | Renders a PNG social preview per block, account and transaction, so a shared link previews with live chain data. |
 
+## Which Cloudflare plan you need
+
+Short answer: the **Workers Paid** plan, $5/month, for `og-cards`. The free
+plan's ceiling is not the request count — it is CPU time.
+
+| Free plan limit | What it means here |
+|---|---|
+| 10 ms CPU per request *and* per cron invocation | the binding constraint |
+| 100,000 requests/day | never close; a tick a minute is 1,440 |
+| 1,000 KV writes/day | `watchdog` was over this and was rewritten to fit |
+| 5 cron triggers per account | one is used |
+
+Measured on this machine, in native CPython, warm:
+
+- `og-cards` spends **~12 ms** rendering and encoding one card. That is over
+  the free ceiling before any of Pyodide's WebAssembly overhead is counted, and
+  every request pays it — the KV cache saves the API call, not the drawing.
+  This Worker needs the paid plan.
+- `watchdog` spends **~2 ms**, nearly all of it parsing the 259 KB network
+  dashboard. That should fit inside 10 ms, but not by much, so treat the free
+  plan as something to try rather than something to rely on.
+
+On the paid plan CPU defaults to 30 s and KV writes are unmetered, and neither
+Worker comes anywhere near either.
+
 ## Deploying
 
 Not Komodo, not Docker, not `just`. Each directory is its own project:
@@ -37,6 +62,18 @@ Not Komodo, not Docker, not `just`. Each directory is its own project:
 cd workers/<name>
 npm install
 uv run pywrangler deploy
+```
+
+`npm install` pulls in exactly one thing: **wrangler**, Cloudflare's CLI. It is
+what actually talks to Cloudflare — uploading code, creating KV namespaces,
+storing secrets, tailing logs. `pywrangler` is a thin Python wrapper around it,
+from the `workers-py` dev dependency, that resolves the Python packages into
+the Pyodide bundle first. Node is only ever a build tool here; none of it ships.
+
+First time on a machine, authenticate once:
+
+```sh
+npx wrangler login
 ```
 
 `pywrangler` is `wrangler` with the Python dependency handling wrapped around
