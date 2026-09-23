@@ -12,6 +12,8 @@ here rather than assumed:
     block it was asked for may simply not exist yet.
 """
 
+from pathlib import Path
+
 import httpx2 as httpx
 import pytest
 from fastapi import FastAPI
@@ -194,3 +196,43 @@ def test_an_unknown_entity_gets_a_card_rather_than_an_error(client):
     assert response.content.startswith(PNG_MAGIC)
     # Short, because that block may simply not have been produced yet.
     assert response.headers["cache-control"] == f"public, max-age={og_cards.TTL_FALLBACK}"
+
+
+# --- the meta tags --------------------------------------------------------
+
+
+def _ogp_macro():
+    from jinja2 import Environment, FileSystemLoader
+
+    root = Path(__file__).resolve().parents[4] / "projects" / "ccdexplorer_site" / "templates"
+    env = Environment(loader=FileSystemLoader(str(root)), autoescape=True)
+    return env.get_template("base/ogp_card.html").module.ogp_card
+
+
+def test_an_unset_site_url_never_becomes_the_word_None():
+    """SITE_URL is absent from a local .env, and Jinja renders None as "None".
+
+    That is how a verification email once went out linking to None/verify/... .
+    Relative URLs are not what the OG spec wants, but nothing crawls a laptop,
+    and they cannot become a link to a host called None.
+    """
+    rendered = _ogp_macro()({"SITE_URL": None}, "mainnet/block/1", "Block 1", None)
+    assert "None/" not in rendered
+    assert 'content="/og/mainnet/block/1/image.png"' in rendered
+
+
+def test_a_set_site_url_is_used_as_an_absolute_base():
+    rendered = _ogp_macro()(
+        {"SITE_URL": "https://ccdexplorer.io"}, "mainnet/block/1", "Block 1", None
+    )
+    assert 'content="https://ccdexplorer.io/og/mainnet/block/1/image.png"' in rendered
+
+
+def test_markup_in_a_title_cannot_escape_the_attribute():
+    rendered = _ogp_macro()(
+        {"SITE_URL": "https://ccdexplorer.io"},
+        "mainnet/account/1",
+        "<script>alert(1)</script>",
+        None,
+    )
+    assert "<script>" not in rendered

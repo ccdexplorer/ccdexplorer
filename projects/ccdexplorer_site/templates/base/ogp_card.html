@@ -13,13 +13,19 @@
   there is nothing to feature-flag: if the route is there, the image is.
 #}
 {% macro ogp_card(env, entity, title, description=None, type="website") -%}
+{#- SITE_URL is unset in a local .env, and Jinja renders None as the literal
+    string "None" -- which is how a verification email once went out pointing
+    at None/verify/... . An empty base gives relative URLs instead: not what
+    the OG spec wants, but nothing crawls a laptop, and it can never become a
+    link to a host called None. #}
+{%- set base = env.SITE_URL or "" %}
 <meta property="og:title" content="{{ title }}" />
 <meta property="og:type" content="{{ type }}" />
-<meta property="og:url" content="{{ env.SITE_URL }}/{{ entity }}" />
+<meta property="og:url" content="{{ base }}/{{ entity }}" />
 {%- if description %}
 <meta property="og:description" content="{{ description }}" />
 {%- endif %}
-{%- set card = env.SITE_URL ~ "/og/" ~ entity ~ "/image.png" %}
+{%- set card = base ~ "/og/" ~ entity ~ "/image.png" %}
 <meta property="og:image" content="{{ card }}" />
 <meta property="og:image:secure_url" content="{{ card }}" />
 <meta property="og:image:type" content="image/png" />
