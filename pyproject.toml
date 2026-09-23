@@ -58,6 +58,11 @@ dependencies = [
     "kaleido>=1.2.0",
     "prometheus-client>=0.22.0",
     "fastmcp>=2.14.5",
+    # Draws the social preview cards served from /og (app/og_cards.py).
+    # 10.1 is the floor: it is where ImageFont.load_default gained a size
+    # argument, which is what lets a card use a scalable font without
+    # shipping a font file alongside it.
+    "pillow>=10.1",
 ]
 
 

@@ -44,6 +44,8 @@ import pickle
 
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from fastapi.routing import APIRoute
+
 from ccdexplorer.ccdexplorer_site.app.routers import (
     account,
     account_pool,
@@ -55,6 +57,7 @@ from ccdexplorer.ccdexplorer_site.app.routers import (
     home,
     node,
     nodes,
+    og,
     projects,
     smart_contract_tab_tokens,
     smart_contracts,
@@ -366,6 +369,25 @@ class AppSettings(BaseModel):
     api_url: str | None = None
 
 
+def allow_head_on_images(app) -> None:
+    """Let a crawler HEAD an og:image instead of being told 405.
+
+    Starlette adds HEAD to any route registered for GET; FastAPI does not. So
+    every .../image.png on this site answered a bare
+    `{"detail":"Method Not Allowed"}` to the HEAD that most link unfurlers send
+    to check an image's type and size before downloading it -- and some treat
+    that as the image being unavailable and drop the preview.
+
+    Only the image routes are widened. Unfurlers GET pages, because they need
+    the HTML; it is images they HEAD first. The handlers need no special case:
+    uvicorn's h11 suppresses the body of a HEAD response on its own, so they go
+    on returning exactly what they returned before.
+    """
+    for route in app.routes:
+        if isinstance(route, APIRoute) and route.path.endswith("image.png"):
+            route.methods = set(route.methods) | {"HEAD"}
+
+
 def create_app(app_settings: AppSettings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -600,6 +622,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(account_tab_validator.router)
     app.include_router(account_pool.router)
     app.include_router(node.router)
+    app.include_router(og.router)
     app.include_router(smart_contracts.router)
     app.include_router(smart_contract_tab_tokens.router)
     app.include_router(tools.router)
@@ -618,6 +641,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(sc_holders.router)
     app.include_router(sc_plt_transfers.router)
     app.include_router(sc_agent_registries.router)
+
+    allow_head_on_images(app)
 
     @app.exception_handler(404)
     async def exception_handler_404(request: Request, exc: Exception):

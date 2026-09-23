@@ -1,0 +1,41 @@
+{#
+  One place that decides what a shared ccdexplorer link looks like.
+
+  `entity` is the same `<net>/<kind>/<identifier>` triple the page already
+  lives at. That is deliberate: the card route takes the same shape, so a
+  page's preview image is always derivable from the page's own address and the
+  two can never drift apart.
+
+  The card itself is rendered by the site at /og/<entity>/image.png -- see
+  app/routers/og.py. That is the same shape the statistics charts already use
+  (/plots/<net>/<name>/image.png, tagged by base/plots_og.html), and the tag
+  set below matches that template's. It deploys with these templates, so
+  there is nothing to feature-flag: if the route is there, the image is.
+#}
+{% macro ogp_card(env, entity, title, description=None, type="website") -%}
+{#- SITE_URL is unset in a local .env, and Jinja renders None as the literal
+    string "None" -- which is how a verification email once went out pointing
+    at None/verify/... . An empty base gives relative URLs instead: not what
+    the OG spec wants, but nothing crawls a laptop, and it can never become a
+    link to a host called None. #}
+{%- set base = env.SITE_URL or "" %}
+<meta property="og:title" content="{{ title }}" />
+<meta property="og:type" content="{{ type }}" />
+<meta property="og:url" content="{{ base }}/{{ entity }}" />
+{%- if description %}
+<meta property="og:description" content="{{ description }}" />
+{%- endif %}
+{%- set card = base ~ "/og/" ~ entity ~ "/image.png" %}
+<meta property="og:image" content="{{ card }}" />
+<meta property="og:image:secure_url" content="{{ card }}" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ title }}" />
+{%- if description %}
+<meta name="twitter:description" content="{{ description }}" />
+{%- endif %}
+<meta name="twitter:image" content="{{ card }}" />
+{%- endmacro %}
