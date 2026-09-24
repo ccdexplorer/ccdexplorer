@@ -205,6 +205,7 @@ class CollectionsUtilities(Enum):
         labeled_accounts_metadata (str): Collection name for labeled accounts metadata.
         exchange_rates (str): Collection name for exchange rates.
         exchange_rates_historical (str): Collection name for historical exchange rates.
+        exchange_rates_intraday (str): Collection name for the intraday CCD price series.
         users_v2_prod (str): Collection name for production users (version 2).
         users_v2_dev (str): Collection name for development users (version 2).
         message_log (str): Collection name for message logs.
@@ -222,6 +223,7 @@ class CollectionsUtilities(Enum):
     labeled_accounts_metadata = "labeled_accounts_metadata"
     exchange_rates = "exchange_rates"
     exchange_rates_historical = "exchange_rates_historical"
+    exchange_rates_intraday = "exchange_rates_intraday"
     users_v2_prod = "users_v2_prod"
     users_v2_dev = "users_v2_dev"
     user_sessions = "user_sessions"

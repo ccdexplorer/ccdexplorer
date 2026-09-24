@@ -17,6 +17,17 @@ from pymongo import ReplaceOne
 # coingecko_rates below.
 PACING_SECONDS = 10
 
+#: The intraday series exists so a price chart can show the last day at the
+#: cadence this job runs, rather than the one point a day the nightly forex job
+#: writes. Only CCD is kept: it is the only rate anything asks to plot, and a
+#: series nobody reads is a collection nobody prunes.
+INTRADAY_TOKEN = "CCD"
+
+#: Fourteen days of CCD at a point every ten minutes is about 2,000 documents.
+#: Small enough to be free, long enough to leave room for a week-long view
+#: without changing anything but the query.
+INTRADAY_RETENTION_DAYS = 14
+
 
 def coinapi(token: str, client: httpx.Client) -> tuple[int, dict | None]:
     url = f"https://rest.coinapi.io/v1/exchangerate/{token}/USD/apikey-{COIN_API_KEY}/"
@@ -94,6 +105,44 @@ def coingecko_rates(
     return response.status_code, rates
 
 
+def intraday_point(result: dict) -> dict:
+    """The document this cycle's rate is stored as in the intraday series.
+
+    The id is the rate's own timestamp, which for CoinGecko is its
+    ``last_updated_at`` rather than the moment we asked. Two cycles that see
+    the same unchanged price therefore collapse onto one document instead of
+    drawing a step the market never took.
+
+    A naive timestamp is read as UTC. CoinAPI hands back whatever its payload
+    carried, and treating that as local time would file the point in the wrong
+    place -- by hours, silently, and only for the tokens that took the fallback
+    route.
+    """
+    moment = result["timestamp"]
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return dict(
+        result,
+        _id=f"USD/{result['token']}-{moment:%Y%m%dT%H%M%SZ}",
+        timestamp=moment,
+    )
+
+
+def store_intraday_points(mongodb: MongoDB, points: list[dict]) -> None:
+    """Append this cycle's points to the intraday series.
+
+    The TTL index is declared on every run. ``create_index`` is idempotent and
+    costs nothing once the index exists, and doing it here means the retention
+    cannot be lost by recreating the collection -- which is exactly when nobody
+    would think to re-add it.
+    """
+    collection = mongodb.utilities[CollectionsUtilities.exchange_rates_intraday]
+    collection.create_index("timestamp", expireAfterSeconds=INTRADAY_RETENTION_DAYS * 24 * 60 * 60)
+    _ = collection.bulk_write(
+        [ReplaceOne({"_id": point["_id"]}, point, upsert=True) for point in points]
+    )
+
+
 def get_token_translations_from_mongo(mongodb: MongoDB):
     result = list(
         mongodb.utilities[CollectionsUtilities.token_api_translations].find(
@@ -151,6 +200,7 @@ def perform_spot_retrieval_update(
     coingecko_token_translation = get_token_translations_from_mongo(mongodb)
 
     queue: list[ReplaceOne] = []
+    intraday: list[dict] = []
     written: list[str] = []
     failed: list[str] = []
     unpriceable: list[str] = []
@@ -189,9 +239,21 @@ def perform_spot_retrieval_update(
                 continue
 
             queue.append(ReplaceOne({"_id": f"USD/{token}"}, result, upsert=True))
+            if token == INTRADAY_TOKEN and isinstance(result.get("timestamp"), dt.datetime):
+                intraday.append(intraday_point(result))
             written.append(token)
 
     if queue:
         _ = mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_write(queue)
+
+    if intraday:
+        # Deliberately swallowed. This job's duty is the spot rates, which are
+        # already written above; the intraday series is a chart's convenience.
+        # Failing the run -- and alerting -- because a secondary write broke
+        # would be the tail wagging the dog.
+        try:
+            store_intraday_points(mongodb, intraday)
+        except Exception as error:  # noqa: BLE001
+            context.log.error(f"intraday series not written: {error}")
 
     return written, failed, unpriceable
