@@ -27,13 +27,32 @@ def site_plot_names() -> set[str]:
     return set(re.findall(r'"/plots/\{net\}/([a-z0-9_]+)/image\.png"', source))
 
 
-def test_the_catalogue_matches_the_charts_the_site_serves():
+def test_the_bot_never_offers_a_chart_the_site_cannot_draw():
+    """The direction that actually breaks something.
+
+    A name here with no route on the site is a URL handed to Telegram that
+    answers with an HTML error page, so the reader gets a broken result. That
+    must fail.
+
+    The other direction is allowed on purpose: the site may serve a chart the
+    bot does not list yet. Requiring equality meant the two had to ship in one
+    commit and deploy together, with no way to put a chart on the site first
+    and add it to the bot once it had proved itself.
+    """
     catalogue = {chart.name for chart in CHARTS}
     served = site_plot_names()
-    assert catalogue == served, (
-        f"only in the bot: {sorted(catalogue - served)}; "
-        f"only on the site: {sorted(served - catalogue)}"
-    )
+    assert catalogue <= served, f"offered by the bot, not served: {sorted(catalogue - served)}"
+
+
+def test_charts_the_site_serves_but_the_bot_does_not_offer():
+    """Not a failure -- a list, so it is a decision rather than an oversight.
+
+    Printed by pytest only when something is missing, which is the moment
+    somebody should be asked whether it belongs in the bot.
+    """
+    missing = sorted(site_plot_names() - {chart.name for chart in CHARTS})
+    if missing:
+        print(f"\n  not offered by the chart bot: {missing}")
 
 
 def test_every_chart_has_a_title_and_a_one_line_description():
@@ -75,7 +94,7 @@ def test_every_chart_is_mainnet():
 
 def test_an_empty_query_shows_the_catalogue_rather_than_nothing():
     """Someone who types the bot's name and stops should see what there is."""
-    assert len(search("")) == MAX_RESULTS
+    assert len(search("")) == len(CHARTS)
     assert search("   ") == search("")
 
 
@@ -167,9 +186,16 @@ def test_it_refuses_to_start_without_a_token(monkeypatch):
 
 
 def test_an_empty_query_shows_every_chart():
-    """Capping this below the catalogue size hid six charts from the only
-    means anyone has of browsing."""
+    """Capping this below the catalogue size hid charts from the only means
+    anyone has of browsing -- twice: first at twelve of eighteen, then again
+    when three price charts were added to a cap pinned at eighteen."""
     assert len(search("")) == len(CHARTS)
+
+
+def test_the_catalogue_still_fits_in_one_telegram_answer():
+    """Fifty is Telegram's limit, not ours. Past it, results are silently
+    dropped again."""
+    assert len(CHARTS) <= MAX_RESULTS
 
 
 @pytest.mark.parametrize(
@@ -182,7 +208,8 @@ def test_an_empty_query_shows_every_chart():
         ("tps", "network_activity_tps"),
         ("bakers", "staking_validator_count"),
         ("binance", "ccd_on_exchanges"),
-        ("price", "realized_prices"),
+        ("price", "ccd_price_24h"),
+        ("realized", "realized_prices"),
     ],
 )
 def test_the_words_people_actually_type_find_the_chart(query, expected):
