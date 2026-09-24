@@ -39,6 +39,7 @@ from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_exchange_rates,
+    get_exchange_rates_historical,
     get_grpcclient,
     get_mongo_db,
     get_mongo_motor,
@@ -289,6 +290,220 @@ async def get_spot_exchange_rates(
         )
 
     return exchange_rates
+
+
+#: The chain sets its CCD/EUR rate by update transaction every thirty minutes,
+#: and has done since 2021. That is the only complete intraday price history
+#: there is -- the daily forex job writes one point a day, and the spot job
+#: only started keeping intraday recently and prunes after two weeks.
+CCD_PRICE_UPDATE_TYPE = "micro_ccd_per_euro_update"
+
+#: Beyond about a week, thirty-minute resolution is thousands of points nobody
+#: can see on a chart. Past this the daily on-chain values are used instead --
+#: the same rate, already aggregated once a day by the nightrunner.
+CCD_PRICE_INTRADAY_MAX_HOURS = 168
+
+#: A chart is about a thousand pixels wide. More points than this is bytes
+#: nobody can perceive, so the series is thinned to fit before it is sent.
+CCD_PRICE_MAX_POINTS = 500
+
+#: A year. Further back exists on chain, but nothing asks for it yet.
+CCD_PRICE_MAX_HOURS = 8760
+
+
+def _eur_per_ccd(payload: dict) -> float | None:
+    """microCCD per euro, as the chain stores it, inverted into EUR per CCD.
+
+    Stored as strings because the numerator outgrows 64 bits.
+    """
+    try:
+        numerator = int(payload["numerator"])
+        denominator = int(payload["denominator"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if numerator <= 0:
+        return None
+    return 1_000_000 * denominator / numerator
+
+
+def _thin(points: list, limit: int) -> list:
+    """Keep at most ``limit`` points, evenly spaced, always including the last.
+
+    The last one matters more than the spacing: it is what the headline change
+    is measured against, and dropping it would make the chart disagree with
+    the number printed above it.
+    """
+    if len(points) <= limit:
+        return points
+    step = len(points) / limit
+    thinned = [points[int(index * step)] for index in range(limit)]
+    if thinned[-1] is not points[-1]:
+        thinned[-1] = points[-1]
+    return thinned
+
+
+@router.get("/{net}/misc/ccd-price/last/{hours}", response_class=JSONResponse)
+async def get_ccd_price_series(
+    request: Request,
+    net: str,
+    hours: int,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    exchange_rates: dict = Depends(get_exchange_rates),
+    exchange_rates_historical: dict = Depends(get_exchange_rates_historical),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Return the CCD price over the last ``hours``, from the chain's own rate.
+
+    The chain carries a CCD/EUR rate, set by update transaction every thirty
+    minutes since 2021, which it uses to price transaction fees. It is not a
+    market feed -- it is governance-set -- but it tracks one closely, and it is
+    the only complete intraday history available: the daily forex job writes a
+    single point per day, and that point is a snapshot taken shortly after
+    midnight, so by mid-morning it is hours stale.
+
+    Below a week the individual updates are returned. Above it, the daily
+    on-chain values the nightrunner already aggregates, because thirty-minute
+    resolution over a year is seventeen thousand points nobody can see.
+
+    Prices are converted to USD here rather than by the caller, so a chart
+    stays a renderer. ``spot_usd`` is the market price from the spot job and
+    will differ from the last point by a few tenths of a percent -- one is what
+    the chain charges fees at, the other is what an exchange quotes.
+    """
+    if net != "mainnet":
+        raise HTTPException(
+            status_code=422,
+            detail="CCD only has a price on mainnet.",
+        )
+
+    hours = max(1, min(int(hours), CCD_PRICE_MAX_HOURS))
+    now = dt.datetime.now(dt.timezone.utc)
+    cutoff = now - timedelta(hours=hours)
+    db_to_use = net_db(mongomotor, net)
+
+    points: list[dict] = []
+    if hours <= CCD_PRICE_INTRADAY_MAX_HOURS:
+        source = "chain-30min"
+        # Sorted by height using the (type.contents, block_info.height) index,
+        # then trimmed by time, rather than scanning a slot_time range that
+        # would walk every transaction in the window -- around a hundred
+        # thousand a day -- to find the forty-eight that are rate updates.
+        limit = hours * 2 + 10
+        cursor = (
+            db_to_use[Collections.transactions]
+            .find(
+                {"type.contents": CCD_PRICE_UPDATE_TYPE},
+                {"block_info.slot_time": 1, f"update.payload.{CCD_PRICE_UPDATE_TYPE}": 1},
+            )
+            .sort("block_info.height", -1)
+            .limit(limit)
+        )
+        for doc in await cursor.to_list(length=limit):
+            at = (doc.get("block_info") or {}).get("slot_time")
+            eur = _eur_per_ccd(
+                (doc.get("update") or {}).get("payload", {}).get(CCD_PRICE_UPDATE_TYPE, {})
+            )
+            if at is None or eur is None:
+                continue
+            if at.tzinfo is None:
+                at = at.replace(tzinfo=dt.timezone.utc)
+            if at >= cutoff:
+                points.append({"at": at, "eur": eur})
+        points.sort(key=lambda point: point["at"])
+    else:
+        source = "chain-daily"
+        start = cutoff.strftime("%Y-%m-%d")
+        cursor = db_to_use[Collections.statistics].find(
+            {"type": "statistics_microccd", "date": {"$gte": start}},
+            {"date": 1, "GTU_numerator": 1, "GTU_denominator": 1},
+        )
+        for doc in await cursor.to_list(length=None):
+            eur = _eur_per_ccd(
+                {"numerator": doc.get("GTU_numerator"), "denominator": doc.get("GTU_denominator")}
+            )
+            if eur is None:
+                continue
+            points.append(
+                {
+                    "at": dt.datetime.strptime(doc["date"], "%Y-%m-%d").replace(
+                        tzinfo=dt.timezone.utc
+                    ),
+                    "eur": eur,
+                }
+            )
+        points.sort(key=lambda point: point["at"])
+
+        # The nightrunner only writes a day once it is over, so the daily
+        # series stops at yesterday. Left alone, a 90-day chart would end a
+        # day short while the 24-hour one is current, and the headline change
+        # would be measured to yesterday. The newest rate update closes it.
+        newest = await (
+            db_to_use[Collections.transactions]
+            .find(
+                {"type.contents": CCD_PRICE_UPDATE_TYPE},
+                {"block_info.slot_time": 1, f"update.payload.{CCD_PRICE_UPDATE_TYPE}": 1},
+            )
+            .sort("block_info.height", -1)
+            .limit(1)
+            .to_list(length=1)
+        )
+        for doc in newest:
+            at = (doc.get("block_info") or {}).get("slot_time")
+            eur = _eur_per_ccd(
+                (doc.get("update") or {}).get("payload", {}).get(CCD_PRICE_UPDATE_TYPE, {})
+            )
+            if at is None or eur is None:
+                continue
+            if at.tzinfo is None:
+                at = at.replace(tzinfo=dt.timezone.utc)
+            if not points or at > points[-1]["at"]:
+                points.append({"at": at, "eur": eur})
+
+    if not points:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No CCD price points found for the last {hours} hours on {net}.",
+        )
+
+    # USD per EUR, from the most recent daily forex row we hold.
+    eur_rates = (exchange_rates_historical or {}).get("EUR") or {}
+    eur_usd = eur_rates.get(max(eur_rates)) if eur_rates else None
+
+    points = _thin(points, CCD_PRICE_MAX_POINTS)
+    series = [
+        {
+            "at": point["at"].strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "eur": point["eur"],
+            "usd": (point["eur"] * eur_usd) if eur_usd else None,
+        }
+        for point in points
+    ]
+    usd_values = [row["usd"] for row in series if row["usd"] is not None]
+    first, last = series[0], series[-1]
+
+    spot = (exchange_rates or {}).get("CCD") or {}
+    spot_at = spot.get("timestamp")
+
+    return {
+        "net": net,
+        "hours": hours,
+        "source": source,
+        "points": len(series),
+        "series": series,
+        "first_usd": first["usd"],
+        "last_usd": last["usd"],
+        "change_pct": (
+            ((last["usd"] / first["usd"]) - 1) * 100 if first["usd"] and last["usd"] else None
+        ),
+        "high_usd": max(usd_values) if usd_values else None,
+        "low_usd": min(usd_values) if usd_values else None,
+        "eur_usd": eur_usd,
+        # The market price, for the headline. It disagrees with the last point
+        # by a few tenths of a percent, and that is the honest difference
+        # between a fee rate and an exchange quote.
+        "spot_usd": spot.get("rate"),
+        "spot_at": spot_at.strftime("%Y-%m-%dT%H:%M:%SZ") if spot_at else None,
+    }
 
 
 @router.get("/{net}/misc/protocol-updates")
