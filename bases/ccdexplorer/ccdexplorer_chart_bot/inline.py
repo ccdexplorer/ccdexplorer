@@ -17,9 +17,13 @@ from telegram import (
     InlineQueryResultsButton,
     InputTextMessageContent,
 )
+import logging
+
 from telegram.constants import ParseMode
 
 from .catalogue import Chart, search
+
+log = logging.getLogger(__name__)
 
 #: How long Telegram may reuse an answer. The plots behind it are cached for an
 #: hour by the site, so anything under that costs nothing and spares both ends
@@ -85,8 +89,20 @@ def handler(site_url: str):
         inline_query = update.inline_query
         if inline_query is None:
             return
+        query = inline_query.query or ""
+        results = results_for(query, site_url)
+        # Logged because the alternative is what shipped first: a bot that says
+        # nothing from startup until forever, so "nothing in the logs" cannot
+        # distinguish working from broken. The query is recorded, not who sent
+        # it -- this runs in other people's conversations.
+        log.info(
+            "inline query %r -> %d result(s)%s",
+            query,
+            len(results),
+            "" if results and results[0].id != "no-match" else " (no match)",
+        )
         await inline_query.answer(
-            results_for(inline_query.query or "", site_url),
+            results,
             cache_time=CACHE_SECONDS,
             button=HELP_BUTTON,
             # The answer depends only on the query, never on who asked, so

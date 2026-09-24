@@ -228,3 +228,81 @@ def test_the_picker_carries_a_way_to_learn_the_terms():
 
     assert HELP_BUTTON.text
     assert HELP_BUTTON.start_parameter
+
+
+# --- the bot's own chat ---------------------------------------------------
+#
+# Inline mode is for other people's conversations. The private chat is where
+# somebody goes to find out what the bot does, and the first version answered
+# a plain message there with silence.
+
+
+class _Message:
+    """Records what the handler replied with, instead of calling Telegram."""
+
+    def __init__(self, text):
+        self.text = text
+        self.photos = []
+        self.htmls = []
+
+    async def reply_photo(self, photo, caption=None, parse_mode=None, reply_markup=None):
+        self.photos.append((photo, caption, reply_markup))
+
+    async def reply_html(self, text, **kwargs):
+        self.htmls.append(text)
+
+
+class _Update:
+    def __init__(self, text):
+        self.message = _Message(text)
+
+
+class _Context:
+    bot = type("bot", (), {"username": "ccdexplorer_chart_bot"})()
+
+
+async def _send(text):
+    from ccdexplorer.ccdexplorer_chart_bot.direct import handler
+
+    update = _Update(text)
+    await handler(SITE)(update, _Context())
+    return update.message
+
+
+async def test_a_plain_message_returns_the_chart():
+    """Open the bot, type a word, get the chart -- the most obvious way to try
+    it, and the one that used to do nothing at all."""
+    message = await _send("accounts")
+    assert message.photos
+    photo, caption, _ = message.photos[0]
+    assert photo == f"{SITE}/plots/mainnet/accounts_per_day/image.png"
+    assert "Accounts per day" in caption
+
+
+async def test_a_whole_question_works_in_the_chat_too():
+    message = await _send("how much is staked")
+    assert message.photos
+    assert "staking_percentage_staked" in message.photos[0][0]
+
+
+async def test_each_reply_offers_to_send_it_to_a_chat():
+    """So the private chat doubles as a way to find the right chart first."""
+    message = await _send("accounts")
+    _, _, markup = message.photos[0]
+    button = markup.inline_keyboard[0][0]
+    assert button.switch_inline_query == "accounts_per_day"
+
+
+async def test_a_broad_query_is_capped_and_says_so():
+    """Otherwise the chat becomes a wall of near-identical line charts."""
+    from ccdexplorer.ccdexplorer_chart_bot.direct import MAX_REPLIES
+
+    message = await _send("staking")
+    assert len(message.photos) == MAX_REPLIES
+    assert message.htmls and "more" in message.htmls[0]
+
+
+async def test_nonsense_gets_an_answer_rather_than_silence():
+    message = await _send("kittens")
+    assert not message.photos
+    assert message.htmls and "kittens" in message.htmls[0]
