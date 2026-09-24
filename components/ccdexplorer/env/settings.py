@@ -11,6 +11,9 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", "prod")
 NOTIFIER_API_TOKEN = os.environ.get("NOTIFIER_API_TOKEN")
 SITE_URL = os.environ.get("SITE_URL")
 API_TOKEN = os.environ.get("API_TOKEN", "api_token")
+# The chart bot is a second Telegram bot with its own token: it answers inline
+# queries in other people's chats, which the notification bot must never do.
+CHART_BOT_TOKEN = os.environ.get("CHART_BOT_TOKEN", "")
 FASTMAIL_TOKEN = os.environ.get("FASTMAIL_TOKEN")
 CCDEXPLORER_API_KEY = os.environ.get("CCDEXPLORER_API_KEY")
 COIN_MARKET_CAP_API_KEY = os.environ.get("COIN_MARKET_CAP_API_KEY")

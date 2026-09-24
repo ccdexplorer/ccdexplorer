@@ -124,6 +124,7 @@ dev-mode-dirs = [ "components", "bases", "development", "." ]
 "bases/ccdexplorer/ms_modules"            = "ccdexplorer/ms_modules"
 "bases/ccdexplorer/ms_plt"                = "ccdexplorer/ms_plt"
 "bases/ccdexplorer/ccdexplorer_mcp"       = "ccdexplorer/ccdexplorer_mcp"
+"bases/ccdexplorer/ccdexplorer_chart_bot" = "ccdexplorer/ccdexplorer_chart_bot"
 
 
 [tool.ruff]
