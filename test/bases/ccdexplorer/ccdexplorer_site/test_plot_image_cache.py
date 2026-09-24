@@ -158,3 +158,52 @@ def test_evicting_forces_the_next_request_to_redraw(renders):
 
 def test_evicting_something_absent_is_harmless():
     utils.evict_plot_image("/plots/mainnet/never_rendered/image.png")
+
+
+# --- themes ---------------------------------------------------------------
+#
+# The image routes are GETs, so get_theme_from_request found no body and every
+# chart image rendered dark. Fine on the site, which is dark; wrong in a
+# Telegram chat, which mostly is not.
+
+
+def test_a_theme_query_param_is_honoured():
+    from starlette.requests import Request
+
+    async def theme_of(query):
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/plots/mainnet/x/image.png",
+            "query_string": query.encode(),
+            "headers": [],
+            "scheme": "https",
+            "server": ("ccdexplorer.io", 443),
+            "root_path": "",
+        }
+        request = Request(scope)
+        request._body = b""
+        return await utils.get_theme_from_request(request)
+
+    import asyncio
+
+    assert asyncio.run(theme_of("theme=light")) == "light"
+    assert asyncio.run(theme_of("theme=dark")) == "dark"
+    assert asyncio.run(theme_of("")) == "dark", "dark stays the default"
+    # Anything else is refused rather than passed through, because the theme
+    # becomes a cache key -- see below.
+    assert asyncio.run(theme_of("theme=chartreuse")) == "dark"
+    assert asyncio.run(theme_of("theme=../../etc")) == "dark"
+
+
+def test_the_two_themes_are_cached_separately():
+    """Keyed on the path alone, the first render would win and everyone after
+    it would get the wrong colours."""
+    path = "/plots/mainnet/accounts_per_day/image.png"
+    assert utils.plot_cache_key(path, "dark") != utils.plot_cache_key(path, "light")
+
+
+def test_only_the_two_real_themes_can_become_cache_keys():
+    """An unchecked theme would let anyone mint unlimited entries in an
+    in-process store by varying a query string."""
+    assert set(utils.PLOT_THEMES) == {"dark", "light"}
