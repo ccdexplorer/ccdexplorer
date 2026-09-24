@@ -18,6 +18,7 @@ class _Collection:
         self.documents = documents or []
         self.find_calls = 0
         self.bulk_writes = []
+        self.indexes = []
 
     def find(self, *args, **kwargs):
         self.find_calls += 1
@@ -26,6 +27,9 @@ class _Collection:
     def bulk_write(self, queue):
         self.bulk_writes.append(queue)
 
+    def create_index(self, key, **kwargs):
+        self.indexes.append((key, kwargs))
+
 
 def _mongodb(translations=("BTC", "ETH", "EUROe")):
     translation_docs = [{"token": t, "translation": t.lower()} for t in translations]
@@ -33,6 +37,7 @@ def _mongodb(translations=("BTC", "ETH", "EUROe")):
         utilities={
             CollectionsUtilities.token_api_translations: _Collection(translation_docs),
             CollectionsUtilities.exchange_rates: _Collection(),
+            CollectionsUtilities.exchange_rates_intraday: _Collection(),
         }
     )
 
@@ -614,3 +619,114 @@ def test_coinapi_is_only_asked_about_what_coingecko_missed(monkeypatch, sleeps):
     assert (failed, unpriceable) == ([], [])
     # Only one CoinAPI call, so nothing to pace.
     assert sleeps == []
+
+
+# --- the intraday series --------------------------------------------------
+#
+# A price chart needs the day at this job's own cadence, not the single point a
+# day the nightly forex job writes. The series is a by-product of a run that
+# already has the rate in hand, which is cheap -- but it is a by-product, and
+# the tests below are mostly about it staying one.
+
+
+def _ccd_rate(timestamp):
+    def _fake(token, *args, **kwargs):
+        return 200, {
+            "_id": f"USD/{token}",
+            "token": token,
+            "rate": 0.0035,
+            "source": "CoinAPI",
+            "timestamp": timestamp,
+        }
+
+    return _fake
+
+
+def test_the_id_is_the_rates_own_timestamp():
+    """So two cycles seeing one unchanged price collapse to a single point."""
+    moment = datetime(2026, 9, 24, 10, 0, 20, tzinfo=timezone.utc)
+    first = update_spot_retrieval.intraday_point(
+        {"token": "CCD", "rate": 0.0035, "timestamp": moment}
+    )
+    again = update_spot_retrieval.intraday_point(
+        {"token": "CCD", "rate": 0.0035, "timestamp": moment}
+    )
+    assert first["_id"] == again["_id"] == "USD/CCD-20260924T100020Z"
+
+
+def test_a_naive_timestamp_is_read_as_utc():
+    """CoinAPI hands back whatever its payload carried.
+
+    Reading that as local time would file the point hours away from where it
+    belongs, silently, and only for tokens that took the fallback route.
+    """
+    point = update_spot_retrieval.intraday_point(
+        {"token": "CCD", "rate": 0.0035, "timestamp": datetime(2026, 9, 24, 10, 0, 20)}
+    )
+    assert point["_id"] == "USD/CCD-20260924T100020Z"
+    assert point["timestamp"].tzinfo is timezone.utc
+
+
+def test_a_different_timestamp_is_a_different_point():
+    a = update_spot_retrieval.intraday_point(
+        {"token": "CCD", "rate": 1.0, "timestamp": datetime(2026, 9, 24, 10, 0, 0)}
+    )
+    b = update_spot_retrieval.intraday_point(
+        {"token": "CCD", "rate": 1.0, "timestamp": datetime(2026, 9, 24, 10, 10, 0)}
+    )
+    assert a["_id"] != b["_id"]
+
+
+def test_ccd_is_appended_to_the_series_and_other_tokens_are_not(monkeypatch):
+    moment = datetime(2026, 9, 24, 10, 0, 20, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        update_spot_retrieval,
+        "fetch_rate_from_coinapi",
+        lambda context, token, client: _ccd_rate(moment)(token)[1],
+    )
+    mongodb = _mongodb(translations=())
+    perform_spot_retrieval_update(_context(), ["CCD", "BTC"], mongodb)
+
+    series = mongodb.utilities[CollectionsUtilities.exchange_rates_intraday]
+    assert len(series.bulk_writes) == 1
+    written = series.bulk_writes[0]
+    assert len(written) == 1, "only CCD belongs in the series"
+
+
+def test_the_retention_is_declared_on_every_run(monkeypatch):
+    """create_index is idempotent, and doing it here means recreating the
+    collection cannot quietly drop the retention."""
+    moment = datetime(2026, 9, 24, 10, 0, 20, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        update_spot_retrieval,
+        "fetch_rate_from_coinapi",
+        lambda context, token, client: _ccd_rate(moment)(token)[1],
+    )
+    mongodb = _mongodb(translations=())
+    perform_spot_retrieval_update(_context(), ["CCD"], mongodb)
+
+    series = mongodb.utilities[CollectionsUtilities.exchange_rates_intraday]
+    assert series.indexes == [
+        ("timestamp", {"expireAfterSeconds": update_spot_retrieval.INTRADAY_RETENTION_DAYS * 86400})
+    ]
+
+
+def test_a_broken_series_write_does_not_fail_the_spot_run(monkeypatch):
+    """The spot rates are this job's duty; the series is a chart's convenience."""
+    moment = datetime(2026, 9, 24, 10, 0, 20, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        update_spot_retrieval,
+        "fetch_rate_from_coinapi",
+        lambda context, token, client: _ccd_rate(moment)(token)[1],
+    )
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("mongo is having a day")
+
+    monkeypatch.setattr(update_spot_retrieval, "store_intraday_points", explode)
+    mongodb = _mongodb(translations=())
+
+    written, failed, unpriceable = perform_spot_retrieval_update(_context(), ["CCD"], mongodb)
+
+    assert written == ["CCD"], "the spot rate still landed"
+    assert mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_writes
