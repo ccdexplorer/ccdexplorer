@@ -13,12 +13,15 @@ its reciprocal scaled by a million. Getting that wrong by a factor of a million
 would still look plausible on a chart.
 """
 
+import datetime as dt
+
 import pytest
 
 from ccdexplorer.ccdexplorer_api.app.routers.v2.misc_v2 import (
     CCD_PRICE_INTRADAY_MAX_HOURS,
     CCD_PRICE_MAX_HOURS,
     CCD_PRICE_MAX_POINTS,
+    _append_spot,
     _eur_per_ccd,
     _thin,
 )
@@ -104,3 +107,79 @@ def test_intraday_gives_way_to_daily_before_the_series_gets_silly():
 
 def test_a_year_is_reachable():
     assert CCD_PRICE_MAX_HOURS >= 365 * 24
+
+
+# --- ending on the spot ---------------------------------------------------
+#
+# Every price chart ends on the current market price, in the line as well as
+# the headline. The chain rate is up to thirty minutes old and is a fee rate
+# besides, so a chart drawn only from it stops short of the price a reader
+# would look up -- and the headline would then disagree with the end of its
+# own line.
+
+UTC = dt.timezone.utc
+
+
+def _points(*hours_ago):
+    now = dt.datetime(2026, 9, 24, 16, 0, tzinfo=UTC)
+    return [
+        {"at": now - dt.timedelta(hours=h), "eur": 0.003 + h / 10000}
+        for h in sorted(hours_ago, reverse=True)
+    ]
+
+
+def test_the_spot_closes_the_series():
+    points = _points(2, 1)
+    at = dt.datetime(2026, 9, 24, 15, 50, tzinfo=UTC)
+    assert _append_spot(points, 0.0035, at, 1.1426) is True
+    assert points[-1]["usd"] == 0.0035
+    assert points[-1]["at"] == at
+
+
+def test_the_spot_point_carries_its_own_usd_price():
+    """The chain points are converted from EUR; this one is already USD, and
+    converting it through EUR and back would only lose precision."""
+    points = _points(1)
+    _append_spot(points, 0.0035, dt.datetime(2026, 9, 24, 15, 50, tzinfo=UTC), 1.1426)
+    assert points[-1]["usd"] == 0.0035
+    assert points[-1]["eur"] == pytest.approx(0.0035 / 1.1426)
+
+
+def test_a_naive_spot_timestamp_is_read_as_utc():
+    """Mongo hands these back naive; reading one as local time would place it
+    hours away and reorder the end of the series."""
+    points = _points(1)
+    assert _append_spot(points, 0.0035, dt.datetime(2026, 9, 24, 15, 50), 1.1426) is True
+    assert points[-1]["at"].tzinfo is not None
+
+
+def test_a_spot_older_than_the_chain_is_not_appended():
+    """It would bend the last segment backwards in time."""
+    points = _points(2, 1)
+    stale = dt.datetime(2026, 9, 24, 12, 0, tzinfo=UTC)
+    assert _append_spot(points, 0.0035, stale, 1.1426) is False
+    assert len(points) == 2
+
+
+def test_a_missing_spot_leaves_the_series_alone():
+    points = _points(1)
+    assert _append_spot(points, None, dt.datetime.now(UTC), 1.1426) is False
+    assert _append_spot(points, 0.0035, None, 1.1426) is False
+    assert len(points) == 1
+
+
+def test_the_spot_survives_thinning():
+    """It is the point the headline is measured against; thinning it away
+    would make the chart disagree with its own header."""
+    points = _points(*range(1, 900))
+    at = dt.datetime(2026, 9, 24, 15, 59, tzinfo=UTC)
+    _append_spot(points, 0.0035, at, 1.1426)
+    thinned = _thin(points, CCD_PRICE_MAX_POINTS)
+    assert thinned[-1]["usd"] == 0.0035
+    assert thinned[-1]["at"] == at
+
+
+def test_the_spot_still_lands_on_an_empty_series():
+    points = []
+    assert _append_spot(points, 0.0035, dt.datetime.now(UTC), 1.1426) is True
+    assert len(points) == 1

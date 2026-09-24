@@ -326,6 +326,34 @@ def _eur_per_ccd(payload: dict) -> float | None:
     return 1_000_000 * denominator / numerator
 
 
+def _append_spot(points: list, spot_usd, spot_at, eur_usd) -> bool:
+    """Close the series on the current market price. Returns whether it did.
+
+    Every price chart ends on the spot, in the line as well as the headline.
+    The chain rate is up to thirty minutes old and is a fee rate besides, so a
+    chart drawn only from it stops short of the price a reader would look up --
+    and the headline would then disagree with the end of its own line.
+
+    Appended rather than substituted: the chain points before it are what they
+    were. And only when it is genuinely newer, because a spot reading that lags
+    the chain would bend the last segment backwards in time.
+    """
+    if not spot_usd or not spot_at:
+        return False
+    if spot_at.tzinfo is None:
+        spot_at = spot_at.replace(tzinfo=dt.timezone.utc)
+    if points and spot_at <= points[-1]["at"]:
+        return False
+    points.append(
+        {
+            "at": spot_at,
+            "eur": (spot_usd / eur_usd) if eur_usd else None,
+            "usd": spot_usd,
+        }
+    )
+    return True
+
+
 def _thin(points: list, limit: int) -> list:
     """Keep at most ``limit`` points, evenly spaced, always including the last.
 
@@ -469,26 +497,39 @@ async def get_ccd_price_series(
     eur_rates = (exchange_rates_historical or {}).get("EUR") or {}
     eur_usd = eur_rates.get(max(eur_rates)) if eur_rates else None
 
+    # Every price chart ends on the current spot, in the line as well as the
+    # headline. The chain rate is up to thirty minutes old and is a fee rate
+    # besides, so a chart drawn only from it stops short of the price anyone
+    # reading it would look up -- and the headline would then disagree with
+    # the end of its own line. Appended rather than substituted: the chain
+    # points before it are what they were.
+    spot = (exchange_rates or {}).get("CCD") or {}
+    spot_usd = spot.get("rate")
+    spot_at = spot.get("timestamp")
+    ends_with_spot = _append_spot(points, spot_usd, spot_at, eur_usd)
+
     points = _thin(points, CCD_PRICE_MAX_POINTS)
     series = [
         {
             "at": point["at"].strftime("%Y-%m-%dT%H:%M:%SZ"),
             "eur": point["eur"],
-            "usd": (point["eur"] * eur_usd) if eur_usd else None,
+            # The spot point carries its own USD price; the chain points are
+            # converted from EUR.
+            "usd": point.get("usd")
+            if point.get("usd") is not None
+            else ((point["eur"] * eur_usd) if eur_usd and point["eur"] else None),
         }
         for point in points
     ]
     usd_values = [row["usd"] for row in series if row["usd"] is not None]
     first, last = series[0], series[-1]
 
-    spot = (exchange_rates or {}).get("CCD") or {}
-    spot_at = spot.get("timestamp")
-
     return {
         "net": net,
         "hours": hours,
         "source": source,
         "points": len(series),
+        "ends_with_spot": ends_with_spot,
         "series": series,
         "first_usd": first["usd"],
         "last_usd": last["usd"],
@@ -501,7 +542,7 @@ async def get_ccd_price_series(
         # The market price, for the headline. It disagrees with the last point
         # by a few tenths of a percent, and that is the honest difference
         # between a fee rate and an exchange quote.
-        "spot_usd": spot.get("rate"),
+        "spot_usd": spot_usd,
         "spot_at": spot_at.strftime("%Y-%m-%dT%H:%M:%SZ") if spot_at else None,
     }
 
