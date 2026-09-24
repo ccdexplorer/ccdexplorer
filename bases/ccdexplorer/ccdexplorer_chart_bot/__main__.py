@@ -15,10 +15,17 @@ import logging
 
 from ccdexplorer.env import CHART_BOT_TOKEN, SITE_URL
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, InlineQueryHandler
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    InlineQueryHandler,
+    MessageHandler,
+    filters,
+)
 
 from .catalogue import CHARTS
-from .inline import handler
+from .direct import handler as direct_handler
+from .inline import handler as inline_handler
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -64,7 +71,12 @@ def main() -> None:
 
     application = ApplicationBuilder().token(CHART_BOT_TOKEN).build()
     application.add_handler(CommandHandler(["start", "help"], start))
-    application.add_handler(InlineQueryHandler(handler(site_url)))
+    application.add_handler(InlineQueryHandler(inline_handler(site_url)))
+    # Anything else typed at the bot directly is treated as a chart query.
+    # Registered last, so it cannot swallow the commands above.
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, direct_handler(site_url))
+    )
     application.run_polling(allowed_updates=["message", "inline_query"])
 
 
