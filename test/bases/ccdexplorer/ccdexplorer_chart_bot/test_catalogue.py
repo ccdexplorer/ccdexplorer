@@ -158,3 +158,73 @@ def test_it_refuses_to_start_without_a_token(monkeypatch):
     monkeypatch.setattr(__main__, "CHART_BOT_TOKEN", "")
     with pytest.raises(SystemExit):
         __main__.main()
+
+
+# --- discovery ------------------------------------------------------------
+#
+# An inline bot is browsed, not searched: someone types its name, looks at what
+# comes back, and picks. Everything below is about that working.
+
+
+def test_an_empty_query_shows_every_chart():
+    """Capping this below the catalogue size hid six charts from the only
+    means anyone has of browsing."""
+    assert len(search("")) == len(CHARTS)
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        ("how much is staked", "staking_percentage_staked"),
+        ("show me the validators", "staking_validator_count"),
+        ("what are the fees", "transaction_fees"),
+        ("whales", "daily_limits"),
+        ("tps", "network_activity_tps"),
+        ("bakers", "staking_validator_count"),
+        ("binance", "ccd_on_exchanges"),
+        ("price", "realized_prices"),
+    ],
+)
+def test_the_words_people_actually_type_find_the_chart(query, expected):
+    """The route names are ours, not the reader's."""
+    assert search(query)[0].name == expected
+
+
+def test_filler_words_do_not_sink_a_query():
+    """Every word having to match meant a whole question found nothing."""
+    assert search("how much is staked") == search("staked")
+
+
+def test_a_near_miss_beats_an_empty_panel():
+    """Half-right is worth showing; the reader can see it and reject it."""
+    hits = search("validator kittens")
+    assert hits and hits[0].name.startswith("staking_validator")
+
+
+def test_genuine_nonsense_still_finds_nothing():
+    assert search("kittens") == []
+
+
+def test_every_chart_carries_words_that_reach_it():
+    for chart in CHARTS:
+        assert chart.keywords, chart.name
+        for word in chart.keywords:
+            assert chart.name in {c.name for c in search(word)}, f"{word} misses {chart.name}"
+
+
+def test_stopwords_do_not_swallow_discriminating_words():
+    """ccd, pool and per appear in chart names and must keep working."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import STOPWORDS
+
+    assert not {"ccd", "pool", "per"} & STOPWORDS
+    assert search("ccd on exchanges")[0].name == "ccd_on_exchanges"
+    assert search("delegators per pool")[0].name == "staking_avg_delegator_per_pool_count"
+
+
+def test_the_picker_carries_a_way_to_learn_the_terms():
+    """The button Telegram draws above the results is where somebody who is
+    stuck is actually looking."""
+    from ccdexplorer.ccdexplorer_chart_bot.inline import HELP_BUTTON
+
+    assert HELP_BUTTON.text
+    assert HELP_BUTTON.start_parameter

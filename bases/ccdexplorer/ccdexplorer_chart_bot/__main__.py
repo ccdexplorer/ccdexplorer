@@ -28,19 +28,31 @@ DEFAULT_SITE_URL = "https://ccdexplorer.io"
 
 
 async def start(update: Update, context) -> None:
-    """What someone sees when they open the bot directly rather than inline."""
+    """The list of charts, and the words that select them.
+
+    Reached two ways: opening the bot directly, and the "What can I ask for?"
+    button Telegram draws above the inline results. The second is the one that
+    matters -- it is in front of someone who is mid-query and stuck, which is
+    exactly when a list of words is worth having.
+    """
+    username = context.bot.username or "ccdexplorer_chart_bot"
     lines = [
         "I put Concordium charts into any chat.",
         "",
-        "Type <code>@%s</code> followed by what you want, in any conversation:"
-        % (context.bot.username or "ccdexplorer_chart_bot"),
+        f"Type <code>@{username}</code> in any conversation, then any of these:",
         "",
-        "  <code>validators</code>   <code>delegators</code>   <code>fees</code>   "
-        "<code>accounts</code>   <code>exchanges</code>",
-        "",
-        f"There are {len(CHARTS)} charts. Type nothing to see them all.",
     ]
-    await update.message.reply_html("\n".join(lines))
+    for chart in CHARTS:
+        terms = ", ".join(chart.keywords[:3])
+        lines.append(f"<b>{chart.title}</b> — <i>{terms}</i>")
+
+    lines += [
+        "",
+        f"Or type <code>@{username}</code> and nothing else to see all {len(CHARTS)} charts.",
+        "",
+        "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
+    ]
+    await update.message.reply_html("\n".join(lines), disable_web_page_preview=True)
 
 
 def main() -> None:

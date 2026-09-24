@@ -11,7 +11,12 @@ connection and no credentials beyond its own token -- and a chart it has never
 seen still works the moment the site can draw it.
 """
 
-from telegram import InlineQueryResultArticle, InlineQueryResultPhoto, InputTextMessageContent
+from telegram import (
+    InlineQueryResultArticle,
+    InlineQueryResultPhoto,
+    InlineQueryResultsButton,
+    InputTextMessageContent,
+)
 from telegram.constants import ParseMode
 
 from .catalogue import Chart, search
@@ -66,6 +71,13 @@ def results_for(query: str, site_url: str) -> list:
     return [photo_result(chart, site_url) for chart in matches]
 
 
+#: Telegram draws this above the results, inside the picker. It is the only
+#: place a reader is actually looking when they are trying to work out what to
+#: type, so the answer to "which words select which chart" belongs here rather
+#: than in a help command nobody opens.
+HELP_BUTTON = InlineQueryResultsButton(text="What can I ask for?", start_parameter="charts")
+
+
 def handler(site_url: str):
     """Build the inline handler, closing over where the charts are served from."""
 
@@ -76,6 +88,7 @@ def handler(site_url: str):
         await inline_query.answer(
             results_for(inline_query.query or "", site_url),
             cache_time=CACHE_SECONDS,
+            button=HELP_BUTTON,
             # The answer depends only on the query, never on who asked, so
             # Telegram may share one cached answer between everybody.
             is_personal=False,
