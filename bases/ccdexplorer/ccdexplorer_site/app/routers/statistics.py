@@ -544,6 +544,112 @@ async def statistics_daily_holders_plotly(
     )
 
 
+# --- CCD price ------------------------------------------------------------
+#
+# Drawn from the chain's own CCD/EUR rate, set by update transaction every
+# thirty minutes since 2021 and used to price transaction fees. It is not a
+# market feed, but it tracks one to within half a percent and it is the only
+# complete intraday history there is: the daily forex job writes one point per
+# day, and that point is a snapshot taken shortly after midnight.
+#
+# The API does the source selection, the USD conversion, the thinning, and
+# closes the series on the current spot, so everything below is a renderer.
+
+#: Up is green, down is red. Bright enough to read on both themes.
+CCD_PRICE_UP = "#22C55E"
+CCD_PRICE_DOWN = "#EF4444"
+
+
+async def _ccd_price_plot(request: Request, net: str, hours: int, window: str):
+    """One CCD price chart, over the last ``hours``."""
+    theme = await get_theme_from_request(request)
+    title = f"CCD Price, last {window}"
+
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            request,
+            "testnet/not-available.html",
+            {"env": request.app.env, "net": net, "request": request},
+        )
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/mainnet/misc/ccd-price/last/{hours}",
+        request.app.httpx_client,
+    )
+    payload = api_result.return_value if api_result.ok else None
+    series = (payload or {}).get("series") or []
+    if not series:
+        return await return_plot_response(go.Figure(), request, title)
+
+    df = pd.DataFrame(series)
+    df["at"] = pd.to_datetime(df["at"])
+
+    change = payload.get("change_pct")
+    up = (change or 0) >= 0
+    colour = CCD_PRICE_UP if up else CCD_PRICE_DOWN
+
+    # The header carries the number, because the series ends on the current
+    # spot and on a year-long chart that last point is a single pixel.
+    # No dollar signs anywhere in a Plotly title: it routes $...$ through
+    # MathJax, so a pair of them swallows everything between as LaTeX. The
+    # first version of this rendered as "0.003514 < b > -11.37" with the
+    # chart's name missing entirely. The y-axis already says USD.
+    last = payload.get("last_usd")
+    subtitle = f"USD {last:,.6f}" if last else ""
+    if change is not None:
+        subtitle += f"   <b>{'+' if up else ''}{change:,.2f}%</b> over the last {window}"
+    high, low = payload.get("high_usd"), payload.get("low_usd")
+    if high and low:
+        subtitle += f"   ·   high {high:,.6f}   low {low:,.6f}"
+
+    fig = px.line(
+        df,
+        x="at",
+        y="usd",
+        color_discrete_sequence=[colour],
+        template=ccdexplorer_plotly_template(theme),
+    )
+    fig.update_traces(line_width=2.5)
+    fig.update_yaxes(title_text="USD", showgrid=False, tickformat=".6f")
+    fig.update_xaxes(title=None)
+    fig.update_layout(
+        title=f"<b>{title}</b><br><sup>{subtitle}</sup>",
+        height=350,
+        showlegend=False,
+    )
+    return await return_plot_response(fig, request, title)
+
+
+@router.get("/plots/{net}/ccd_price_24h", response_class=Response)
+@router.get("/plots/{net}/ccd_price_24h/image.png", response_class=Response)
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/ccd_price_24h",
+    response_class=HTMLResponse,
+)
+async def ccd_price_24h_plotly(request: Request, net: str):
+    return await _ccd_price_plot(request, net, hours=24, window="24 hours")
+
+
+@router.get("/plots/{net}/ccd_price_90d", response_class=Response)
+@router.get("/plots/{net}/ccd_price_90d/image.png", response_class=Response)
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/ccd_price_90d",
+    response_class=HTMLResponse,
+)
+async def ccd_price_90d_plotly(request: Request, net: str):
+    return await _ccd_price_plot(request, net, hours=90 * 24, window="90 days")
+
+
+@router.get("/plots/{net}/ccd_price_1y", response_class=Response)
+@router.get("/plots/{net}/ccd_price_1y/image.png", response_class=Response)
+@router.post(
+    "/{net}/ajax_statistics_plotly_py/ccd_price_1y",
+    response_class=HTMLResponse,
+)
+async def ccd_price_1y_plotly(request: Request, net: str):
+    return await _ccd_price_plot(request, net, hours=365 * 24, window="year")
+
+
 @router.get("/plots/{net}/daily_limits", response_class=Response)
 @router.get("/plots/{net}/daily_limits/image.png", response_class=Response)
 @router.post(

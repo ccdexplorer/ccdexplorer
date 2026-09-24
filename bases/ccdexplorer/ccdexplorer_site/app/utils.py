@@ -549,6 +549,18 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
 
 
 plot_info = {
+    "ccd_price_24h": {
+        "description": "The CCD price over the last 24 hours, from the chain's own CCD/EUR rate, ending on the current spot price.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "ccd_price_90d": {
+        "description": "The CCD price over the last 90 days, from the chain's own CCD/EUR rate, ending on the current spot price.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "ccd_price_1y": {
+        "description": "The CCD price over the last year, from the chain's own CCD/EUR rate, ending on the current spot price.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
     "accounts_per_day": {
         "description": "Number of new accounts created per day on the Concordium blockchain.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",

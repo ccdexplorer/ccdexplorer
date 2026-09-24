@@ -23,10 +23,12 @@ from dataclasses import dataclass
 #: a broken result, so the net is not a parameter here at all.
 NET = "mainnet"
 
-#: Telegram allows 50. All eighteen fit, and they should all be reachable:
-#: capping this lower hid six charts from anyone who typed the bot's name and
-#: looked at what came back, which is the only way to browse an inline bot.
-MAX_RESULTS = 18
+#: Telegram's own limit, and the catalogue is kept under it. Pinned to the
+#: catalogue size once instead, this silently stopped matching when charts were
+#: added -- three new price charts and the last three fell off the end of an
+#: empty query, which is the only way to browse an inline bot. A number that
+#: has to be revised whenever the list grows is a number that will not be.
+MAX_RESULTS = 50
 
 
 @dataclass(frozen=True)
@@ -54,70 +56,34 @@ class Chart:
 
 CHARTS: tuple[Chart, ...] = (
     Chart(
-        "accounts_per_day",
-        "Accounts per day",
-        "New accounts created each day",
-        ("accounts", "new", "growth", "signups", "users", "adoption"),
+        "ccd_price_24h",
+        "CCD price, 24h",
+        "The last day, ending on the current price",
+        ("price", "ccd", "today", "intraday", "day", "usd", "chart", "value"),
     ),
     Chart(
-        "ccd_on_exchanges",
-        "CCD on exchanges",
-        "Balance held on exchange wallets",
-        ("exchanges", "cex", "listed", "custody", "binance"),
+        "ccd_price_90d",
+        "CCD price, 90 days",
+        "The last quarter, ending on the current price",
+        ("price", "ccd", "quarter", "90", "usd", "value"),
     ),
     Chart(
-        "daily_limits",
-        "Daily limits",
-        "CCD needed to reach the top 100 and top 250",
-        ("rich", "top", "whales", "leaderboard", "ranking", "holders"),
+        "ccd_price_1y",
+        "CCD price, 1 year",
+        "The last year, ending on the current price",
+        ("price", "ccd", "year", "annual", "usd", "value"),
     ),
     Chart(
-        "exchange_wallets",
-        "Exchange wallets",
-        "Count of exchange wallets over time",
-        ("exchanges", "wallets", "aliases", "custody"),
-    ),
-    Chart(
-        "fee_stabilization",
-        "Fee stabilization",
-        "Cost of a regular transfer over time",
-        ("fees", "cost", "transfer", "stable", "cheap", "price"),
-    ),
-    Chart(
-        "network_activity_tps",
-        "Network activity",
-        "CCD transferred per day, and TPS",
-        ("tps", "throughput", "activity", "volume", "speed", "usage"),
-    ),
-    Chart(
-        "realized_prices",
-        "Realized price",
-        "Average price at which coins last moved",
-        ("price", "realized", "valuation", "cost", "basis", "market"),
-    ),
-    Chart(
-        "transaction_fees",
-        "Transaction fees",
-        "Fees paid on the chain over time",
-        ("fees", "revenue", "paid", "cost", "transactions"),
-    ),
-    Chart(
-        "transaction_types",
-        "Transaction types",
-        "Transactions by high-level type",
-        ("types", "breakdown", "mix", "transactions", "kinds"),
+        "staking_percentage_staked",
+        "Percentage staked",
+        "Share of all CCD that is staked",
+        ("staked", "percentage", "ratio", "share", "supply", "staking"),
     ),
     Chart(
         "staking_validator_count",
         "Validator count",
         "Validators over time",
         ("validators", "bakers", "nodes", "count", "staking"),
-    ),
-    Chart(
-        "staking_validator_staked_amounts",
-        "Validator stake",
-        "What validators have staked",
-        ("validators", "bakers", "stake", "amounts", "staking"),
     ),
     Chart(
         "staking_delegator_count",
@@ -132,10 +98,10 @@ CHARTS: tuple[Chart, ...] = (
         ("pools", "open", "delegation", "staking"),
     ),
     Chart(
-        "staking_percentage_staked",
-        "Percentage staked",
-        "Share of all CCD that is staked",
-        ("staked", "percentage", "ratio", "share", "supply", "staking"),
+        "staking_validator_staked_amounts",
+        "Validator stake",
+        "What validators have staked",
+        ("validators", "bakers", "stake", "amounts", "staking"),
     ),
     Chart(
         "staking_restaked_rewards",
@@ -161,9 +127,68 @@ CHARTS: tuple[Chart, ...] = (
         "Average number of delegators in a pool",
         ("average", "delegators", "pool", "mean", "staking"),
     ),
+    Chart(
+        "accounts_per_day",
+        "Accounts per day",
+        "New accounts created each day",
+        ("accounts", "new", "growth", "signups", "users", "adoption"),
+    ),
+    Chart(
+        "network_activity_tps",
+        "Network activity",
+        "CCD transferred per day, and TPS",
+        ("tps", "throughput", "activity", "volume", "speed", "usage"),
+    ),
+    Chart(
+        "transaction_types",
+        "Transaction types",
+        "Transactions by high-level type",
+        ("types", "breakdown", "mix", "transactions", "kinds"),
+    ),
+    Chart(
+        "transaction_fees",
+        "Transaction fees",
+        "Fees paid on the chain over time",
+        ("fees", "revenue", "paid", "cost", "transactions"),
+    ),
+    Chart(
+        "fee_stabilization",
+        "Fee stabilization",
+        "Cost of a regular transfer over time",
+        ("fees", "cost", "transfer", "stable", "cheap", "price"),
+    ),
+    Chart(
+        "daily_limits",
+        "Daily limits",
+        "CCD needed to reach the top 100 and top 250",
+        ("rich", "top", "whales", "leaderboard", "ranking", "holders"),
+    ),
+    Chart(
+        "realized_prices",
+        "Realized price",
+        "Average price at which coins last moved",
+        ("price", "realized", "valuation", "cost", "basis", "market"),
+    ),
+    Chart(
+        "ccd_on_exchanges",
+        "CCD on exchanges",
+        "Balance held on exchange wallets",
+        ("exchanges", "cex", "listed", "custody", "binance"),
+    ),
+    Chart(
+        "exchange_wallets",
+        "Exchange wallets",
+        "Count of exchange wallets over time",
+        ("exchanges", "wallets", "aliases", "custody"),
+    ),
 )
 
 BY_NAME = {chart.name: chart for chart in CHARTS}
+
+#: Ties are broken by the order above rather than alphabetically, so the
+#: order is an editorial decision. Bare "price" should offer the day before
+#: the year, and alphabetically it did the opposite.
+_ORDER = {chart.name: index for index, chart in enumerate(CHARTS)}
 
 
 #: Dropped before matching. People type questions -- "how much is staked" --
@@ -231,7 +256,7 @@ def _rank(terms: list[str], require_all: bool) -> list[tuple[tuple[int, int], st
         else:
             rank = 4
         # More words matched is a better answer than a tidier rank.
-        scored.append(((len(terms) - hits, rank), chart.title, chart))
+        scored.append(((len(terms) - hits, rank), _ORDER[chart.name], chart))
 
     scored.sort(key=lambda row: (row[0], row[1]))
     return scored
