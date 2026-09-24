@@ -42,6 +42,7 @@ ACCOUNT = {
     "address": ADDRESS,
     "amount": 128456789012,
     "available_balance": 98456789012,
+    "sequence_number": 12522,
     "stake": {"baker": {"baker_info": {"baker_id": 8}, "staked_amount": 30000000000}},
 }
 POOL = {
@@ -227,6 +228,68 @@ def test_a_token_supply_is_divided_by_its_own_decimals():
 def test_a_missing_payload_falls_back():
     assert og_cards.build_png("mainnet", og_cards.KINDS["block"], ("1",), None).startswith(
         PNG_MAGIC
+    )
+
+
+def test_the_nonce_becomes_the_count_of_transactions_sent():
+    """sequence_number is the *next* nonce, so one less is what has been sent.
+
+    It counts only what this account sent, never what it received, which is
+    why the card says "transactions sent" rather than a bare count.
+    """
+    card = og_cards.account_card("mainnet", ("41827",), dict(ACCOUNT, sequence_number=12522))
+    assert card is not None
+    assert og_cards.build_png(
+        "mainnet", og_cards.KINDS["account"], ("41827",), dict(ACCOUNT, sequence_number=12522)
+    ).startswith(PNG_MAGIC)
+
+
+@pytest.mark.parametrize(
+    "nonce, expected",
+    [(12522, "12,521"), (1, "0"), (2, "1"), (None, None), ("nonsense", None), (0, None)],
+)
+def test_transactions_sent_handles_every_nonce_the_api_can_send(nonce, expected):
+    account = dict(ACCOUNT, sequence_number=nonce)
+    account.pop("stake")
+    account["available_balance"] = account["amount"]  # so only balance + sent remain
+    stats = _stats_of(account)
+    assert stats.get("Transactions sent") == expected
+
+
+def _stats_of(account):
+    """The label/value pairs account_card would draw, without drawing them."""
+    captured = {}
+
+    def fake_render(net, kicker, headline, subline=None, stats=(), footer=None):
+        captured.update({label: value for label, value in stats})
+        return "image"
+
+    real, og_cards.render_card = og_cards.render_card, fake_render
+    try:
+        og_cards.account_card("mainnet", ("1",), account)
+    finally:
+        og_cards.render_card = real
+    return captured
+
+
+def test_available_is_dropped_when_it_only_repeats_the_balance():
+    account = dict(ACCOUNT, available_balance=ACCOUNT["amount"])
+    assert "Available" not in _stats_of(account)
+    assert "Balance" in _stats_of(account)
+
+
+def test_a_card_offered_four_stats_lays_out_exactly_as_if_offered_three():
+    """The bug this exists to prevent.
+
+    render_card sized its columns by how many stats it was handed and then drew
+    only three, so every column came out narrower than the space it had. A
+    validator's "538.49M CCD" missed the resulting 240px by one pixel and
+    rendered as "538.49M CC...".
+    """
+    three = [("Balance", "538.49M CCD"), ("Staked", "420.00M CCD"), ("Transactions sent", "15")]
+    four = three + [("Available", "118.49M CCD")]
+    assert og_cards.to_png(og_cards.render_card("mainnet", "Account", "#8", None, three)) == (
+        og_cards.to_png(og_cards.render_card("mainnet", "Account", "#8", None, four))
     )
 
 

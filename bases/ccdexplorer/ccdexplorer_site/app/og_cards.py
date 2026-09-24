@@ -74,6 +74,10 @@ TTL_FALLBACK = 600
 #: already carries, and far more than one link's burst of crawlers needs.
 CACHE_MAX_ENTRIES = 256
 
+#: Three stats fit across a 1200px card at a readable size. A builder may
+#: offer more, in priority order, and the extras are dropped.
+MAX_STATS = 3
+
 #: Identifiers arrive from a public URL, so they are attacker-controlled and
 #: are matched against the shape they must have before any work is done.
 #: Heights, account indices and contract indices are decimal; block and
@@ -275,15 +279,24 @@ def render_card(net, kicker, headline, subline=None, stats=(), footer=None):
             (margin, 306), _fit(draw, subline, subline_font, inner), font=subline_font, fill=MUTED
         )
 
-    stats = [(label, value) for label, value in stats if value not in (None, "")]
+    # Dropped before the width is computed, not after: sizing the columns by
+    # how many stats were offered while drawing only three made every column
+    # narrower than the space it actually had. A validator's "538.49M CCD"
+    # missed the resulting 240px by one pixel and rendered as "538.49M CC...".
+    stats = [(label, value) for label, value in stats if value not in (None, "")][:MAX_STATS]
     if stats:
         draw.line([(margin, 420), (CARD_WIDTH - margin, 420)], fill=RULE, width=2)
         label_font = _font(24)
         value_font = _font(38)
-        column = inner // max(len(stats), 1)
-        for index, (label, value) in enumerate(stats[:3]):
+        column = inner // len(stats)
+        for index, (label, value) in enumerate(stats):
             x = margin + (index * column)
-            draw.text((x, 456), str(label).upper(), font=label_font, fill=MUTED)
+            draw.text(
+                (x, 456),
+                _fit(draw, str(label).upper(), label_font, column - 24),
+                font=label_font,
+                fill=MUTED,
+            )
             draw.text(
                 (x, 490), _fit(draw, value, value_font, column - 24), font=value_font, fill=TEXT
             )
@@ -364,16 +377,31 @@ def account_card(net, parts, account):
         role = "Delegator"
         staked = ccd(delegator.get("staked_amount"))
 
+    # The account nonce is the next sequence number, so one less than it is
+    # exactly how many transactions this account has sent. It says nothing
+    # about what it received, which is why the label is "sent" rather than a
+    # bare transaction count.
+    nonce = account.get("sequence_number")
+    sent = f"{nonce - 1:,}" if isinstance(nonce, int) and nonce >= 1 else None
+
+    # Only three fit. Available is listed last because it is the one that is
+    # usually redundant: it equals the balance on an account that is not
+    # staking, and balance minus stake on one that is.
+    amount = account.get("amount")
+    available = account.get("available_balance")
+    candidates = [
+        ("Balance", ccd(amount)),
+        ("Staked", staked),
+        ("Transactions sent", sent),
+        ("Available", ccd(available) if available not in (None, amount) else None),
+    ]
+
     return render_card(
         net,
         "Account",
         f"#{index:,}" if isinstance(index, int) else str(index or parts[0]),
         shorten_hash(account.get("address"), head=12, tail=10),
-        [
-            ("Balance", ccd(account.get("amount"))),
-            ("Available", ccd(account.get("available_balance"))),
-            ("Staked", staked),
-        ],
+        [(label, value) for label, value in candidates if value],
         role,
     )
 
