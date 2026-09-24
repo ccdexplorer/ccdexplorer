@@ -690,5 +690,13 @@ class PngCache:
         while len(self._entries) > self._max:
             self._entries.popitem(last=False)
 
+    def discard(self, key: str) -> None:
+        """Forget one entry, so the next request redraws it.
+
+        Used by the plot warmer: a cached chart is not re-rendered by asking
+        for it, so refreshing one means dropping it first.
+        """
+        self._entries.pop(key, None)
+
     def __len__(self) -> int:
         return len(self._entries)

@@ -98,3 +98,63 @@ async def test_the_render_still_asks_for_the_size_it_always_did(renders):
         _figure(), _request("/plots/mainnet/accounts_per_day/image.png"), "Accounts"
     )
     assert renders[0] == {"format": "png", "width": 720}
+
+
+# --- warming --------------------------------------------------------------
+#
+# A cached chart costs microseconds and a cold one costs about a second of
+# headless Chromium, serialised behind one lock. The chart bot turned that from
+# a rare cost into a common one: an inline picker asks Telegram to fetch all
+# eighteen thumbnails at once, so one expiry means eighteen simultaneous cold
+# renders queued behind each other.
+
+
+def test_the_warm_interval_is_shorter_than_the_ttl():
+    """Otherwise entries expire before anything refreshes them, and the timer
+    changes nothing for the person who arrives in the gap."""
+    assert utils.PLOT_WARM_INTERVAL_MINUTES * 60 < utils.PLOT_IMAGE_TTL
+
+
+def test_the_chart_list_comes_from_the_routes_not_a_list():
+    """So a chart added to the site is warmed without anyone remembering."""
+    from fastapi import FastAPI
+
+    from ccdexplorer.ccdexplorer_site.app.routers import account, statistics
+
+    app = FastAPI()
+    for module in (statistics, account):
+        app.include_router(module.router)
+
+    paths = utils.plot_image_paths(app)
+    assert len(paths) >= 18
+    assert all(p.startswith("/plots/mainnet/") and p.endswith("/image.png") for p in paths)
+
+
+def test_the_per_account_chart_is_not_warmed():
+    """plot_info carries ccd_balance_usd_value, which has no /plots route.
+    Warming it would 404 once an hour, forever."""
+    from fastapi import FastAPI
+
+    from ccdexplorer.ccdexplorer_site.app.routers import account, statistics
+
+    app = FastAPI()
+    for module in (statistics, account):
+        app.include_router(module.router)
+
+    assert "ccd_balance_usd_value" in utils.plot_info
+    assert not any("ccd_balance_usd_value" in p for p in utils.plot_image_paths(app))
+
+
+def test_evicting_forces_the_next_request_to_redraw(renders):
+    """Asking for a cached chart does not redraw it, so the warmer has to drop
+    the entry first -- otherwise it would refresh nothing."""
+    path = "/plots/mainnet/accounts_per_day/image.png"
+    utils._PLOT_IMAGES.put(path, b"stale", 3600)
+    assert utils._PLOT_IMAGES.get(path) is not None
+
+    utils.evict_plot_image(path)
+    assert utils._PLOT_IMAGES.get(path) is None
+
+
+def test_evicting_something_absent_is_harmless():
+    utils.evict_plot_image("/plots/mainnet/never_rendered/image.png")

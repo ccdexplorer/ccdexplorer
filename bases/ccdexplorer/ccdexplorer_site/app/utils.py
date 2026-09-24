@@ -6,6 +6,7 @@ import datetime as dt
 import io
 import json
 import math
+import re
 import typing
 from datetime import timedelta
 from enum import Enum
@@ -650,6 +651,38 @@ _KALEIDO_RENDER_LOCK = asyncio.Lock()
 # cache key.
 _PLOT_IMAGES = PngCache()
 PLOT_IMAGE_TTL = 3600
+
+#: Refreshed a little before they expire, so nobody ever waits on a cold
+#: render. Every chart on this list is redrawn on this interval whether or not
+#: anyone asked, which costs about eighteen seconds of kaleido an hour and
+#: saves the first visitor after each expiry from paying all of it at once.
+PLOT_WARM_INTERVAL_MINUTES = 50
+
+
+#: /plots/<net>/<name>/image.png, with the net still a placeholder.
+_PLOT_IMAGE_ROUTE = re.compile(r"^/plots/\{net\}/([a-z0-9_]+)/image\.png$")
+
+
+def plot_image_paths(app, net: str = "mainnet") -> list[str]:
+    """Every chart image this app serves, as concrete paths.
+
+    Read off the app's own routes rather than from a list, so a chart added to
+    the site is warmed without anyone remembering to add it anywhere. Reading
+    plot_info instead would be wrong: it carries an entry for
+    ccd_balance_usd_value, which is per-account and has no plots/ route, so
+    warming it would just 404 once an hour forever.
+    """
+    names = set()
+    for route in app.routes:
+        match = _PLOT_IMAGE_ROUTE.match(getattr(route, "path", "") or "")
+        if match:
+            names.add(match.group(1))
+    return [f"/plots/{net}/{name}/image.png" for name in sorted(names)]
+
+
+def evict_plot_image(path: str) -> None:
+    """Drop a rendered chart, so the next request for it redraws."""
+    _PLOT_IMAGES.discard(path)
 
 
 async def return_plot_response(fig: go.Figure, request: Request, title: str):

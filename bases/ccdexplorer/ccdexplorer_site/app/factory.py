@@ -79,7 +79,13 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_transactions_count,
     sc_agent_registries,
 )
-from ccdexplorer.ccdexplorer_site.app.utils import add_account_info_to_cache, get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    PLOT_WARM_INTERVAL_MINUTES,
+    add_account_info_to_cache,
+    evict_plot_image,
+    get_url_from_api,
+    plot_image_paths,
+)
 from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -667,6 +673,52 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 "error": "Something's not quite right!",
             },
         )
+
+    @scheduler.scheduled_job(
+        "interval",
+        minutes=PLOT_WARM_INTERVAL_MINUTES,
+        args=[app],
+        # Shortly after boot as well, so a deploy does not leave every chart
+        # cold for whoever arrives first.
+        next_run_time=dt.datetime.now(dt.UTC) + dt.timedelta(seconds=30),
+    )
+    async def repeated_task_warm_plot_images(app: FastAPI):
+        """Redraw every chart before its cache entry expires.
+
+        A chart image is a Plotly figure through kaleido: about a second of
+        headless Chromium, serialised behind one lock. Cached it is a few
+        hundred microseconds, so the only people who ever pay are the ones who
+        arrive just after an entry expired -- and the chart bot made that far
+        worse, because an inline picker asks Telegram to fetch all eighteen
+        thumbnails at once. Eighteen simultaneous cold renders, queued.
+
+        So they are refreshed on a timer instead, a little sooner than they
+        expire. It costs about eighteen seconds of kaleido an hour and means
+        nobody waits. Each image is evicted immediately before it is
+        re-requested, because asking for a cached chart does not redraw it.
+
+        One at a time, deliberately: the render lock is first-come, so a real
+        request arriving mid-sweep waits for one redraw rather than all of
+        them.
+        """
+        paths = plot_image_paths(app)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://plot-warmer", timeout=180.0
+        ) as client:
+            warmed = 0
+            for path in paths:
+                evict_plot_image(path)
+                try:
+                    response = await client.get(path)
+                except Exception as error:  # a cold chart is not worth an outage
+                    print(f"plot warmer: {path} failed ({error})")
+                    continue
+                if response.status_code == 200:
+                    warmed += 1
+                else:
+                    print(f"plot warmer: {path} returned {response.status_code}")
+        print(f"plot warmer: {warmed}/{len(paths)} charts warm")
 
     @scheduler.scheduled_job("interval", seconds=5, args=[app])
     async def repeated_task_get_blocks_and_transactions(app: FastAPI):
