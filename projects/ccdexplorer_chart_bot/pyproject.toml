@@ -1,0 +1,23 @@
+[build-system]
+requires      = [ "hatchling", "hatch-polylith-bricks" ]
+build-backend = "hatchling.build"
+
+[project]
+name    = "ccdexplorer_chart_bot"
+version = "0.1.0"
+
+requires-python = ">=3.12"
+
+# Deliberately short. This bot answers inline queries with URLs the site
+# already serves, so it needs no database driver, no gRPC stack and no chain
+# types -- and a dependency it does not have is one that cannot break it.
+dependencies = [
+    "python-dotenv",
+    "python-telegram-bot[job-queue]>=22.5",
+]
+
+[tool.hatch.build.hooks.polylith-bricks]
+
+[tool.polylith.bricks]
+"../../bases/ccdexplorer/ccdexplorer_chart_bot" = "ccdexplorer/ccdexplorer_chart_bot"
+"../../components/ccdexplorer/env"              = "ccdexplorer/env"
