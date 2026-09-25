@@ -51,6 +51,11 @@ class Chart:
     title: str
     description: str
     keywords: tuple[str, ...] = ()
+    #: Charts that are the same series at different intervals. A chart in
+    #: a group is sent with buttons for its siblings; one on its own is not.
+    group: str = ""
+    #: What the button for this chart says.
+    period: str = ""
 
     def image_url(self, site_url: str) -> str:
         return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}/image.png?theme={THEME}"
@@ -61,22 +66,52 @@ class Chart:
 
 CHARTS: tuple[Chart, ...] = (
     Chart(
+        "ccd_kraken_1h",
+        "CCD on Kraken, 1h",
+        "Hourly candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "hourly"),
+        group="kraken",
+        period="1h",
+    ),
+    Chart(
+        "ccd_kraken_4h",
+        "CCD on Kraken, 4h",
+        "Four-hour candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded"),
+        group="kraken",
+        period="4h",
+    ),
+    Chart(
+        "ccd_kraken_1d",
+        "CCD on Kraken, daily",
+        "Daily candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "daily"),
+        group="kraken",
+        period="1d",
+    ),
+    Chart(
         "ccd_price_24h",
         "CCD price, 24h",
         "The last day, ending on the current price",
         ("price", "ccd", "today", "intraday", "day", "usd", "chart", "value"),
+        group="price",
+        period="24h",
     ),
     Chart(
         "ccd_price_90d",
         "CCD price, 90 days",
         "The last quarter, ending on the current price",
         ("price", "ccd", "quarter", "90", "usd", "value"),
+        group="price",
+        period="90d",
     ),
     Chart(
         "ccd_price_1y",
         "CCD price, 1 year",
         "The last year, ending on the current price",
         ("price", "ccd", "year", "annual", "usd", "value"),
+        group="price",
+        period="1y",
     ),
     Chart(
         "staking_percentage_staked",
@@ -194,6 +229,17 @@ BY_NAME = {chart.name: chart for chart in CHARTS}
 #: order is an editorial decision. Bare "price" should offer the day before
 #: the year, and alphabetically it did the opposite.
 _ORDER = {chart.name: index for index, chart in enumerate(CHARTS)}
+
+
+def siblings(chart: Chart) -> list[Chart]:
+    """The same series at its other intervals, in catalogue order.
+
+    Empty for a chart that stands alone, which is how the caller knows not
+    to draw an interval keyboard under it.
+    """
+    if not chart.group:
+        return []
+    return [c for c in CHARTS if c.group == chart.group]
 
 
 #: Dropped before matching. People type questions -- "how much is staked" --

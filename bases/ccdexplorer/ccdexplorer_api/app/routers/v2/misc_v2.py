@@ -6,6 +6,7 @@
 # pyright: reportArgumentType=false
 import datetime as dt
 import json
+import time
 from collections import Counter
 from datetime import timedelta
 from enum import Enum
@@ -14,6 +15,7 @@ from typing import Any
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import dateutil
 import grpc
+import httpx2 as httpx
 import pandas as pd
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
@@ -544,6 +546,120 @@ async def get_ccd_price_series(
         # between a fee rate and an exchange quote.
         "spot_usd": spot_usd,
         "spot_at": spot_at.strftime("%Y-%m-%dT%H:%M:%SZ") if spot_at else None,
+    }
+
+
+#: Kraken's public OHLC feed, which needs no key. CCD/USD directly, so no
+#: stablecoin leg, and its intervals happen to be exactly the ones a candle
+#: chart wants. This is the only third party anything in the API calls: the
+#: chain rate above owes nothing to anyone, and this is what somebody actually
+#: paid, with volume behind it.
+KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
+KRAKEN_CCD_PAIR = "CCDUSD"
+
+#: minutes, as Kraken names them.
+KRAKEN_INTERVALS = {"15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+
+#: Kraken returns 720 candles whatever you ask for; this is how many reach the
+#: chart. Enough to read, few enough that each candle has width.
+KRAKEN_MAX_BARS = 120
+
+#: Served from the last good response for this long if Kraken is unreachable.
+#: A chart that is an hour stale beats no chart, and this is the only part of
+#: the site that depends on somebody else's uptime.
+KRAKEN_STALE_SECONDS = 3600
+
+_kraken_cache: dict[str, tuple[float, dict]] = {}
+
+
+async def _kraken_ohlc(interval: str) -> dict | None:
+    """Candles from Kraken, cached, falling back to the last good response."""
+    minutes = KRAKEN_INTERVALS[interval]
+    cached = _kraken_cache.get(interval)
+    now = time.time()
+    if cached and now - cached[0] < 60:
+        return cached[1]
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.get(
+                KRAKEN_OHLC_URL, params={"pair": KRAKEN_CCD_PAIR, "interval": minutes}
+            )
+        payload = response.json()
+        if payload.get("error"):
+            raise RuntimeError(payload["error"])
+        rows = next(value for key, value in payload["result"].items() if key != "last")
+    except Exception as error:  # Kraken is not ours; degrade rather than fail
+        print(f"kraken ohlc {interval}: {error}")
+        if cached and now - cached[0] < KRAKEN_STALE_SECONDS:
+            return cached[1]
+        return None
+
+    candles = [
+        {
+            "at": dt.datetime.fromtimestamp(int(row[0]), dt.timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "open": float(row[1]),
+            "high": float(row[2]),
+            "low": float(row[3]),
+            "close": float(row[4]),
+            "volume": float(row[6]),
+            "trades": int(row[7]),
+        }
+        for row in rows
+    ][-KRAKEN_MAX_BARS:]
+    result = {"candles": candles}
+    _kraken_cache[interval] = (now, result)
+    return result
+
+
+@router.get("/{net}/misc/ccd-ohlc/{interval}", response_class=JSONResponse)
+async def get_ccd_ohlc(
+    request: Request,
+    net: str,
+    interval: str,
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """CCD/USD candles from Kraken, with volume.
+
+    Distinct from ccd-price above, which draws the chain's own fee rate. This
+    is one exchange's order book: what people paid, with volume, but only back
+    as far as Kraken keeps and only while Kraken is up.
+    """
+    if net != "mainnet":
+        raise HTTPException(status_code=422, detail="CCD only trades on mainnet.")
+    if interval not in KRAKEN_INTERVALS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"interval must be one of {', '.join(KRAKEN_INTERVALS)}.",
+        )
+
+    result = await _kraken_ohlc(interval)
+    if not result or not result["candles"]:
+        raise HTTPException(status_code=503, detail="No candles available from Kraken.")
+
+    candles = result["candles"]
+    first, last = candles[0], candles[-1]
+    change = ((last["close"] / first["open"]) - 1) * 100 if first["open"] else None
+    empty = sum(1 for c in candles if c["volume"] == 0)
+    return {
+        "net": net,
+        "venue": "Kraken",
+        "pair": "CCD/USD",
+        "interval": interval,
+        "candles": candles,
+        "bars": len(candles),
+        # A candle with no trades is a flat dash, not a gap. Reported so a
+        # caller can say how much of the window was actually traded.
+        "bars_without_trades": empty,
+        "open": first["open"],
+        "high": max(c["high"] for c in candles),
+        "low": min(c["low"] for c in candles),
+        "close": last["close"],
+        "change_pct": change,
+        "volume": sum(c["volume"] for c in candles),
+        "trades": sum(c["trades"] for c in candles),
     }
 
 

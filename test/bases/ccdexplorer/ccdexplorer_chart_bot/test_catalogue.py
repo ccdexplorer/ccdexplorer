@@ -208,6 +208,16 @@ def test_an_empty_query_shows_every_chart():
     assert len(search("")) == len(CHARTS)
 
 
+def test_the_kraken_charts_are_named_apart_from_the_chain_ones():
+    """They answer different questions: one is the chain's fee rate, the other
+    is an exchange's order book. A reader should be able to tell which."""
+    names = {c.name for c in CHARTS}
+    assert {"ccd_kraken_1h", "ccd_kraken_4h", "ccd_kraken_1d"} <= names
+    assert {"ccd_price_24h", "ccd_price_90d", "ccd_price_1y"} <= names
+    assert search("kraken")[0].name.startswith("ccd_kraken")
+    assert search("price")[0].name.startswith("ccd_price")
+
+
 def test_the_catalogue_still_fits_in_one_telegram_answer():
     """Fifty is Telegram's limit, not ours. Past it, results are silently
     dropped again."""
@@ -350,3 +360,72 @@ async def test_nonsense_gets_an_answer_rather_than_silence():
     message = await _send("kittens")
     assert not message.photos
     assert message.htmls and "kittens" in message.htmls[0]
+
+
+# --- interval buttons -----------------------------------------------------
+#
+# Two jobs in one bot: an inline picker over every chart, and the interval
+# charts sent with buttons that swap the image in place. They never collide
+# because they answer different update types.
+
+
+def test_only_interval_series_get_buttons():
+    """An interval row with one entry is a button that does nothing."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME, siblings
+
+    assert [c.period for c in siblings(BY_NAME["ccd_kraken_1h"])] == ["1h", "4h", "1d"]
+    assert [c.period for c in siblings(BY_NAME["ccd_price_24h"])] == ["24h", "90d", "1y"]
+    assert siblings(BY_NAME["accounts_per_day"]) == []
+
+
+def test_the_keyboard_marks_which_interval_is_showing():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
+
+    rows = keyboard_for(BY_NAME["ccd_kraken_4h"]).inline_keyboard
+    labels = [b.text for b in rows[0]]
+    assert labels == ["1h", "· 4h ·", "1d"]
+
+
+def test_a_standalone_chart_gets_no_interval_row():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
+
+    rows = keyboard_for(BY_NAME["accounts_per_day"]).inline_keyboard
+    assert len(rows) == 1
+    assert rows[0][0].switch_inline_query == "accounts_per_day"
+
+
+def test_callback_data_round_trips_and_fits():
+    """Telegram caps callback_data at 64 bytes."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME, CHARTS
+    from ccdexplorer.ccdexplorer_chart_bot.direct import CALLBACK_PREFIX, keyboard_for
+
+    for chart in CHARTS:
+        for row in keyboard_for(chart).inline_keyboard:
+            for button in row:
+                if button.callback_data:
+                    assert len(button.callback_data.encode()) <= 64
+                    name = button.callback_data[len(CALLBACK_PREFIX) :]
+                    assert name in BY_NAME
+
+
+def test_inline_interval_charts_carry_buttons_but_no_send_button():
+    """Sent into somebody else's chat, the interval buttons still work -- the
+    callback query carries the inline_message_id. "Send to a chat" does not
+    belong there: it is already in one."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
+
+    grouped = photo_result(BY_NAME["ccd_price_90d"], SITE)
+    rows = grouped.reply_markup.inline_keyboard
+    assert [b.text for b in rows[0]] == ["24h", "· 90d ·", "1y"]
+    assert len(rows) == 1
+    assert all(b.callback_data for b in rows[0])
+
+
+def test_inline_standalone_charts_carry_no_keyboard():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
+
+    assert photo_result(BY_NAME["accounts_per_day"], SITE).reply_markup is None

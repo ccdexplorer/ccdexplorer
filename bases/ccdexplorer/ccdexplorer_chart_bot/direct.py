@@ -12,10 +12,10 @@ it matters.
 
 import logging
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
-from .catalogue import Chart, search
+from .catalogue import BY_NAME, Chart, search, siblings
 
 log = logging.getLogger(__name__)
 
@@ -24,11 +24,32 @@ log = logging.getLogger(__name__)
 MAX_REPLIES = 3
 
 
-def send_button(chart: Chart) -> InlineKeyboardMarkup:
-    """A button that opens a chat picker with this chart's query filled in."""
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)]]
-    )
+#: Prefix on callback_data, which Telegram caps at 64 bytes. Chart names are
+#: well inside that, so the name itself is the payload.
+CALLBACK_PREFIX = "c:"
+
+
+def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup:
+    """Interval buttons above, and a way to send the chart onward below.
+
+    A chart with no siblings gets only the send button -- an interval row with
+    one entry is a button that does nothing.
+    """
+    rows = []
+    family = siblings(chart)
+    if len(family) > 1:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    f"· {sibling.period} ·" if sibling.name == chart.name else sibling.period,
+                    callback_data=f"{CALLBACK_PREFIX}{sibling.name}",
+                )
+                for sibling in family
+            ]
+        )
+    if send_button:
+        rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
+    return InlineKeyboardMarkup(rows)
 
 
 def caption(chart: Chart, site_url: str) -> str:
@@ -63,7 +84,7 @@ def handler(site_url: str):
                 photo=chart.image_url(site_url),
                 caption=caption(chart, site_url),
                 parse_mode=ParseMode.HTML,
-                reply_markup=send_button(chart),
+                reply_markup=keyboard_for(chart),
             )
 
         if len(matches) > MAX_REPLIES:
@@ -73,3 +94,36 @@ def handler(site_url: str):
             )
 
     return reply_with_chart
+
+
+def callback_handler(site_url: str):
+    """Swap the chart in place when an interval button is tapped.
+
+    editMessageMedia re-fetches the URL, so every tap is a request to the site.
+    The plot cache and its warmer already cover that, which is what makes this
+    cheap enough to be a button rather than a new message.
+    """
+
+    async def switch_interval(update, context) -> None:
+        query = update.callback_query
+        if query is None or not (query.data or "").startswith(CALLBACK_PREFIX):
+            return
+        chart = BY_NAME.get(query.data[len(CALLBACK_PREFIX) :])
+        if chart is None:
+            # Telegram will keep showing the spinner unless the query is
+            # answered, so a stale button gets a reason rather than a hang.
+            await query.answer("That chart is no longer available.")
+            return
+
+        log.info("button %r", chart.name)
+        await query.answer()
+        await query.edit_message_media(
+            media=InputMediaPhoto(
+                media=chart.image_url(site_url),
+                caption=caption(chart, site_url),
+                parse_mode=ParseMode.HTML,
+            ),
+            reply_markup=keyboard_for(chart),
+        )
+
+    return switch_interval

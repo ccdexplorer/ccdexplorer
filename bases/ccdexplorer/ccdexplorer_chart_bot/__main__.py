@@ -18,12 +18,14 @@ from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
+    CallbackQueryHandler,
     InlineQueryHandler,
     MessageHandler,
     filters,
 )
 
 from .catalogue import CHARTS
+from .direct import callback_handler
 from .direct import handler as direct_handler
 from .inline import handler as inline_handler
 
@@ -72,12 +74,20 @@ def main() -> None:
     application = ApplicationBuilder().token(CHART_BOT_TOKEN).build()
     application.add_handler(CommandHandler(["start", "help"], start))
     application.add_handler(InlineQueryHandler(inline_handler(site_url)))
+    application.add_handler(CallbackQueryHandler(callback_handler(site_url)))
     # Anything else typed at the bot directly is treated as a chart query.
     # Registered last, so it cannot swallow the commands above.
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, direct_handler(site_url))
     )
-    application.run_polling(allowed_updates=["message", "inline_query"])
+    application.run_polling(
+        allowed_updates=[
+            "message",
+            "inline_query",
+            "callback_query",
+            "chosen_inline_result",
+        ]
+    )
 
 
 if __name__ == "__main__":

@@ -650,6 +650,144 @@ async def ccd_price_1y_plotly(request: Request, net: str):
     return await _ccd_price_plot(request, net, hours=365 * 24, window="year")
 
 
+# --- CCD on Kraken --------------------------------------------------------
+#
+# Distinct from the CCD price charts above, which draw the chain's own fee
+# rate. These are one exchange's order book: what people actually paid, with
+# volume, and the only thing on this site that depends on a third party being
+# up. The API does the fetching and the falling back; this draws.
+
+CANDLE_UP = "#26A69A"
+CANDLE_DOWN = "#EF5350"
+
+
+async def _ccd_kraken_plot(request: Request, net: str, interval: str):
+    theme = await get_theme_from_request(request)
+    title = f"CCD/USD on Kraken, {interval}"
+
+    if net != "mainnet":
+        return request.app.templates.TemplateResponse(
+            request,
+            "testnet/not-available.html",
+            {"env": request.app.env, "net": net, "request": request},
+        )
+
+    api_result = await get_url_from_api(
+        f"{request.app.api_url}/v2/mainnet/misc/ccd-ohlc/{interval}",
+        request.app.httpx_client,
+    )
+    payload = api_result.return_value if api_result.ok else None
+    candles = (payload or {}).get("candles") or []
+    if not candles:
+        return await return_plot_response(go.Figure(), request, title)
+
+    at = [c["at"] for c in candles]
+    closes = [c["close"] for c in candles]
+    opens = [c["open"] for c in candles]
+    change = payload.get("change_pct") or 0
+    up = change >= 0
+
+    fig = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, row_heights=[0.78, 0.22], vertical_spacing=0.04
+    )
+    fig.add_trace(
+        go.Candlestick(
+            x=at,
+            open=opens,
+            high=[c["high"] for c in candles],
+            low=[c["low"] for c in candles],
+            close=closes,
+            increasing_line_color=CANDLE_UP,
+            decreasing_line_color=CANDLE_DOWN,
+            increasing_fillcolor=CANDLE_UP,
+            decreasing_fillcolor=CANDLE_DOWN,
+            line_width=1,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=at,
+            y=[c["volume"] for c in candles],
+            marker_color=[CANDLE_UP if c["close"] >= c["open"] else CANDLE_DOWN for c in candles],
+            marker_line_width=0,
+            opacity=0.45,
+        ),
+        row=2,
+        col=1,
+    )
+    # The dashed last price. "x domain" and not "paper": with row/col set,
+    # Plotly resolves the reference against the subplot's data axis, and x=1
+    # then reads as 1970-01-01 and stretches the chart back five decades.
+    fig.add_hline(
+        y=closes[-1],
+        line_dash="dash",
+        line_width=1,
+        line_color=CANDLE_UP if up else CANDLE_DOWN,
+        row=1,
+        col=1,
+    )
+    fig.add_annotation(
+        x=1,
+        xref="x domain",
+        y=closes[-1],
+        yref="y",
+        text=f" {closes[-1]:.8f} ",
+        showarrow=False,
+        # Anchored inside the plot, not hanging off the right edge: the chart
+        # template sets its own margins and overrides any asked for here, so
+        # an outside label renders half off the canvas.
+        xanchor="right",
+        font=dict(color="white", size=11),
+        bgcolor=CANDLE_UP if up else CANDLE_DOWN,
+        borderpad=3,
+        row=1,
+        col=1,
+    )
+
+    empty = payload.get("bars_without_trades") or 0
+    subtitle = (
+        f"O{opens[-1]:.8f}  H{candles[-1]['high']:.8f}  "
+        f"L{candles[-1]['low']:.8f}  C{closes[-1]:.8f}   "
+        f"<b>{'+' if up else ''}{change:,.2f}%</b> over {payload.get('bars')} bars"
+    )
+    if empty:
+        subtitle += f"   ·   {empty} with no trades"
+
+    fig.update_layout(
+        template=ccdexplorer_plotly_template(theme),
+        title=f"<b>{title}</b><br><sup>{subtitle}</sup>",
+        height=420,
+        showlegend=False,
+        xaxis_rangeslider_visible=False,
+        bargap=0.25,
+    )
+    fig.update_yaxes(title_text="USD", tickformat=".8f", showgrid=False, row=1, col=1)
+    fig.update_yaxes(showticklabels=False, showgrid=False, row=2, col=1)
+    fig.update_xaxes(title=None, row=1, col=1)
+    fig.update_xaxes(title=None, row=2, col=1)
+    return await return_plot_response(fig, request, title)
+
+
+@router.get("/plots/{net}/ccd_kraken_1h", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_1h/image.png", response_class=Response)
+async def ccd_kraken_1h_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "1h")
+
+
+@router.get("/plots/{net}/ccd_kraken_4h", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_4h/image.png", response_class=Response)
+async def ccd_kraken_4h_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "4h")
+
+
+@router.get("/plots/{net}/ccd_kraken_1d", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_1d/image.png", response_class=Response)
+async def ccd_kraken_1d_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "1d")
+
+
 @router.get("/plots/{net}/daily_limits", response_class=Response)
 @router.get("/plots/{net}/daily_limits/image.png", response_class=Response)
 @router.post(

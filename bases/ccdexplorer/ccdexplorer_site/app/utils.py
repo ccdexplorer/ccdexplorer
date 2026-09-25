@@ -549,6 +549,18 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
 
 
 plot_info = {
+    "ccd_kraken_1h": {
+        "description": "CCD/USD 1-hour candles and volume from Kraken, the order book rather than the chain's fee rate.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "ccd_kraken_4h": {
+        "description": "CCD/USD 4-hour candles and volume from Kraken, the order book rather than the chain's fee rate.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
+    "ccd_kraken_1d": {
+        "description": "CCD/USD daily candles and volume from Kraken, the order book rather than the chain's fee rate.",
+        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
+    },
     "ccd_price_24h": {
         "description": "The CCD price over the last 24 hours, from the chain's own CCD/EUR rate, ending on the current spot price.",
         "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",

@@ -21,7 +21,8 @@ import logging
 
 from telegram.constants import ParseMode
 
-from .catalogue import Chart, search
+from .catalogue import Chart, search, siblings
+from .direct import keyboard_for
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,10 @@ def photo_result(chart: Chart, site_url: str) -> InlineQueryResultPhoto:
         description=chart.description,
         caption=f"<b>{chart.title}</b> — {chart.description}\n{chart.page_url(site_url)}",
         parse_mode=ParseMode.HTML,
+        # Only the interval series carry a keyboard here. A one-off chart sent
+        # into someone else's conversation does not need a button, and the
+        # "send to a chat" button makes no sense once it is already in one.
+        reply_markup=keyboard_for(chart, send_button=False) if len(siblings(chart)) > 1 else None,
     )
 
 
