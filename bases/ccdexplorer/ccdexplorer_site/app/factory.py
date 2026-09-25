@@ -1,6 +1,7 @@
 # ruff: noqa: F403, F405, E402, E501, E722, F401
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import warnings
 import hashlib
 import gc
 import uuid
@@ -493,6 +494,16 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # new Chromium process per render, and enough concurrent renders can
         # exhaust container memory.
         kaleido.start_sync_server()
+        # plotly hands kaleido per-call options that a running server ignores,
+        # and warns about it on every render. With the warmer redrawing 24
+        # charts in two themes every 50 minutes that is around 1,400 identical
+        # lines a day, which is enough to bury anything worth reading. Matched
+        # on the message so any other kaleido warning still comes through.
+        warnings.filterwarnings(
+            "ignore",
+            message="The kopts argument is ignored if using a server.",
+            category=UserWarning,
+        )
         try:
             yield
         finally:
