@@ -61,6 +61,24 @@ class Chart:
 
 CHARTS: tuple[Chart, ...] = (
     Chart(
+        "ccd_kraken_1h",
+        "CCD on Kraken, 1h",
+        "Hourly candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "hourly"),
+    ),
+    Chart(
+        "ccd_kraken_4h",
+        "CCD on Kraken, 4h",
+        "Four-hour candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded"),
+    ),
+    Chart(
+        "ccd_kraken_1d",
+        "CCD on Kraken, daily",
+        "Daily candles and volume from the order book",
+        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "daily"),
+    ),
+    Chart(
         "ccd_price_24h",
         "CCD price, 24h",
         "The last day, ending on the current price",

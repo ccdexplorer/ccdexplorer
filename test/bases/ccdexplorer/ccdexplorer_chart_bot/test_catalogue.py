@@ -208,6 +208,16 @@ def test_an_empty_query_shows_every_chart():
     assert len(search("")) == len(CHARTS)
 
 
+def test_the_kraken_charts_are_named_apart_from_the_chain_ones():
+    """They answer different questions: one is the chain's fee rate, the other
+    is an exchange's order book. A reader should be able to tell which."""
+    names = {c.name for c in CHARTS}
+    assert {"ccd_kraken_1h", "ccd_kraken_4h", "ccd_kraken_1d"} <= names
+    assert {"ccd_price_24h", "ccd_price_90d", "ccd_price_1y"} <= names
+    assert search("kraken")[0].name.startswith("ccd_kraken")
+    assert search("price")[0].name.startswith("ccd_price")
+
+
 def test_the_catalogue_still_fits_in_one_telegram_answer():
     """Fifty is Telegram's limit, not ours. Past it, results are silently
     dropped again."""
