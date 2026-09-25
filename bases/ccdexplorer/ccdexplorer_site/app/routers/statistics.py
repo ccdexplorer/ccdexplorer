@@ -770,6 +770,30 @@ async def _ccd_kraken_plot(request: Request, net: str, interval: str):
     return await return_plot_response(fig, request, title)
 
 
+@router.get("/plots/{net}/ccd_kraken_1m", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_1m/image.png", response_class=Response)
+async def ccd_kraken_1m_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "1m")
+
+
+@router.get("/plots/{net}/ccd_kraken_5m", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_5m/image.png", response_class=Response)
+async def ccd_kraken_5m_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "5m")
+
+
+@router.get("/plots/{net}/ccd_kraken_15m", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_15m/image.png", response_class=Response)
+async def ccd_kraken_15m_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "15m")
+
+
+@router.get("/plots/{net}/ccd_kraken_30m", response_class=Response)
+@router.get("/plots/{net}/ccd_kraken_30m/image.png", response_class=Response)
+async def ccd_kraken_30m_plotly(request: Request, net: str):
+    return await _ccd_kraken_plot(request, net, "30m")
+
+
 @router.get("/plots/{net}/ccd_kraken_1h", response_class=Response)
 @router.get("/plots/{net}/ccd_kraken_1h/image.png", response_class=Response)
 async def ccd_kraken_1h_plotly(request: Request, net: str):

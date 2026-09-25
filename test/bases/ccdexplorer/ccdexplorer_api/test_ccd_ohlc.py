@@ -18,7 +18,19 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2.misc_v2 import (
 def test_the_intervals_are_the_ones_kraken_serves():
     """Kraken takes minutes, and only these. Anything else comes back empty
     rather than as an error, which would look like no trades."""
-    assert KRAKEN_INTERVALS == {"15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+    assert KRAKEN_INTERVALS == {
+        "1m": 1,
+        "5m": 5,
+        "15m": 15,
+        "30m": 30,
+        "1h": 60,
+        "4h": 240,
+        "1d": 1440,
+    }
+    # Kraken's whole accepted set, from its OHLC docs. Asking for anything
+    # outside it -- 10m, say -- is answered with an empty result, which on a
+    # thinly traded pair is indistinguishable from a quiet hour.
+    assert set(KRAKEN_INTERVALS.values()) <= {1, 5, 15, 30, 60, 240, 1440, 10080, 21600}
 
 
 def test_the_pair_is_usd_not_usdt():

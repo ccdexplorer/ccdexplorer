@@ -558,7 +558,15 @@ KRAKEN_OHLC_URL = "https://api.kraken.com/0/public/OHLC"
 KRAKEN_CCD_PAIR = "CCDUSD"
 
 #: minutes, as Kraken names them.
-KRAKEN_INTERVALS = {"15m": 15, "30m": 30, "1h": 60, "4h": 240, "1d": 1440}
+KRAKEN_INTERVALS = {
+    "1m": 1,
+    "5m": 5,
+    "15m": 15,
+    "30m": 30,
+    "1h": 60,
+    "4h": 240,
+    "1d": 1440,
+}
 
 #: Kraken returns 720 candles whatever you ask for; this is how many reach the
 #: chart. Enough to read, few enough that each candle has width.

@@ -212,7 +212,15 @@ def test_the_kraken_charts_are_named_apart_from_the_chain_ones():
     """They answer different questions: one is the chain's fee rate, the other
     is an exchange's order book. A reader should be able to tell which."""
     names = {c.name for c in CHARTS}
-    assert {"ccd_kraken_1h", "ccd_kraken_4h", "ccd_kraken_1d"} <= names
+    assert {
+        "ccd_kraken_1m",
+        "ccd_kraken_5m",
+        "ccd_kraken_15m",
+        "ccd_kraken_30m",
+        "ccd_kraken_1h",
+        "ccd_kraken_4h",
+        "ccd_kraken_1d",
+    } <= names
     assert {"ccd_price_24h", "ccd_price_90d", "ccd_price_1y"} <= names
     assert search("kraken")[0].name.startswith("ccd_kraken")
     assert search("price")[0].name.startswith("ccd_price")
@@ -373,7 +381,15 @@ def test_only_interval_series_get_buttons():
     """An interval row with one entry is a button that does nothing."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME, siblings
 
-    assert [c.period for c in siblings(BY_NAME["ccd_kraken_1h"])] == ["1h", "4h", "1d"]
+    assert [c.period for c in siblings(BY_NAME["ccd_kraken_1h"])] == [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "4h",
+        "1d",
+    ]
     assert [c.period for c in siblings(BY_NAME["ccd_price_24h"])] == ["24h", "90d", "1y"]
     assert siblings(BY_NAME["accounts_per_day"]) == []
 
@@ -383,8 +399,19 @@ def test_the_keyboard_marks_which_interval_is_showing():
     from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
 
     rows = keyboard_for(BY_NAME["ccd_kraken_4h"]).inline_keyboard
-    labels = [b.text for b in rows[0]]
-    assert labels == ["1h", "· 4h ·", "1d"]
+    labels = [b.text for row in rows[:-1] for b in row]
+    assert labels == ["1m", "5m", "15m", "30m", "1h", "· 4h ·", "1d"]
+
+
+def test_the_interval_row_wraps_before_it_gets_too_narrow():
+    """Seven buttons across a phone screen is seven unreadable slivers, and
+    these charts are read on phones."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.direct import BUTTONS_PER_ROW, keyboard_for
+
+    for chart in CHARTS:
+        for row in keyboard_for(chart).inline_keyboard:
+            assert len(row) <= BUTTONS_PER_ROW
 
 
 def test_a_standalone_chart_gets_no_interval_row():
