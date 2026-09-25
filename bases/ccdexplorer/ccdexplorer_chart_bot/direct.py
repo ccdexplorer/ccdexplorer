@@ -28,6 +28,9 @@ MAX_REPLIES = 3
 #: well inside that, so the name itself is the payload.
 CALLBACK_PREFIX = "c:"
 
+#: Telegram will render more, unreadably narrow.
+BUTTONS_PER_ROW = 4
+
 
 def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup:
     """Interval buttons above, and a way to send the chart onward below.
@@ -38,14 +41,17 @@ def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup
     rows = []
     family = siblings(chart)
     if len(family) > 1:
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    f"· {sibling.period} ·" if sibling.name == chart.name else sibling.period,
-                    callback_data=f"{CALLBACK_PREFIX}{sibling.name}",
-                )
-                for sibling in family
-            ]
+        buttons = [
+            InlineKeyboardButton(
+                f"· {sibling.period} ·" if sibling.name == chart.name else sibling.period,
+                callback_data=f"{CALLBACK_PREFIX}{sibling.name}",
+            )
+            for sibling in family
+        ]
+        # Four to a row. Seven intervals in one row is unreadable at phone
+        # width, which is where these are looked at.
+        rows.extend(
+            buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)
         )
     if send_button:
         rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
