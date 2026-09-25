@@ -208,10 +208,12 @@ def test_an_empty_query_shows_every_chart():
     assert len(search("")) == len(CHARTS)
 
 
-def test_the_kraken_charts_are_named_apart_from_the_chain_ones():
-    """They answer different questions: one is the chain's fee rate, the other
-    is an exchange's order book. A reader should be able to tell which."""
+def test_the_kraken_charts_are_the_only_price_charts_the_bot_offers():
+    """The chain's own fee rate is charted by the site but not by the bot.
+    Two families both called "price", both drawing a CCD/USD line, made
+    typing "price" a coin flip between a market and a governance figure."""
     names = {c.name for c in CHARTS}
+    assert not [name for name in names if name.startswith("ccd_price")]
     assert {
         "ccd_kraken_1m",
         "ccd_kraken_5m",
@@ -221,9 +223,17 @@ def test_the_kraken_charts_are_named_apart_from_the_chain_ones():
         "ccd_kraken_4h",
         "ccd_kraken_1d",
     } <= names
-    assert {"ccd_price_24h", "ccd_price_90d", "ccd_price_1y"} <= names
     assert search("kraken")[0].name.startswith("ccd_kraken")
-    assert search("price")[0].name.startswith("ccd_price")
+
+
+def test_price_lands_on_the_hourly_candles():
+    """Bare "price" has to answer with one chart, and the minute chart of a
+    thinly traded pair is mostly empty candles -- a bad thing to lead with.
+    It beats realized_prices, which has the word in its name but answers a
+    different question."""
+    assert search("price")[0].name == "ccd_kraken_1h"
+    assert search("ccd price")[0].name == "ccd_kraken_1h"
+    assert search("realized price")[0].name == "realized_prices"
 
 
 def test_the_catalogue_still_fits_in_one_telegram_answer():
@@ -242,7 +252,7 @@ def test_the_catalogue_still_fits_in_one_telegram_answer():
         ("tps", "network_activity_tps"),
         ("bakers", "staking_validator_count"),
         ("binance", "ccd_on_exchanges"),
-        ("price", "ccd_price_24h"),
+        ("price", "ccd_kraken_1h"),
         ("realized", "realized_prices"),
     ],
 )
@@ -390,7 +400,6 @@ def test_only_interval_series_get_buttons():
         "4h",
         "1d",
     ]
-    assert [c.period for c in siblings(BY_NAME["ccd_price_24h"])] == ["24h", "90d", "1y"]
     assert siblings(BY_NAME["accounts_per_day"]) == []
 
 
@@ -444,11 +453,18 @@ def test_inline_interval_charts_carry_buttons_but_no_send_button():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
     from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
 
-    grouped = photo_result(BY_NAME["ccd_price_90d"], SITE)
+    grouped = photo_result(BY_NAME["ccd_kraken_4h"], SITE)
     rows = grouped.reply_markup.inline_keyboard
-    assert [b.text for b in rows[0]] == ["24h", "· 90d ·", "1y"]
-    assert len(rows) == 1
-    assert all(b.callback_data for b in rows[0])
+    assert [b.text for row in rows for b in row] == [
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "· 4h ·",
+        "1d",
+    ]
+    assert all(b.callback_data for row in rows for b in row)
 
 
 def test_inline_standalone_charts_carry_no_keyboard():
