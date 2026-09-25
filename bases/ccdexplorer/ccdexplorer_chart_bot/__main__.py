@@ -80,7 +80,14 @@ def main() -> None:
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, direct_handler(site_url))
     )
-    application.run_polling(allowed_updates=["message", "inline_query", "callback_query"])
+    application.run_polling(
+        allowed_updates=[
+            "message",
+            "inline_query",
+            "callback_query",
+            "chosen_inline_result",
+        ]
+    )
 
 
 if __name__ == "__main__":

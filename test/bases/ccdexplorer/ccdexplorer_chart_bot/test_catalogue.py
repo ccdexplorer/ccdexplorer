@@ -408,3 +408,24 @@ def test_callback_data_round_trips_and_fits():
                     assert len(button.callback_data.encode()) <= 64
                     name = button.callback_data[len(CALLBACK_PREFIX) :]
                     assert name in BY_NAME
+
+
+def test_inline_interval_charts_carry_buttons_but_no_send_button():
+    """Sent into somebody else's chat, the interval buttons still work -- the
+    callback query carries the inline_message_id. "Send to a chat" does not
+    belong there: it is already in one."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
+
+    grouped = photo_result(BY_NAME["ccd_price_90d"], SITE)
+    rows = grouped.reply_markup.inline_keyboard
+    assert [b.text for b in rows[0]] == ["24h", "· 90d ·", "1y"]
+    assert len(rows) == 1
+    assert all(b.callback_data for b in rows[0])
+
+
+def test_inline_standalone_charts_carry_no_keyboard():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+    from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
+
+    assert photo_result(BY_NAME["accounts_per_day"], SITE).reply_markup is None

@@ -29,7 +29,7 @@ MAX_REPLIES = 3
 CALLBACK_PREFIX = "c:"
 
 
-def keyboard_for(chart: Chart) -> InlineKeyboardMarkup:
+def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup:
     """Interval buttons above, and a way to send the chart onward below.
 
     A chart with no siblings gets only the send button -- an interval row with
@@ -47,7 +47,8 @@ def keyboard_for(chart: Chart) -> InlineKeyboardMarkup:
                 for sibling in family
             ]
         )
-    rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
+    if send_button:
+        rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
     return InlineKeyboardMarkup(rows)
 
 
