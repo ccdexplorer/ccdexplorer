@@ -80,10 +80,12 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_agent_registries,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    PLOT_THEMES,
     PLOT_WARM_INTERVAL_MINUTES,
     add_account_info_to_cache,
     evict_plot_image,
     get_url_from_api,
+    plot_cache_key,
     plot_image_paths,
 )
 from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment
@@ -707,18 +709,23 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             transport=transport, base_url="http://plot-warmer", timeout=180.0
         ) as client:
             warmed = 0
-            for path in paths:
-                evict_plot_image(path)
+            # Both themes: the site asks for dark and the chart bot asks for
+            # light, and they are separate cache entries. Warming only one
+            # leaves the other paying a cold render on first use, which is
+            # exactly the wait this job exists to remove.
+            wanted = [(path, theme) for path in paths for theme in PLOT_THEMES]
+            for path, theme in wanted:
+                evict_plot_image(plot_cache_key(path, theme))
                 try:
-                    response = await client.get(path)
+                    response = await client.get(path, params={"theme": theme})
                 except Exception as error:  # a cold chart is not worth an outage
-                    print(f"plot warmer: {path} failed ({error})")
+                    print(f"plot warmer: {path} [{theme}] failed ({error})")
                     continue
                 if response.status_code == 200:
                     warmed += 1
                 else:
-                    print(f"plot warmer: {path} returned {response.status_code}")
-        print(f"plot warmer: {warmed}/{len(paths)} charts warm")
+                    print(f"plot warmer: {path} [{theme}] returned {response.status_code}")
+        print(f"plot warmer: {warmed}/{len(wanted)} chart images warm")
 
     @scheduler.scheduled_job("interval", seconds=5, args=[app])
     async def repeated_task_get_blocks_and_transactions(app: FastAPI):

@@ -592,8 +592,7 @@ async def test_message_account_plt_event_update(bot: Bot, grpcclient: GRPCClient
             for call in publish_mock.await_args_list
         )
         assert all(
-            call.kwargs["message_response"] is not None
-            for call in publish_mock.await_args_list
+            call.kwargs["message_response"] is not None for call in publish_mock.await_args_list
         )
     finally:
         bot.users = original_users

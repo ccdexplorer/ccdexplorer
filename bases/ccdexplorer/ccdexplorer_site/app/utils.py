@@ -701,7 +701,11 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
-        cache_key = request.url.path
+        # Resolved here rather than passed in, so none of the twenty-odd call
+        # sites has to change. From the query string only: this branch is a
+        # GET, and reading a body it does not have blocks.
+        theme = theme_from_query(request)
+        cache_key = plot_cache_key(request.url.path, theme)
         cached = _PLOT_IMAGES.get(cache_key)
         if cached is None:
             async with _KALEIDO_RENDER_LOCK:
@@ -2292,12 +2296,50 @@ def user_string(user: SiteUser):
     return user.username if user else "A user"
 
 
+#: The only two a caller may ask for. Validated rather than passed through,
+#: because the theme becomes part of a cache key: an unchecked value would let
+#: anyone mint unlimited entries in an in-process store by varying a query
+#: string, which is a memory leak with a public trigger.
+PLOT_THEMES = ("dark", "light")
+
+
 async def get_theme_from_request(request: Request):
-    theme = "dark"
+    """The theme to draw in: query string first, then the posted form, then dark.
+
+    The query string exists for the image routes. Those are GETs, so they have
+    no body, so every chart image rendered dark no matter who asked -- fine on
+    the site, which is dark, and wrong in a Telegram chat that is not.
+    """
+    requested = request.query_params.get("theme")
+    if requested in PLOT_THEMES:
+        return requested
+
+    theme = "dark"  # noqa: F841 - reassigned from the body below
     body = await request.body()
     if body:
         theme = body.decode("utf-8").split("=")[1]
-    return theme
+    return theme if theme in PLOT_THEMES else "dark"
+
+
+def theme_from_query(request: Request) -> str:
+    """The theme from the query string alone, without touching the body.
+
+    The image routes are GETs and never carry one, and awaiting a body that
+    will never arrive is a good way to hang: doing it here took the test suite
+    from ten seconds to six and a half minutes, because a Request built without
+    a receive channel simply waits.
+    """
+    requested = request.query_params.get("theme")
+    return requested if requested in PLOT_THEMES else "dark"
+
+
+def plot_cache_key(path: str, theme: str) -> str:
+    """Charts differ by theme, so the cached image has to as well.
+
+    Keyed on the path alone, the first render would win and everyone after it
+    would get the wrong colours.
+    """
+    return f"{path}?theme={theme}"
 
 
 @lru_cache

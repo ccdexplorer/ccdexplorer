@@ -16,9 +16,7 @@ def make_run_record(
     repository_label: str | None = None,
 ):
     remote_job_origin = (
-        None
-        if location_name is None
-        else SimpleNamespace(location_name=location_name)
+        None if location_name is None else SimpleNamespace(location_name=location_name)
     )
     tags = {}
     if repository_label is not None:

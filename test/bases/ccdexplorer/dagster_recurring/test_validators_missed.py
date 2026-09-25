@@ -111,7 +111,9 @@ def test_epochs_to_record_is_empty_when_caught_up():
 
 
 def test_epochs_to_record_catches_up_after_downtime():
-    assert epochs_to_record(50, _filled(50), payday_epoch=190, chain_epoch=200) == list(range(51, 200))
+    assert epochs_to_record(50, _filled(50), payday_epoch=190, chain_epoch=200) == list(
+        range(51, 200)
+    )
 
 
 def test_epochs_to_record_falls_back_to_the_payday_on_an_empty_genesis():

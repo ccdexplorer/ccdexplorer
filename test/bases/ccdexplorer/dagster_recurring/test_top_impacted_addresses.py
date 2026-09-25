@@ -55,6 +55,4 @@ def test_missing_top_list_marker_seeds_instead_of_failing():
     result = update_top_impacted_addresses(context, mongodb, "devnet")
 
     assert "skipped" not in result
-    assert (
-        result["heartbeat_last_block_processed_impacted_addresses_all_top_list"] == 51_517_071
-    )
+    assert result["heartbeat_last_block_processed_impacted_addresses_all_top_list"] == 51_517_071

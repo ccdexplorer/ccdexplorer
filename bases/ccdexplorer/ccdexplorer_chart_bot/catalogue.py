@@ -23,6 +23,11 @@ from dataclasses import dataclass
 #: a broken result, so the net is not a parameter here at all.
 NET = "mainnet"
 
+#: Charts are drawn light for the bot. The site is dark and its own images
+#: match it, but these land in somebody else's chat -- most of them light --
+#: where a dark chart reads as a black rectangle rather than a graph.
+THEME = "light"
+
 #: Telegram's own limit, and the catalogue is kept under it. Pinned to the
 #: catalogue size once instead, this silently stopped matching when charts were
 #: added -- three new price charts and the last three fell off the end of an
@@ -48,7 +53,7 @@ class Chart:
     keywords: tuple[str, ...] = ()
 
     def image_url(self, site_url: str) -> str:
-        return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}/image.png"
+        return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}/image.png?theme={THEME}"
 
     def page_url(self, site_url: str) -> str:
         return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}"

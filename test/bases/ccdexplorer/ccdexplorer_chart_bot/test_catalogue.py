@@ -70,8 +70,24 @@ def test_names_are_unique():
 
 def test_the_image_url_is_the_one_the_site_serves():
     chart = next(c for c in CHARTS if c.name == "staking_validator_count")
-    assert chart.image_url(SITE) == f"{SITE}/plots/mainnet/staking_validator_count/image.png"
+    assert chart.image_url(SITE).startswith(
+        f"{SITE}/plots/mainnet/staking_validator_count/image.png"
+    )
     assert chart.page_url(SITE) == f"{SITE}/plots/mainnet/staking_validator_count"
+
+
+def test_the_bot_asks_for_light_charts():
+    """These land in somebody else's chat, mostly a light one, where a dark
+    chart reads as a black rectangle rather than a graph."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import THEME
+
+    assert THEME == "light"
+    assert all(c.image_url(SITE).endswith("?theme=light") for c in CHARTS)
+
+
+def test_the_page_link_carries_no_theme():
+    """The page is the site's own, and the site picks its own theme."""
+    assert all("theme=" not in c.page_url(SITE) for c in CHARTS)
 
 
 def test_a_trailing_slash_on_the_site_url_does_not_double_up():
@@ -302,7 +318,8 @@ async def test_a_plain_message_returns_the_chart():
     message = await _send("accounts")
     assert message.photos
     photo, caption, _ = message.photos[0]
-    assert photo == f"{SITE}/plots/mainnet/accounts_per_day/image.png"
+    assert photo.startswith(f"{SITE}/plots/mainnet/accounts_per_day/image.png")
+    assert photo.endswith("?theme=light")
     assert "Accounts per day" in caption
 
 
