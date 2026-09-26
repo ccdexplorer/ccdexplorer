@@ -56,6 +56,12 @@ class Chart:
     group: str = ""
     #: What the button for this chart says.
     period: str = ""
+    #: Words this chart answers ahead of everything else, beating even a chart
+    #: with the word in its own name. "price" reaches several charts loosely
+    #: -- realized price, fee stabilization -- and somebody typing it wants the
+    #: market price, so one family has to be allowed to claim the word outright
+    #: rather than win it by accident of naming.
+    claims: tuple[str, ...] = ()
 
     def image_url(self, site_url: str) -> str:
         return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}/image.png?theme={THEME}"
@@ -69,81 +75,102 @@ CHARTS: tuple[Chart, ...] = (
         "ccd_kraken_1m",
         "CCD on Kraken, 1m",
         "1m candles and volume from the order book",
-        ("kraken", "minute", "candles", "ohlc"),
+        ("price", "ccd", "usd", "value", "chart", "kraken", "minute", "candles", "ohlc"),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="1m",
     ),
     Chart(
         "ccd_kraken_5m",
         "CCD on Kraken, 5m",
         "5m candles and volume from the order book",
-        ("kraken", "candles", "ohlc"),
+        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="5m",
     ),
     Chart(
         "ccd_kraken_15m",
         "CCD on Kraken, 15m",
         "15m candles and volume from the order book",
-        ("kraken", "candles", "ohlc"),
+        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="15m",
     ),
     Chart(
         "ccd_kraken_30m",
         "CCD on Kraken, 30m",
         "30m candles and volume from the order book",
-        ("kraken", "candles", "ohlc"),
+        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="30m",
     ),
     Chart(
         "ccd_kraken_1h",
         "CCD on Kraken, 1h",
         "Hourly candles and volume from the order book",
-        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "hourly"),
+        (
+            "price",
+            "ccd",
+            "usd",
+            "value",
+            "chart",
+            "kraken",
+            "candles",
+            "ohlc",
+            "volume",
+            "exchange",
+            "traded",
+            "hourly",
+        ),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="1h",
     ),
     Chart(
         "ccd_kraken_4h",
         "CCD on Kraken, 4h",
         "Four-hour candles and volume from the order book",
-        ("kraken", "candles", "ohlc", "volume", "exchange", "traded"),
+        (
+            "price",
+            "ccd",
+            "usd",
+            "value",
+            "chart",
+            "kraken",
+            "candles",
+            "ohlc",
+            "volume",
+            "exchange",
+            "traded",
+        ),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="4h",
     ),
     Chart(
         "ccd_kraken_1d",
         "CCD on Kraken, daily",
         "Daily candles and volume from the order book",
-        ("kraken", "candles", "ohlc", "volume", "exchange", "traded", "daily"),
+        (
+            "price",
+            "ccd",
+            "usd",
+            "value",
+            "chart",
+            "kraken",
+            "candles",
+            "ohlc",
+            "volume",
+            "exchange",
+            "traded",
+            "daily",
+        ),
         group="kraken",
+        claims=("price", "ccd", "usd", "value"),
         period="1d",
-    ),
-    Chart(
-        "ccd_price_24h",
-        "CCD price, 24h",
-        "The last day, ending on the current price",
-        ("price", "ccd", "today", "intraday", "day", "usd", "chart", "value"),
-        group="price",
-        period="24h",
-    ),
-    Chart(
-        "ccd_price_90d",
-        "CCD price, 90 days",
-        "The last quarter, ending on the current price",
-        ("price", "ccd", "quarter", "90", "usd", "value"),
-        group="price",
-        period="90d",
-    ),
-    Chart(
-        "ccd_price_1y",
-        "CCD price, 1 year",
-        "The last year, ending on the current price",
-        ("price", "ccd", "year", "annual", "usd", "value"),
-        group="price",
-        period="1y",
     ),
     Chart(
         "staking_percentage_staked",
@@ -257,6 +284,11 @@ CHARTS: tuple[Chart, ...] = (
 
 BY_NAME = {chart.name: chart for chart in CHARTS}
 
+#: Which interval a group leads with when its claimed word is typed on its
+#: own. Catalogue order runs shortest first, because that is the order the
+#: buttons have to read in, and the shortest is the worst default.
+GROUP_DEFAULT = {"kraken": "1h"}
+
 #: Ties are broken by the order above rather than alphabetically, so the
 #: order is an editorial decision. Bare "price" should offer the day before
 #: the year, and alphabetically it did the opposite.
@@ -328,7 +360,9 @@ def _rank(terms: list[str], require_all: bool) -> list[tuple[tuple[int, int], st
         if hits == 0 or (require_all and hits < len(terms)):
             continue
         joined = " ".join(terms)
-        if name == joined.replace(" ", "_"):
+        if chart.claims and all(term in chart.claims for term in terms):
+            rank = 0 if chart.period == GROUP_DEFAULT.get(chart.group) else 1
+        elif name == joined.replace(" ", "_"):
             rank = 0
         elif name.startswith(joined.replace(" ", "_")):
             rank = 1
