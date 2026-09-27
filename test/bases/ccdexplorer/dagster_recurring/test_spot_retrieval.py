@@ -43,8 +43,23 @@ def _mongodb(translations=("BTC", "ETH", "EUROe")):
 
 
 def _context():
+    """A Dagster context whose log records what was said at which level.
+
+    The level matters, not just the text: Sentry ships error-level Dagster logs
+    as events, so a line's level decides whether it becomes an alert.
+    """
+    infos: list[str] = []
+    warnings: list[str] = []
+    errors: list[str] = []
     return SimpleNamespace(
-        log=SimpleNamespace(info=lambda *a, **k: None, error=lambda *a, **k: None)
+        log=SimpleNamespace(
+            info=lambda message, *a, **k: infos.append(message),
+            warning=lambda message, *a, **k: warnings.append(message),
+            error=lambda message, *a, **k: errors.append(message),
+        ),
+        infos=infos,
+        warnings=warnings,
+        errors=errors,
     )
 
 
@@ -730,3 +745,56 @@ def test_a_broken_series_write_does_not_fail_the_spot_run(monkeypatch):
 
     assert written == ["CCD"], "the spot rate still landed"
     assert mongodb.utilities[CollectionsUtilities.exchange_rates].bulk_writes
+
+
+# A token CoinAPI will not price is not an incident
+#
+# Sentry's Dagster integration ships every error-level log line as an event. For
+# the week to 2026-09-27 two of them -- BNB and UMB, both 403 from CoinAPI --
+# accounted for 4,134 of the 4,200 events on the celery project, one per token
+# per cycle, forever. The condition is real but it is a configuration gap, and
+# perform_spot_retrieval_update already reports it: the token lands in `failed`
+# or `unpriceable` and the run summary names it once. The per-token line is a
+# duplicate of an alert that already exists, so it belongs below error level.
+
+
+def test_a_token_coinapi_will_not_price_is_logged_below_error(monkeypatch):
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(403))
+    context = _context()
+
+    result = update_spot_retrieval.fetch_rate_from_coinapi(context, "BNB", client=None)
+
+    assert result is None
+    assert context.errors == []
+    assert any("No spot rate for BNB" in line for line in context.warnings)
+    assert any("403" in line for line in context.warnings)
+
+
+def test_a_raising_coinapi_is_still_an_error(monkeypatch):
+    """An exception is not a priced-out token -- that one stays an alert."""
+
+    def _boom(token, client):
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _boom)
+    context = _context()
+
+    result = update_spot_retrieval.fetch_rate_from_coinapi(context, "BNB", client=None)
+
+    assert result is None
+    assert any("Error in CoinAPI call for BNB" in line for line in context.errors)
+
+
+def test_the_run_summary_is_still_where_the_alert_lives(monkeypatch):
+    """Dropping the per-token level must not cost the caller its classification."""
+    monkeypatch.setattr(update_spot_retrieval, "coinapi", _no_rate(403))
+    monkeypatch.setattr(update_spot_retrieval, "coingecko_rates", _gecko_none())
+    mongodb = _mongodb(translations=("BNB",))
+
+    written, failed, unpriceable = perform_spot_retrieval_update(
+        _context(), ["BNB", "UMB"], mongodb
+    )
+
+    assert written == []
+    assert failed == ["BNB"]  # has a CoinGecko id and still got nothing
+    assert unpriceable == ["UMB"]  # no id at all, CoinAPI was the only route

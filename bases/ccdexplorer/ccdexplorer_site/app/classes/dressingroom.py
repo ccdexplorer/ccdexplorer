@@ -1124,26 +1124,18 @@ class MakeUp:
                             self.events_list.append(new_event)
 
                 elif effects.data_registered is not None:
-                    try:
-                        data_decoded = cbor2.loads(bytes.fromhex(effects.data_registered))
-                        if "hash" in data_decoded:
-                            if isinstance(data_decoded["hash"], bytes):
-                                data_decoded["hash"] = data_decoded["hash"].hex()
-                    except Exception:
-                        data_decoded = None
-                    if data_decoded is None:
-                        try:
-                            b = bytes.fromhex(effects.data_registered)
-
-                            # 2) bytes -> string
-                            data_decoded = json.loads(b.decode("utf-8"))
-                        except Exception:
-                            data_decoded = None
+                    # The payload is a stranger's bytes and the template renders
+                    # it with `tojson`, so the decode has to hand back something
+                    # json can hold -- see decode_registered_data. Hexing a
+                    # bytes `hash` used to be done here; json_safe now does that
+                    # for every bytes value at any depth, which is where a
+                    # transaction with a tag for a map key came unstuck.
+                    data_decoded = decode_registered_data(effects.data_registered)
                     self.classifier = TransactionClassifier.Data_Registered
                     new_event = EventType(
                         "Data Registered",
                         f"{shorten_address(effects.data_registered)}",
-                        data_decoded if isinstance(data_decoded, dict) else None,
+                        data_decoded,
                     )
 
                 if new_event and (len(self.events_list) == 0):

@@ -1513,6 +1513,64 @@ def shorten_address(value, address=None):
         return "<div class='ccd'>No metadata url found</div>"
 
 
+def json_safe(value):
+    """The same data, in the shapes json can hold.
+
+    CBOR is a wider format than JSON: a map key may be any type at all, values
+    may be tags or raw bytes, and cbor2 decodes tag 258 to a set. None of that
+    survives `json.dumps`, and Jinja's `tojson` passes `sort_keys=True`, so a map
+    with two differently-typed keys is sorted -- and raises comparing them --
+    before json even gets as far as rejecting the key type. Since anyone can
+    register data on chain, anyone could otherwise mint a transaction whose page
+    will not render.
+
+    Keys become strings (all of them, not just the ones json refuses: sorting
+    mixed str and int keys fails just as sorting int and tag keys does). Bytes
+    become hex, which is how the site shows bytes everywhere else. A tag is
+    replaced by its content, which is the part worth reading. Values that json
+    already holds are left exactly as they are.
+    """
+    if isinstance(value, cbor2.CBORTag):
+        return json_safe(value.value)
+    if isinstance(value, (bytes, bytearray)):
+        return value.hex()
+    if isinstance(value, dict):
+        return {str(json_safe(key)): json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return [json_safe(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    # A type this does not know about: show it rather than break the page.
+    return str(value)
+
+
+def decode_registered_data(hex: str) -> dict | None:
+    """A Data Registered payload, ready for a template.
+
+    CBOR first, then JSON, which is what the two encoders anything registering
+    data in practice uses produce. Returns None for anything else -- the caller
+    shows the raw hex in that case, which is honest and always works.
+
+    The result is put through json_safe because its only consumer renders it with
+    `tojson`, and the bytes it was decoded from are a stranger's to choose.
+    """
+    decoded = None
+    try:
+        decoded = cbor2.loads(bytes.fromhex(hex))
+    except Exception:  # noqa: BLE001 -- arbitrary on-chain bytes
+        try:
+            decoded = json.loads(bytes.fromhex(hex).decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            return None
+
+    if not isinstance(decoded, dict):
+        return None
+
+    return json_safe(decoded)
+
+
 def decode_memo(hex: str):
     raw = bytes.fromhex(hex)
 
