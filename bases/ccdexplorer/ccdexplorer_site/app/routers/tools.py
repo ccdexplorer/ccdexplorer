@@ -522,6 +522,26 @@ async def today_in(
         return response
 
 
+def _parse_month_boundary(value: str, field: str) -> dt.datetime:
+    """The date a user-supplied string names, or a 422.
+
+    The transfer search widens both of its dates to whole months, so all this
+    needs out of the string is a year and a month. The strings come from a
+    datepicker, but nothing stops a client sending anything at all: production
+    was sent "Septembre 2026" -- a localised month name dateutil cannot read --
+    and answered with an unhandled ParserError. A date the caller typed wrong is
+    a bad request, so it is named as one rather than raised as a server error.
+    """
+    try:
+        return dateutil.parser.parse(value)
+    except (ValueError, OverflowError) as error:
+        # ParserError subclasses ValueError; OverflowError is what a date far
+        # outside the representable range raises.
+        raise HTTPException(
+            status_code=422, detail=f"Could not read {field} as a date: {value!r}"
+        ) from error
+
+
 class PostDataTransfer(BaseModel):
     theme: str
     gte: str | int
@@ -560,10 +580,10 @@ async def ajax_tx_search_transfers(
     skip = (post_data.page - 1) * post_data.size
     if post_data.sort[0].field == "type_additional_info":
         post_data.sort[0].field = "amount"
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = _parse_month_boundary(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = _parse_month_boundary(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")

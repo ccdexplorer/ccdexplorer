@@ -168,7 +168,11 @@ def fetch_rate_from_coinapi(context, token: str, client: httpx.Client) -> dict |
         context.log.error(f"Recurring: Error in CoinAPI call for {token}. Error: {e}")
         return None
 
-    context.log.error(f"Recurring: No spot rate for {token} from CoinAPI (status {status}).")
+    # Warning, not error: Sentry ships error-level Dagster logs as events, and a
+    # token CoinAPI declines to price does so every cycle, forever. The caller
+    # already sorts this token into `failed` or `unpriceable` and the run summary
+    # names it once -- that is the alert. This line is the detail behind it.
+    context.log.warning(f"Recurring: No spot rate for {token} from CoinAPI (status {status}).")
     return None
 
 
