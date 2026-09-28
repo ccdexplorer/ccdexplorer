@@ -305,6 +305,18 @@ class GRPCClient(  # type: ignore
         Streaming: returns a list of streamed messages (consumes the stream).
         """
 
+        # A net with no hosts is a configuration gap, not a node that is down.
+        # env/settings.py yields [] for GRPC_MAINNET or GRPC_TESTNET when the
+        # variable is unset, and __init__ leaves the channel and stub as None in
+        # that case. Without this, the indexing two lines down is [][0] --
+        # IndexError: list index out of range, once per endpoint, saying nothing
+        # about what is actually wrong.
+        if not self.hosts.get(net):
+            _record_net_unresponsive(net.value, "no_host_configured")
+            raise ConnectionError(
+                f"no gRPC host configured for {net.value} -- set GRPC_{net.value.upper()}"
+            )
+
         for attempt in range(retries + 1):
             # Adjust readiness timeout for secure endpoints (you already have _current_is_secure, or inline the logic)
             rt = connect_timeout_s
@@ -421,6 +433,12 @@ class GRPCClient(  # type: ignore
         self, net: NET = NET.MAINNET, *, attempts: int = 2, timeout_s: float = 1.0
     ) -> bool:
         channel_to_check = getattr(self, f"channel_{net.value}")
+
+        # No hosts configured means __init__ never built a channel. Answering the
+        # question with False beats raising on a None channel, which is what
+        # grpc.channel_ready_future(None) does.
+        if channel_to_check is None or not self.hosts.get(net):
+            return False
 
         for _ in range(attempts):
             try:
