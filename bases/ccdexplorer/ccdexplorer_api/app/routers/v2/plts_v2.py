@@ -79,7 +79,7 @@ async def get_all_plt_tokens_from_node(
 
     try:
         result = grpcclient.get_token_list("last_final", net=NET(net))
-    except grpc._channel._InactiveRpcError | _MultiThreadedRendezvous:  # type: ignore
+    except (grpc._channel._InactiveRpcError, _MultiThreadedRendezvous):
         result = None
 
     if not result:

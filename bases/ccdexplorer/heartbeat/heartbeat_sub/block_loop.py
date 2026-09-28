@@ -241,7 +241,7 @@ class BlockLoop(_block_processing):
                         for h in batch
                     )
                 )
-            except grpc._channel._InactiveRpcError | ValueError as rpc_error:  # type: ignore
+            except (grpc._channel._InactiveRpcError, ValueError) as rpc_error:
                 self.tooter.relay(
                     channel=TooterChannel.NOTIFIER,
                     title="",
