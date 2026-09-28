@@ -50,6 +50,12 @@ dependencies = [
     "asgi-lifespan>=2.1.0",
     "dagster>=1.11.14",
     "dagster-postgres>=0.27.14",
+    # SQLAlchemy 2.1 changed what a bare postgresql:// url means -- psycopg (v3)
+    # instead of psycopg2 -- and dagster-postgres ships only psycopg2-binary, so a
+    # fresh resolve at image build time starts the app with a driver that is not
+    # installed. Bounded here as well as in uv.lock because the Dockerfiles run
+    # `uv pip install -e ./projects/<name>`, which re-resolves and ignores the lock.
+    "sqlalchemy<2.1",
     "dagster-docker>=0.27.14",
     "gitpython>=3.1.45",
     "polars==1.34.0",
