@@ -89,7 +89,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     plot_cache_key,
     plot_image_paths,
 )
-from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment
+from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment, sentry_dsn
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -113,7 +113,7 @@ HOME_TABLES_IDLE_GRACE_SECONDS = 4
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
-        dsn=environment["SENTRY_DSN"],
+        dsn=sentry_dsn(environment["SENTRY_DSN"]),
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )
@@ -313,7 +313,7 @@ class SiteSessionMiddleware(BaseHTTPMiddleware):
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
-        dsn=environment["SENTRY_DSN"],
+        dsn=sentry_dsn(environment["SENTRY_DSN"]),
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )

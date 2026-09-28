@@ -1,4 +1,5 @@
 from .settings import (
+    sentry_dsn,
     LIVE_PORT,
     ADMIN_CHAT_ID,
     API_TOKEN,
@@ -80,4 +81,5 @@ __all__ = [
     "COIN_GECKO_API_KEY",
     "REPO_DIR",
     "ON_SERVER",
+    "sentry_dsn",
 ]

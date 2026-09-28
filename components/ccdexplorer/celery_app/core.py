@@ -5,7 +5,7 @@ import os
 from typing import Literal, Optional
 
 import sentry_sdk
-from ccdexplorer.env import REDIS_URL, RUN_ON_NET
+from ccdexplorer.env import REDIS_URL, RUN_ON_NET, sentry_dsn
 from ccdexplorer.mongodb import Collections, MongoDB
 from celery import Celery
 from pydantic import BaseModel, ConfigDict, Field
@@ -44,7 +44,9 @@ class TaskResult(BaseModel):
 
 
 sentry_sdk.init(
-    dsn="https://514fe6c4c0481f29c21e71f1b7ad2755@o4503924901347328.ingest.us.sentry.io/4510817932935168",
+    dsn=sentry_dsn(
+        "https://514fe6c4c0481f29c21e71f1b7ad2755@o4503924901347328.ingest.us.sentry.io/4510817932935168"
+    ),
     # Add data like request headers and IP for users,
     # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
     send_default_pii=True,

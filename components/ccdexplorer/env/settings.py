@@ -1,4 +1,5 @@
 import os
+import sys
 import ast
 from dotenv import load_dotenv
 
@@ -68,6 +69,42 @@ RUN_ON_NET = os.environ.get("RUN_ON_NET", "mainnet")
 RUN_LOCAL_STR = os.environ.get("RUN_LOCAL_STR", "local")
 REDIS_URL = os.environ.get("REDIS_URL")
 SENTRY_DSN = os.environ.get("SENTRY_DSN")
+
+
+def sentry_dsn(dsn: str | None) -> str | None:
+    """`dsn`, or None when Sentry must stay off.
+
+    Every sentry_sdk.init in this repo routes its DSN through here, so there is
+    one place that knows when reporting is unwanted -- and no call site can be
+    switched off only by an environment variable it happens to read. A test run
+    in a container once created 77 issues on the celery project because
+    celery_app/core.py passed a DSN written into its own source straight to
+    init: SENTRY_DSN="" could not reach it, and one import armed the process
+    global excepthook.
+
+    Two signals, because neither covers the other:
+
+    * SENTRY_DISABLED is an environment variable, so a subprocess inherits it.
+      That matters -- a pytest collection failure is reported from a separate
+      interpreter, which has no pytest in its own sys.modules.
+    * `pytest in sys.modules` needs no cooperation from whoever started the
+      process, so it holds for a test run that never loads our conftest.
+
+    Returns "" when off, not None. This is the part that is easy to get wrong:
+    sentry_sdk.init(dsn=None) falls back to reading the SENTRY_DSN environment
+    variable itself and comes up live, so None does not disable anything in a
+    container that has one set. An empty string blocks that fallback and leaves
+    the client with no transport, which is what actually stops events leaving.
+
+    When reporting is wanted, `dsn` is handed back untouched -- including None,
+    so the SDK's own behaviour is unchanged where a call site relies on it.
+    """
+    if os.environ.get("SENTRY_DISABLED") == "1":
+        return ""
+    if "pytest" in sys.modules:
+        return ""
+    return dsn
+
 SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT")
 HEARTBEAT_PROGRESS_DOCUMENT_ID = os.environ.get(
     "HEARTBEAT_PROGRESS_DOCUMENT_ID", "heartbeat_last_processed_block"
