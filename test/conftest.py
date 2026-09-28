@@ -13,6 +13,12 @@ load_dotenv()  # populate os.environ from .env before any ccdexplorer import bel
 # paths, like the smoke test hitting 404/500s) report as production incidents.
 # Force this off before factory (or anything importing it) is ever imported.
 os.environ["SENTRY_DSN"] = ""
+# An environment variable, so anything this run spawns inherits it. The DSN
+# blanking above only reaches the call sites that read SENTRY_DSN; this reaches
+# every sentry_sdk.init in the repo, because they all pass their DSN through
+# ccdexplorer.env.sentry_dsn, and it survives into a subprocess -- which is how
+# a pytest collection failure once got reported through the global excepthook.
+os.environ["SENTRY_DISABLED"] = "1"
 os.environ["API_URL"] = "http://testserver"
 
 # MongoDB/MongoMotor (components/ccdexplorer/mongodb/core.py) import MONGO_URI

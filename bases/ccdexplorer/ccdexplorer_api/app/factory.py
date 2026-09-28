@@ -71,7 +71,7 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2 import (
     transaction_v2,
     transactions_v2,
 )
-from ccdexplorer.env import REDIS_URL, environment
+from ccdexplorer.env import REDIS_URL, environment, sentry_dsn
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.tooter import Tooter
 
@@ -95,7 +95,7 @@ from ccdexplorer.env import API_KEY_HEADER
 
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
-        dsn=environment["SENTRY_DSN"],
+        dsn=sentry_dsn(environment["SENTRY_DSN"]),
         traces_sample_rate=1.0,
         _experiments={"continuous_profiling_auto_start": True},
     )

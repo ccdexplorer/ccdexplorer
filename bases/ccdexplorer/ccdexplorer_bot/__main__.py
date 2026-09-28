@@ -26,7 +26,9 @@ logging.getLogger("apscheduler").propagate = False
 import sentry_sdk
 
 sentry_sdk.init(
-    dsn="https://9e4d7daa546f8e53fae6a8ce4ba6cac0@o4503924901347328.ingest.us.sentry.io/4510815580389376",
+    dsn=sentry_dsn(
+        "https://9e4d7daa546f8e53fae6a8ce4ba6cac0@o4503924901347328.ingest.us.sentry.io/4510815580389376"
+    ),
     # No send_default_pii here. This process handles Telegram messages, so
     # "request headers and IP for users" means named people's chat identifiers
     # and message content going to a third party. The site and the API both
