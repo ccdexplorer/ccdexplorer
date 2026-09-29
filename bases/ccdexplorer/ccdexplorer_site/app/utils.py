@@ -692,6 +692,26 @@ _KALEIDO_RENDER_LOCK = asyncio.Lock()
 _PLOT_IMAGES = PngCache()
 PLOT_IMAGE_TTL = 3600
 
+#: Charts whose png must expire sooner than the default hour, keyed by chart
+#: name. Each of these draws 120 candles of its own interval, so ccd_kraken_1m
+#: covers two hours and an hour-old image of it has missed half of what it
+#: claims to show. The chart bot buckets its image urls on these same numbers,
+#: so Telegram refetches exactly when there is something new to fetch -- keep
+#: the two in step.
+PLOT_IMAGE_TTL_BY_CHART = {
+    "ccd_kraken_1m": 60,
+    "ccd_kraken_5m": 300,
+    "ccd_kraken_15m": 900,
+    "ccd_kraken_30m": 1800,
+}
+
+
+def plot_image_ttl(path: str) -> int:
+    """How long this chart's rendered png may be served for."""
+    parts = path.rstrip("/").split("/")
+    name = parts[-2] if len(parts) >= 2 and parts[-1] == "image.png" else ""
+    return PLOT_IMAGE_TTL_BY_CHART.get(name, PLOT_IMAGE_TTL)
+
 #: Refreshed a little before they expire, so nobody ever waits on a cold
 #: render. Every chart on this list is redrawn on this interval whether or not
 #: anyone asked, which costs about eighteen seconds of kaleido an hour and
@@ -734,6 +754,7 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
         # GET, and reading a body it does not have blocks.
         theme = theme_from_query(request)
         cache_key = plot_cache_key(request.url.path, theme)
+        ttl = plot_image_ttl(request.url.path)
         cached = _PLOT_IMAGES.get(cache_key)
         if cached is None:
             async with _KALEIDO_RENDER_LOCK:
@@ -745,8 +766,8 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
                     img_bytes = await asyncio.get_running_loop().run_in_executor(
                         None, lambda: pio.to_image(fig, format="png", width=720)
                     )
-                    _PLOT_IMAGES.put(cache_key, img_bytes, PLOT_IMAGE_TTL)
-                    cached = (img_bytes, PLOT_IMAGE_TTL)
+                    _PLOT_IMAGES.put(cache_key, img_bytes, ttl)
+                    cached = (img_bytes, ttl)
         img_bytes, max_age = cached
         return Response(
             content=img_bytes,
