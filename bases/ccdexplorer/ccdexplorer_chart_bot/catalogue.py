@@ -16,6 +16,7 @@ chart added or removed there fails here rather than quietly going missing.
 """
 
 import re
+import time
 from dataclasses import dataclass
 
 #: Every chart is mainnet-only. The routes exist for other nets and answer 200
@@ -62,9 +63,28 @@ class Chart:
     #: market price, so one family has to be allowed to claim the word outright
     #: rather than win it by accident of naming.
     claims: tuple[str, ...] = ()
+    #: How often this chart's image url changes. Telegram downloads a photo url
+    #: once and serves its own stored copy every later time it is handed the
+    #: same url, so a url that never changes is a chart that never updates --
+    #: the Kraken charts showed their first render for four days while the site
+    #: was current throughout. This has to match the site's png ttl for the same
+    #: chart (PLOT_IMAGE_TTL_BY_CHART): sooner and Telegram refetches an image
+    #: that has not been redrawn, later and the chart lags for no reason.
+    refresh_seconds: int = 3600
 
-    def image_url(self, site_url: str) -> str:
-        return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}/image.png?theme={THEME}"
+    def image_url(self, site_url: str, now: float | None = None) -> str:
+        """The site url for this chart's png, in a form Telegram will refetch.
+
+        The bucket is what makes it refetch. It is deliberately coarse: a url
+        that changed on every call would cost a download per message and throw
+        away the file reuse that makes sending one cheap. `now` is injectable so
+        the bucketing can be tested without waiting for a clock.
+        """
+        bucket = int((time.time() if now is None else now) // self.refresh_seconds)
+        return (
+            f"{site_url.rstrip('/')}/plots/{NET}/{self.name}"
+            f"/image.png?theme={THEME}&t={bucket}"
+        )
 
     def page_url(self, site_url: str) -> str:
         return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}"
@@ -79,6 +99,7 @@ CHARTS: tuple[Chart, ...] = (
         group="kraken",
         claims=("price", "ccd", "usd", "value"),
         period="1m",
+        refresh_seconds=60,
     ),
     Chart(
         "ccd_kraken_5m",
@@ -88,6 +109,7 @@ CHARTS: tuple[Chart, ...] = (
         group="kraken",
         claims=("price", "ccd", "usd", "value"),
         period="5m",
+        refresh_seconds=300,
     ),
     Chart(
         "ccd_kraken_15m",
@@ -97,6 +119,7 @@ CHARTS: tuple[Chart, ...] = (
         group="kraken",
         claims=("price", "ccd", "usd", "value"),
         period="15m",
+        refresh_seconds=900,
     ),
     Chart(
         "ccd_kraken_30m",
@@ -106,6 +129,7 @@ CHARTS: tuple[Chart, ...] = (
         group="kraken",
         claims=("price", "ccd", "usd", "value"),
         period="30m",
+        refresh_seconds=1800,
     ),
     Chart(
         "ccd_kraken_1h",

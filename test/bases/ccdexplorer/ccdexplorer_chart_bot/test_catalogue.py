@@ -82,7 +82,10 @@ def test_the_bot_asks_for_light_charts():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import THEME
 
     assert THEME == "light"
-    assert all(c.image_url(SITE).endswith("?theme=light") for c in CHARTS)
+    # Present rather than trailing: the url also carries a cache-busting bucket
+    # now, so that Telegram refetches a redrawn chart instead of serving the
+    # copy it downloaded the first time.
+    assert all("theme=light" in c.image_url(SITE) for c in CHARTS)
 
 
 def test_the_page_link_carries_no_theme():
@@ -347,7 +350,7 @@ async def test_a_plain_message_returns_the_chart():
     assert message.photos
     photo, caption, _ = message.photos[0]
     assert photo.startswith(f"{SITE}/plots/mainnet/accounts_per_day/image.png")
-    assert photo.endswith("?theme=light")
+    assert "theme=light" in photo
     assert "Accounts per day" in caption
 
 
