@@ -661,11 +661,6 @@ CANDLE_UP = "#26A69A"
 CANDLE_DOWN = "#EF5350"
 
 
-#: How much blank time to leave past the newest candle, as a share of the
-#: window drawn. Enough for a ten-character price label at 720px wide.
-LAST_PRICE_LABEL_SHARE = 0.11
-
-
 async def _ccd_kraken_plot(request: Request, net: str, interval: str):
     theme = await get_theme_from_request(request)
     title = f"CCD/USD on Kraken, {interval}"
@@ -735,22 +730,21 @@ async def _ccd_kraken_plot(request: Request, net: str, interval: str):
     )
     fig.add_annotation(
         x=1,
-        xref="x domain",
+        xref="paper",
         y=closes[-1],
         yref="y",
-        text=f" {closes[-1]:.8f} ",
+        text=f"{closes[-1]:.8f}",
         showarrow=False,
-        # Anchored inside the plot, not hanging off the right edge: the chart
-        # template sets its own margins and overrides any asked for here, so
-        # an outside label renders half off the canvas. Inside, it would sit on
-        # top of the newest candles -- the ones being looked at -- which is why
-        # the axis below is padded to leave it somewhere empty to sit.
-        xanchor="right",
+        # On the scale, in the right margin, rather than on the canvas: the
+        # badge's left edge sits at the plot's right edge, so it covers the tick
+        # it stands in for and cannot reach the candles whatever the price does.
+        # The margin below is widened to hold it -- an explicit margin does
+        # override the template's, which an earlier note here doubted.
+        xanchor="left",
+        xshift=6,
         font=dict(color="white", size=11),
         bgcolor=CANDLE_UP if up else CANDLE_DOWN,
         borderpad=3,
-        row=1,
-        col=1,
     )
 
     empty = payload.get("bars_without_trades") or 0
@@ -769,21 +763,19 @@ async def _ccd_kraken_plot(request: Request, net: str, interval: str):
         showlegend=False,
         xaxis_rangeslider_visible=False,
         bargap=0.25,
+        # Room for an eight-decimal scale and the badge over it. The template
+        # leaves 24, which is right for a chart whose scale is on the left.
+        margin_r=96,
     )
-    fig.update_yaxes(title_text="USD", tickformat=".8f", showgrid=False, row=1, col=1)
-    fig.update_yaxes(showticklabels=False, showgrid=False, row=2, col=1)
+    # Right, as every trading chart has it: the newest candles are on the right,
+    # so that is where the eye already is when it wants the number.
+    fig.update_yaxes(
+        title_text="USD", tickformat=".8f", showgrid=False, side="right", row=1, col=1
+    )
+    fig.update_yaxes(showticklabels=False, showgrid=False, side="right", row=2, col=1)
     fig.update_xaxes(title=None, row=1, col=1)
     fig.update_xaxes(title=None, row=2, col=1)
 
-    # Room at the right for the last-price label. Without it the label covers
-    # the newest candles, which are the reason anyone opened the chart.
-    first_at = datetime.fromisoformat(at[0].replace("Z", "+00:00"))
-    last_at = datetime.fromisoformat(at[-1].replace("Z", "+00:00"))
-    span = last_at - first_at
-    if span:
-        padded = [first_at, last_at + span * LAST_PRICE_LABEL_SHARE]
-        fig.update_xaxes(range=padded, row=1, col=1)
-        fig.update_xaxes(range=padded, row=2, col=1)
     return await return_plot_response(fig, request, title)
 
 
