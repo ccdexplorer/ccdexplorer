@@ -63,6 +63,9 @@ class Chart:
     #: market price, so one family has to be allowed to claim the word outright
     #: rather than win it by accident of naming.
     claims: tuple[str, ...] = ()
+    #: True for the one member of a family that the picker shows and that a
+    #: keyword resolves to. Meaningless outside a family; `other` has none.
+    default: bool = False
     #: How often this chart's image url changes. Telegram downloads a photo url
     #: once and serves its own stored copy every later time it is handed the
     #: same url, so a url that never changes is a chart that never updates --
@@ -96,7 +99,7 @@ CHARTS: tuple[Chart, ...] = (
         "CCD on Kraken, 1m",
         "1m candles and volume from the order book",
         ("price", "ccd", "usd", "value", "chart", "kraken", "minute", "candles", "ohlc"),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="1m",
         refresh_seconds=60,
@@ -106,7 +109,7 @@ CHARTS: tuple[Chart, ...] = (
         "CCD on Kraken, 5m",
         "5m candles and volume from the order book",
         ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="5m",
         refresh_seconds=300,
@@ -116,7 +119,7 @@ CHARTS: tuple[Chart, ...] = (
         "CCD on Kraken, 15m",
         "15m candles and volume from the order book",
         ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="15m",
         refresh_seconds=900,
@@ -126,7 +129,7 @@ CHARTS: tuple[Chart, ...] = (
         "CCD on Kraken, 30m",
         "30m candles and volume from the order book",
         ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="30m",
         refresh_seconds=1800,
@@ -149,7 +152,7 @@ CHARTS: tuple[Chart, ...] = (
             "traded",
             "hourly",
         ),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="1h",
     ),
@@ -170,9 +173,10 @@ CHARTS: tuple[Chart, ...] = (
             "exchange",
             "traded",
         ),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="4h",
+        default=True,
     ),
     Chart(
         "ccd_kraken_1d",
@@ -192,7 +196,7 @@ CHARTS: tuple[Chart, ...] = (
             "traded",
             "daily",
         ),
-        group="kraken",
+        group="price",
         claims=("price", "ccd", "usd", "value"),
         period="1d",
     ),
@@ -201,117 +205,130 @@ CHARTS: tuple[Chart, ...] = (
         "Percentage staked",
         "Share of all CCD that is staked",
         ("staked", "percentage", "ratio", "share", "supply", "staking"),
+        group="other",
     ),
     Chart(
         "staking_validator_count",
         "Validator count",
         "Validators over time",
         ("validators", "bakers", "nodes", "count", "staking"),
+        group="other",
     ),
     Chart(
         "staking_delegator_count",
         "Delegator count",
         "Delegators over time",
         ("delegators", "delegation", "count", "staking"),
+        group="other",
     ),
     Chart(
         "staking_open_pool_count",
         "Open pools",
         "Pools open for delegation over time",
         ("pools", "open", "delegation", "staking"),
+        group="other",
     ),
     Chart(
         "staking_validator_staked_amounts",
         "Validator stake",
         "What validators have staked",
         ("validators", "bakers", "stake", "amounts", "staking"),
+        group="other",
     ),
     Chart(
         "staking_restaked_rewards",
         "Restaked rewards",
         "Share of daily rewards restaked",
         ("restake", "compounding", "rewards", "staking"),
+        group="other",
     ),
     Chart(
         "staking_distribution_of_rewards",
         "Reward distribution",
         "Daily breakdown of rewards",
         ("rewards", "distribution", "payday", "staking", "earnings"),
+        group="other",
     ),
     Chart(
         "staking_avg_delegator_stake",
         "Average delegator stake",
         "Average stake per delegator",
         ("average", "delegator", "stake", "mean", "staking"),
+        group="other",
     ),
     Chart(
         "staking_avg_delegator_per_pool_count",
         "Delegators per pool",
         "Average number of delegators in a pool",
         ("average", "delegators", "pool", "mean", "staking"),
+        group="other",
     ),
     Chart(
         "accounts_per_day",
         "Accounts per day",
         "New accounts created each day",
         ("accounts", "new", "growth", "signups", "users", "adoption"),
+        group="other",
     ),
     Chart(
         "network_activity_tps",
         "Network activity",
         "CCD transferred per day, and TPS",
         ("tps", "throughput", "activity", "volume", "speed", "usage"),
+        group="other",
     ),
     Chart(
         "transaction_types",
         "Transaction types",
         "Transactions by high-level type",
         ("types", "breakdown", "mix", "transactions", "kinds"),
+        group="other",
     ),
     Chart(
         "transaction_fees",
         "Transaction fees",
         "Fees paid on the chain over time",
         ("fees", "revenue", "paid", "cost", "transactions"),
+        group="other",
     ),
     Chart(
         "fee_stabilization",
         "Fee stabilization",
         "Cost of a regular transfer over time",
         ("fees", "cost", "transfer", "stable", "cheap", "price"),
+        group="other",
     ),
     Chart(
         "daily_limits",
         "Daily limits",
         "CCD needed to reach the top 100 and top 250",
         ("rich", "top", "whales", "leaderboard", "ranking", "holders"),
+        group="other",
     ),
     Chart(
         "realized_prices",
         "Realized price",
         "Average price at which coins last moved",
         ("price", "realized", "valuation", "cost", "basis", "market"),
+        group="other",
     ),
     Chart(
         "ccd_on_exchanges",
         "CCD on exchanges",
         "Balance held on exchange wallets",
         ("exchanges", "cex", "listed", "custody", "binance"),
+        group="other",
     ),
     Chart(
         "exchange_wallets",
         "Exchange wallets",
         "Count of exchange wallets over time",
         ("exchanges", "wallets", "aliases", "custody"),
+        group="other",
     ),
 )
 
 BY_NAME = {chart.name: chart for chart in CHARTS}
-
-#: Which interval a group leads with when its claimed word is typed on its
-#: own. Catalogue order runs shortest first, because that is the order the
-#: buttons have to read in, and the shortest is the worst default.
-GROUP_DEFAULT = {"kraken": "1h"}
 
 #: Ties are broken by the order above rather than alphabetically, so the
 #: order is an editorial decision. Bare "price" should offer the day before
@@ -322,12 +339,22 @@ _ORDER = {chart.name: index for index, chart in enumerate(CHARTS)}
 def siblings(chart: Chart) -> list[Chart]:
     """The same series at its other intervals, in catalogue order.
 
+    Keyed on `period`, not on `group`. A group is a category, and `other` holds
+    eighteen unrelated charts; if this returned those, keyboard_for and
+    photo_result would each attach a keyboard of seventeen buttons to charts
+    that have nothing to do with one another.
+
     Empty for a chart that stands alone, which is how the caller knows not
     to draw an interval keyboard under it.
     """
-    if not chart.group:
+    if not chart.group or not chart.period:
         return []
-    return [c for c in CHARTS if c.group == chart.group]
+    return [c for c in CHARTS if c.group == chart.group and c.period]
+
+
+def family_default(group: str) -> Chart | None:
+    """The chart a group opens at, or None for a group that is not a family."""
+    return next((c for c in CHARTS if c.group == group and c.default), None)
 
 
 #: Dropped before matching. People type questions -- "how much is staked" --
@@ -385,7 +412,11 @@ def _rank(terms: list[str], require_all: bool) -> list[tuple[tuple[int, int], st
             continue
         joined = " ".join(terms)
         if chart.claims and all(term in chart.claims for term in terms):
-            rank = 0 if chart.period == GROUP_DEFAULT.get(chart.group) else 1
+            # Which member a claimed word leads with. Catalogue order runs
+            # shortest first, because that is the order the buttons must read
+            # in, and the shortest is the worst thing to lead with -- so the
+            # family says which one it opens at rather than inheriting it.
+            rank = 0 if chart.default else 1
         elif name == joined.replace(" ", "_"):
             rank = 0
         elif name.startswith(joined.replace(" ", "_")):

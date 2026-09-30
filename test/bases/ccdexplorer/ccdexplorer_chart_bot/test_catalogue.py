@@ -229,13 +229,15 @@ def test_the_kraken_charts_are_the_only_price_charts_the_bot_offers():
     assert search("kraken")[0].name.startswith("ccd_kraken")
 
 
-def test_price_lands_on_the_hourly_candles():
+def test_price_lands_on_the_four_hour_candles():
     """Bare "price" has to answer with one chart, and the minute chart of a
     thinly traded pair is mostly empty candles -- a bad thing to lead with.
     It beats realized_prices, which has the word in its name but answers a
-    different question."""
-    assert search("price")[0].name == "ccd_kraken_1h"
-    assert search("ccd price")[0].name == "ccd_kraken_1h"
+    different question.
+
+    4h rather than 1h since the family says which member it opens at."""
+    assert search("price")[0].name == "ccd_kraken_4h"
+    assert search("ccd price")[0].name == "ccd_kraken_4h"
     assert search("realized price")[0].name == "realized_prices"
 
 
@@ -255,7 +257,7 @@ def test_the_catalogue_still_fits_in_one_telegram_answer():
         ("tps", "network_activity_tps"),
         ("bakers", "staking_validator_count"),
         ("binance", "ccd_on_exchanges"),
-        ("price", "ccd_kraken_1h"),
+        ("price", "ccd_kraken_4h"),
         ("realized", "realized_prices"),
     ],
 )
