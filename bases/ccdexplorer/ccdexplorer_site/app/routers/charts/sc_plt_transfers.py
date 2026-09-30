@@ -246,7 +246,13 @@ async def statistics_plt_transfers(
 IMAGE_WINDOWS = (30, 90, 180, 365)
 
 
-def build_plt_tvl_figure(all_data: list[dict], *, theme: str, freq: str) -> go.Figure:
+def build_plt_tvl_figure(
+    all_data: list[dict],
+    *,
+    theme: str,
+    freq: str,
+    stablecoins: set[str] | None = None,
+) -> go.Figure:
     """Total PLT stablecoin TVL in USD, as one line.
 
     Not the page's figure. The page stacks a bar per token and filters to the
@@ -264,16 +270,27 @@ def build_plt_tvl_figure(all_data: list[dict], *, theme: str, freq: str) -> go.F
     df = pd.json_normalize(extract_usd_transfers(all_data)).fillna(0)
     df["date"] = pd.to_datetime(df["date"])
     supply = [c for c in df.columns if c.endswith("USD.total_supply")]
+    if stablecoins is not None:
+        # The title says stablecoin and the route is named plt_tvl, so a PLT
+        # that tracks nothing must not be in the total. `stablecoins` is empty
+        # when we could not find out which those are -- then there is no honest
+        # number to draw, and a blank chart beats one that is confidently wrong.
+        supply = [c for c in supply if c.split(".")[1] in stablecoins]
     if not supply:
         return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
 
     # Per token first, so a token that stops reporting keeps its last known
-    # level for the period rather than dropping the total to zero.
+    # level rather than dropping the total to zero.
     df = (
         df.groupby([pd.Grouper(key="date", freq=freq, label="left", closed="left")])[supply]
         .last()
         .reset_index()
     )
+    # And carried across empty bins for the same reason. A day the nightly run
+    # skipped has no rows, so .last() gives NaN and the row sum skips it to 0 --
+    # which drew a cliff to zero and back, as though every stablecoin had been
+    # redeemed overnight and reissued the next morning.
+    df[supply] = df[supply].ffill()
     df["tvl"] = df[supply].sum(axis=1)
 
     fig = go.Figure(
@@ -306,8 +323,25 @@ async def plt_tvl_image(request: Request, net: str, days: int):
     all_data = await get_all_data_for_analysis_limited(
         "statistics_plt", request.app, start.isoformat(), end.isoformat()
     )
+
+    # Which PLTs are stablecoins is not in the statistics data, so it comes
+    # from the same overview endpoint the page uses. A failure here yields an
+    # empty set, which draws nothing rather than every PLT under a title that
+    # says stablecoin.
+    overview = await get_url_from_api(
+        f"{request.app.api_url}/v2/{net}/plts/overview", request.app.httpx_client
+    )
+    plts: dict = overview.return_value if overview.ok else {}
+    stablecoins = {
+        str(plt.get("_id"))
+        for plt in plts.values()
+        if plt.get("stablecoin_tracks") is not None
+    }
+
     theme = await get_theme_from_request(request)
-    fig = build_plt_tvl_figure(all_data, theme=theme, freq="D")
+    fig = build_plt_tvl_figure(
+        all_data, theme=theme, freq="D", stablecoins=stablecoins
+    )
     return await return_plot_response(fig, request, f"PLT stablecoin TVL, {days}d")
 
 

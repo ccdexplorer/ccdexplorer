@@ -161,3 +161,70 @@ async def test_an_interval_button_still_works():
 
     assert query.media
     assert "ccd_kraken_1d" in query.media[0][0].media
+
+
+# --- review finding 1: the advertised command sent the same chart three times
+
+
+async def test_a_family_word_sends_the_chart_once():
+    """/ccd price is what the nudge tells everyone to type.
+
+    It matched all seven Kraken intervals, resolved each to the family default
+    and sent that default once per match.
+    """
+    message = await _run("price")
+
+    sent = [p for p, _kw in message.photos]
+    assert len(sent) == len(set(sent)), f"sent the same chart more than once: {sent}"
+
+
+async def test_the_overflow_count_counts_what_is_left_after_collapsing():
+    """"…and 6 more" when two distinct charts remain is a lie."""
+    message = await _run("price")
+
+    assert not message.htmls, f"claimed there were more: {message.htmls}"
+
+
+async def test_a_word_matching_two_families_sends_one_of_each():
+    message = await _run("ccd")
+    sent = [p for p, _kw in message.photos]
+
+    assert len(sent) == len(set(sent))
+
+
+# --- review findings 5 and 6 -----------------------------------------------
+
+
+def test_the_nudge_only_answers_private_chats():
+    """Answering every plain message is the noise this branch set out to remove.
+
+    If the bot's privacy mode is off it sees every group message, and the nudge
+    would reply to all of them -- one for one with the behaviour being removed.
+    """
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    source = __import__("inspect").getsource(main)
+    assert "filters.ChatType.PRIVATE" in source, "the nudge answers group chats"
+
+
+async def test_start_does_not_claim_more_charts_than_the_picker_shows():
+    """It said "all 37 charts"; the picker collapsed families and shows 22."""
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+    from ccdexplorer.ccdexplorer_chart_bot.inline import pickable
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+    text = message.htmls[0]
+
+    assert f"all {len(CHARTS)} charts" not in text, "still claims the pre-collapse count"
+    assert str(len(pickable(CHARTS))) in text
+
+
+async def test_start_mentions_the_command():
+    """Plain text now tells people to use /ccd; the help must know it exists."""
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+
+    assert "/ccd" in message.htmls[0]

@@ -70,3 +70,54 @@ def test_family_default_of_other_is_none():
 
 def test_family_default_of_an_unknown_group_is_none():
     assert family_default("nonsense") is None
+
+
+# --- resolving a list of matches to what should actually be sent ------------
+#
+# Review finding 1 and 2, which are the same bug at two call sites. A query
+# matching several members of one family must collapse to that family once --
+# not send its default repeatedly, and not vanish.
+
+
+def test_a_family_collapses_to_one_entry():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families
+
+    price = [c for c in CHARTS if c.group == "price"]
+
+    assert [c.name for c in resolve_families(price)] == ["ccd_kraken_4h"]
+
+
+def test_a_non_default_member_resolves_instead_of_disappearing():
+    """`1d`, `90d`, `minute` and `hourly` match only non-default members."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families, search
+
+    for word in ("1d", "minute", "hourly", "90d", "365d"):
+        assert resolve_families(search(word)), f"{word!r} resolved to nothing"
+
+
+def test_charts_outside_a_family_are_kept_as_themselves():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families
+
+    others = [c for c in CHARTS if c.group == "other"]
+
+    assert resolve_families(others) == others
+
+
+def test_order_is_preserved():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families
+
+    resolved = resolve_families(list(CHARTS))
+    order = [c.name for c in CHARTS]
+
+    assert [order.index(c.name) for c in resolved] == sorted(
+        order.index(c.name) for c in resolved
+    )
+
+
+def test_the_whole_catalogue_resolves_to_one_per_family_plus_other():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families
+
+    families = {c.group for c in CHARTS if c.period}
+    others = [c for c in CHARTS if c.group == "other"]
+
+    assert len(resolve_families(list(CHARTS))) == len(families) + len(others)

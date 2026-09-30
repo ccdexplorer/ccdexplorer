@@ -15,7 +15,15 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
-from .catalogue import BY_NAME, CHARTS, Chart, family_default, search, siblings
+from .catalogue import (
+    BY_NAME,
+    CHARTS,
+    Chart,
+    family_default,
+    resolve_families,
+    search,
+    siblings,
+)
 
 log = logging.getLogger(__name__)
 
@@ -103,8 +111,12 @@ def command_handler(site_url: str):
             )
             return
 
-        matches = search(query)
-        log.info("/ccd %r -> %d match(es)", query, len(matches))
+        # Collapsed before the slice, not after: "price" matches all seven
+        # Kraken intervals, and resolving each one afterwards sent the same
+        # default once per match -- three identical charts for the command the
+        # nudge tells everyone to type.
+        matches = resolve_families(search(query))
+        log.info("/ccd %r -> %d chart(s)", query, len(matches))
         if not matches:
             await message.reply_html(
                 f"No chart matches “{query}”. Try <code>/ccd</code> on its own."
@@ -112,10 +124,6 @@ def command_handler(site_url: str):
             return
 
         for chart in matches[:MAX_REPLIES]:
-            # A match inside a family opens at that family's default, so the
-            # interval buttons arrive with it. A chart in `other` has no
-            # default and is sent as itself.
-            chart = family_default(chart.group) or chart
             await message.reply_photo(
                 photo=chart.image_url(site_url),
                 caption=caption(chart, site_url),

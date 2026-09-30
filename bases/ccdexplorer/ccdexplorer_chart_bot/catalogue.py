@@ -463,6 +463,25 @@ def siblings(chart: Chart) -> list[Chart]:
     return [c for c in CHARTS if c.group == chart.group and c.period]
 
 
+def resolve_families(charts: list[Chart]) -> list[Chart]:
+    """Collapse each family in `charts` to the one chart worth sending.
+
+    A query matching several members of one family -- "price" matches all seven
+    Kraken intervals -- must answer with that family once. Resolving after a
+    slice sent the same default repeatedly; dropping non-defaults instead made
+    "1d" and "90d" match nothing at all, because those words only ever match a
+    member that is not the default.
+
+    Order is the caller's, which for a search is rank and for the picker is
+    catalogue order.
+    """
+    seen: dict[str, Chart] = {}
+    for chart in charts:
+        resolved = family_default(chart.group) or chart
+        seen.setdefault(resolved.name, resolved)
+    return list(seen.values())
+
+
 def family_default(group: str) -> Chart | None:
     """The chart a group opens at, or None for a group that is not a family."""
     return next((c for c in CHARTS if c.group == group and c.default), None)

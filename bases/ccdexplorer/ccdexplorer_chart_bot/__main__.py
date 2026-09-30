@@ -27,6 +27,7 @@ from telegram.ext import (
 from .catalogue import CHARTS
 from .direct import callback_handler, command_handler, nudge_handler
 from .inline import handler as inline_handler
+from .inline import pickable
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -44,19 +45,27 @@ async def start(update: Update, context) -> None:
     exactly when a list of words is worth having.
     """
     username = context.bot.username or "ccdexplorer_chart_bot"
+    # The picker collapses a family to one entry, so this counts what a reader
+    # will actually see rather than how many Chart objects exist.
+    offered = pickable(CHARTS)
     lines = [
         "I put Concordium charts into any chat.",
         "",
-        f"Type <code>@{username}</code> in any conversation, then any of these:",
+        "Here: <code>/ccd &lt;word&gt;</code> — for example <code>/ccd price</code>. "
+        "<code>/ccd</code> on its own lists the categories.",
+        "",
+        f"Anywhere else: type <code>@{username}</code>, then any of these:",
         "",
     ]
-    for chart in CHARTS:
+    for chart in offered:
         terms = ", ".join(chart.keywords[:3])
         lines.append(f"<b>{chart.title}</b> — <i>{terms}</i>")
 
     lines += [
         "",
-        f"Or type <code>@{username}</code> and nothing else to see all {len(CHARTS)} charts.",
+        f"Or type <code>@{username}</code> and nothing else to see all {len(offered)} charts.",
+        "",
+        "Charts with intervals arrive with buttons for their other periods.",
         "",
         "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
     ]
@@ -80,7 +89,14 @@ def main() -> None:
     # bot made it noisy in group chats; going silent instead would read as the
     # bot being broken, so it says one line and nothing more.
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, nudge_handler())
+        MessageHandler(
+            # Private only. Answering every plain message is the group-chat
+            # noise this replaced; if the bot's privacy mode is off it sees
+            # every message in every group, and the nudge would reply to all
+            # of them -- one for one with what was removed.
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            nudge_handler(),
+        )
     )
     application.run_polling(
         allowed_updates=[

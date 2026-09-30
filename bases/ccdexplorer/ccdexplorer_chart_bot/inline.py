@@ -21,7 +21,7 @@ import logging
 
 from telegram.constants import ParseMode
 
-from .catalogue import Chart, search, siblings
+from .catalogue import Chart, resolve_families, search, siblings
 from .direct import keyboard_for
 
 log = logging.getLogger(__name__)
@@ -81,8 +81,13 @@ def pickable(charts) -> list[Chart]:
     keyboard that arrives with it. Charts outside a family carry no `period`
     and are all kept -- `other` is eighteen different charts, not one chart
     eighteen ways.
+
+    Resolving rather than filtering. Dropping every non-default member emptied
+    the list for "1d", "90d" and "minute", which match only members that are
+    not the default -- and an empty list renders as "No chart matches", for
+    queries that answered before.
     """
-    return [chart for chart in charts if chart.default or not chart.period]
+    return resolve_families(list(charts))
 
 
 def results_for(query: str, site_url: str) -> list:

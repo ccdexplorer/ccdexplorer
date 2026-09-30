@@ -47,3 +47,21 @@ def test_a_search_result_collapses_too():
     price_charts = [c for c in CHARTS if c.group == "price"]
 
     assert len(pickable(price_charts)) == 1
+
+
+# --- review finding 2: the picker reported "no match" for real queries
+
+
+def test_a_query_matching_only_non_default_members_still_offers_a_chart():
+    """`1d`, `90d`, `minute`, `hourly` match no family default at all.
+
+    Dropping non-defaults left an empty list, and the inline handler renders
+    that as "No chart matches …" -- for queries that worked before.
+    """
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+    from ccdexplorer.ccdexplorer_chart_bot.inline import results_for
+
+    for word in ("1d", "minute", "hourly", "90d", "180d", "365d"):
+        assert search(word), f"{word!r} matches nothing even before collapsing"
+        results = results_for(word, "https://ccdexplorer.io")
+        assert results[0].id != "no-match", f"{word!r} reported no match"
