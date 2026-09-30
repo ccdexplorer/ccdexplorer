@@ -400,6 +400,43 @@ CHARTS: tuple[Chart, ...] = (
         claims=("tvl",),
         period="365d",
     ),
+    Chart(
+        "transactions_count_30d",
+        "Transactions, 30d",
+        "Transactions per day, by category",
+        ("txs", "tx", "transactions", "count", "volume", "activity"),
+        group="txs",
+        claims=("txs", "transactions"),
+        period="30d",
+        default=True,
+    ),
+    Chart(
+        "transactions_count_90d",
+        "Transactions, 90d",
+        "Transactions per day, by category",
+        ("txs", "tx", "transactions", "count", "volume", "activity"),
+        group="txs",
+        claims=("txs", "transactions"),
+        period="90d",
+    ),
+    Chart(
+        "transactions_count_180d",
+        "Transactions, 180d",
+        "Transactions per day, by category",
+        ("txs", "tx", "transactions", "count", "volume", "activity"),
+        group="txs",
+        claims=("txs", "transactions"),
+        period="180d",
+    ),
+    Chart(
+        "transactions_count_365d",
+        "Transactions, 365d",
+        "Transactions per day, by category",
+        ("txs", "tx", "transactions", "count", "volume", "activity"),
+        group="txs",
+        claims=("txs", "transactions"),
+        period="365d",
+    ),
 )
 
 BY_NAME = {chart.name: chart for chart in CHARTS}
