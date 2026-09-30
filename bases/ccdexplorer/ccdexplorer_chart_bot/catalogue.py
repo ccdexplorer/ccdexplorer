@@ -326,6 +326,43 @@ CHARTS: tuple[Chart, ...] = (
         ("exchanges", "wallets", "aliases", "custody"),
         group="other",
     ),
+    Chart(
+        "agent_registries_30d",
+        "Agent registries, 30d",
+        "Agents registered per day on CIS-8004 contracts",
+        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
+        group="agents",
+        claims=("agents", "registries"),
+        period="30d",
+        default=True,
+    ),
+    Chart(
+        "agent_registries_90d",
+        "Agent registries, 90d",
+        "Agents registered per day on CIS-8004 contracts",
+        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
+        group="agents",
+        claims=("agents", "registries"),
+        period="90d",
+    ),
+    Chart(
+        "agent_registries_180d",
+        "Agent registries, 180d",
+        "Agents registered per day on CIS-8004 contracts",
+        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
+        group="agents",
+        claims=("agents", "registries"),
+        period="180d",
+    ),
+    Chart(
+        "agent_registries_365d",
+        "Agent registries, 365d",
+        "Agents registered per day on CIS-8004 contracts",
+        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
+        group="agents",
+        claims=("agents", "registries"),
+        period="365d",
+    ),
 )
 
 BY_NAME = {chart.name: chart for chart in CHARTS}
