@@ -21,7 +21,7 @@ import logging
 
 from telegram.constants import ParseMode
 
-from .catalogue import Chart, search, siblings
+from .catalogue import Chart, resolve_families, search, siblings
 from .direct import keyboard_for
 
 log = logging.getLogger(__name__)
@@ -73,8 +73,25 @@ def nothing_found(query: str, site_url: str) -> InlineQueryResultArticle:
     )
 
 
+def pickable(charts) -> list[Chart]:
+    """What the picker offers: each family once, and everything else as it is.
+
+    Seven Kraken intervals filled most of a phone screen for one chart. A
+    family is represented by its default; the intervals are a tap away on the
+    keyboard that arrives with it. Charts outside a family carry no `period`
+    and are all kept -- `other` is eighteen different charts, not one chart
+    eighteen ways.
+
+    Resolving rather than filtering. Dropping every non-default member emptied
+    the list for "1d", "90d" and "minute", which match only members that are
+    not the default -- and an empty list renders as "No chart matches", for
+    queries that answered before.
+    """
+    return resolve_families(list(charts))
+
+
 def results_for(query: str, site_url: str) -> list:
-    matches = search(query)
+    matches = pickable(search(query))
     if not matches:
         return [nothing_found(query, site_url)]
     return [photo_result(chart, site_url) for chart in matches]

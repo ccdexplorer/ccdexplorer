@@ -15,7 +15,15 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
-from .catalogue import BY_NAME, Chart, search, siblings
+from .catalogue import (
+    BY_NAME,
+    CHARTS,
+    Chart,
+    family_default,
+    resolve_families,
+    search,
+    siblings,
+)
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +38,14 @@ CALLBACK_PREFIX = "c:"
 
 #: Telegram will render more, unreadably narrow.
 BUTTONS_PER_ROW = 4
+
+#: Prefix for the category menu's buttons, kept distinct from CALLBACK_PREFIX
+#: so a tap on a category cannot be read as a chart name.
+MENU_PREFIX = "g:"
+
+#: The order the categories read in. price first because it is what most
+#: people open the bot for; other last because it is the leftovers.
+CATEGORY_ORDER = ("price", "txs", "agents", "tvl", "other")
 
 
 def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup:
@@ -58,30 +74,52 @@ def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup
     return InlineKeyboardMarkup(rows)
 
 
+def category_menu() -> InlineKeyboardMarkup:
+    """One button per category, in a fixed order.
+
+    Built from the catalogue rather than a literal list, so a category that
+    does not exist yet does not offer a button that answers nothing.
+    """
+    present = [g for g in CATEGORY_ORDER if any(c.group == g for c in CHARTS)]
+    buttons = [
+        InlineKeyboardButton(group, callback_data=f"{MENU_PREFIX}{group}")
+        for group in present
+    ]
+    return InlineKeyboardMarkup(
+        [buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)]
+    )
+
+
 def caption(chart: Chart, site_url: str) -> str:
     return f"<b>{chart.title}</b> — {chart.description}\n{chart.page_url(site_url)}"
 
 
-def handler(site_url: str):
-    """Build the message handler, closing over where the charts are served from."""
+def command_handler(site_url: str):
+    """/ccd <word> sends a chart; /ccd on its own offers the categories."""
 
-    async def reply_with_chart(update, context) -> None:
+    async def reply_to_command(update, context) -> None:
         message = update.message
-        if message is None or not message.text:
+        if message is None:
             return
 
-        query = message.text.strip()
-        matches = search(query)
-        log.info("message %r -> %d match(es)", query, len(matches))
-
-        if not matches:
-            username = context.bot.username or "ccdexplorer_chart_bot"
+        query = " ".join(getattr(context, "args", None) or []).strip()
+        if not query:
             await message.reply_html(
-                f"No chart matches “{query}”.\n\n"
-                "Try <i>validators</i>, <i>delegators</i>, <i>fees</i>, "
-                "<i>accounts</i> or <i>exchanges</i> — or /start for the full list.\n\n"
-                f"In any chat, type <code>@{username}</code> to browse them.",
-                disable_web_page_preview=True,
+                "Which chart? Pick a category, or say <code>/c &lt;word&gt;</code> "
+                "— for example <code>/c staking</code>.",
+                reply_markup=category_menu(),
+            )
+            return
+
+        # Collapsed before the slice, not after: "price" matches all seven
+        # Kraken intervals, and resolving each one afterwards sent the same
+        # default once per match -- three identical charts for the command the
+        # nudge tells everyone to type.
+        matches = resolve_families(search(query))
+        log.info("/ccd %r -> %d chart(s)", query, len(matches))
+        if not matches:
+            await message.reply_html(
+                f"No chart matches “{query}”. Try <code>/c</code> on its own."
             )
             return
 
@@ -99,7 +137,26 @@ def handler(site_url: str):
                 "Narrow it down, or /start for the full list."
             )
 
-    return reply_with_chart
+    return reply_to_command
+
+
+def nudge_handler():
+    """Plain text no longer searches -- it points at the command.
+
+    Going silent would leave anyone who types "price" today with no chart and
+    no reason, which reads as the bot being broken.
+    """
+
+    async def nudge(update, context) -> None:
+        message = update.message
+        if message is None or not message.text:
+            return
+        await message.reply_html(
+            "I answer commands now — try <code>/c price</code>, "
+            "or <code>/c</code> on its own for the list."
+        )
+
+    return nudge
 
 
 def callback_handler(site_url: str):
@@ -112,9 +169,40 @@ def callback_handler(site_url: str):
 
     async def switch_interval(update, context) -> None:
         query = update.callback_query
-        if query is None or not (query.data or "").startswith(CALLBACK_PREFIX):
+        if query is None:
             return
-        chart = BY_NAME.get(query.data[len(CALLBACK_PREFIX) :])
+        data = query.data or ""
+
+        if data.startswith(MENU_PREFIX):
+            group = data[len(MENU_PREFIX) :]
+            chart = family_default(group)
+            if chart is None:
+                members = [c for c in CHARTS if c.group == group]
+                if not members:
+                    # Answered rather than ignored: Telegram spins on an
+                    # unanswered callback query until it times out.
+                    await query.answer("That category is no longer available.")
+                    return
+                # A category with no default is `other` -- eighteen unrelated
+                # charts, so the tap opens a second menu rather than guessing.
+                await query.answer()
+                buttons = [
+                    InlineKeyboardButton(
+                        c.title, callback_data=f"{CALLBACK_PREFIX}{c.name}"
+                    )
+                    for c in members
+                ]
+                await query.edit_message_text(
+                    "Which one?",
+                    reply_markup=InlineKeyboardMarkup(
+                        [buttons[i : i + 1] for i in range(len(buttons))]
+                    ),
+                )
+                return
+        else:
+            if not data.startswith(CALLBACK_PREFIX):
+                return
+            chart = BY_NAME.get(data[len(CALLBACK_PREFIX) :])
         if chart is None:
             # Telegram will keep showing the spinner unless the query is
             # answered, so a stale button gets a reason rather than a hang.

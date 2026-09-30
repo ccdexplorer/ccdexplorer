@@ -25,9 +25,9 @@ from telegram.ext import (
 )
 
 from .catalogue import CHARTS
-from .direct import callback_handler
-from .direct import handler as direct_handler
+from .direct import callback_handler, command_handler, nudge_handler
 from .inline import handler as inline_handler
+from .inline import pickable
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -45,19 +45,30 @@ async def start(update: Update, context) -> None:
     exactly when a list of words is worth having.
     """
     username = context.bot.username or "ccdexplorer_chart_bot"
+    # The picker collapses a family to one entry, so this counts what a reader
+    # will actually see rather than how many Chart objects exist.
+    offered = pickable(CHARTS)
     lines = [
         "I put Concordium charts into any chat.",
         "",
-        f"Type <code>@{username}</code> in any conversation, then any of these:",
+        "Here: <code>/c &lt;word&gt;</code> — for example <code>/c price</code>. "
+        "<code>/c</code> on its own lists the categories.",
+        "",
+        f"Anywhere else: type <code>@{username}</code>, then any of these:",
         "",
     ]
-    for chart in CHARTS:
+    for chart in offered:
         terms = ", ".join(chart.keywords[:3])
         lines.append(f"<b>{chart.title}</b> — <i>{terms}</i>")
 
     lines += [
         "",
-        f"Or type <code>@{username}</code> and nothing else to see all {len(CHARTS)} charts.",
+        f"Or type <code>@{username}</code> and nothing else to see all {len(offered)} charts.",
+        "",
+        "Charts with intervals arrive with buttons for their other periods.",
+        "",
+        "In a group where another bot also answers <code>/c</code>, use "
+        "<code>/ccd</code> or <code>/c@" + username + "</code>.",
         "",
         "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
     ]
@@ -75,10 +86,24 @@ def main() -> None:
     application.add_handler(CommandHandler(["start", "help"], start))
     application.add_handler(InlineQueryHandler(inline_handler(site_url)))
     application.add_handler(CallbackQueryHandler(callback_handler(site_url)))
-    # Anything else typed at the bot directly is treated as a chart query.
-    # Registered last, so it cannot swallow the commands above.
+    # /c is short enough that another bot in the same group may claim it. PTB
+    # ignores /c@other_bot -- it compares the part after @ to its own username
+    # -- so the only ambiguous case is a bare /c in a group, where both bots
+    # answer. /ccd stays registered as the form that cannot be mistaken.
+    application.add_handler(CommandHandler(["c", "ccd"], command_handler(site_url)))
+    # Plain text no longer searches -- it points at /ccd. Registered last, so
+    # it cannot swallow the commands above. Answering everything typed at the
+    # bot made it noisy in group chats; going silent instead would read as the
+    # bot being broken, so it says one line and nothing more.
     application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, direct_handler(site_url))
+        MessageHandler(
+            # Private only. Answering every plain message is the group-chat
+            # noise this replaced; if the bot's privacy mode is off it sees
+            # every message in every group, and the nudge would reply to all
+            # of them -- one for one with what was removed.
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            nudge_handler(),
+        )
     )
     application.run_polling(
         allowed_updates=[

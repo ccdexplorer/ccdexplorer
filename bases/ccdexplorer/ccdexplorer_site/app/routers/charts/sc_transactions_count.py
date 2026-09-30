@@ -21,7 +21,12 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     get_all_data_for_analysis_limited,
 )
 from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
-from ccdexplorer.ccdexplorer_site.app.utils import get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    get_theme_from_request,
+    get_url_from_api,
+    return_plot_response,
+)
+from fastapi import HTTPException
 
 router = APIRouter()
 
@@ -117,146 +122,37 @@ async def ajax_transaction_types_reporting(
     all_data = await get_all_data_for_analysis_limited(
         analysis, request.app, post_data.start_date, post_data.end_date
     )
-    df = pd.json_normalize(all_data)
-    df.fillna(0)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.groupby([pd.Grouper(key="date", freq=letter, label="left", closed="left")]).sum().reset_index()
+    fig = build_transactions_count_figure(
+        all_data,
+        theme=theme,
+        freq=letter,
+        traces=post_data.trace_selection,
+        subtitle=f"{start_date_str} - {end_date_str}",
+        per=tooltip,
+    )
 
-    # only continue if we have data
+    # The CSV behind the page's download button. It stays here rather than in
+    # the builder: an image route has no filename to write to.
+    df = pd.json_normalize(all_data).fillna(0)
     if len(df) > 0:
-        # make sure we can sum up values
-        df.fillna(0)
         df["date"] = pd.to_datetime(df["date"])
-        df = df.fillna(0)
-
-        # Account
-        df = add_if_present(
-            "account",
-            ["account_creation", "credential_keys_updated", "credentials_updated"],
-            df,
+        df = (
+            df.groupby([pd.Grouper(key="date", freq=letter, label="left", closed="left")])
+            .sum()
+            .reset_index()
         )
-
-        # Staking
-        df = add_if_present(
-            "staking",
-            [
-                "baker_configured",
-                "baker_added",
-                "baker_removed",
-                "baker_keys_updated",
-                "baker_restake_earnings_updated",
-                "baker_stake_updated",
-                "delegation_configured",
-            ],
-            df,
-        )
-
-        # Smart Contracts
-        df = add_if_present(
-            "smart ctr",
-            ["contract_initialized", "contract_update_issued", "module_deployed"],
-            df,
-        )
-
-        # Data
-        df = add_if_present("register data", ["data_registered"], df)
-
-        # Transfer
-        df = add_if_present(
-            "transfer",
-            [
-                "account_transfer",
-                "transferred_to_encrypted",
-                "transferred_to_public",
-                "encrypted_amount_transferred",
-                "transferred_with_schedule",
-            ],
-            df,
-        )
-
-        fig = go.Figure()
-        if "account" in post_data.trace_selection:
-            fig.add_trace(
-                go.Bar(
-                    x=df["date"].to_list(),
-                    y=df["account"].to_list(),
-                    name="Account",
-                    marker=dict(color="#EE9B54"),
-                )
-            )
-        if "transfer" in post_data.trace_selection:
-            fig.add_trace(
-                go.Bar(
-                    x=df["date"].to_list(),
-                    y=df["transfer"].to_list(),
-                    name="Transfer",
-                    marker=dict(color="#F7D30A"),
-                )
-            )
-
-        if "smart ctr" in post_data.trace_selection:
-            fig.add_trace(
-                go.Bar(
-                    x=df["date"].to_list(),
-                    y=df["smart ctr"].to_list(),
-                    name="Smart Contracts",
-                    marker=dict(color="#6E97F7"),
-                )
-            )
-
-        if "staking" in post_data.trace_selection:
-            fig.add_trace(
-                go.Bar(
-                    x=df["date"].to_list(),
-                    y=df["staking"].to_list(),
-                    name="Staking",
-                    marker=dict(color="#F36F85"),
-                )
-            )
-
-        if "register data" in post_data.trace_selection:
-            fig.add_trace(
-                go.Bar(
-                    x=df["date"].to_list(),
-                    y=df["register data"].to_list(),
-                    name="Data",
-                    marker=dict(color="#AE7CF7"),
-                )
-            )
-
-        title = "Account Transaction Types"
-        trace_titles = {
-            "account": "Account",
-            "transfer": "Transfer",
-            "smart ctr": "Smart Contracts",
-            "staking": "Staking",
-            "register data": "Data",
-        }
-        # Generate title based on selected traces
-        selected_traces = post_data.trace_selection
-
-        selected_titles = [
-            trace_titles[trace] for trace in selected_traces if trace in trace_titles
-        ]
-
-        title = f"Account Transaction Types ({', '.join(selected_titles)}) per {tooltip}"
-
-        fig.update_layout(
-            barmode="stack",
-            showlegend=False,
-            title=f"<b>{title}</b><br><sup>{start_date_str} - {end_date_str}</sup>",
-            template=ccdexplorer_plotly_template(theme),
-            height=400,
-        )
-
-        df = df[["date"] + post_data.trace_selection]
-        df["total_selected"] = df[post_data.trace_selection].sum(axis=1)
+        for key, _label, _colour, columns in TX_CATEGORIES:
+            df = add_if_present(key, columns, df)
+        present = [t for t in post_data.trace_selection if t in df.columns]
+        df = df[["date"] + present]
+        df["total_selected"] = df[present].sum(axis=1) if present else 0
         df.to_csv(post_data.filename, index=False)
-        return fig.to_html(
-            config={"responsive": True, "displayModeBar": False},
-            full_html=False,
-            include_plotlyjs=False,
-        )
+
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
 
 
 def add_if_present(grouper_name: str, column_names: list[str], df: pd.DataFrame):
@@ -405,3 +301,132 @@ async def statistics_network_summary_accounts_per_day_standalone(
         full_html=False,
         include_plotlyjs=False,
     )
+
+
+#: The five categories: the source columns each rolls up, the label it draws
+#: under, and its colour. One table instead of five if-blocks and a parallel
+#: dict that had to agree with them.
+TX_CATEGORIES = (
+    ("account", "Account", "#EE9B54",
+     ["account_creation", "credential_keys_updated", "credentials_updated"]),
+    ("transfer", "Transfer", "#F7D30A",
+     ["account_transfer", "transferred_to_encrypted", "transferred_to_public",
+      "encrypted_amount_transferred", "transferred_with_schedule"]),
+    ("smart ctr", "Smart Contracts", "#6E97F7",
+     ["contract_initialized", "contract_update_issued", "module_deployed"]),
+    ("staking", "Staking", "#F36F85",
+     ["baker_configured", "baker_added", "baker_removed", "baker_keys_updated",
+      "baker_restake_earnings_updated", "baker_stake_updated", "delegation_configured"]),
+    ("register data", "Data", "#AE7CF7", ["data_registered"]),
+)
+
+#: The windows the chart bot's buttons offer. One route each -- see the note in
+#: sc_agent_registries.
+IMAGE_WINDOWS = (30, 90, 180, 365)
+
+
+def build_transactions_count_figure(
+    all_data: list[dict],
+    *,
+    theme: str,
+    freq: str,
+    traces: list[str],
+    subtitle: str = "",
+    per: str = "",
+) -> go.Figure:
+    """The figure both the page and the image routes draw.
+
+    `traces` is the page's trace_selection; the image routes pass every
+    category. The rollups are the fragile part -- a renamed source column just
+    stops contributing and the chart still draws -- so they live in
+    TX_CATEGORIES where they can be read at a glance.
+    """
+    if not all_data:
+        return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
+
+    df = pd.json_normalize(all_data).fillna(0)
+    df["date"] = pd.to_datetime(df["date"])
+    df = (
+        df.groupby([pd.Grouper(key="date", freq=freq, label="left", closed="left")])
+        .sum()
+        .reset_index()
+    )
+    if len(df) == 0:
+        return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
+    df = df.fillna(0)
+
+    for key, _label, _colour, columns in TX_CATEGORIES:
+        df = add_if_present(key, columns, df)
+
+    fig = go.Figure()
+    for key, label, colour, _columns in TX_CATEGORIES:
+        if key in traces and key in df.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=df["date"].to_list(),
+                    y=df[key].to_list(),
+                    name=label,
+                    marker=dict(color=colour),
+                )
+            )
+
+    chosen = [label for key, label, _c, _cols in TX_CATEGORIES if key in traces]
+    # "per Day"/"per Week"/"per Month": what one bar covers. The page has always
+    # said so, and a stacked bar chart without it is ambiguous.
+    heading = f"Account Transaction Types ({', '.join(chosen)})"
+    if per:
+        heading += f" per {per}"
+    fig.update_layout(
+        barmode="stack",
+        showlegend=False,
+        title=f"<b>{heading}</b><br><sup>{subtitle}</sup>",
+        template=ccdexplorer_plotly_template(theme),
+        height=400,
+    )
+    return fig
+
+
+async def transactions_count_image(request: Request, net: str, days: int):
+    """One window of the transaction counts chart, as a PNG the bot can fetch."""
+    if net != "mainnet":
+        raise HTTPException(status_code=404, detail="Transaction counts are mainnet only.")
+
+    end = dt.date.today()
+    start = end - dt.timedelta(days=days)
+    all_data = await get_all_data_for_analysis_limited(
+        "statistics_mongo_transactions", request.app, start.isoformat(), end.isoformat()
+    )
+    theme = await get_theme_from_request(request)
+    fig = build_transactions_count_figure(
+        all_data,
+        theme=theme,
+        freq="D",
+        traces=[key for key, _l, _c, _cols in TX_CATEGORIES],
+        subtitle=f"last {days} days",
+        per="Day",
+    )
+    return await return_plot_response(fig, request, f"Transactions, {days}d")
+
+
+@router.get("/plots/{net}/transactions_count_30d", response_class=Response)
+@router.get("/plots/{net}/transactions_count_30d/image.png", response_class=Response)
+async def transactions_count_30d(request: Request, net: str):
+    return await transactions_count_image(request, net, 30)
+
+
+@router.get("/plots/{net}/transactions_count_90d", response_class=Response)
+@router.get("/plots/{net}/transactions_count_90d/image.png", response_class=Response)
+async def transactions_count_90d(request: Request, net: str):
+    return await transactions_count_image(request, net, 90)
+
+
+@router.get("/plots/{net}/transactions_count_180d", response_class=Response)
+@router.get("/plots/{net}/transactions_count_180d/image.png", response_class=Response)
+async def transactions_count_180d(request: Request, net: str):
+    return await transactions_count_image(request, net, 180)
+
+
+@router.get("/plots/{net}/transactions_count_365d", response_class=Response)
+@router.get("/plots/{net}/transactions_count_365d/image.png", response_class=Response)
+async def transactions_count_365d(request: Request, net: str):
+    return await transactions_count_image(request, net, 365)

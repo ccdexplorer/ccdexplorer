@@ -14,7 +14,12 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
 )
-from ccdexplorer.ccdexplorer_site.app.utils import get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    get_theme_from_request,
+    get_url_from_api,
+    return_plot_response,
+)
+from fastapi import HTTPException
 
 router = APIRouter()
 
@@ -69,6 +74,77 @@ class PostData(BaseModel):
     filename: str
 
 
+def build_agent_registries_figure(
+    all_data: list[dict],
+    *,
+    theme: str,
+    freq: str,
+    subtitle: str = "",
+) -> go.Figure:
+    """The figure both the page and the image route draw.
+
+    Extracted from the POST handler so an image route can reuse it with a
+    window it computed rather than one a date picker supplied. The CSV the
+    page writes for its download button stays in the handler: an image route
+    has nowhere to put one.
+    """
+    if not all_data:
+        # A quiet window is not an error. Returning an empty figure keeps the
+        # route drawing an empty chart rather than raising on an empty frame.
+        return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
+
+    registries = sorted({c for row in all_data for c in (row.get("registries") or []) if c})
+
+    df_per_day = pd.json_normalize(all_data).fillna(0)
+    df_per_day = df_per_day.drop(columns=["registries"], errors="ignore")
+
+    df_per_day["date"] = pd.to_datetime(df_per_day["date"])
+    agg_map = {col: "agents_registered" for col in df_per_day.columns if col != "date"}
+
+    df_per_day = (
+        df_per_day.groupby([pd.Grouper(key="date", freq=freq, label="left", closed="left")])  # type: ignore
+        .sum()
+        .reset_index()
+    )
+    fig = go.Figure()
+
+    if len(registries) == 1:
+        title = f"Agent Registries (Contract {registries[0].strip('<>').split(',')[0]})"
+    elif registries:
+        title = f"Agent Registries ({len(registries)} CIS-8004 contracts)"
+    else:
+        title = "Agent Registries"
+    fig.add_trace(
+        go.Bar(
+            x=df_per_day["date"].to_list(),
+            y=df_per_day["agents_registered"].to_list(),
+            name="Agents Registered",
+            # marker=dict(color="#549FF2"),
+        )
+    )
+
+    fig.update_xaxes(type="date")
+    fig.update_layout(dragmode=False)
+
+    fig.update_layout(
+        barmode="stack",
+        showlegend=False,
+        legend_orientation="h",
+        legend_y=-0.2,
+        title=f"<b>{title}</b><br><sup>{subtitle}</sup>",
+        template=ccdexplorer_plotly_template(theme),
+        height=400,
+    )
+
+    # Convert non-date columns to integers
+    non_date_columns = df_per_day.columns.difference(["date"])
+    # Fill NA values with 0
+    df_per_day = df_per_day.fillna(0)
+    df_per_day[non_date_columns] = df_per_day[non_date_columns].astype(int)
+
+    return fig
+
+
 @router.post(
     "/{net}/ajax_statistics_standalone/agent_registries",
     response_class=Response,
@@ -121,52 +197,18 @@ async def statistics_agent_registries(
     # the registries actually behind the bars rather than a number typed in
     # here. Read before the frame is built: it is a list column, and summing
     # it during the groupby would just concatenate one copy per day.
-    registries = sorted({c for row in all_data for c in (row.get("registries") or []) if c})
-
+    fig = build_agent_registries_figure(
+        all_data, theme=theme, freq=letter, subtitle=f"{start_date_str} - {end_date_str}"
+    )
     df_per_day = pd.json_normalize(all_data).fillna(0)
     df_per_day = df_per_day.drop(columns=["registries"], errors="ignore")
-
     df_per_day["date"] = pd.to_datetime(df_per_day["date"])
-    agg_map = {col: "agents_registered" for col in df_per_day.columns if col != "date"}
-
     df_per_day = (
         df_per_day.groupby([pd.Grouper(key="date", freq=letter, label="left", closed="left")])  # type: ignore
         .sum()
         .reset_index()
     )
-    fig = go.Figure()
-
-    if len(registries) == 1:
-        title = f"Agent Registries (Contract {registries[0].strip('<>').split(',')[0]})"
-    elif registries:
-        title = f"Agent Registries ({len(registries)} CIS-8004 contracts)"
-    else:
-        title = "Agent Registries"
-    fig.add_trace(
-        go.Bar(
-            x=df_per_day["date"].to_list(),
-            y=df_per_day["agents_registered"].to_list(),
-            name="Agents Registered",
-            # marker=dict(color="#549FF2"),
-        )
-    )
-
-    fig.update_xaxes(type="date")
-    fig.update_layout(dragmode=False)
-
-    fig.update_layout(
-        barmode="stack",
-        showlegend=False,
-        legend_orientation="h",
-        legend_y=-0.2,
-        title=f"<b>{title}</b><br><sup>{start_date_str} - {end_date_str}</sup>",
-        template=ccdexplorer_plotly_template(theme),
-        height=400,
-    )
-
-    # Convert non-date columns to integers
     non_date_columns = df_per_day.columns.difference(["date"])
-    # Fill NA values with 0
     df_per_day = df_per_day.fillna(0)
     df_per_day[non_date_columns] = df_per_day[non_date_columns].astype(int)
 
@@ -176,3 +218,52 @@ async def statistics_agent_registries(
         full_html=False,
         include_plotlyjs=False,
     )
+
+
+#: The windows the chart bot's buttons offer. One route each, never a
+#: parameterised path: plot_image_paths scans route paths to build the warmer's
+#: list, and _PLOT_IMAGE_ROUTE only matches a literal chart name.
+IMAGE_WINDOWS = (30, 90, 180, 365)
+
+
+async def agent_registries_image(request: Request, net: str, days: int):
+    """One window of the agent registries chart, as a PNG the bot can fetch."""
+    if net != "mainnet":
+        # Not the page's "not available" template: Telegram fetches this url
+        # itself and would render an HTML body as a broken image.
+        raise HTTPException(status_code=404, detail="Agent registries are mainnet only.")
+
+    end = dt.date.today()
+    start = end - dt.timedelta(days=days)
+    all_data = await get_all_data_for_analysis_limited(
+        "statistics_agent_registry", request.app, start.isoformat(), end.isoformat()
+    )
+    theme = await get_theme_from_request(request)
+    fig = build_agent_registries_figure(
+        all_data, theme=theme, freq="D", subtitle=f"last {days} days"
+    )
+    return await return_plot_response(fig, request, f"Agent Registries, {days}d")
+
+
+@router.get("/plots/{net}/agent_registries_30d", response_class=Response)
+@router.get("/plots/{net}/agent_registries_30d/image.png", response_class=Response)
+async def agent_registries_30d(request: Request, net: str):
+    return await agent_registries_image(request, net, 30)
+
+
+@router.get("/plots/{net}/agent_registries_90d", response_class=Response)
+@router.get("/plots/{net}/agent_registries_90d/image.png", response_class=Response)
+async def agent_registries_90d(request: Request, net: str):
+    return await agent_registries_image(request, net, 90)
+
+
+@router.get("/plots/{net}/agent_registries_180d", response_class=Response)
+@router.get("/plots/{net}/agent_registries_180d/image.png", response_class=Response)
+async def agent_registries_180d(request: Request, net: str):
+    return await agent_registries_image(request, net, 180)
+
+
+@router.get("/plots/{net}/agent_registries_365d", response_class=Response)
+@router.get("/plots/{net}/agent_registries_365d/image.png", response_class=Response)
+async def agent_registries_365d(request: Request, net: str):
+    return await agent_registries_image(request, net, 365)
