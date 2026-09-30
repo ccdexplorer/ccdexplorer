@@ -295,7 +295,7 @@ CHARTS: tuple[Chart, ...] = (
         "fee_stabilization",
         "Fee stabilization",
         "Cost of a regular transfer over time",
-        ("fees", "cost", "transfer", "stable", "cheap", "price"),
+        ("fees", "cost", "transfer", "stable", "cheap"),
         group="other",
     ),
     Chart(
@@ -309,7 +309,7 @@ CHARTS: tuple[Chart, ...] = (
         "realized_prices",
         "Realized price",
         "Average price at which coins last moved",
-        ("price", "realized", "valuation", "cost", "basis", "market"),
+        ("realized", "valuation", "cost", "basis", "market"),
         group="other",
     ),
     Chart(
@@ -367,7 +367,7 @@ CHARTS: tuple[Chart, ...] = (
         "plt_tvl_30d",
         "PLT stablecoin TVL, 30d",
         "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
         group="tvl",
         claims=("tvl",),
         period="30d",
@@ -377,7 +377,7 @@ CHARTS: tuple[Chart, ...] = (
         "plt_tvl_90d",
         "PLT stablecoin TVL, 90d",
         "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
         group="tvl",
         claims=("tvl",),
         period="90d",
@@ -386,7 +386,7 @@ CHARTS: tuple[Chart, ...] = (
         "plt_tvl_180d",
         "PLT stablecoin TVL, 180d",
         "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
         group="tvl",
         claims=("tvl",),
         period="180d",
@@ -395,7 +395,7 @@ CHARTS: tuple[Chart, ...] = (
         "plt_tvl_365d",
         "PLT stablecoin TVL, 365d",
         "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
         group="tvl",
         claims=("tvl",),
         period="365d",
@@ -406,7 +406,7 @@ CHARTS: tuple[Chart, ...] = (
         "Transactions per day, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
-        claims=("txs", "transactions"),
+        claims=("txs",),
         period="30d",
         default=True,
     ),
@@ -416,7 +416,7 @@ CHARTS: tuple[Chart, ...] = (
         "Transactions per day, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
-        claims=("txs", "transactions"),
+        claims=("txs",),
         period="90d",
     ),
     Chart(
@@ -425,7 +425,7 @@ CHARTS: tuple[Chart, ...] = (
         "Transactions per day, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
-        claims=("txs", "transactions"),
+        claims=("txs",),
         period="180d",
     ),
     Chart(
@@ -434,7 +434,7 @@ CHARTS: tuple[Chart, ...] = (
         "Transactions per day, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
-        claims=("txs", "transactions"),
+        claims=("txs",),
         period="365d",
     ),
 )
@@ -523,6 +523,21 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[Chart]:
         return list(CHARTS)[:limit]
 
     matched = _rank(terms, require_all=True)
+
+    # A claimed word answers with its claimant and nothing else. Ranking alone
+    # only put the claimant first, so "price" still sent realized prices and fee
+    # stabilization after it -- three charts for a word that means one thing.
+    # `claims` exists to let a family take a word outright rather than win it by
+    # accident of naming, and that is a claim on the answer, not just the order.
+    # Filtered after ranking, never instead of it, so the family still leads
+    # with the interval it opens at.
+    claimed = [
+        row for row in matched
+        if row[2].claims and all(term in row[2].claims for term in terms)
+    ]
+    if claimed:
+        matched = claimed
+
     if not matched:
         # Nothing matched every word. Rather than answer "no such chart" to a
         # query that was mostly right, fall back to whatever matched most of

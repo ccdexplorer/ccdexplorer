@@ -478,6 +478,18 @@ class AnalysisType(Enum):
     statistics_classified_pools = "statistics_classified_pools"
 
 
+#: Beyond a month, a chart image groups by week. A year of daily bars is slow
+#: to build -- the TVL and agent-registry images were slow enough to notice --
+#: and 365 bars at card width are unreadable anyway. Thirty days is short enough
+#: that a day still reads as a bar.
+IMAGE_DAILY_MAX_DAYS = 30
+
+
+def image_freq(days: int) -> str:
+    """The pandas grouping frequency a chart image should use for `days`."""
+    return "D" if days <= IMAGE_DAILY_MAX_DAYS else "W-MON"
+
+
 async def get_all_data_for_analysis_limited(
     analysis: str, app, start_date: str | dt.date, end_date: str
 ) -> list[str]:

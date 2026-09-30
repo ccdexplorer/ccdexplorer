@@ -121,3 +121,69 @@ def test_the_whole_catalogue_resolves_to_one_per_family_plus_other():
     others = [c for c in CHARTS if c.group == "other"]
 
     assert len(resolve_families(list(CHARTS))) == len(families) + len(others)
+
+
+# --- a claimed word answers with one chart ---------------------------------
+#
+# `claims` exists so that one family can "claim the word outright rather than
+# win it by accident of naming" -- its own words. Ranking put the claimant
+# first but still returned the accidents, so /c price sent the Kraken chart,
+# realized prices and fee stabilization, three charts for an unambiguous word.
+
+
+def test_a_claimed_word_returns_only_the_claimant():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+
+    names = [c.name for c in search("price")]
+
+    assert "realized_prices" not in names
+    assert "fee_stabilization" not in names
+    assert names[0] == "ccd_kraken_4h"
+
+
+def test_a_claimed_word_still_offers_the_whole_family():
+    """Claiming narrows to the family, not to a single chart -- the picker and
+    the interval buttons both still need its members."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+
+    assert {c.group for c in search("price")} == {"price"}
+
+
+def test_an_unclaimed_word_is_unaffected():
+    """"staking" is claimed by nobody and must still return everything it matches."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+
+    assert len(search("staking")) > 1
+
+
+def test_a_word_only_some_of_which_is_claimed_does_not_narrow():
+    """"realized price" is two words; the price family claims "price" but not
+    "realized", so the claim must not swallow the more specific query."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+
+    assert search("realized price")[0].name == "realized_prices"
+
+
+def test_tvl_claims_its_word_too():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
+
+    assert {c.group for c in search("tvl")} == {"tvl"}
+
+
+def test_no_chart_carries_a_word_another_family_claims():
+    """A claim is exclusive now, so a keyword another family claims is a
+    keyword that can never reach its own chart."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS
+
+    claimed: dict[str, set[str]] = {}
+    for chart in CHARTS:
+        for word in chart.claims:
+            claimed.setdefault(word, set()).add(chart.group)
+
+    stranded = [
+        f"{c.name} carries {w!r}, claimed by {sorted(claimed[w])}"
+        for c in CHARTS
+        for w in c.keywords
+        if w in claimed and c.group not in claimed[w]
+    ]
+    assert not stranded, "unreachable keywords:\n  " + "\n  ".join(stranded)
