@@ -336,18 +336,27 @@ class _Update:
 class _Context:
     bot = type("bot", (), {"username": "ccdexplorer_chart_bot"})()
 
+    def __init__(self, *args):
+        self.args = list(args)
+
 
 async def _send(text):
-    from ccdexplorer.ccdexplorer_chart_bot.direct import handler
+    """Through /ccd, which is the only trigger now.
+
+    These assertions used to run against a plain message. Plain text made the
+    bot noisy in group chats and no longer searches; what they actually guard
+    -- that the right chart is found, captioned and offered onward -- is worth
+    keeping, so they moved to the command rather than being deleted.
+    """
+    from ccdexplorer.ccdexplorer_chart_bot.direct import command_handler
 
     update = _Update(text)
-    await handler(SITE)(update, _Context())
+    await command_handler(SITE)(update, _Context(*text.split()))
     return update.message
 
 
-async def test_a_plain_message_returns_the_chart():
-    """Open the bot, type a word, get the chart -- the most obvious way to try
-    it, and the one that used to do nothing at all."""
+async def test_the_command_returns_the_chart():
+    """Open the bot, say /ccd accounts, get the chart."""
     message = await _send("accounts")
     assert message.photos
     photo, caption, _ = message.photos[0]
