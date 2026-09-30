@@ -198,3 +198,10 @@ cov.xml
 cov.xml
 development/mising_payday_se.py
 
+
+# Specs, plans and scratch from AI-assisted work. These are working notes, not
+# part of the repository: they describe what was about to be built, while the
+# commits and the code are the record of what was.
+development/specs/
+development/plans/
+.superpowers/
