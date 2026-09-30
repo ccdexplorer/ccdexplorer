@@ -101,7 +101,7 @@ async def test_plain_text_gets_a_nudge_and_no_chart():
     await direct.nudge_handler()(update, ctx)
 
     assert not update.message.photos, "plain text still sent a chart"
-    assert any("/ccd" in h for h in update.message.htmls)
+    assert any("/c" in h for h in update.message.htmls)
 
 
 # --- the category menu's buttons -------------------------------------------
@@ -228,3 +228,48 @@ async def test_start_mentions_the_command():
     await main.start(SimpleNamespace(message=message), _context())
 
     assert "/ccd" in message.htmls[0]
+
+
+# --- /c, with /ccd kept as the unambiguous fallback -------------------------
+#
+# /c is short enough to collide: any other bot in the same group may claim it.
+# PTB ignores /c@otherbot (it compares the part after @ to its own username),
+# so the only ambiguous case is a bare /c in a group, where both bots answer.
+# /ccd stays registered as the form that cannot be mistaken.
+
+
+def test_both_c_and_ccd_are_registered():
+    import inspect
+
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    source = inspect.getsource(main)
+    assert 'CommandHandler(["c", "ccd"]' in source, "expected /c with /ccd as an alias"
+
+
+async def test_the_nudge_points_at_the_short_command():
+    update, ctx = _update("price"), _context()
+
+    await direct.nudge_handler()(update, ctx)
+
+    assert "/c " in update.message.htmls[0] or "/c<" in update.message.htmls[0]
+
+
+async def test_start_teaches_the_short_command():
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+
+    assert "/c " in message.htmls[0] or "/c<" in message.htmls[0]
+
+
+async def test_start_says_what_to_do_when_another_bot_claims_the_command():
+    """A group with two bots offering /c is the one case a user cannot resolve
+    without being told the qualified form exists."""
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+
+    assert "/ccd" in message.htmls[0] or "@" in message.htmls[0]

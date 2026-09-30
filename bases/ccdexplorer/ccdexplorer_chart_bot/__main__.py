@@ -51,8 +51,8 @@ async def start(update: Update, context) -> None:
     lines = [
         "I put Concordium charts into any chat.",
         "",
-        "Here: <code>/ccd &lt;word&gt;</code> — for example <code>/ccd price</code>. "
-        "<code>/ccd</code> on its own lists the categories.",
+        "Here: <code>/c &lt;word&gt;</code> — for example <code>/c price</code>. "
+        "<code>/c</code> on its own lists the categories.",
         "",
         f"Anywhere else: type <code>@{username}</code>, then any of these:",
         "",
@@ -66,6 +66,9 @@ async def start(update: Update, context) -> None:
         f"Or type <code>@{username}</code> and nothing else to see all {len(offered)} charts.",
         "",
         "Charts with intervals arrive with buttons for their other periods.",
+        "",
+        "In a group where another bot also answers <code>/c</code>, use "
+        "<code>/ccd</code> or <code>/c@" + username + "</code>.",
         "",
         "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
     ]
@@ -83,7 +86,11 @@ def main() -> None:
     application.add_handler(CommandHandler(["start", "help"], start))
     application.add_handler(InlineQueryHandler(inline_handler(site_url)))
     application.add_handler(CallbackQueryHandler(callback_handler(site_url)))
-    application.add_handler(CommandHandler("ccd", command_handler(site_url)))
+    # /c is short enough that another bot in the same group may claim it. PTB
+    # ignores /c@other_bot -- it compares the part after @ to its own username
+    # -- so the only ambiguous case is a bare /c in a group, where both bots
+    # answer. /ccd stays registered as the form that cannot be mistaken.
+    application.add_handler(CommandHandler(["c", "ccd"], command_handler(site_url)))
     # Plain text no longer searches -- it points at /ccd. Registered last, so
     # it cannot swallow the commands above. Answering everything typed at the
     # bot made it noisy in group chats; going silent instead would read as the

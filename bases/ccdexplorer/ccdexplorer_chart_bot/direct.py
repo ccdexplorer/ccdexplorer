@@ -105,8 +105,8 @@ def command_handler(site_url: str):
         query = " ".join(getattr(context, "args", None) or []).strip()
         if not query:
             await message.reply_html(
-                "Which chart? Pick a category, or say <code>/ccd &lt;word&gt;</code> "
-                "— for example <code>/ccd staking</code>.",
+                "Which chart? Pick a category, or say <code>/c &lt;word&gt;</code> "
+                "— for example <code>/c staking</code>.",
                 reply_markup=category_menu(),
             )
             return
@@ -119,7 +119,7 @@ def command_handler(site_url: str):
         log.info("/ccd %r -> %d chart(s)", query, len(matches))
         if not matches:
             await message.reply_html(
-                f"No chart matches “{query}”. Try <code>/ccd</code> on its own."
+                f"No chart matches “{query}”. Try <code>/c</code> on its own."
             )
             return
 
@@ -152,8 +152,8 @@ def nudge_handler():
         if message is None or not message.text:
             return
         await message.reply_html(
-            "I answer commands now — try <code>/ccd price</code>, "
-            "or <code>/ccd</code> on its own for the list."
+            "I answer commands now — try <code>/c price</code>, "
+            "or <code>/c</code> on its own for the list."
         )
 
     return nudge
