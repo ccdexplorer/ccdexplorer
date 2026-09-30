@@ -363,6 +363,43 @@ CHARTS: tuple[Chart, ...] = (
         claims=("agents", "registries"),
         period="365d",
     ),
+    Chart(
+        "plt_tvl_30d",
+        "PLT stablecoin TVL, 30d",
+        "Total value locked in PLT stablecoins, in USD",
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        group="tvl",
+        claims=("tvl",),
+        period="30d",
+        default=True,
+    ),
+    Chart(
+        "plt_tvl_90d",
+        "PLT stablecoin TVL, 90d",
+        "Total value locked in PLT stablecoins, in USD",
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        group="tvl",
+        claims=("tvl",),
+        period="90d",
+    ),
+    Chart(
+        "plt_tvl_180d",
+        "PLT stablecoin TVL, 180d",
+        "Total value locked in PLT stablecoins, in USD",
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        group="tvl",
+        claims=("tvl",),
+        period="180d",
+    ),
+    Chart(
+        "plt_tvl_365d",
+        "PLT stablecoin TVL, 365d",
+        "Total value locked in PLT stablecoins, in USD",
+        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply", "value"),
+        group="tvl",
+        claims=("tvl",),
+        period="365d",
+    ),
 )
 
 BY_NAME = {chart.name: chart for chart in CHARTS}

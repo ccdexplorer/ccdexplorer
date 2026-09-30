@@ -14,7 +14,12 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
 )
-from ccdexplorer.ccdexplorer_site.app.utils import get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    get_theme_from_request,
+    get_url_from_api,
+    return_plot_response,
+)
+from fastapi import HTTPException
 
 router = APIRouter()
 
@@ -234,3 +239,97 @@ async def statistics_plt_transfers(
         full_html=False,
         include_plotlyjs=False,
     )
+
+
+#: The windows the chart bot's buttons offer. One route each -- see the note in
+#: sc_agent_registries: plot_image_paths scans route paths.
+IMAGE_WINDOWS = (30, 90, 180, 365)
+
+
+def build_plt_tvl_figure(all_data: list[dict], *, theme: str, freq: str) -> go.Figure:
+    """Total PLT stablecoin TVL in USD, as one line.
+
+    Not the page's figure. The page stacks a bar per token and filters to the
+    stablecoins tracking one currency, which needs an API call to know which
+    those are; at card size in a chat that is unreadable, and the question a
+    reader has there is how much is locked in total. Same data, different
+    chart, so there is nothing to share.
+
+    `last` and not `sum`: TVL is a level, and adding two days of it would
+    invent money. The page's own agg_map already treats these columns that way.
+    """
+    if not all_data:
+        return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
+
+    df = pd.json_normalize(extract_usd_transfers(all_data)).fillna(0)
+    df["date"] = pd.to_datetime(df["date"])
+    supply = [c for c in df.columns if c.endswith("USD.total_supply")]
+    if not supply:
+        return go.Figure(layout={"template": ccdexplorer_plotly_template(theme)})
+
+    # Per token first, so a token that stops reporting keeps its last known
+    # level for the period rather than dropping the total to zero.
+    df = (
+        df.groupby([pd.Grouper(key="date", freq=freq, label="left", closed="left")])[supply]
+        .last()
+        .reset_index()
+    )
+    df["tvl"] = df[supply].sum(axis=1)
+
+    fig = go.Figure(
+        go.Scatter(
+            x=df["date"].to_list(),
+            y=df["tvl"].to_list(),
+            name="TVL",
+            mode="lines",
+            fill="tozeroy",
+        )
+    )
+    fig.update_xaxes(type="date")
+    fig.update_layout(
+        showlegend=False,
+        dragmode=False,
+        title="<b>PLT stablecoin TVL (USD)</b>",
+        template=ccdexplorer_plotly_template(theme),
+        height=400,
+    )
+    return fig
+
+
+async def plt_tvl_image(request: Request, net: str, days: int):
+    """One window of total PLT stablecoin TVL, as a PNG the bot can fetch."""
+    if net != "mainnet":
+        raise HTTPException(status_code=404, detail="PLT TVL is mainnet only.")
+
+    end = dt.date.today()
+    start = end - dt.timedelta(days=days)
+    all_data = await get_all_data_for_analysis_limited(
+        "statistics_plt", request.app, start.isoformat(), end.isoformat()
+    )
+    theme = await get_theme_from_request(request)
+    fig = build_plt_tvl_figure(all_data, theme=theme, freq="D")
+    return await return_plot_response(fig, request, f"PLT stablecoin TVL, {days}d")
+
+
+@router.get("/plots/{net}/plt_tvl_30d", response_class=Response)
+@router.get("/plots/{net}/plt_tvl_30d/image.png", response_class=Response)
+async def plt_tvl_30d(request: Request, net: str):
+    return await plt_tvl_image(request, net, 30)
+
+
+@router.get("/plots/{net}/plt_tvl_90d", response_class=Response)
+@router.get("/plots/{net}/plt_tvl_90d/image.png", response_class=Response)
+async def plt_tvl_90d(request: Request, net: str):
+    return await plt_tvl_image(request, net, 90)
+
+
+@router.get("/plots/{net}/plt_tvl_180d", response_class=Response)
+@router.get("/plots/{net}/plt_tvl_180d/image.png", response_class=Response)
+async def plt_tvl_180d(request: Request, net: str):
+    return await plt_tvl_image(request, net, 180)
+
+
+@router.get("/plots/{net}/plt_tvl_365d", response_class=Response)
+@router.get("/plots/{net}/plt_tvl_365d/image.png", response_class=Response)
+async def plt_tvl_365d(request: Request, net: str):
+    return await plt_tvl_image(request, net, 365)
