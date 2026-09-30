@@ -490,6 +490,17 @@ def image_freq(days: int) -> str:
     return "D" if days <= IMAGE_DAILY_MAX_DAYS else "W-MON"
 
 
+def image_period(days: int) -> str:
+    """What one bar covers, for the title. Kept next to image_freq deliberately.
+
+    These two have to agree: the grouping went weekly while the label still
+    said "per Day", so a year of weekly bars claimed to be daily ones. A chart
+    that misreports its own bar width is worse than a dense one, because
+    nothing about it looks wrong.
+    """
+    return "Day" if days <= IMAGE_DAILY_MAX_DAYS else "Week"
+
+
 async def get_all_data_for_analysis_limited(
     analysis: str, app, start_date: str | dt.date, end_date: str
 ) -> list[str]:

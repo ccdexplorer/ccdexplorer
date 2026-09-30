@@ -20,6 +20,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
     image_freq,
+    image_period,
 )
 from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
@@ -404,7 +405,7 @@ async def transactions_count_image(request: Request, net: str, days: int):
         freq=image_freq(days),
         traces=[key for key, _l, _c, _cols in TX_CATEGORIES],
         subtitle=f"last {days} days",
-        per="Day",
+        per=image_period(days),
     )
     return await return_plot_response(fig, request, f"Transactions, {days}d")
 
