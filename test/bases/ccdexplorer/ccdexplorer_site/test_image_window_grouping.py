@@ -86,3 +86,60 @@ async def test_only_the_shortest_window_is_daily(mod, builder, route, monkeypatc
             daily.append(days)
 
     assert daily == [30]
+
+
+# --- and the title has to say which it is -----------------------------------
+#
+# The grouping changed but the label did not: a 365-day chart drew weekly bars
+# under a title that said "per Day". A chart that misreports its own bar width
+# is worse than one that is merely dense, because nothing looks wrong.
+
+
+def _title_of(mod, route, days, monkeypatch):
+    captured: dict[str, str] = {}
+
+    async def fake_fetch(analysis, app, start, end):
+        return [{"date": "2026-09-01", "agents_registered": 1, "registries": ["<1,0>"],
+                 "account_creation": 1,
+                 "tokens": {"E": {"USD": {"transfer": 0, "burn": 0, "mint": 0,
+                                          "total_supply": 1}, "count_txs": 0}}}]
+
+    async def fake_theme(request):
+        return "light"
+
+    async def fake_response(fig, request, title):
+        captured["title"] = fig.layout.title.text or ""
+        return "rendered"
+
+    monkeypatch.setattr(mod, "get_all_data_for_analysis_limited", fake_fetch)
+    monkeypatch.setattr(mod, "get_theme_from_request", fake_theme)
+    monkeypatch.setattr(mod, "return_plot_response", fake_response)
+    if hasattr(mod, "get_url_from_api"):
+        monkeypatch.setattr(mod, "get_url_from_api", _overview)
+
+    return captured, getattr(mod, route)
+
+
+async def test_the_transactions_title_names_the_real_bar_width(monkeypatch):
+    captured, route = _title_of(sc_transactions_count, "transactions_count_image", 30, monkeypatch)
+    await route(_request(), "mainnet", 30)
+    assert "per Day" in captured["title"]
+
+    await route(_request(), "mainnet", 365)
+    assert "per Week" in captured["title"]
+    assert "per Day" not in captured["title"], "weekly bars labelled as daily"
+
+
+@pytest.mark.parametrize(("mod", "route"), [
+    (sc_agent_registries, "agent_registries_image"),
+    (sc_plt_transfers, "plt_tvl_image"),
+])
+async def test_the_other_two_say_how_they_are_grouped(mod, route, monkeypatch):
+    """They carried no period label at all, so weekly bars went unannounced."""
+    captured, fn = _title_of(mod, route, 30, monkeypatch)
+
+    await fn(_request(), "mainnet", 30)
+    assert "day" in captured["title"].lower()
+
+    await fn(_request(), "mainnet", 180)
+    assert "week" in captured["title"].lower()

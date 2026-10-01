@@ -14,6 +14,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
     image_freq,
+    image_period,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
     get_theme_from_request,
@@ -241,7 +242,7 @@ async def agent_registries_image(request: Request, net: str, days: int):
     )
     theme = await get_theme_from_request(request)
     fig = build_agent_registries_figure(
-        all_data, theme=theme, freq=image_freq(days), subtitle=f"last {days} days"
+        all_data, theme=theme, freq=image_freq(days), subtitle=f"last {days} days, by {image_period(days).lower()}"
     )
     return await return_plot_response(fig, request, f"Agent Registries, {days}d")
 

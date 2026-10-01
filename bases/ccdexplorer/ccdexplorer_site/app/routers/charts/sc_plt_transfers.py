@@ -14,6 +14,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
     image_freq,
+    image_period,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
     get_theme_from_request,
@@ -253,6 +254,7 @@ def build_plt_tvl_figure(
     theme: str,
     freq: str,
     stablecoins: set[str] | None = None,
+    subtitle: str = "",
 ) -> go.Figure:
     """Total PLT stablecoin TVL in USD, as one line.
 
@@ -307,7 +309,7 @@ def build_plt_tvl_figure(
     fig.update_layout(
         showlegend=False,
         dragmode=False,
-        title="<b>PLT stablecoin TVL (USD)</b>",
+        title=f"<b>PLT stablecoin TVL (USD)</b><br><sup>{subtitle}</sup>",
         template=ccdexplorer_plotly_template(theme),
         height=400,
     )
@@ -341,7 +343,11 @@ async def plt_tvl_image(request: Request, net: str, days: int):
 
     theme = await get_theme_from_request(request)
     fig = build_plt_tvl_figure(
-        all_data, theme=theme, freq=image_freq(days), stablecoins=stablecoins
+        all_data,
+        theme=theme,
+        freq=image_freq(days),
+        stablecoins=stablecoins,
+        subtitle=f"last {days} days, by {image_period(days).lower()}",
     )
     return await return_plot_response(fig, request, f"PLT stablecoin TVL, {days}d")
 
