@@ -339,7 +339,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "agent_registries_90d",
         "Agent registries, 90d",
-        "Agents registered per day on CIS-8004 contracts",
+        "Agents registered per week on CIS-8004 contracts",
         ("agents", "agent", "registry", "registries", "cis8004", "registered"),
         group="agents",
         claims=("agents", "registries"),
@@ -348,7 +348,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "agent_registries_180d",
         "Agent registries, 180d",
-        "Agents registered per day on CIS-8004 contracts",
+        "Agents registered per week on CIS-8004 contracts",
         ("agents", "agent", "registry", "registries", "cis8004", "registered"),
         group="agents",
         claims=("agents", "registries"),
@@ -357,7 +357,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "agent_registries_365d",
         "Agent registries, 365d",
-        "Agents registered per day on CIS-8004 contracts",
+        "Agents registered per week on CIS-8004 contracts",
         ("agents", "agent", "registry", "registries", "cis8004", "registered"),
         group="agents",
         claims=("agents", "registries"),
@@ -413,7 +413,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "transactions_count_90d",
         "Transactions, 90d",
-        "Transactions per day, by category",
+        "Transactions per week, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
         claims=("txs",),
@@ -422,7 +422,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "transactions_count_180d",
         "Transactions, 180d",
-        "Transactions per day, by category",
+        "Transactions per week, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
         claims=("txs",),
@@ -431,7 +431,7 @@ CHARTS: tuple[Chart, ...] = (
     Chart(
         "transactions_count_365d",
         "Transactions, 365d",
-        "Transactions per day, by category",
+        "Transactions per week, by category",
         ("txs", "tx", "transactions", "count", "volume", "activity"),
         group="txs",
         claims=("txs",),
