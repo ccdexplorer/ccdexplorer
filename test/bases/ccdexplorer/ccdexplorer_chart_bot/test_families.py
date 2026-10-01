@@ -187,3 +187,51 @@ def test_no_chart_carries_a_word_another_family_claims():
         if w in claimed and c.group not in claimed[w]
     ]
     assert not stranded, "unreachable keywords:\n  " + "\n  ".join(stranded)
+
+
+# --- a chart's description must match the bars it draws ---------------------
+#
+# The image routes group by week beyond thirty days, but the catalogue
+# descriptions still said "per day" for every window, so the 90d, 180d and 365d
+# charts described themselves wrongly in the picker and in every caption.
+
+
+def test_no_description_claims_a_period_the_chart_does_not_draw():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS
+
+    wrong = []
+    for chart in CHARTS:
+        if not chart.period or not chart.period.endswith("d"):
+            continue
+        days = int(chart.period[:-1])
+        text = chart.description.lower()
+        if days <= 30 and "per week" in text:
+            wrong.append(f"{chart.name}: daily bars described as weekly")
+        if days > 30 and "per day" in text:
+            wrong.append(f"{chart.name}: weekly bars described as daily")
+
+    assert not wrong, "\n  " + "\n  ".join(wrong)
+
+
+def test_the_windows_that_group_by_week_say_so():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+
+    assert "per day" in BY_NAME["agent_registries_30d"].description
+    assert "per week" in BY_NAME["agent_registries_365d"].description
+    assert "per day" in BY_NAME["transactions_count_30d"].description
+    assert "per week" in BY_NAME["transactions_count_90d"].description
+
+
+def test_the_description_agrees_with_the_site_that_draws_it():
+    """The bot's words and the site's grouping come from the same threshold."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS
+    from ccdexplorer.ccdexplorer_site.app.routers.statistics import image_period
+
+    for chart in CHARTS:
+        if not chart.period or not chart.period.endswith("d"):
+            continue
+        expected = image_period(int(chart.period[:-1])).lower()
+        other = "week" if expected == "day" else "day"
+        assert f"per {other}" not in chart.description.lower(), (
+            f"{chart.name} says per {other}, site draws per {expected}"
+        )
