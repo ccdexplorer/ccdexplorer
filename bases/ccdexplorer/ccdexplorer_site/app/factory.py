@@ -84,7 +84,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     PLOT_THEMES,
     PLOT_WARM_INTERVAL_MINUTES,
     add_account_info_to_cache,
-    evict_plot_image,
+    forcing_plot_render,
     get_url_from_api,
     plot_cache_key,
     plot_image_paths,
@@ -726,9 +726,15 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             # exactly the wait this job exists to remove.
             wanted = [(path, theme) for path in paths for theme in PLOT_THEMES]
             for path, theme in wanted:
-                evict_plot_image(plot_cache_key(path, theme))
                 try:
-                    response = await client.get(path, params={"theme": theme})
+                    # Not evicted first. Clearing the entry and then drawing its
+                    # replacement left the chart blank for the length of a
+                    # render, and the render lock is global, so a reader
+                    # arriving then waited for a redraw nobody asked them to
+                    # pay for. forcing_plot_render redraws and overwrites, so
+                    # the old image is served until the new one exists.
+                    with forcing_plot_render():
+                        response = await client.get(path, params={"theme": theme})
                 except Exception as error:  # a cold chart is not worth an outage
                     print(f"plot warmer: {path} [{theme}] failed ({error})")
                     continue

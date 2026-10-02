@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from contextvars import ContextVar
+from contextlib import contextmanager
 import base64
 import datetime as dt
 import io
@@ -740,6 +742,30 @@ def plot_image_paths(app, net: str = "mainnet") -> list[str]:
     return [f"/plots/{net}/{name}/image.png" for name in sorted(names)]
 
 
+#: Set only while the warmer is refreshing a chart. A ContextVar and not a query
+#: parameter on purpose: the warmer reaches the route in-process through
+#: ASGITransport, so the context carries into the handler, while a visitor has
+#: no way to set it. A refresh anyone could request is a way to make the site
+#: redraw forty charts on demand.
+_FORCE_PLOT_RENDER: ContextVar[bool] = ContextVar("force_plot_render", default=False)
+
+
+@contextmanager
+def forcing_plot_render():
+    """Redraw the chart inside this block even though it is cached.
+
+    The warmer used to evict the entry and then re-request the path, which left
+    the chart with no entry at all while it was being drawn -- and the render
+    lock is global, so a reader arriving then waited for a render they did not
+    ask for. Rendering first and overwriting means the entry is never absent.
+    """
+    token = _FORCE_PLOT_RENDER.set(True)
+    try:
+        yield
+    finally:
+        _FORCE_PLOT_RENDER.reset(token)
+
+
 def evict_plot_image(path: str) -> None:
     """Drop a rendered chart, so the next request for it redraws."""
     _PLOT_IMAGES.discard(path)
@@ -755,13 +781,17 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
         theme = theme_from_query(request)
         cache_key = plot_cache_key(request.url.path, theme)
         ttl = plot_image_ttl(request.url.path)
-        cached = _PLOT_IMAGES.get(cache_key)
+        refreshing = _FORCE_PLOT_RENDER.get()
+        # A refresh ignores the cache on the way in, but does not clear it: the
+        # old image keeps being served until the new one is ready.
+        cached = None if refreshing else _PLOT_IMAGES.get(cache_key)
         if cached is None:
             async with _KALEIDO_RENDER_LOCK:
                 # Checked again under the lock. A burst of crawlers for the
                 # same link all miss together, and without this each would go
-                # on to render the identical figure in turn.
-                cached = _PLOT_IMAGES.get(cache_key)
+                # on to render the identical figure in turn. A refresh skips
+                # the re-check, or it would find the entry it is replacing.
+                cached = None if refreshing else _PLOT_IMAGES.get(cache_key)
                 if cached is None:
                     img_bytes = await asyncio.get_running_loop().run_in_executor(
                         None, lambda: pio.to_image(fig, format="png", width=720)
