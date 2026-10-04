@@ -10,31 +10,30 @@ chat doubles as a way to find the chart you want before sending it somewhere
 it matters.
 """
 
+import html
 import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
 
+from ccdexplorer.charts import ChartState
+
 from .catalogue import (
-    BY_NAME,
+    CALLBACK_PREFIX,
     CHARTS,
     Chart,
+    callback_data,
     family_default,
+    image_url,
+    page_url,
+    parse_callback,
     resolve_families,
     search,
     siblings,
+    state_for,
 )
 
 log = logging.getLogger(__name__)
-
-#: More than this and the chat becomes a wall of near-identical line charts.
-#: The rest are a query away, and the reply says so.
-MAX_REPLIES = 3
-
-
-#: Prefix on callback_data, which Telegram caps at 64 bytes. Chart names are
-#: well inside that, so the name itself is the payload.
-CALLBACK_PREFIX = "c:"
 
 #: Telegram will render more, unreadably narrow.
 BUTTONS_PER_ROW = 4
@@ -45,33 +44,84 @@ MENU_PREFIX = "g:"
 
 #: The order the categories read in. price first because it is what most
 #: people open the bot for; other last because it is the leftovers.
-CATEGORY_ORDER = ("price", "txs", "agents", "tvl", "other")
+CATEGORY_ORDER = ("price", "chain", "plt", "agents", "other")
 
 
-def keyboard_for(chart: Chart, send_button: bool = True) -> InlineKeyboardMarkup:
-    """Interval buttons above, and a way to send the chart onward below.
+def keyboard_for(
+    chart: Chart, state: ChartState | None = None, send_button: bool = True
+) -> InlineKeyboardMarkup:
+    """The rows this chart can actually offer, and a way to send it onward.
 
-    A chart with no siblings gets only the send button -- an interval row with
-    one entry is a button that does nothing.
+    A spec-backed chart gets a window row and a grouping row built from what
+    its spec allows. One that has not been migrated keeps its interval family,
+    if it has one. A row with a single entry is a button that does nothing, so
+    it is absent rather than empty.
     """
     rows = []
-    family = siblings(chart)
-    if len(family) > 1:
-        buttons = [
-            InlineKeyboardButton(
-                f"· {sibling.period} ·" if sibling.name == chart.name else sibling.period,
-                callback_data=f"{CALLBACK_PREFIX}{sibling.name}",
+    spec = chart.spec
+    if spec is not None:
+        if state is None:
+            state = state_for(chart)
+        if len(spec.windows) > 1:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"· {w.value} ·" if w is state.window else w.value,
+                        callback_data=callback_data(chart, w, state.grouping),
+                    )
+                    for w in spec.windows
+                ]
             )
-            for sibling in family
-        ]
-        # Four to a row. Seven intervals in one row is unreadable at phone
-        # width, which is where these are looked at.
-        rows.extend(
-            buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)
-        )
+        # Absent, not dead: a chart whose every series is a closing value
+        # redraws the same measurement at a different point count, so the
+        # grouping is a resolution the span answers better than a button --
+        # and over thirty days a monthly button answers with two points.
+        if len(spec.groupings) > 1 and not spec.automatic_grouping:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"· {g.value} ·" if g is state.grouping else g.value,
+                        callback_data=callback_data(chart, state.window, g),
+                    )
+                    for g in spec.groupings
+                ]
+            )
+    else:
+        family = siblings(chart)
+        if len(family) > 1:
+            buttons = [
+                InlineKeyboardButton(
+                    f"· {s.period} ·" if s.name == chart.name else s.period,
+                    callback_data=f"{CALLBACK_PREFIX}{s.name}",
+                )
+                for s in family
+            ]
+            # Four to a row. Seven intervals in one row is unreadable at phone
+            # width, which is where these are looked at.
+            rows.extend(
+                buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)
+            )
     if send_button:
         rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
     return InlineKeyboardMarkup(rows)
+
+
+def chart_picker(charts) -> InlineKeyboardMarkup:
+    """One button per chart, by title.
+
+    One to a row: "Average delegator stake" and "Distribution of rewards" do
+    not fit beside anything at phone width, and these are read on phones.
+
+    The callback is the plain chart name, the form parse_callback has always
+    understood, so a picked chart opens in its default state and its own
+    buttons take it from there.
+    """
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(chart.title, callback_data=f"{CALLBACK_PREFIX}{chart.name}")]
+            for chart in charts
+        ]
+    )
 
 
 def category_menu() -> InlineKeyboardMarkup:
@@ -82,16 +132,15 @@ def category_menu() -> InlineKeyboardMarkup:
     """
     present = [g for g in CATEGORY_ORDER if any(c.group == g for c in CHARTS)]
     buttons = [
-        InlineKeyboardButton(group, callback_data=f"{MENU_PREFIX}{group}")
-        for group in present
+        InlineKeyboardButton(group, callback_data=f"{MENU_PREFIX}{group}") for group in present
     ]
     return InlineKeyboardMarkup(
         [buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)]
     )
 
 
-def caption(chart: Chart, site_url: str) -> str:
-    return f"<b>{chart.title}</b> — {chart.description}\n{chart.page_url(site_url)}"
+def caption(chart: Chart, site_url: str, state: ChartState | None = None) -> str:
+    return f"<b>{chart.title}</b> — {chart.description}\n{page_url(chart, site_url, state)}"
 
 
 def command_handler(site_url: str):
@@ -117,25 +166,33 @@ def command_handler(site_url: str):
         # nudge tells everyone to type.
         matches = resolve_families(search(query))
         log.info("/ccd %r -> %d chart(s)", query, len(matches))
+        # Escaped because the reply is HTML and the word is the reader's: a
+        # query containing < made Telegram reject the message outright, so
+        # the bot answered a slightly odd question with silence.
+        asked = html.escape(query)
         if not matches:
+            await message.reply_html(f"No chart matches “{asked}”. Try <code>/c</code> on its own.")
+            return
+
+        # More than one match is a question, not an answer. "validator" sent
+        # two charts and "staking" sent three and a note saying six more
+        # existed, which left the reader to sort out a wall of near-identical
+        # line charts -- while the bot was the one holding the list.
+        if len(matches) > 1:
             await message.reply_html(
-                f"No chart matches “{query}”. Try <code>/c</code> on its own."
+                f"{len(matches)} charts match “{asked}”. Which one?",
+                reply_markup=chart_picker(matches),
             )
             return
 
-        for chart in matches[:MAX_REPLIES]:
-            await message.reply_photo(
-                photo=chart.image_url(site_url),
-                caption=caption(chart, site_url),
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard_for(chart),
-            )
-
-        if len(matches) > MAX_REPLIES:
-            await message.reply_html(
-                f"…and {len(matches) - MAX_REPLIES} more. "
-                "Narrow it down, or /start for the full list."
-            )
+        chart = matches[0]
+        state = state_for(chart)
+        await message.reply_photo(
+            photo=image_url(chart, site_url, state),
+            caption=caption(chart, site_url, state),
+            parse_mode=ParseMode.HTML,
+            reply_markup=keyboard_for(chart, state),
+        )
 
     return reply_to_command
 
@@ -173,6 +230,7 @@ def callback_handler(site_url: str):
             return
         data = query.data or ""
 
+        state = None
         if data.startswith(MENU_PREFIX):
             group = data[len(MENU_PREFIX) :]
             chart = family_default(group)
@@ -183,41 +241,63 @@ def callback_handler(site_url: str):
                     # unanswered callback query until it times out.
                     await query.answer("That category is no longer available.")
                     return
-                # A category with no default is `other` -- eighteen unrelated
-                # charts, so the tap opens a second menu rather than guessing.
-                await query.answer()
-                buttons = [
-                    InlineKeyboardButton(
-                        c.title, callback_data=f"{CALLBACK_PREFIX}{c.name}"
+                if len(members) == 1:
+                    chart = members[0]
+                else:
+                    # A category with no default is a bag of unrelated charts,
+                    # so the tap opens a second menu rather than guessing.
+                    await query.answer()
+                    buttons = [
+                        InlineKeyboardButton(c.title, callback_data=f"{CALLBACK_PREFIX}{c.name}")
+                        for c in members
+                    ]
+                    await query.edit_message_text(
+                        "Which one?",
+                        reply_markup=InlineKeyboardMarkup(
+                            [buttons[i : i + 1] for i in range(len(buttons))]
+                        ),
                     )
-                    for c in members
-                ]
-                await query.edit_message_text(
-                    "Which one?",
-                    reply_markup=InlineKeyboardMarkup(
-                        [buttons[i : i + 1] for i in range(len(buttons))]
-                    ),
-                )
-                return
+                    return
+            state = state_for(chart)
         else:
-            if not data.startswith(CALLBACK_PREFIX):
+            resolved = parse_callback(data)
+            if resolved is None:
+                # Telegram keeps showing the spinner unless the query is
+                # answered, so a stale button gets a reason rather than a hang.
+                await query.answer("That chart is no longer available.")
                 return
-            chart = BY_NAME.get(data[len(CALLBACK_PREFIX) :])
-        if chart is None:
-            # Telegram will keep showing the spinner unless the query is
-            # answered, so a stale button gets a reason rather than a hang.
-            await query.answer("That chart is no longer available.")
-            return
-
+            chart, state = resolved
+            if state is None:
+                state = state_for(chart)
         log.info("button %r", chart.name)
         await query.answer()
+
+        # editMessageMedia needs media to edit, and Telegram refuses a text
+        # message outright. The picker and the category's "Which one?" are
+        # both text, so a tap there answers with a new message; a tap on a
+        # chart's own period or grouping button swaps that chart in place,
+        # because replacing it each time would fill the chat with near
+        # identical pictures.
+        # No message at all means the button is on an inline result sitting in
+        # someone else's chat, where there is nothing to reply to and
+        # edit_message_media addresses it by inline_message_id instead.
+        picked_from = getattr(query, "message", None)
+        if picked_from is not None and not getattr(picked_from, "photo", None):
+            await query.message.reply_photo(
+                photo=image_url(chart, site_url, state),
+                caption=caption(chart, site_url, state),
+                parse_mode=ParseMode.HTML,
+                reply_markup=keyboard_for(chart, state),
+            )
+            return
+
         await query.edit_message_media(
             media=InputMediaPhoto(
-                media=chart.image_url(site_url),
-                caption=caption(chart, site_url),
+                media=image_url(chart, site_url, state),
+                caption=caption(chart, site_url, state),
                 parse_mode=ParseMode.HTML,
             ),
-            reply_markup=keyboard_for(chart),
+            reply_markup=keyboard_for(chart, state),
         )
 
     return switch_interval

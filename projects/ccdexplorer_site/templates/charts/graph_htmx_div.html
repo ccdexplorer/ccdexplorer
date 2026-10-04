@@ -6,10 +6,10 @@
     hx-post="{{hx_post_url}}"
     hx-vals='js:{
         theme: document.querySelector("HTML").getAttribute("data-bs-theme"),
-        start_date: document.getElementById("event-start-pretty").innerText,
-        end_date: document.getElementById("event-end-pretty").innerText,
+        start_date: (document.getElementById("event-start-pretty")?.dataset.iso || document.getElementById("event-start-pretty").innerText),
+        end_date: (document.getElementById("event-end-pretty")?.dataset.iso || document.getElementById("event-end-pretty").innerText),
         filename: "{{filename}}",
-        group_by_selection: document.querySelector("input[name=\"group_by\"]:checked").id,
+        group_by_selection: (document.querySelector("input[name=\"group_by\"]:checked") || {id: ""}).id,
         {%if include_trace_selection %}trace_selection: [...document.querySelectorAll("input[name=\"trace_selection\"]:checked")].map(el => el.id).join(","),{% endif %}
         {%if include_dropdown_fancy %}dropdown_values_fancy:document.querySelector("input[name=\"fancy_group\"]:checked").id,{% endif %}
         {% if include_kpis %}kpi: document.getElementById("kpi_id")?.value{% endif %}

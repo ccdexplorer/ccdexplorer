@@ -60,6 +60,7 @@ dependencies = [
 
 [tool.polylith.bricks]
 "../../bases/ccdexplorer/ccdexplorer_api"  = "ccdexplorer/ccdexplorer_api"
+"../../components/ccdexplorer/charts"      = "ccdexplorer/charts"
 "../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
 "../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"

@@ -61,7 +61,7 @@ from ccdexplorer.site_user import SiteUser
 from ccdexplorer.schema_parser import Schema
 from dateutil.relativedelta import relativedelta
 from markupsafe import escape
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from plotly.graph_objs.layout._template import Template
 from pydantic import BaseModel, ConfigDict, ValidationError
 from rich import print
@@ -691,7 +691,11 @@ _KALEIDO_RENDER_LOCK = asyncio.Lock()
 # returns "dark" and `add_watermark_to_plot` always adds the watermark. The
 # path is therefore the whole of the input, which makes it the whole of the
 # cache key.
-_PLOT_IMAGES = PngCache()
+# Its own bound rather than the shared 256: that was comfortable at about
+# eighty plot keys, and window and grouping combinations push well past it.
+# Overflowing evicts the warmed defaults first, which is the worst thing it
+# could drop.
+_PLOT_IMAGES = PngCache(max_entries=512)
 PLOT_IMAGE_TTL = 3600
 
 #: Charts whose png must expire sooner than the default hour, keyed by chart
@@ -713,6 +717,7 @@ def plot_image_ttl(path: str) -> int:
     parts = path.rstrip("/").split("/")
     name = parts[-2] if len(parts) >= 2 and parts[-1] == "image.png" else ""
     return PLOT_IMAGE_TTL_BY_CHART.get(name, PLOT_IMAGE_TTL)
+
 
 #: Refreshed a little before they expire, so nobody ever waits on a cold
 #: render. Every chart on this list is redrawn on this interval whether or not
@@ -766,20 +771,138 @@ def forcing_plot_render():
         _FORCE_PLOT_RENDER.reset(token)
 
 
+def empty_chart_figure(theme: str, message: str = "No data for this range") -> go.Figure:
+    """A chart with nothing to draw, that says so.
+
+    Returning a bare Figure drew an empty pair of axes, which a reader takes
+    for a flat line at zero -- a claim about the data rather than an absence
+    of it. Several handlers did exactly that on an empty API result.
+    """
+    fig = go.Figure(layout={"template": ccdexplorer_plotly_template(theme), "height": 400})
+    fig.add_annotation(
+        text=message,
+        xref="paper",
+        yref="paper",
+        x=0.5,
+        y=0.5,
+        showarrow=False,
+        font=dict(size=16, color="#8A8F98"),
+    )
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+    return fig
+
+
+def plot_warm_targets(app, net: str = "mainnet") -> list[tuple[str, dict]]:
+    """Every chart image to redraw on a sweep, with the parameters to draw it at.
+
+    A chart with a spec is warmed in the state it opens in and no other.
+    Warming every window and grouping would be 25 charts x 4 windows x 3
+    groupings x 2 themes = 600 renders a sweep at roughly two seconds each --
+    twenty minutes of kaleido per fifty-minute cycle, almost all of it for
+    pictures nobody asked for. A tap on a non-default button pays one render
+    and then caches for the hour.
+
+    A spec-backed chart is warmed at two urls, because it is asked for at
+    two and they are separate cache entries:
+
+    * the path form, which the bot's buttons ask for;
+    * the stateless /image.png, which is the og:image of the shareable plot
+      page and so what Telegram fetches for every link shared so far.
+
+    The state goes in the path and not the query. Asked as
+    `?grouping=weekly`, the stateless route answers 308 to the path that
+    means the same thing, and the warmer's client does not follow
+    redirects: every spec-backed chart recorded a 308 and warmed nothing.
+    """
+    from ccdexplorer.charts import ChartState
+    from ccdexplorer.charts.paths import format_month
+    from ccdexplorer.charts.registry import BY_NAME
+
+    targets = []
+    for path in plot_image_paths(app, net):
+        name = path.split("/")[-2]
+        spec = BY_NAME.get(name)
+        if spec is None or not spec.groupings:
+            # Not migrated yet, or intraday: no window or grouping to pass.
+            targets.append((path, {}))
+            continue
+        state = ChartState.from_query(spec, {})
+        targets.append(
+            (
+                f"/plots/{net}/{name}/{state.grouping.value}"
+                f"/{format_month(state.start)}/{format_month(state.end)}/image.png",
+                {},
+            )
+        )
+        targets.append((path, {}))
+    return targets
+
+
 def evict_plot_image(path: str) -> None:
     """Drop a rendered chart, so the next request for it redraws."""
     _PLOT_IMAGES.discard(path)
+
+
+#: A cover is the chart without its chrome, at thumbnail size. The index
+#: carries the category name beside it and a legend is unreadable this
+#: small, so both come off.
+COVER_WIDTH = 520
+COVER_HEIGHT = 260
+
+
+def as_cover(fig: go.Figure) -> go.Figure:
+    """The same figure, stripped to what reads at 520x260."""
+    fig.update_layout(
+        title=None,
+        showlegend=False,
+        margin=dict(l=4, r=4, t=4, b=4),
+        height=COVER_HEIGHT,
+    )
+    return fig
+
+
+def chart_page_url(name: str, request: Request) -> str:
+    """Where "View chart on CCDExplorer.io" should lead, or "" if unknown.
+
+    plot_info carries a page_url per chart, written when the charts lived
+    under /statistics tabs and hardcoded to mainnet. They do not live there
+    any more: the Kraken plot page offered a link to
+    /mainnet/statistics/exchanges, which is not a page showing that chart.
+
+    Read off the registry instead -- the chart's own page where it has one,
+    and otherwise the category it sits in, which is the nearest thing that
+    does show it.
+    """
+    from ccdexplorer.charts.registry import spec_for_plot
+
+    spec = spec_for_plot(name)
+    if spec is None:
+        return ""
+    segments = request.url.path.strip("/").split("/")
+    net = segments[1] if len(segments) > 1 else "mainnet"
+    if spec.has_page:
+        return f"/{net}/charts/{spec.slug}"
+    return f"/{net}/charts/category/{spec.category}"
 
 
 async def return_plot_response(fig: go.Figure, request: Request, title: str):
     figure_key = request.url.path.split("/")[-1]
     fig = add_watermark_to_plot(fig, request)
     if "image.png" in request.url.path:
+        # ?cover=1 asks for the index thumbnail. Handled here rather than in
+        # the cover generator so that every chart can be a cover, including
+        # the ones the generic builder cannot draw -- the Kraken candles and
+        # PLT's TVL both have their own handler, and this reaches them the
+        # same way a reader does.
+        cover = request.query_params.get("cover")
+        if cover:
+            fig = as_cover(fig)
         # Resolved here rather than passed in, so none of the twenty-odd call
         # sites has to change. From the query string only: this branch is a
         # GET, and reading a body it does not have blocks.
         theme = theme_from_query(request)
-        cache_key = plot_cache_key(request.url.path, theme)
+        cache_key = plot_cache_key(request.url.path, theme, dict(request.query_params))
         ttl = plot_image_ttl(request.url.path)
         refreshing = _FORCE_PLOT_RENDER.get()
         # A refresh ignores the cache on the way in, but does not clear it: the
@@ -793,8 +916,11 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
                 # the re-check, or it would find the entry it is replacing.
                 cached = None if refreshing else _PLOT_IMAGES.get(cache_key)
                 if cached is None:
+                    width = COVER_WIDTH if cover else 720
+                    height = COVER_HEIGHT if cover else None
                     img_bytes = await asyncio.get_running_loop().run_in_executor(
-                        None, lambda: pio.to_image(fig, format="png", width=720)
+                        None,
+                        lambda: pio.to_image(fig, format="png", width=width, height=height),
                     )
                     _PLOT_IMAGES.put(cache_key, img_bytes, ttl)
                     cached = (img_bytes, ttl)
@@ -802,7 +928,15 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
         return Response(
             content=img_bytes,
             media_type="image/png",
-            headers={"Cache-Control": f"public, max-age={max_age}"},
+            headers={
+                "Cache-Control": f"public, max-age={max_age}",
+                # A url with no theme parameter answers light or dark
+                # depending on bsTheme, so a shared cache that keys on the
+                # url alone will hand one reader's theme to the next. The
+                # browser already did it to a single reader: tiles cached
+                # in dark were served to a page that had switched to light.
+                "Vary": "Cookie, Accept-Encoding",
+            },
         )
 
     else:
@@ -829,6 +963,8 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
             page_url = plot_info.get(figure_key, {}).get("page_url", "")
             if figure_key == "ccd_balance_usd_value":
                 page_url += request.url.path.split("/")[-2]
+            else:
+                page_url = chart_page_url(figure_key, request) or page_url
             return request.app.templates.TemplateResponse(
                 request,
                 "base/plots_og.html",
@@ -841,6 +977,13 @@ async def return_plot_response(fig: go.Figure, request: Request, title: str):
                     "page_url": page_url,
                     "plot_description": plot_info.get(figure_key, {}).get("description", ""),
                     "plot_html": fig_html,
+                    # The page used to hardcode dark while the figure drawn
+                    # into it followed the cookie. They agreed only while
+                    # the fallback was also dark; once a request that says
+                    # nothing got light -- which is what Telegram's in-app
+                    # browser sends -- the caption link opened a dark page
+                    # around a light chart.
+                    "theme": theme_from_query(request),
                     "env": request.app.env,
                 },
             )
@@ -2441,42 +2584,135 @@ PLOT_THEMES = ("dark", "light")
 
 
 async def get_theme_from_request(request: Request):
-    """The theme to draw in: query string first, then the posted form, then dark.
+    """The theme to draw in: query string, then the posted form, then the
+    same fallback a GET with nothing to say gets anywhere else.
 
     The query string exists for the image routes. Those are GETs, so they have
     no body, so every chart image rendered dark no matter who asked -- fine on
     the site, which is dark, and wrong in a Telegram chat that is not.
+
+    Ending at a hardcoded dark was the other half of that. It left two
+    resolvers disagreeing about the same request: the generated chart routes
+    use theme_from_query and answered light, these answered dark, and which
+    one a chart got came down to which router happened to register its path
+    first. Eight of the charts the bot offers landed in chats as black
+    rectangles. A reader on the dark site still gets dark, out of the
+    bsTheme cookie below -- which is what that cookie is for.
     """
     requested = request.query_params.get("theme")
     if requested in PLOT_THEMES:
         return requested
 
-    theme = "dark"  # noqa: F841 - reassigned from the body below
     body = await request.body()
     if body:
-        theme = body.decode("utf-8").split("=")[1]
-    return theme if theme in PLOT_THEMES else "dark"
+        posted = body.decode("utf-8").split("=")[1]
+        if posted in PLOT_THEMES:
+            return posted
+
+    chosen = request.cookies.get(THEME_COOKIE)
+    return chosen if chosen in PLOT_THEMES else DEFAULT_PLOT_THEME
+
+
+#: Mirrors the localStorage key the theme toggle writes. A cookie as well,
+#: because localStorage is invisible to an <img src> -- which is why the
+#: site's own chart thumbnails were drawn dark whatever theme the reader had
+#: chosen.
+THEME_COOKIE = "bsTheme"
+
+#: What a request that says nothing gets. Telegram sends no cookie and the
+#: bot no longer sends a parameter, and these land in somebody else's chat --
+#: mostly a light one, where a dark chart reads as a black rectangle rather
+#: than a graph.
+DEFAULT_PLOT_THEME = "light"
+
+
+#: What a *page* assumes before anyone has chosen. base/base.html's head
+#: script reads `localStorage.getItem('bsTheme') || 'dark'`, so a first-time
+#: visitor is looking at a dark page -- and anything the server renders into
+#: it has to agree, or the index opens with light tiles on a dark page and
+#: only corrects itself when the reader toggles.
+#:
+#: Deliberately not DEFAULT_PLOT_THEME. That one is light because its
+#: callers are Telegram and link unfurlers, which land in other people's
+#: chats; this one is the site's own appearance.
+DEFAULT_PAGE_THEME = "dark"
+
+
+def page_theme(request: Request) -> str:
+    """The theme the page this request renders into is already showing."""
+    chosen = request.cookies.get(THEME_COOKIE)
+    return chosen if chosen in PLOT_THEMES else DEFAULT_PAGE_THEME
 
 
 def theme_from_query(request: Request) -> str:
-    """The theme from the query string alone, without touching the body.
+    """The theme to draw in, without touching the body.
 
-    The image routes are GETs and never carry one, and awaiting a body that
-    will never arrive is a good way to hang: doing it here took the test suite
-    from ten seconds to six and a half minutes, because a Request built without
-    a receive channel simply waits.
+    Query first, because the warmer asks for each theme by name. Then the
+    cookie, which is the only way a GET can carry what the reader chose.
+
+    Never the body: the image routes are GETs, and awaiting a body that will
+    never arrive is a good way to hang -- doing it here took the test suite
+    from ten seconds to six and a half minutes, because a Request built
+    without a receive channel simply waits.
     """
     requested = request.query_params.get("theme")
-    return requested if requested in PLOT_THEMES else "dark"
+    if requested in PLOT_THEMES:
+        return requested
+    chosen = request.cookies.get(THEME_COOKIE)
+    return chosen if chosen in PLOT_THEMES else DEFAULT_PLOT_THEME
 
 
-def plot_cache_key(path: str, theme: str) -> str:
-    """Charts differ by theme, so the cached image has to as well.
+#: Query parameters that change the picture. Everything else -- Telegram's
+#: cache-busting `t`, anything a crawler appends -- is ignored, or the cache
+#: would hold one entry per hour per chart and never be hit.
+#: `from` and `to` are here because the image routes honour them: without
+#: them in the key, two requests for different years resolve to one entry --
+#: and it is the same entry the warmer repopulates, so one shared link with a
+#: date range serves its picture to everyone asking for the default.
+def parse_slider_date(value: str, field: str) -> dt.datetime:
+    """The date a slider sent, or a 422.
+
+    The sliders post a date, and until now every handler parsed it with a
+    bare dateutil.parser.parse. Nothing stops a caller sending anything
+    else, and something did: production received
+    `{"start_date": "Juin 2021", "end_date": "Septembre 2026"}` from a
+    French Chrome and raised an unhandled ParserError. The slider writes
+    English month names, so the French came from Chrome's page translation
+    rewriting the hidden span the value was read out of.
+
+    The client sends a machine-readable value in an attribute now, which is
+    the actual fix. This is the other half: a bot, a stale cached page or a
+    hand-rolled request can still send anything, and a string the caller got
+    wrong is a bad request rather than a server error.
+    """
+    try:
+        return dateutil.parser.parse(value)
+    except (ValueError, OverflowError, TypeError) as error:
+        # ParserError subclasses ValueError; OverflowError is what a date far
+        # outside the representable range raises; TypeError is a non-string.
+        raise HTTPException(
+            status_code=422, detail=f"Could not read {field} as a date: {value!r}"
+        ) from error
+
+
+PLOT_CACHE_PARAMS = ("window", "grouping", "traces", "from", "to", "cover")
+
+
+def plot_cache_key(path: str, theme: str, params=None) -> str:
+    """Charts differ by theme, window and grouping, so the key has to as well.
 
     Keyed on the path alone, the first render would win and everyone after it
-    would get the wrong colours.
+    would get the wrong colours -- and now the wrong window too.
+
+    Sorted, so two links that spell the same configuration differently do not
+    cost two renders.
     """
-    return f"{path}?theme={theme}"
+    parts = [f"theme={theme}"]
+    for name in PLOT_CACHE_PARAMS:
+        value = (params or {}).get(name)
+        if value:
+            parts.append(f"{name}={value}")
+    return f"{path}?{'&'.join(sorted(parts))}"
 
 
 @lru_cache

@@ -5,7 +5,13 @@
       // Applied synchronously, before any stylesheet loads, so the page never
       // paints the wrong theme and then flips (FOUC). Keep this as the very
       // first thing in <head>.
-      document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('bsTheme') || 'dark');
+      const bsTheme = localStorage.getItem('bsTheme') || 'dark';
+      document.documentElement.setAttribute('data-bs-theme', bsTheme);
+      // Mirrored into a cookie because localStorage is invisible to an
+      // <img src>, and the chart thumbnails are images: without this the
+      // server has no idea which theme to draw them in, and drew every one
+      // dark whatever the reader had chosen.
+      document.cookie = `bsTheme=${bsTheme}; path=/; max-age=31536000; samesite=lax`;
     </script>
     <title>ccdexplorer.io: The most comprehensive explorer for the Concordium blockchain.</title>
     <script src="/static/js/net_switcher.js?v=2"></script>
@@ -92,7 +98,7 @@ html {
     </div>
     
     
-    <script src="/static/js/theme_switcher.js"></script>
+    <script src="/static/js/theme_switcher.js?v=3"></script>
     <script src="/node/htmx.org/dist/htmx.js"></script>
 
     <script src="/node/htmx-ext-class-tools/class-tools.js"></script>

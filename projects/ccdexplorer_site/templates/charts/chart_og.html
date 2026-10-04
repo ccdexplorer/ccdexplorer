@@ -1,0 +1,29 @@
+{#
+  What a shared chart link looks like in a chat.
+
+  The configurable pages replaced the statistics tiles, whose share button
+  copied /plots/<net>/<name> -- a small og-tagged page, so Telegram drew a
+  card. These arrived with nothing, and the url people copy is the one in
+  the address bar.
+
+  og:image is the chart in the state the url names, not the state it opens
+  in. A link shared at monthly over three years that previews the last year
+  weekly is a card about a different chart from the one it opens.
+
+  SITE_URL is unset in a local .env, and Jinja renders None as the literal
+  "None" -- an empty base gives relative urls instead, which no crawler will
+  reach on a laptop but which can never become a link to a host called None.
+#}
+<meta property="og:title" content="{{ og_title }}" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="{{ og_page_url }}" />
+{%- set og_text = (og_description ~ " · " ~ og_subtitle) if og_description else og_subtitle %}
+<meta property="og:description" content="{{ og_text }}" />
+<meta property="og:image" content="{{ og_image_url }}" />
+<meta property="og:image:secure_url" content="{{ og_image_url }}" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="{{ og_title }}" />
+<meta name="twitter:description" content="{{ og_text }}" />
+<meta name="twitter:image" content="{{ og_image_url }}" />

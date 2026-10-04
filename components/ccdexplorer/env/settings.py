@@ -105,6 +105,7 @@ def sentry_dsn(dsn: str | None) -> str | None:
         return ""
     return dsn
 
+
 SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT")
 HEARTBEAT_PROGRESS_DOCUMENT_ID = os.environ.get(
     "HEARTBEAT_PROGRESS_DOCUMENT_ID", "heartbeat_last_processed_block"

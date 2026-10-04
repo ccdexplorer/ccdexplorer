@@ -38,9 +38,7 @@ async def get_project_route(
     )
     mainnet_project_addresses = api_result.return_value if api_result.ok else []
     request.state.api_calls = {}
-    request.state.api_calls["Project Info"] = (
-        f"{request.app.api_url}/docs#/Misc/get_project_id"
-    )
+    request.state.api_calls["Project Info"] = f"{request.app.api_url}/docs#/Misc/get_project_id"
     request.state.api_calls["Project Addresses"] = (
         f"{request.app.api_url}/docs#/Misc/get_project_addresses"
     )

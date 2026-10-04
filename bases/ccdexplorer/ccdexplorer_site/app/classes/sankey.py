@@ -523,7 +523,9 @@ class ClusterSanKey(SanKey):
     CENTER_LABEL = "Cluster"
     SPECIAL_LABELS = SanKey.SPECIAL_LABELS + [CENTER_LABEL]
 
-    def __init__(self, gte, app, net: str, member_canonicals, token: str = "CCD", center_label=None):
+    def __init__(
+        self, gte, app, net: str, member_canonicals, token: str = "CCD", center_label=None
+    ):
         # 29-char canonical addresses of every account in the cluster.
         self.member_canonicals = set(member_canonicals)
         self.internal_total = 0.0

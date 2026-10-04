@@ -11,7 +11,6 @@ duplication is safe.
 """
 
 import re
-from pathlib import Path
 
 import pytest
 
@@ -19,12 +18,45 @@ from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS, MAX_RESULTS, NET
 from ccdexplorer.ccdexplorer_chart_bot.inline import nothing_found, photo_result, results_for
 
 SITE = "https://ccdexplorer.io"
-ROUTERS = Path(__file__).resolve().parents[4] / "bases/ccdexplorer/ccdexplorer_site/app/routers"
+
+#: /plots/<net>/<name>/image.png, optionally with a grouping, a range and a
+#: trace list between the name and the filename.
+PLOT_PATH = re.compile(r"/plots/\{net\}/([a-z0-9_]+)(/\{[a-z_]+\})*/image\.png")
 
 
 def site_plot_names() -> set[str]:
-    source = "".join(p.read_text() for p in ROUTERS.rglob("*.py"))
-    return set(re.findall(r'"/plots/\{net\}/([a-z0-9_]+)/image\.png"', source))
+    """The names the site really answers on, read from its routes.
+
+    Read off the source text until the charts became configurable; most of
+    them are now registered in a loop over the specs, so the path never
+    appears in a file as a literal and a grep found none of them.
+    """
+    import importlib
+    import pkgutil
+
+    from fastapi import FastAPI
+    from fastapi.routing import APIRoute
+
+    from ccdexplorer.ccdexplorer_site.app.routers import charts, statistics
+
+    # Every chart module, discovered rather than listed: the handwritten
+    # ones that keep their own route (PLT) count as served too.
+    modules = [statistics]
+    for found in pkgutil.iter_modules(charts.__path__):
+        modules.append(importlib.import_module(f"{charts.__name__}.{found.name}"))
+
+    app = FastAPI()
+    for module in modules:
+        if hasattr(module, "router"):
+            app.include_router(module.router)
+
+    names = set()
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            match = PLOT_PATH.fullmatch(route.path)
+            if match:
+                names.add(match.group(1))
+    return names
 
 
 def test_the_bot_never_offers_a_chart_the_site_cannot_draw():
@@ -73,19 +105,31 @@ def test_the_image_url_is_the_one_the_site_serves():
     assert chart.image_url(SITE).startswith(
         f"{SITE}/plots/mainnet/staking_validator_count/image.png"
     )
-    assert chart.page_url(SITE) == f"{SITE}/plots/mainnet/staking_validator_count"
 
 
-def test_the_bot_asks_for_light_charts():
+def test_the_caption_leads_to_the_page_that_configures_the_chart():
+    """It used to point at the raw png, because that was all there was. The
+    image route still takes no parameters -- so no buttons -- but there is
+    somewhere to change the range now, and the caption should go there."""
+    chart = next(c for c in CHARTS if c.name == "staking_validator_count")
+    assert chart.page_url(SITE) == f"{SITE}/mainnet/charts/staking-validator-count"
+
+
+def test_the_bot_lets_the_site_default_to_light():
     """These land in somebody else's chat, mostly a light one, where a dark
     chart reads as a black rectangle rather than a graph."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import THEME
 
     assert THEME == "light"
+    # Not sent any more: a request with neither parameter nor cookie is
+    # drawn light, and Telegram sends neither. THEME stays as the statement
+    # of what the bot expects to get.
     # Present rather than trailing: the url also carries a cache-busting bucket
     # now, so that Telegram refetches a redrawn chart instead of serving the
     # copy it downloaded the first time.
-    assert all("theme=light" in c.image_url(SITE) for c in CHARTS)
+    # Not asked for any more: a request carrying neither a theme parameter
+    # nor a theme cookie is drawn light, and Telegram sends neither.
+    assert all("theme=" not in c.image_url(SITE) for c in CHARTS)
 
 
 def test_the_page_link_carries_no_theme():
@@ -125,7 +169,7 @@ def test_an_empty_query_shows_the_catalogue_rather_than_nothing():
         ("delegators per pool", "staking_avg_delegator_per_pool_count"),
         ("fees", "transaction_fees"),
         ("exchanges", "ccd_on_exchanges"),
-        ("accounts per day", "accounts_per_day"),
+        ("accounts per day", "accounts_growth"),
     ],
 )
 def test_a_query_finds_the_chart_it_describes(query, expected):
@@ -254,7 +298,7 @@ def test_the_catalogue_still_fits_in_one_telegram_answer():
         ("show me the validators", "staking_validator_count"),
         ("what are the fees", "transaction_fees"),
         ("whales", "daily_limits"),
-        ("tps", "network_activity_tps"),
+        ("tps", "network_activity"),
         ("bakers", "staking_validator_count"),
         ("binance", "ccd_on_exchanges"),
         ("price", "ccd_kraken_4h"),
@@ -320,12 +364,16 @@ class _Message:
         self.text = text
         self.photos = []
         self.htmls = []
+        self.markups = []
 
     async def reply_photo(self, photo, caption=None, parse_mode=None, reply_markup=None):
         self.photos.append((photo, caption, reply_markup))
 
     async def reply_html(self, text, **kwargs):
         self.htmls.append(text)
+        # A query matching more than one chart answers with buttons, so the
+        # markup is part of what this fake has to record.
+        self.markups.append(kwargs.get("reply_markup"))
 
 
 class _Update:
@@ -360,32 +408,42 @@ async def test_the_command_returns_the_chart():
     message = await _send("accounts")
     assert message.photos
     photo, caption, _ = message.photos[0]
-    assert photo.startswith(f"{SITE}/plots/mainnet/accounts_per_day/image.png")
-    assert "theme=light" in photo
-    assert "Accounts per day" in caption
+    # The url carries the state the buttons will change: grouping, then the
+    # range, so tapping one is a different path rather than a query string.
+    assert photo.startswith(f"{SITE}/plots/mainnet/accounts_growth/weekly/")
+    assert photo.split("?")[0].endswith("/image.png")
+    assert "theme=" not in photo  # light is what a bare request gets
+    assert "Accounts growth" in caption
 
 
 async def test_a_whole_question_works_in_the_chat_too():
+    """It matches three charts, so the answer is the question "which one?"
+    -- but percentage staked still has to be among them."""
     message = await _send("how much is staked")
-    assert message.photos
-    assert "staking_percentage_staked" in message.photos[0][0]
+    offered = [b.text for row in message.markups[-1].inline_keyboard for b in row]
+    assert "Percentage staked" in offered, offered
 
 
 async def test_each_reply_offers_to_send_it_to_a_chat():
     """So the private chat doubles as a way to find the right chart first."""
     message = await _send("accounts")
     _, _, markup = message.photos[0]
-    button = markup.inline_keyboard[0][0]
-    assert button.switch_inline_query == "accounts_per_day"
+    # Last row: the configuration buttons come first, and "send it on" is
+    # what you do once the chart says what you wanted.
+    button = markup.inline_keyboard[-1][0]
+    assert button.switch_inline_query == "accounts_growth"
 
 
-async def test_a_broad_query_is_capped_and_says_so():
-    """Otherwise the chat becomes a wall of near-identical line charts."""
-    from ccdexplorer.ccdexplorer_chart_bot.direct import MAX_REPLIES
+async def test_a_broad_query_offers_every_match_and_sends_none():
+    """Was: send three and say six more exist. A wall of near-identical line
+    charts is what this guarded against, and a list of titles avoids it
+    without making the reader retype to reach the other six."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families, search
 
     message = await _send("staking")
-    assert len(message.photos) == MAX_REPLIES
-    assert message.htmls and "more" in message.htmls[0]
+    assert not message.photos
+    offered = [b.text for row in message.markups[-1].inline_keyboard for b in row]
+    assert len(offered) == len(resolve_families(search("staking")))
 
 
 async def test_nonsense_gets_an_answer_rather_than_silence():
@@ -414,7 +472,7 @@ def test_only_interval_series_get_buttons():
         "4h",
         "1d",
     ]
-    assert siblings(BY_NAME["accounts_per_day"]) == []
+    assert siblings(BY_NAME["accounts_growth"]) == []
 
 
 def test_the_keyboard_marks_which_interval_is_showing():
@@ -429,7 +487,6 @@ def test_the_keyboard_marks_which_interval_is_showing():
 def test_the_interval_row_wraps_before_it_gets_too_narrow():
     """Seven buttons across a phone screen is seven unreadable slivers, and
     these charts are read on phones."""
-    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
     from ccdexplorer.ccdexplorer_chart_bot.direct import BUTTONS_PER_ROW, keyboard_for
 
     for chart in CHARTS:
@@ -441,9 +498,9 @@ def test_a_standalone_chart_gets_no_interval_row():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
     from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
 
-    rows = keyboard_for(BY_NAME["accounts_per_day"]).inline_keyboard
+    rows = keyboard_for(BY_NAME["staking_validator_staked_amounts"]).inline_keyboard
     assert len(rows) == 1
-    assert rows[0][0].switch_inline_query == "accounts_per_day"
+    assert rows[0][0].switch_inline_query == "staking_validator_staked_amounts"
 
 
 def test_callback_data_round_trips_and_fits():
@@ -456,7 +513,9 @@ def test_callback_data_round_trips_and_fits():
             for button in row:
                 if button.callback_data:
                     assert len(button.callback_data.encode()) <= 64
-                    name = button.callback_data[len(CALLBACK_PREFIX) :]
+                    # Two payload shapes: a bare name for an unmigrated chart,
+                    # and name:window:grouping for a spec-backed one.
+                    name = button.callback_data[len(CALLBACK_PREFIX) :].split(":")[0]
                     assert name in BY_NAME
 
 
@@ -485,4 +544,4 @@ def test_inline_standalone_charts_carry_no_keyboard():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
     from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
 
-    assert photo_result(BY_NAME["accounts_per_day"], SITE).reply_markup is None
+    assert photo_result(BY_NAME["staking_validator_staked_amounts"], SITE).reply_markup is None

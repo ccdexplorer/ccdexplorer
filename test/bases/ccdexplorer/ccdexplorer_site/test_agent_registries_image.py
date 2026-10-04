@@ -11,6 +11,10 @@ from types import SimpleNamespace
 
 import plotly.graph_objects as go
 import pytest
+
+from ccdexplorer.ccdexplorer_site.app.routers.charts import images
+from ccdexplorer.charts import ChartState, Window
+from ccdexplorer.charts.registry import BY_NAME
 from fastapi import HTTPException
 
 from ccdexplorer.ccdexplorer_site.app.routers.charts import sc_agent_registries as mod
@@ -21,6 +25,16 @@ SAMPLE = [
 ]
 
 WINDOWS = [30, 90, 180, 365]
+
+
+def _state_for_days(days: int) -> ChartState:
+    """The state an image request for roughly `days` would resolve to.
+
+    The enum has no 180d, so the suite's 180 maps to the 90d window the
+    retired route redirects to.
+    """
+    window = {30: Window.D30, 90: Window.D90, 180: Window.D90, 365: Window.Y1}[days]
+    return ChartState.from_query(BY_NAME["agent_registries"], {"window": window.value})
 
 
 def _request():
@@ -94,11 +108,16 @@ async def test_the_image_route_asks_for_its_own_window(days, monkeypatch):
     monkeypatch.setattr(mod, "get_theme_from_request", fake_theme)
     monkeypatch.setattr(mod, "return_plot_response", fake_response)
 
-    await mod.agent_registries_image(_request(), "mainnet", days)
+    await mod.agent_registries_image(_request(), "mainnet", _state_for_days(days))
 
     assert seen["analysis"] == "statistics_agent_registry"
-    span = dt.date.fromisoformat(seen["end"]) - dt.date.fromisoformat(seen["start"])
-    assert span.days == days
+    # Against the state the request resolved to, not the raw `days`: the enum
+    # has no 180d window, and a chart whose history is shorter than the window
+    # is clamped to its own chain start rather than asking for data that
+    # cannot exist.
+    state = _state_for_days(days)
+    assert dt.date.fromisoformat(seen["start"]) == state.start
+    assert dt.date.fromisoformat(seen["end"]) == state.end
     assert captured["fig"] is not None
 
 
@@ -110,8 +129,31 @@ async def test_a_non_mainnet_net_is_refused_not_rendered_as_html():
     assert exc.value.status_code == 404
 
 
+def test_the_parameterised_image_route_is_served_by_the_generated_router():
+    """One route per window became one route with parameters -- and then
+    those routes moved to charts/generated.py, which registers the same
+    shape for every spec. This module kept registering them too, and because
+    its router is included first it won every request: the chart rendered
+    through the old handler, whose theme falls back to dark, so it arrived
+    in Telegram as a black rectangle. Only the legacy redirects stay here.
+    """
+    from ccdexplorer.ccdexplorer_site.app.routers.charts import generated
+
+    mine = {getattr(r, "path", "") for r in mod.router.routes}
+    theirs = {getattr(r, "path", "") for r in generated.router.routes}
+
+    assert "/plots/{net}/agent_registries/image.png" not in mine
+    assert "/plots/{net}/agent_registries/image.png" in theirs
+    assert "/plots/{net}/agent_registries_{window}/image.png" in mine, (
+        "the legacy redirect went too"
+    )
+
+
 @pytest.mark.parametrize("days", WINDOWS)
-def test_every_window_has_a_route(days):
+def test_every_old_window_name_still_resolves(days):
+    """The retired names are in Telegram's file cache and in shared links, so
+    they redirect rather than 404."""
     paths = {getattr(r, "path", "") for r in mod.router.routes}
 
-    assert f"/plots/{{net}}/agent_registries_{days}d/image.png" in paths
+    assert "/plots/{net}/agent_registries_{window}/image.png" in paths
+    assert images.legacy_redirect_target("mainnet", "agent_registries", f"{days}d") is not None

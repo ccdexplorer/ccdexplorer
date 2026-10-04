@@ -14,6 +14,10 @@ from types import SimpleNamespace
 
 import plotly.graph_objects as go
 import pytest
+
+from ccdexplorer.ccdexplorer_site.app.routers.charts import images
+from ccdexplorer.charts import ChartState, Window
+from ccdexplorer.charts.registry import BY_NAME
 from fastapi import HTTPException
 
 from ccdexplorer.ccdexplorer_site.app.routers.charts import sc_plt_transfers as mod
@@ -22,19 +26,27 @@ SAMPLE = [
     {
         "date": "2026-09-01",
         "tokens": {
-            "EUROe": {"USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 100},
-                      "count_txs": 2},
-            "USDC": {"USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 200},
-                     "count_txs": 3},
+            "EUROe": {
+                "USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 100},
+                "count_txs": 2,
+            },
+            "USDC": {
+                "USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 200},
+                "count_txs": 3,
+            },
         },
     },
     {
         "date": "2026-09-02",
         "tokens": {
-            "EUROe": {"USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 150},
-                      "count_txs": 2},
-            "USDC": {"USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 250},
-                     "count_txs": 3},
+            "EUROe": {
+                "USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 150},
+                "count_txs": 2,
+            },
+            "USDC": {
+                "USD": {"transfer": 1, "burn": 0, "mint": 0, "total_supply": 250},
+                "count_txs": 3,
+            },
         },
     },
 ]
@@ -42,10 +54,18 @@ SAMPLE = [
 WINDOWS = [30, 90, 180, 365]
 
 
+def _state_for_days(days: int) -> ChartState:
+    """The state an image request for roughly `days` would resolve to.
+
+    The enum has no 180d, so the suite's 180 maps to the 90d window the
+    retired route redirects to.
+    """
+    window = {30: Window.D30, 90: Window.D90, 180: Window.D90, 365: Window.Y1}[days]
+    return ChartState.from_query(BY_NAME["plt_tvl"], {"window": window.value})
+
+
 def _request():
-    return SimpleNamespace(
-        app=SimpleNamespace(env={}, api_url="http://api", httpx_client=None)
-    )
+    return SimpleNamespace(app=SimpleNamespace(env={}, api_url="http://api", httpx_client=None))
 
 
 async def _overview_says_all_are_stablecoins(url, client):
@@ -99,7 +119,7 @@ async def test_the_image_route_asks_for_its_own_window(days, monkeypatch):
         seen.update(analysis=analysis, start=start, end=end)
         return SAMPLE
 
-    async def fake_theme(request):
+    def fake_theme(request):
         return "light"
 
     async def fake_response(fig, request, title):
@@ -107,14 +127,19 @@ async def test_the_image_route_asks_for_its_own_window(days, monkeypatch):
 
     monkeypatch.setattr(mod, "get_all_data_for_analysis_limited", fake_fetch)
     monkeypatch.setattr(mod, "get_url_from_api", _overview_says_all_are_stablecoins)
-    monkeypatch.setattr(mod, "get_theme_from_request", fake_theme)
+    monkeypatch.setattr(mod, "theme_from_query", fake_theme)
     monkeypatch.setattr(mod, "return_plot_response", fake_response)
 
-    await mod.plt_tvl_image(_request(), "mainnet", days)
+    await mod.plt_tvl_image(_request(), "mainnet", _state_for_days(days))
 
     assert seen["analysis"] == "statistics_plt"
-    span = dt.date.fromisoformat(seen["end"]) - dt.date.fromisoformat(seen["start"])
-    assert span.days == days
+    # Against the state the request resolved to, not the raw `days`: the enum
+    # has no 180d window, and a chart whose history is shorter than the window
+    # is clamped to its own chain start rather than asking for data that
+    # cannot exist.
+    state = _state_for_days(days)
+    assert dt.date.fromisoformat(seen["start"]) == state.start
+    assert dt.date.fromisoformat(seen["end"]) == state.end
 
 
 async def test_a_non_mainnet_net_is_refused():
@@ -125,11 +150,21 @@ async def test_a_non_mainnet_net_is_refused():
     assert exc.value.status_code == 404
 
 
-@pytest.mark.parametrize("days", WINDOWS)
-def test_every_window_has_a_route(days):
+def test_the_parameterised_image_route_exists():
+    """One route per window became one route with parameters."""
     paths = {getattr(r, "path", "") for r in mod.router.routes}
 
-    assert f"/plots/{{net}}/plt_tvl_{days}d/image.png" in paths
+    assert "/plots/{net}/plt_tvl/image.png" in paths
+
+
+@pytest.mark.parametrize("days", WINDOWS)
+def test_every_old_window_name_still_resolves(days):
+    """The retired names are in Telegram's file cache and in shared links, so
+    they redirect rather than 404."""
+    paths = {getattr(r, "path", "") for r in mod.router.routes}
+
+    assert "/plots/{net}/plt_tvl_{window}/image.png" in paths
+    assert images.legacy_redirect_target("mainnet", "plt_tvl", f"{days}d") is not None
 
 
 # --- review finding 3 ------------------------------------------------------
@@ -138,13 +173,21 @@ def test_every_window_has_a_route(days):
 GAPPED = [
     {
         "date": "2026-09-01",
-        "tokens": {"EUROe": {"USD": {"transfer": 0, "burn": 0, "mint": 0,
-                                     "total_supply": 100}, "count_txs": 0}},
+        "tokens": {
+            "EUROe": {
+                "USD": {"transfer": 0, "burn": 0, "mint": 0, "total_supply": 100},
+                "count_txs": 0,
+            }
+        },
     },
     {
         "date": "2026-09-03",
-        "tokens": {"EUROe": {"USD": {"transfer": 0, "burn": 0, "mint": 0,
-                                     "total_supply": 120}, "count_txs": 0}},
+        "tokens": {
+            "EUROe": {
+                "USD": {"transfer": 0, "burn": 0, "mint": 0, "total_supply": 120},
+                "count_txs": 0,
+            }
+        },
     },
 ]
 
@@ -169,10 +212,14 @@ MIXED = [
     {
         "date": "2026-09-01",
         "tokens": {
-            "EUROe": {"USD": {"transfer": 0, "burn": 0, "mint": 0,
-                              "total_supply": 100}, "count_txs": 0},
-            "NOTACOIN": {"USD": {"transfer": 0, "burn": 0, "mint": 0,
-                                 "total_supply": 900}, "count_txs": 0},
+            "EUROe": {
+                "USD": {"transfer": 0, "burn": 0, "mint": 0, "total_supply": 100},
+                "count_txs": 0,
+            },
+            "NOTACOIN": {
+                "USD": {"transfer": 0, "burn": 0, "mint": 0, "total_supply": 900},
+                "count_txs": 0,
+            },
         },
     },
 ]
@@ -184,9 +231,7 @@ def test_only_stablecoins_count_towards_stablecoin_tvl():
     Every PLT with a USD supply was being added, so a PLT that tracks nothing
     inflated a figure labelled as stablecoins.
     """
-    fig = mod.build_plt_tvl_figure(
-        MIXED, theme="light", freq="D", stablecoins={"EUROe"}
-    )
+    fig = mod.build_plt_tvl_figure(MIXED, theme="light", freq="D", stablecoins={"EUROe"})
 
     assert list(fig.data[0].y) == [100], "counted a PLT that is not a stablecoin"
 
@@ -218,7 +263,7 @@ async def test_the_route_asks_the_api_which_plts_are_stablecoins(monkeypatch):
             },
         )
 
-    async def fake_theme(request):
+    def fake_theme(request):
         return "light"
 
     captured = {}
@@ -229,13 +274,11 @@ async def test_the_route_asks_the_api_which_plts_are_stablecoins(monkeypatch):
 
     monkeypatch.setattr(mod, "get_all_data_for_analysis_limited", fake_fetch)
     monkeypatch.setattr(mod, "get_url_from_api", fake_api)
-    monkeypatch.setattr(mod, "get_theme_from_request", fake_theme)
+    monkeypatch.setattr(mod, "theme_from_query", fake_theme)
     monkeypatch.setattr(mod, "return_plot_response", fake_response)
 
-    request = SimpleNamespace(
-        app=SimpleNamespace(env={}, api_url="http://api", httpx_client=None)
-    )
-    await mod.plt_tvl_image(request, "mainnet", 30)
+    request = SimpleNamespace(app=SimpleNamespace(env={}, api_url="http://api", httpx_client=None))
+    await mod.plt_tvl_image(request, "mainnet", _state_for_days(30))
 
     assert "plts/overview" in asked["url"]
     assert captured["y"] == [100], "the non-stablecoin leaked into the total"

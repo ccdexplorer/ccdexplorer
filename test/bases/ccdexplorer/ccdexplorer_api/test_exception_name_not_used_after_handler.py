@@ -28,7 +28,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[4]
 
-BAD = '''
+BAD = """
 def f():
     try:
         r = g()
@@ -37,9 +37,9 @@ def f():
     if r:
         return r
     raise RuntimeError(f"{error}")
-'''
+"""
 
-SIBLING_HANDLERS_ARE_FINE = '''
+SIBLING_HANDLERS_ARE_FINE = """
 def f():
     try:
         return g()
@@ -47,9 +47,9 @@ def f():
         log(e)
     except TypeError as e:
         log(e)
-'''
+"""
 
-CAPTURED_IS_FINE = '''
+CAPTURED_IS_FINE = """
 def f():
     error_message = None
     try:
@@ -60,9 +60,9 @@ def f():
     if r:
         return r
     raise RuntimeError(f"{error_message}")
-'''
+"""
 
-REBOUND_IS_FINE = '''
+REBOUND_IS_FINE = """
 def f():
     error = None
     try:
@@ -70,7 +70,7 @@ def f():
     except Exception as error:
         r = None
     return f"{error}"
-'''
+"""
 
 
 def _uses_after_handler(tree: ast.AST) -> list[tuple[int, str]]:
@@ -139,6 +139,4 @@ def test_nothing_in_the_codebase_reads_an_exception_name_after_its_handler():
             for lineno, name in _uses_after_handler(ast.parse(path.read_text())):
                 offenders.append(f"{path.relative_to(REPO)}:{lineno} reads '{name}'")
 
-    assert not offenders, "these raise UnboundLocalError when reached:\n  " + "\n  ".join(
-        offenders
-    )
+    assert not offenders, "these raise UnboundLocalError when reached:\n  " + "\n  ".join(offenders)

@@ -12,6 +12,9 @@ requires-python = ">=3.12"
 # already serves, so it needs no database driver, no gRPC stack and no chain
 # types -- and a dependency it does not have is one that cannot break it.
 dependencies = [
+    # The catalogue's Chart and the shared charts component are pydantic
+    # models; the bot had no direct pydantic dependency before.
+    "pydantic",
     "python-dotenv",
     "python-telegram-bot[job-queue]>=22.5",
 ]
@@ -20,4 +23,5 @@ dependencies = [
 
 [tool.polylith.bricks]
 "../../bases/ccdexplorer/ccdexplorer_chart_bot" = "ccdexplorer/ccdexplorer_chart_bot"
+"../../components/ccdexplorer/charts"           = "ccdexplorer/charts"
 "../../components/ccdexplorer/env"              = "ccdexplorer/env"

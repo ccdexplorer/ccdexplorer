@@ -1,0 +1,41 @@
+{% extends "base/base.html" %}
+{% block ogp %}{% include 'charts/chart_og.html' %}{% endblock %}
+{% block content %}
+    {% set include_kpis = False %}
+    {% set include_dropdown_fancy = False %}
+    {# The address bar is rewritten as a path, so the script needs the chart's
+       own slug and the url name of each trace. #}
+    <script>
+      window.CHART_SLUG = {{ spec.slug | tojson }};
+      window.CHART_NET = {{ net | tojson }};
+      window.TRACE_URL_NAMES = {{ trace_url_names | tojson }};
+      {# null where the reader chooses the grouping. #}
+      window.CHART_AUTO_GROUPING = {{ auto_grouping | tojson }};
+    </script>
+
+    {# Top left, where the statistics tiles kept it, because these pages
+       replaced those tiles and that is where people already look.
+
+       It copies the address of the chart as it is on screen -- grouping,
+       range and traces -- because that is what is worth passing on, and
+       because the card is drawn from the page rather than from the png. #}
+    <div class="position-relative">
+      <button type="button"
+              class="btn btn-sm position-absolute top-0 start-0"
+              style="z-index: 5;"
+              data-share-url="{{ og_page_url }}"
+              onclick="sharePlot(this)"
+              title="Copy a link to this chart">
+        <i class="bi bi-share-fill"></i>
+      </button>
+
+      {% include 'charts/standalone_chart.html' %}
+    </div>
+
+    {# A real endpoint, not the tempfile the handwritten pages linked to:
+       those wrote a csv into /tmp while drawing and nothing removed them. #}
+    <a href="{{ csv_url }}" title="Download .csv file" target="_blank">Download Data
+      <i style="color:#F6DB9A;" class="bi bi-download"></i></a>
+
+    {% if docs %}{% include 'charts/documentation_link.html' %}{% endif %}
+{% endblock %}

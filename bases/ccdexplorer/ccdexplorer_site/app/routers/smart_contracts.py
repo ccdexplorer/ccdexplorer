@@ -620,9 +620,7 @@ async def module_module_address(
             "error": True,
             "errorMessage": f"No module on {net} found at {module_ref}.",
         }
-    request.state.api_calls["Module Info"] = (
-        f"{request.app.api_url}/docs#/Module/get_module"
-    )
+    request.state.api_calls["Module Info"] = f"{request.app.api_url}/docs#/Module/get_module"
     request.state.api_calls["Deployed Tx"] = (
         f"{request.app.api_url}/docs#/Module/get_module_deployment_tx"
     )
@@ -632,9 +630,7 @@ async def module_module_address(
     request.state.api_calls["Module Instances"] = (
         f"{request.app.api_url}/docs#/Module/get_module_instances"
     )
-    request.state.api_calls["Module Usage"] = (
-        f"{request.app.api_url}/docs#/Module/get_module_usage"
-    )
+    request.state.api_calls["Module Usage"] = f"{request.app.api_url}/docs#/Module/get_module_usage"
     return request.app.templates.TemplateResponse(
         request,
         "smart_contracts/smart_module.html",

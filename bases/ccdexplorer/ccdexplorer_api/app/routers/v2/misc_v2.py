@@ -17,6 +17,8 @@ import dateutil
 import grpc
 import httpx2 as httpx
 import pandas as pd
+from ccdexplorer.charts import Grouping, build_grouping_pipeline
+from ccdexplorer.charts.registry import BY_SOURCE
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import (
@@ -963,6 +965,49 @@ async def get_data_for_chain_analysis(
     return JSONResponse([x for x in result])
 
 
+def parse_grouping(value: str | None) -> Grouping | None:
+    """The grouping from the query string, or None for raw daily documents."""
+    if value is None:
+        return None
+    try:
+        return Grouping(value)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"grouping must be one of {[g.value for g in Grouping]}.",
+        )
+
+
+def spec_for_analysis(analysis: str):
+    """The chart spec that knows how to group this analysis.
+
+    Refused rather than guessed: without a spec there is no per-series
+    aggregation rule, and defaulting to $sum is exactly how a level series
+    ends up seven times too large.
+    """
+    spec = BY_SOURCE.get(analysis)
+    if spec is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No chart spec for {analysis}, so it cannot be grouped.",
+        )
+    return spec
+
+
+def pipeline_for(spec, start_date: str, end_date: str, grouping):
+    """The aggregation for this spec, or a 422 explaining why there is none.
+
+    Some sources are registered but cannot be grouped generically --
+    statistics_plt nests a document per token and needs per-token last,
+    forward-fill and a stablecoin filter. Refusing is right; crashing is not,
+    so the reason the builder already carries reaches the caller.
+    """
+    try:
+        return build_grouping_pipeline(spec, start_date, end_date, grouping)
+    except NotImplementedError as reason:
+        raise HTTPException(status_code=422, detail=str(reason))
+
+
 @router.get(
     "/{net}/misc/statistics/{analysis}/{start_date}/{end_date}",
     response_class=JSONResponse,
@@ -973,16 +1018,32 @@ async def get_data_for_analysis(
     analysis: str,
     start_date: str,
     end_date: str,
+    grouping: str | None = None,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
     api_key: str = Security(API_KEY_HEADER),
 ) -> JSONResponse:
     """
     Endpoint to get data for analysis.
+
+    With ?grouping=, the days are collapsed into buckets by the aggregation
+    rules on the chart's spec. Without it, the raw daily documents come back
+    exactly as before -- the charts that have not migrated yet still group in
+    pandas and would double-count a bucketed response.
     """
     if net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(
             status_code=422,
             detail="Don't be silly. We only support mainnet, testnet, and devnet.",
+        )
+
+    parsed = parse_grouping(grouping)
+    if parsed is not None:
+        spec = spec_for_analysis(analysis)
+        pipeline = pipeline_for(spec, start_date, end_date, parsed)
+        result = await await_await(mongomotor.mainnet, Collections.statistics, pipeline)
+        # _id is a datetime from $dateTrunc; callers expect a `date` string.
+        return JSONResponse(
+            [{"date": row.pop("_id").strftime("%Y-%m-%d"), **row} for row in result]
         )
 
     try:

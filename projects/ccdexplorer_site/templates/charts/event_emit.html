@@ -13,6 +13,75 @@ document.querySelectorAll('input[name="group_by"]').forEach(radio => {
         document.getElementById('update').dispatchEvent(event);
     });
 });
+
+
+// Keep the address bar in step, so the chart somebody is looking at is the
+// chart they can send to someone else. Until now the configuration lived only
+// in the DOM and was lost on reload.
+//
+// The dates come from the slider rather than from a range control: the slider
+// is the only thing on this page that sets them, and writing a window here
+// would claim a state the page cannot be put back into.
+document.body.addEventListener('htmx:afterSwap', function () {
+    if (!window.CHART_SLUG) return;   // an older chart page, not a generated one
+
+    // dataset.iso, not the text: Chrome's page translation rewrites text
+    // nodes, and the address bar would then carry a month parsed out of
+    // whatever language the reader is reading in.
+    const startSpan = document.getElementById('event-start-pretty');
+    const endSpan = document.getElementById('event-end-pretty');
+    const from = startSpan?.dataset.iso || startSpan?.innerText;
+    const to = endSpan?.dataset.iso || endSpan?.innerText;
+    if (!from || !to) return;
+
+    // The slider's labels are "Mon YYYY"; the path wants YYYYMM.
+    const asMonth = (text) => {
+        const when = new Date(text);
+        if (isNaN(when)) return null;
+        return `${when.getFullYear()}${String(when.getMonth() + 1).padStart(2, '0')}`;
+    };
+    const a = asMonth(from), b = asMonth(to);
+    if (!a || !b) return;
+
+    // A chart whose grouping changes nothing about the number has no
+    // radios to read -- it takes its resolution from the span instead.
+    // The thresholds come from the server so there is one definition of
+    // the rule; see resolution_for in the charts component.
+    const picked = document.querySelector('input[name="group_by"]:checked');
+    let grouping;
+    if (picked) {
+        grouping = picked.id;
+    } else if (window.CHART_AUTO_GROUPING) {
+        const days = (new Date(to) - new Date(from)) / 86400000;
+        grouping =
+            days <= window.CHART_AUTO_GROUPING.daily_up_to ? 'daily'
+            : days <= window.CHART_AUTO_GROUPING.weekly_up_to ? 'weekly'
+            : 'monthly';
+    } else {
+        return;
+    }
+
+    let path = `/${window.CHART_NET}/charts/${window.CHART_SLUG}/${grouping}/${a}/${b}`;
+
+    // Every trace is the default, and a default is not spelled out.
+    const boxes = [...document.querySelectorAll('input[name="trace_selection"]')];
+    if (boxes.length) {
+        const kept = boxes.filter(b => b.checked).map(b => window.TRACE_URL_NAMES[b.id]);
+        if (kept.length && kept.length < boxes.length) path += `/${kept.join('-')}`;
+    }
+    history.replaceState(null, '', path);
+
+    // The share button hands out a url, so it has to be the url of the chart
+    // on screen. Left as the server rendered it, it was wrong twice: it held
+    // the state the page was loaded with rather than the one the reader had
+    // moved to, and it was built from SITE_URL -- the deployment's own idea
+    // of its host, which is not necessarily the host being read.
+    //
+    // Only from here, never on load: before the first swap the server's value
+    // is the canonical form of this page, and that is a better thing to copy
+    // than whatever shorthand was typed into the address bar.
+    document.querySelector('[data-share-url]')?.setAttribute('data-share-url', location.href);
+});
 '{% if include_kpis %}'
     document.getElementById('kpi_id')?.addEventListener('change', function () {
   const event = new CustomEvent('update_event');

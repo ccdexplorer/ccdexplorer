@@ -107,6 +107,7 @@ dev-mode-dirs = [ "components", "bases", "development", "." ]
 
 [tool.polylith.bricks]
 "components/ccdexplorer/celery_app"        = "ccdexplorer/celery_app"
+"components/ccdexplorer/charts"            = "ccdexplorer/charts"
 "components/ccdexplorer/ccdscan"           = "ccdexplorer/ccdscan"
 "components/ccdexplorer/cis"               = "ccdexplorer/cis"
 "components/ccdexplorer/cns"               = "ccdexplorer/cns"

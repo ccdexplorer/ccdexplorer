@@ -13,7 +13,7 @@ from ccdexplorer.ccdexplorer_chart_bot.catalogue import (
     siblings,
 )
 
-GROUPS = {"price", "txs", "agents", "tvl", "other"}
+GROUPS = {"price", "chain", "plt", "agents", "other"}
 
 
 def _families() -> set[str]:
@@ -36,16 +36,19 @@ def test_kraken_is_now_the_price_family():
 
 def test_a_chart_in_other_has_no_siblings():
     """The regression that would give eighteen charts seventeen buttons each."""
-    chart = BY_NAME["accounts_per_day"]
+    chart = BY_NAME["accounts_growth"]
 
     assert chart.group == "other"
     assert siblings(chart) == []
 
 
-def test_only_family_members_carry_a_period():
+def test_only_interval_family_members_carry_a_period():
+    """Three shapes now. `other` is standalone charts; a spec-backed chart
+    carries its windows on its spec, not as a period; and what is left is the
+    interval families, where the period is the button's label."""
     for chart in CHARTS:
-        if chart.group == "other":
-            assert not chart.period, f"{chart.name} is in other but has a period"
+        if chart.group == "other" or chart.spec_name:
+            assert not chart.period, f"{chart.name} should carry no period"
         else:
             assert chart.period, f"{chart.name} is in a family but has no period"
 
@@ -91,6 +94,8 @@ def test_a_non_default_member_resolves_instead_of_disappearing():
     """`1d`, `90d`, `minute` and `hourly` match only non-default members."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families, search
 
+    # 90d and 365d used to be chart names; they are window_words now, and
+    # must still reach the chart whose button they name.
     for word in ("1d", "minute", "hourly", "90d", "365d"):
         assert resolve_families(search(word)), f"{word!r} resolved to nothing"
 
@@ -109,18 +114,20 @@ def test_order_is_preserved():
     resolved = resolve_families(list(CHARTS))
     order = [c.name for c in CHARTS]
 
-    assert [order.index(c.name) for c in resolved] == sorted(
-        order.index(c.name) for c in resolved
-    )
+    assert [order.index(c.name) for c in resolved] == sorted(order.index(c.name) for c in resolved)
 
 
 def test_the_whole_catalogue_resolves_to_one_per_family_plus_other():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families
 
+    # A group is a family only when its members carry a period -- `chain`,
+    # `plt` and `agents` hold one chart each and collapse to themselves, the
+    # same as everything in `other`. Counting spec-backed charts separately
+    # double-counted nearly the whole catalogue once most of them had a spec.
     families = {c.group for c in CHARTS if c.period}
-    others = [c for c in CHARTS if c.group == "other"]
+    standalone = [c for c in CHARTS if c.group not in families]
 
-    assert len(resolve_families(list(CHARTS))) == len(families) + len(others)
+    assert len(resolve_families(list(CHARTS))) == len(families) + len(standalone)
 
 
 # --- a claimed word answers with one chart ---------------------------------
@@ -150,14 +157,14 @@ def test_a_claimed_word_still_offers_the_whole_family():
 
 
 def test_an_unclaimed_word_is_unaffected():
-    """"staking" is claimed by nobody and must still return everything it matches."""
+    """ "staking" is claimed by nobody and must still return everything it matches."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
 
     assert len(search("staking")) > 1
 
 
 def test_a_word_only_some_of_which_is_claimed_does_not_narrow():
-    """"realized price" is two words; the price family claims "price" but not
+    """ "realized price" is two words; the price family claims "price" but not
     "realized", so the claim must not swallow the more specific query."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
 
@@ -167,7 +174,7 @@ def test_a_word_only_some_of_which_is_claimed_does_not_narrow():
 def test_tvl_claims_its_word_too():
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import search
 
-    assert {c.group for c in search("tvl")} == {"tvl"}
+    assert {c.group for c in search("tvl")} == {"plt"}
 
 
 def test_no_chart_carries_a_word_another_family_claims():
@@ -213,13 +220,23 @@ def test_no_description_claims_a_period_the_chart_does_not_draw():
     assert not wrong, "\n  " + "\n  ".join(wrong)
 
 
-def test_the_windows_that_group_by_week_say_so():
-    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+def test_a_spec_backed_chart_claims_no_fixed_period():
+    """These used to be four charts whose descriptions each named the bar
+    width their window implied -- "per day" for 30d, "per week" for 365d.
 
-    assert "per day" in BY_NAME["agent_registries_30d"].description
-    assert "per week" in BY_NAME["agent_registries_365d"].description
-    assert "per day" in BY_NAME["transactions_count_30d"].description
-    assert "per week" in BY_NAME["transactions_count_90d"].description
+    One chart with a grouping button cannot say that: the bar width is
+    whatever the reader last tapped, and a description insisting otherwise
+    would be wrong three times out of four. The figure's own title carries it
+    instead, which is the only place it can stay true."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS
+
+    for chart in CHARTS:
+        if not chart.spec_name:
+            continue
+        text = chart.description.lower()
+        assert "per day" not in text, chart.name
+        assert "per week" not in text, chart.name
+        assert "per month" not in text, chart.name
 
 
 def test_the_description_agrees_with_the_site_that_draws_it():

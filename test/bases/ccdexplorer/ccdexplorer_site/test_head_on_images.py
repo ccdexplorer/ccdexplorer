@@ -14,6 +14,7 @@ from starlette.testclient import TestClient
 
 from ccdexplorer.ccdexplorer_site.app.factory import allow_head_on_images
 from ccdexplorer.ccdexplorer_site.app.routers import account, og, statistics
+from ccdexplorer.ccdexplorer_site.app.routers.charts import generated
 from ccdexplorer.ccdexplorer_site.app.state import get_httpx_client
 
 import httpx2 as httpx
@@ -85,7 +86,8 @@ def test_every_real_image_route_is_covered():
     registers a card at .../card.png it will silently miss.
     """
     app = FastAPI()
-    for module in (statistics, account, og):
+    # generated too: most chart images are served from there now.
+    for module in (statistics, account, og, generated):
         app.include_router(module.router)
 
     images = [r for r in app.routes if isinstance(r, APIRoute) and r.path.endswith("image.png")]

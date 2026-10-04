@@ -1,0 +1,224 @@
+"""What a chart is, as data.
+
+Deliberately free of plotly, telegram, fastapi and pymongo: the site, the chart
+bot and the API all import this, and a component that dragged any of those in
+would make every one of them heavier for nothing.
+
+The important field is `Series.agg`. Some series are flows -- a count
+accumulated during that day -- and summing them over a week is right. Others
+are levels, a snapshot of the world at day's end, and summing those produces a
+number seven times too large on a chart that looks entirely normal. It has no
+default for that reason.
+"""
+
+import datetime as dt
+import re
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+class Agg(str, Enum):
+    """How one series collapses from days into a bucket."""
+
+    SUM = "sum"  # flows: fees, transaction counts
+    LAST = "last"  # levels: validator count, balances
+    MEAN = "mean"  # ratios and averages
+    DELTA_OF_LAST = "delta_of_last"  # growth derived from a cumulative level
+
+
+class Grouping(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+
+
+class Window(str, Enum):
+    D30 = "30d"
+    D90 = "90d"
+    Y1 = "1y"
+    ALL = "all"
+
+    def days(self) -> int | None:
+        """How far back this window reaches, or None for all of history."""
+        return {"30d": 30, "90d": 90, "1y": 365, "all": None}[self.value]
+
+
+class Kind(str, Enum):
+    BAR = "bar"
+    STACKED_BAR = "stacked_bar"
+    LINE = "line"
+    #: Stacked bands making up a total, where the band heights are the point.
+    AREA = "area"
+    CANDLE = "candle"
+
+
+class Series(BaseModel):
+    """One line or bar stack, and how it survives being grouped."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: str
+    label: str
+    colour: str
+    agg: Agg
+    #: What the stored number is divided by to reach the unit the chart
+    #: shows. fee_for_day is microCCD; the handwritten chart divided by a
+    #: million before drawing and the generic one has to as well.
+    scale: float = 1.0
+    #: Drawn differently from the rest of the chart. TPS is a line against
+    #: bars because 0.6 transactions a second beside fourteen million CCD is
+    #: an invisible bar, and on its own axis for the same reason.
+    kind: "Kind | None" = None
+    secondary_y: bool = False
+    #: What this trace is called in a url. The mongo field will not do: two
+    #: of them have spaces in, and amount_to_make_top_100 is not something to
+    #: put in an address. Derived from the key unless given, and never
+    #: containing the hyphen that separates traces from each other.
+    url_name: str = ""
+    #: Fields that roll up into this series, e.g. the five source columns
+    #: behind "Transfer". Empty means `key` is itself the mongo field.
+    source_fields: tuple[str, ...] = ()
+    #: Mongo stores statistics_microccd's four fields as strings; everything
+    #: else is a BSON number.
+    cast_to_double: bool = False
+    #: True when source_fields names a top-level field whose NAME contains a
+    #: dot, rather than a path into a nested document. "$gate.io" means the
+    #: `io` subfield of `gate`, so the real field reads as missing and
+    #: $ifNull quietly substitutes zero -- an exchange with a wallet drawn as
+    #: having none. The two cases look identical in the string, so the series
+    #: has to say which it means.
+    literal_field: bool = False
+    #: What an empty bucket means for this series, when that does not follow
+    #: from `agg`. A flow fills with zero -- nothing happened -- and a level
+    #: carries forward, because the validator count did not drop to zero, the
+    #: job simply did not write. Usually `agg` says which: SUM is a flow,
+    #: LAST is a level. Active addresses is the exception that forced this
+    #: field: it collapses with LAST for a mechanical reason (its source is
+    #: pre-grouped, one document per bucket) while being a per-period count.
+    #: Carrying that forward would draw a missed week at the previous week's
+    #: value, indistinguishable from real activity.
+    fills_with_zero: bool | None = None
+
+    @property
+    def short_period_understates(self) -> bool:
+        """Whether fewer days in a period makes this number smaller.
+
+        A total does: six days of fees in a seven-day bar really is less
+        than a week's worth, and the bar should say so. A snapshot does not
+        -- the week's closing validator count is Sunday's number whether or
+        not Monday was recorded -- and nor does an average.
+        """
+        return self.empty_bucket_is_zero or self.agg is Agg.DELTA_OF_LAST
+
+    @property
+    def empty_bucket_is_zero(self) -> bool:
+        if self.fills_with_zero is not None:
+            return self.fills_with_zero
+        return self.agg is Agg.SUM
+
+    @model_validator(mode="after")
+    def _default_url_name(self):
+        if not self.url_name:
+            object.__setattr__(self, "url_name", _URL_SAFE.sub("", self.key.lower()))
+        return self
+
+
+_URL_SAFE = re.compile(r"[^a-z0-9]")
+
+
+class ChartSpec(BaseModel):
+    """One chart, everywhere it appears."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str  # "transaction_fees" -- the /plots route name
+    slug: str  # "transaction-fees" -- the /charts page path
+    title: str
+    description: str  # the paragraph the site shows
+    blurb: str  # the one line an inline bot result shows
+    category: str  # chain | staking | accounts | exchanges | plt | agents
+    source: str  # the mongo `type`
+    series: tuple[Series, ...]
+    chain_start: dt.date
+
+    keywords: tuple[str, ...] = ()
+    claims: tuple[str, ...] = ()
+    #: Route names this chart supersedes. Three dashboard tiles name a route
+    #: that became a spec under a different name, and without saying so they
+    #: cannot find the page that replaced them.
+    aliases: tuple[str, ...] = ()
+    groupings: tuple[Grouping, ...] = (
+        Grouping.DAILY,
+        Grouping.WEEKLY,
+        Grouping.MONTHLY,
+    )
+    default_grouping: Grouping = Grouping.WEEKLY
+    windows: tuple[Window, ...] = (Window.D30, Window.D90, Window.Y1, Window.ALL)
+    default_window: Window = Window.Y1
+    kind: Kind = Kind.BAR
+    docs_path: str | None = None
+    mainnet_only: bool = True
+    #: Named transform the renderer runs before drawing. Three of these
+    #: charts plot a computation of their fields rather than the fields --
+    #: a percentage, a cost, a difference -- and drawing the raw columns
+    #: gives a chart of nothing: fee stabilization came out as GTU_numerator
+    #: at 1.2e19 against NRG_numerator at 1.
+    derived: str | None = None
+    #: A second collection merged in on the date. Network activity needs one:
+    #: the CCD transferred is in statistics_network_activity and the
+    #: transaction count behind its TPS line is in another collection
+    #: entirely. Its fields are named by extra_series.
+    extra_source: str | None = None
+    extra_series: tuple[Series, ...] = ()
+    #: What a derived chart draws, which is not what it reads. The reader
+    #: sees "Activity" and "TPS"; network_activity and account_transaction
+    #: are an implementation detail they never chose.
+    derived_series: tuple[Series, ...] = ()
+    #: Some of those only make sense on a log axis.
+    log_y: bool = False
+    #: Whether /{net}/charts/<slug> exists. A chart gets a spec before it gets
+    #: a page: registering it already buys the bot its buttons and the API its
+    #: aggregation rules. False keeps the gallery from linking to a 404.
+    has_page: bool = False
+    #: Whether /plots/{net}/<name>/image.png exists. False keeps the gallery
+    #: from rendering a broken thumbnail.
+    has_image: bool = False
+    #: Whether the gallery lists this chart. False for the six Kraken
+    #: intervals that are not the one it opens at: they are one chart seven
+    #: ways, and seven tiles of the same picture is not seven charts.
+    listed: bool = True
+    #: Charts whose source collection is already pre-grouped, so the grouping
+    #: picks the `type` instead of driving a $group. Active addresses are
+    #: written daily, weekly and monthly by the nightly job.
+    source_by_grouping: dict[Grouping, str] = {}
+
+    @property
+    def automatic_grouping(self) -> bool:
+        """Whether this chart picks its own resolution rather than asking.
+
+        Grouping earns a control where it changes what the number is: a
+        week of fees is not a day of fees, a week of growth is not a day of
+        growth, and a week's distinct addresses cannot be built out of
+        seven daily counts -- which is what source_by_grouping exists for.
+
+        For a closing value it changes nothing. The same measurement,
+        fewer points, so the only question is resolution, and the span
+        answers that better than the reader can. Asked, they could pick
+        monthly over thirty days and get a two-point chart.
+
+        A mean is left asking on purpose: "average over the week" is a
+        smoothing a reader may genuinely want, and the panel says so.
+        """
+        if not self.display_series or self.source_by_grouping:
+            return False
+        return all(series.agg is Agg.LAST for series in self.display_series)
+
+    @property
+    def display_series(self) -> tuple[Series, ...]:
+        """The traces the reader sees, selects and shares."""
+        return self.derived_series or self.series
+
+    def source_for(self, grouping: Grouping) -> str:
+        """The mongo `type` to read for this grouping."""
+        return self.source_by_grouping.get(grouping, self.source)

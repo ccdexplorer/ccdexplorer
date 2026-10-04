@@ -14,6 +14,10 @@ from types import SimpleNamespace
 
 import plotly.graph_objects as go
 import pytest
+
+from ccdexplorer.ccdexplorer_site.app.routers.charts import images
+from ccdexplorer.charts import ChartState, Window
+from ccdexplorer.charts.registry import BY_NAME
 from fastapi import HTTPException
 
 from ccdexplorer.ccdexplorer_site.app.routers.charts import sc_transactions_count as mod
@@ -48,23 +52,29 @@ SAMPLE = [
 WINDOWS = [30, 90, 180, 365]
 
 
+def _state_for_days(days: int) -> ChartState:
+    """The state an image request for roughly `days` would resolve to.
+
+    The enum has no 180d, so the suite's 180 maps to the 90d window the
+    retired route redirects to.
+    """
+    window = {30: Window.D30, 90: Window.D90, 180: Window.D90, 365: Window.Y1}[days]
+    return ChartState.from_query(BY_NAME["transactions_count"], {"window": window.value})
+
+
 def _request():
     return SimpleNamespace(app=SimpleNamespace(env={}))
 
 
 def test_the_builder_keeps_its_categories_and_their_order():
-    fig = mod.build_transactions_count_figure(
-        SAMPLE, theme="light", freq="D", traces=ALL_TRACES
-    )
+    fig = mod.build_transactions_count_figure(SAMPLE, theme="light", freq="D", traces=ALL_TRACES)
 
     assert [t.name for t in fig.data] == EXPECTED_TRACES
 
 
 def test_a_category_sums_its_source_columns():
     """Account is account_creation + credential_keys_updated + credentials_updated."""
-    fig = mod.build_transactions_count_figure(
-        SAMPLE, theme="light", freq="D", traces=ALL_TRACES
-    )
+    fig = mod.build_transactions_count_figure(SAMPLE, theme="light", freq="D", traces=ALL_TRACES)
     account = next(t for t in fig.data if t.name == "Account")
 
     assert list(account.y) == [3, 2]
@@ -74,18 +84,14 @@ def test_a_missing_source_column_does_not_break_the_category():
     """add_if_present skips columns the window has no rows for."""
     data = [{"date": "2026-09-01", "account_creation": 1}]
 
-    fig = mod.build_transactions_count_figure(
-        data, theme="light", freq="D", traces=ALL_TRACES
-    )
+    fig = mod.build_transactions_count_figure(data, theme="light", freq="D", traces=ALL_TRACES)
     account = next(t for t in fig.data if t.name == "Account")
 
     assert list(account.y) == [1]
 
 
 def test_the_page_can_still_choose_fewer_traces():
-    fig = mod.build_transactions_count_figure(
-        SAMPLE, theme="light", freq="D", traces=["transfer"]
-    )
+    fig = mod.build_transactions_count_figure(SAMPLE, theme="light", freq="D", traces=["transfer"])
 
     assert [t.name for t in fig.data] == ["Transfer"]
 
@@ -116,11 +122,16 @@ async def test_the_image_route_asks_for_its_own_window(days, monkeypatch):
     monkeypatch.setattr(mod, "get_theme_from_request", fake_theme)
     monkeypatch.setattr(mod, "return_plot_response", fake_response)
 
-    await mod.transactions_count_image(_request(), "mainnet", days)
+    await mod.transactions_count_image(_request(), "mainnet", _state_for_days(days))
 
     assert seen["analysis"] == "statistics_mongo_transactions"
-    span = dt.date.fromisoformat(seen["end"]) - dt.date.fromisoformat(seen["start"])
-    assert span.days == days
+    # Against the state the request resolved to, not the raw `days`: the enum
+    # has no 180d window, and a chart whose history is shorter than the window
+    # is clamped to its own chain start rather than asking for data that
+    # cannot exist.
+    state = _state_for_days(days)
+    assert dt.date.fromisoformat(seen["start"]) == state.start
+    assert dt.date.fromisoformat(seen["end"]) == state.end
     assert seen["traces"] == EXPECTED_TRACES, "the image route must show every category"
 
 
@@ -132,11 +143,34 @@ async def test_a_non_mainnet_net_is_refused():
     assert exc.value.status_code == 404
 
 
+def test_the_parameterised_image_route_is_served_by_the_generated_router():
+    """One route per window became one route with parameters -- and then
+    those routes moved to charts/generated.py, which registers the same
+    shape for every spec. This module kept registering them too, and because
+    its router is included first it won every request: the chart rendered
+    through the old handler, whose theme falls back to dark, so it arrived
+    in Telegram as a black rectangle. Only the legacy redirects stay here.
+    """
+    from ccdexplorer.ccdexplorer_site.app.routers.charts import generated
+
+    mine = {getattr(r, "path", "") for r in mod.router.routes}
+    theirs = {getattr(r, "path", "") for r in generated.router.routes}
+
+    assert "/plots/{net}/transactions_count/image.png" not in mine
+    assert "/plots/{net}/transactions_count/image.png" in theirs
+    assert "/plots/{net}/transactions_count_{window}/image.png" in mine, (
+        "the legacy redirect went too"
+    )
+
+
 @pytest.mark.parametrize("days", WINDOWS)
-def test_every_window_has_a_route(days):
+def test_every_old_window_name_still_resolves(days):
+    """The retired names are in Telegram's file cache and in shared links, so
+    they redirect rather than 404."""
     paths = {getattr(r, "path", "") for r in mod.router.routes}
 
-    assert f"/plots/{{net}}/transactions_count_{days}d/image.png" in paths
+    assert "/plots/{net}/transactions_count_{window}/image.png" in paths
+    assert images.legacy_redirect_target("mainnet", "transactions_count", f"{days}d") is not None
 
 
 def test_the_title_still_says_what_a_bar_covers():

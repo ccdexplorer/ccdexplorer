@@ -40,9 +40,7 @@ async def get_node(
     )
     node = api_result.return_value if api_result.ok else None
     request.state.api_calls = {}
-    request.state.api_calls["Node Info"] = (
-        f"{request.app.api_url}/docs#/Misc/get_node_info"
-    )
+    request.state.api_calls["Node Info"] = f"{request.app.api_url}/docs#/Misc/get_node_info"
 
     return request.app.templates.TemplateResponse(
         request,
