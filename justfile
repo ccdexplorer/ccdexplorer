@@ -91,12 +91,32 @@ site:
 mcp:
     uvicorn projects.ccdexplorer_mcp.asgi:app --loop asyncio --port 8765
 
+# Telegram fetches chart images by url from its own servers, so a site on
+# 127.0.0.1 gives a bot whose every answer is a broken image. The quick
+# tunnel is what makes the local site reachable.
+
+# Chart bot against the local site, over a Cloudflare quick tunnel
+bot-tunnel:
+    ./scripts/bot-tunnel.sh
+
 # Playwright end-to-end tests for ccdexplorer_site (headless)
 e2e:
     cd e2e && npm test
 
 accounts:
     python -m bases.ccdexplorer.accounts_retrieval
+
+# On demand rather than on every commit: the eight pickles total ~79MB and are
+# tracked, so regenerating them per commit would add that much binary to
+# history each time, and would make committing require a live database.
+
+# Redraw the charts index covers (greyscale pngs, one per category)
+chart-covers:
+    uv run python bases/ccdexplorer/ccdexplorer_site/covers/make_chart_covers.py
+
+# Refresh the address->index pickles the site loads at boot (live Mongo, all nets)
+addresses:
+    uv run python bases/ccdexplorer/ccdexplorer_site/addresses/get_addresses_from_collection.py
 
 # --- Devnet ---
 

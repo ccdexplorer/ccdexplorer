@@ -17,7 +17,12 @@ chart added or removed there fails here rather than quietly going missing.
 
 import re
 import time
-from dataclasses import dataclass
+
+from pydantic import BaseModel, ConfigDict
+
+from ccdexplorer.charts import ChartSpec, ChartState, Grouping, Window, chart_path
+from ccdexplorer.charts.registry import BY_NAME as SPEC_BY_NAME
+from ccdexplorer.charts.registry import spec_for_plot
 
 #: Every chart is mainnet-only. The routes exist for other nets and answer 200
 #: with an HTML error page rather than an image, which would reach Telegram as
@@ -36,9 +41,12 @@ THEME = "light"
 #: has to be revised whenever the list grows is a number that will not be.
 MAX_RESULTS = 50
 
+#: Prefix on callback_data, which Telegram caps at 64 bytes. Chart names are
+#: well inside that, so the name itself is the payload.
+CALLBACK_PREFIX = "c:"
 
-@dataclass(frozen=True)
-class Chart:
+
+class Chart(BaseModel):
     """One chart, and the words somebody might reach for to find it.
 
     ``keywords`` exists because the route names are ours, not the reader's.
@@ -47,6 +55,8 @@ class Chart:
     explicitly rather than guessed at by a fuzzy matcher -- a wrong fuzzy match
     is worse than no match, because the reader sends the wrong chart.
     """
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     title: str
@@ -74,71 +84,207 @@ class Chart:
     #: chart (PLOT_IMAGE_TTL_BY_CHART): sooner and Telegram refetches an image
     #: that has not been redrawn, later and the chart lags for no reason.
     refresh_seconds: int = 3600
+    #: The ChartSpec this chart is drawn from, for the charts that have been
+    #: migrated. None for the twenty-five that have not: those keep their own
+    #: title, keywords and interval family until Plan 2 moves them.
+    spec_name: str | None = None
+    #: Searchable words that are not keywords proper -- the window names a
+    #: reader may still type after the per-window routes went away.
+    window_words: tuple[str, ...] = ()
+
+    @property
+    def spec(self) -> ChartSpec | None:
+        return SPEC_BY_NAME.get(self.spec_name) if self.spec_name else None
 
     def image_url(self, site_url: str, now: float | None = None) -> str:
-        """The site url for this chart's png, in a form Telegram will refetch.
-
-        The bucket is what makes it refetch. It is deliberately coarse: a url
-        that changed on every call would cost a download per message and throw
-        away the file reuse that makes sending one cheap. `now` is injectable so
-        the bucketing can be tested without waiting for a clock.
-        """
-        bucket = int((time.time() if now is None else now) // self.refresh_seconds)
-        return (
-            f"{site_url.rstrip('/')}/plots/{NET}/{self.name}"
-            f"/image.png?theme={THEME}&t={bucket}"
-        )
+        """Kept for the charts that carry no state. See image_url() below."""
+        return image_url(self, site_url, None, now)
 
     def page_url(self, site_url: str) -> str:
-        return f"{site_url.rstrip('/')}/plots/{NET}/{self.name}"
+        return page_url(self, site_url, None)
+
+
+def state_for(
+    chart: Chart, window: Window | None = None, grouping: Grouping | None = None
+) -> ChartState | None:
+    """The state a spec-backed chart should be drawn in, or None without a spec."""
+    spec = chart.spec
+    if spec is None:
+        return None
+    return ChartState.from_query(
+        spec,
+        {
+            "window": (window or spec.default_window).value,
+            "grouping": (grouping or spec.default_grouping).value,
+        },
+    )
+
+
+def _bucket(chart: Chart, now: float | None) -> int:
+    """What makes Telegram refetch.
+
+    Telegram downloads a photo url once and serves its own stored copy every
+    later time it is handed the same url, so a url that never changes is a
+    chart that never updates. Deliberately coarse: a url that changed on every
+    call would cost a download per message and throw away the file reuse that
+    makes sending one cheap.
+    """
+    return int((time.time() if now is None else now) // chart.refresh_seconds)
+
+
+def image_url(
+    chart: Chart, site_url: str, state: ChartState | None = None, now: float | None = None
+) -> str:
+    """The site url for this chart's png, in a form Telegram will refetch.
+
+    The state goes in the path, the same shape as the chart's page. What
+    stays in the query is what is not an address: the theme, a rendering
+    preference with a working default, and the bucket, which exists so the
+    url stops matching when the chart has been redrawn.
+    """
+    from ccdexplorer.charts.paths import format_month
+
+    # No theme: light is what a request carrying neither a parameter nor a
+    # cookie gets, and Telegram sends neither. One parameter left, and it is
+    # the one whose whole job is to stop the url matching.
+    query = f"t={_bucket(chart, now)}"
+    base = f"{site_url.rstrip('/')}/plots/{NET}/{chart.name}"
+    if state is None or chart.spec is None:
+        # Its route takes no state, so there is none to put in the path.
+        return f"{base}/image.png?{query}"
+    return (
+        f"{base}/{state.grouping.value}"
+        f"/{format_month(state.start)}/{format_month(state.end)}/image.png?{query}"
+    )
+
+
+def page_for(chart: Chart) -> ChartSpec | None:
+    """The configurable page behind this chart, if one exists.
+
+    Resolved through the registry rather than through spec_name, because a
+    chart can have a page long before its image route takes parameters. Those
+    charts get no buttons -- their /plots route would ignore them -- but the
+    caption should still lead somewhere a reader can change the range.
+    """
+    spec = chart.spec or spec_for_plot(chart.name)
+    return spec if spec is not None and spec.has_page else None
+
+
+def page_url(chart: Chart, site_url: str, state: ChartState | None = None) -> str:
+    """The page to open, carrying what the reader is already looking at.
+
+    A path, like everywhere else: this is the one url a reader actually sees
+    and might keep.
+    """
+    spec = page_for(chart)
+    if spec is None:
+        # No page to send them to -- an intraday chart has nothing to
+        # configure -- so the image's own url stands.
+        return f"{site_url.rstrip('/')}/plots/{NET}/{chart.name}"
+    return f"{site_url.rstrip('/')}{chart_path(spec, state, net=NET)}"
+
+
+def callback_data(chart: Chart, window: Window, grouping: Grouping) -> str:
+    return f"{CALLBACK_PREFIX}{chart.name}:{window.value}:{grouping.value}"
+
+
+#: What the twelve retired family buttons meant. Their urls redirect; their
+#: callback payloads have to resolve too, because a button tapped in a
+#: months-old message would otherwise answer "That chart is no longer
+#: available" about a chart that very much is. 180d has no exact Window; 90d
+#: is the nearest that does not overstate it, matching the url redirect.
+_RETIRED_WINDOWS = {"30d": "30d", "90d": "90d", "180d": "90d", "365d": "1y"}
+
+
+def _retired(name: str):
+    """(chart, state) for a payload naming a chart that was folded into a spec."""
+    base, _, suffix = name.rpartition("_")
+    target = _RETIRED_WINDOWS.get(suffix)
+    if target is None:
+        return None
+    chart = BY_NAME.get(base)
+    if chart is None or chart.spec is None:
+        return None
+    return chart, state_for(chart, Window(target))
+
+
+def parse_callback(data: str):
+    """(chart, state) for a button press, or None if it is stale.
+
+    Two payload shapes, because buttons already sitting in people's chats
+    carry the old one: a bare name for a chart with no spec, and
+    name:window:grouping for one that has.
+    """
+    if not data.startswith(CALLBACK_PREFIX):
+        return None
+    parts = data[len(CALLBACK_PREFIX) :].split(":")
+    chart = BY_NAME.get(parts[0])
+    if chart is None:
+        retired = _retired(parts[0])
+        if retired is None:
+            return None
+        return retired
+    if len(parts) == 1:
+        return chart, None
+    if len(parts) != 3 or chart.spec is None:
+        return None
+    try:
+        return chart, state_for(chart, Window(parts[1]), Grouping(parts[2]))
+    except ValueError:
+        return None
+
+
+#: The charts drawn from a ChartSpec, in catalogue order. The rest keep their
+#: own entries until Plan 2 migrates them.
+SPEC_BACKED = ("transactions_count", "plt_tvl", "agent_registries")
 
 
 CHARTS: tuple[Chart, ...] = (
     Chart(
-        "ccd_kraken_1m",
-        "CCD on Kraken, 1m",
-        "1m candles and volume from the order book",
-        ("price", "ccd", "usd", "value", "chart", "kraken", "minute", "candles", "ohlc"),
+        name="ccd_kraken_1m",
+        title="CCD on Kraken, 1m",
+        description="1m candles and volume from the order book",
+        keywords=("price", "ccd", "usd", "value", "chart", "kraken", "minute", "candles", "ohlc"),
         group="price",
         claims=("price", "ccd", "usd", "value"),
         period="1m",
         refresh_seconds=60,
     ),
     Chart(
-        "ccd_kraken_5m",
-        "CCD on Kraken, 5m",
-        "5m candles and volume from the order book",
-        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
+        name="ccd_kraken_5m",
+        title="CCD on Kraken, 5m",
+        description="5m candles and volume from the order book",
+        keywords=("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="price",
         claims=("price", "ccd", "usd", "value"),
         period="5m",
         refresh_seconds=300,
     ),
     Chart(
-        "ccd_kraken_15m",
-        "CCD on Kraken, 15m",
-        "15m candles and volume from the order book",
-        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
+        name="ccd_kraken_15m",
+        title="CCD on Kraken, 15m",
+        description="15m candles and volume from the order book",
+        keywords=("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="price",
         claims=("price", "ccd", "usd", "value"),
         period="15m",
         refresh_seconds=900,
     ),
     Chart(
-        "ccd_kraken_30m",
-        "CCD on Kraken, 30m",
-        "30m candles and volume from the order book",
-        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
+        name="ccd_kraken_30m",
+        title="CCD on Kraken, 30m",
+        description="30m candles and volume from the order book",
+        keywords=("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc"),
         group="price",
         claims=("price", "ccd", "usd", "value"),
         period="30m",
         refresh_seconds=1800,
     ),
     Chart(
-        "ccd_kraken_1h",
-        "CCD on Kraken, 1h",
-        "Hourly candles and volume from the order book",
-        (
+        name="ccd_kraken_1h",
+        title="CCD on Kraken, 1h",
+        description="Hourly candles and volume from the order book",
+        keywords=(
             "price",
             "ccd",
             "usd",
@@ -157,10 +303,10 @@ CHARTS: tuple[Chart, ...] = (
         period="1h",
     ),
     Chart(
-        "ccd_kraken_4h",
-        "CCD on Kraken, 4h",
-        "Four-hour candles and volume from the order book",
-        (
+        name="ccd_kraken_4h",
+        title="CCD on Kraken, 4h",
+        description="Four-hour candles and volume from the order book",
+        keywords=(
             "price",
             "ccd",
             "usd",
@@ -179,10 +325,10 @@ CHARTS: tuple[Chart, ...] = (
         default=True,
     ),
     Chart(
-        "ccd_kraken_1d",
-        "CCD on Kraken, daily",
-        "Daily candles and volume from the order book",
-        (
+        name="ccd_kraken_1d",
+        title="CCD on Kraken, daily",
+        description="Daily candles and volume from the order book",
+        keywords=(
             "price",
             "ccd",
             "usd",
@@ -201,241 +347,179 @@ CHARTS: tuple[Chart, ...] = (
         period="1d",
     ),
     Chart(
-        "staking_percentage_staked",
-        "Percentage staked",
-        "Share of all CCD that is staked",
-        ("staked", "percentage", "ratio", "share", "supply", "staking"),
+        name="staking_percentage_staked",
+        title="Percentage staked",
+        description="Share of all CCD that is staked",
+        keywords=("staked", "percentage", "ratio", "share", "supply", "staking"),
+        group="other",
+        spec_name="staking_percentage_staked",
+    ),
+    Chart(
+        name="staking_validator_count",
+        title="Validator count",
+        description="Validators over time",
+        keywords=("validators", "bakers", "nodes", "count", "staking"),
+        group="other",
+        spec_name="staking_validator_count",
+    ),
+    Chart(
+        name="staking_delegator_count",
+        title="Delegator count",
+        description="Delegators over time",
+        keywords=("delegators", "delegation", "count", "staking"),
+        group="other",
+        spec_name="staking_delegator_count",
+    ),
+    Chart(
+        name="staking_open_pool_count",
+        title="Open pools",
+        description="Pools open for delegation over time",
+        keywords=("pools", "open", "delegation", "staking"),
+        group="other",
+        spec_name="staking_open_pool_count",
+    ),
+    Chart(
+        name="staking_validator_staked_amounts",
+        title="Validator stake",
+        description="What validators have staked",
+        keywords=("validators", "bakers", "stake", "amounts", "staking"),
         group="other",
     ),
     Chart(
-        "staking_validator_count",
-        "Validator count",
-        "Validators over time",
-        ("validators", "bakers", "nodes", "count", "staking"),
+        name="staking_restaked_rewards",
+        title="Restaked rewards",
+        description="Share of daily rewards restaked",
+        keywords=("restake", "compounding", "rewards", "staking"),
         group="other",
+        spec_name="staking_restaked_rewards",
     ),
     Chart(
-        "staking_delegator_count",
-        "Delegator count",
-        "Delegators over time",
-        ("delegators", "delegation", "count", "staking"),
+        name="staking_distribution_of_rewards",
+        title="Reward distribution",
+        description="Daily breakdown of rewards",
+        keywords=("rewards", "distribution", "payday", "staking", "earnings"),
         group="other",
+        spec_name="staking_distribution_of_rewards",
     ),
     Chart(
-        "staking_open_pool_count",
-        "Open pools",
-        "Pools open for delegation over time",
-        ("pools", "open", "delegation", "staking"),
+        name="staking_avg_delegator_stake",
+        title="Average delegator stake",
+        description="Average stake per delegator",
+        keywords=("average", "delegator", "stake", "mean", "staking"),
         group="other",
+        spec_name="staking_avg_delegator_stake",
     ),
     Chart(
-        "staking_validator_staked_amounts",
-        "Validator stake",
-        "What validators have staked",
-        ("validators", "bakers", "stake", "amounts", "staking"),
+        name="staking_avg_delegator_per_pool_count",
+        title="Delegators per pool",
+        description="Average number of delegators in a pool",
+        keywords=("average", "delegators", "pool", "mean", "staking"),
         group="other",
+        spec_name="staking_avg_delegator_per_pool_count",
     ),
     Chart(
-        "staking_restaked_rewards",
-        "Restaked rewards",
-        "Share of daily rewards restaked",
-        ("restake", "compounding", "rewards", "staking"),
+        name="accounts_growth",
+        title="Accounts growth",
+        description="New accounts created over time",
+        # "per day" stays a keyword although the chart no longer is: the
+        # grouping is a button now, but it is still what people type.
+        keywords=("accounts", "new", "growth", "signups", "users", "adoption", "per", "day"),
         group="other",
+        spec_name="accounts_growth",
     ),
     Chart(
-        "staking_distribution_of_rewards",
-        "Reward distribution",
-        "Daily breakdown of rewards",
-        ("rewards", "distribution", "payday", "staking", "earnings"),
+        name="network_activity",
+        title="Network activity",
+        description="CCD transferred, and transactions per second",
+        keywords=("tps", "throughput", "activity", "volume", "speed", "usage"),
         group="other",
+        spec_name="network_activity",
     ),
     Chart(
-        "staking_avg_delegator_stake",
-        "Average delegator stake",
-        "Average stake per delegator",
-        ("average", "delegator", "stake", "mean", "staking"),
+        name="transaction_fees",
+        title="Transaction fees",
+        description="Fees paid on the chain over time",
+        keywords=("fees", "revenue", "paid", "cost", "transactions"),
         group="other",
+        spec_name="transaction_fees",
     ),
     Chart(
-        "staking_avg_delegator_per_pool_count",
-        "Delegators per pool",
-        "Average number of delegators in a pool",
-        ("average", "delegators", "pool", "mean", "staking"),
+        name="fee_stabilization",
+        title="Fee stabilization",
+        description="Cost of a regular transfer over time",
+        keywords=("fees", "cost", "transfer", "stable", "cheap"),
         group="other",
+        spec_name="fee_stabilization",
     ),
     Chart(
-        "accounts_per_day",
-        "Accounts per day",
-        "New accounts created each day",
-        ("accounts", "new", "growth", "signups", "users", "adoption"),
+        name="daily_limits",
+        title="Daily limits",
+        description="CCD needed to reach the top 100 and top 250",
+        keywords=("rich", "top", "whales", "leaderboard", "ranking", "holders"),
         group="other",
+        spec_name="daily_limits",
     ),
     Chart(
-        "network_activity_tps",
-        "Network activity",
-        "CCD transferred per day, and TPS",
-        ("tps", "throughput", "activity", "volume", "speed", "usage"),
+        name="realized_prices",
+        title="Realized price",
+        description="Average price at which coins last moved",
+        keywords=("realized", "valuation", "cost", "basis", "market"),
         group="other",
+        spec_name="realized_prices",
     ),
     Chart(
-        "transaction_types",
-        "Transaction types",
-        "Transactions by high-level type",
-        ("types", "breakdown", "mix", "transactions", "kinds"),
+        name="ccd_on_exchanges",
+        title="CCD on exchanges",
+        description="Balance held on exchange wallets",
+        keywords=("exchanges", "cex", "listed", "custody", "binance"),
         group="other",
+        spec_name="ccd_on_exchanges",
     ),
     Chart(
-        "transaction_fees",
-        "Transaction fees",
-        "Fees paid on the chain over time",
-        ("fees", "revenue", "paid", "cost", "transactions"),
+        name="exchange_wallets",
+        title="Exchange wallets",
+        description="Count of exchange wallets over time",
+        keywords=("exchanges", "wallets", "aliases", "custody"),
         group="other",
+        spec_name="exchange_wallets",
+    ),
+    # The three families that have specs. One entry each instead of four:
+    # the windows are a button row now, not four route names.
+    Chart(
+        name="transactions_count",
+        title="Transactions",
+        description="Transactions by category",
+        keywords=("txs", "tx", "transactions", "count", "volume", "activity"),
+        group="chain",
+        claims=("txs",),
+        # The window used to be part of the chart name, so "/c 90d" found
+        # one. It is a button now; the words stay searchable.
+        window_words=("30d", "90d", "180d", "365d", "1y"),
+        spec_name="transactions_count",
     ),
     Chart(
-        "fee_stabilization",
-        "Fee stabilization",
-        "Cost of a regular transfer over time",
-        ("fees", "cost", "transfer", "stable", "cheap"),
-        group="other",
+        name="plt_tvl",
+        title="PLT stablecoin TVL",
+        description="Total value locked in PLT stablecoins, in USD",
+        keywords=("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
+        group="plt",
+        claims=("tvl",),
+        # The window used to be part of the chart name, so "/c 90d" found
+        # one. It is a button now; the words stay searchable.
+        window_words=("30d", "90d", "180d", "365d", "1y"),
+        spec_name="plt_tvl",
     ),
     Chart(
-        "daily_limits",
-        "Daily limits",
-        "CCD needed to reach the top 100 and top 250",
-        ("rich", "top", "whales", "leaderboard", "ranking", "holders"),
-        group="other",
-    ),
-    Chart(
-        "realized_prices",
-        "Realized price",
-        "Average price at which coins last moved",
-        ("realized", "valuation", "cost", "basis", "market"),
-        group="other",
-    ),
-    Chart(
-        "ccd_on_exchanges",
-        "CCD on exchanges",
-        "Balance held on exchange wallets",
-        ("exchanges", "cex", "listed", "custody", "binance"),
-        group="other",
-    ),
-    Chart(
-        "exchange_wallets",
-        "Exchange wallets",
-        "Count of exchange wallets over time",
-        ("exchanges", "wallets", "aliases", "custody"),
-        group="other",
-    ),
-    Chart(
-        "agent_registries_30d",
-        "Agent registries, 30d",
-        "Agents registered per day on CIS-8004 contracts",
-        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
+        name="agent_registries",
+        title="Agent registries",
+        description="Agents registered on CIS-8004 contracts",
+        keywords=("agents", "agent", "registry", "registries", "cis8004", "registered"),
         group="agents",
         claims=("agents", "registries"),
-        period="30d",
-        default=True,
-    ),
-    Chart(
-        "agent_registries_90d",
-        "Agent registries, 90d",
-        "Agents registered per week on CIS-8004 contracts",
-        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
-        group="agents",
-        claims=("agents", "registries"),
-        period="90d",
-    ),
-    Chart(
-        "agent_registries_180d",
-        "Agent registries, 180d",
-        "Agents registered per week on CIS-8004 contracts",
-        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
-        group="agents",
-        claims=("agents", "registries"),
-        period="180d",
-    ),
-    Chart(
-        "agent_registries_365d",
-        "Agent registries, 365d",
-        "Agents registered per week on CIS-8004 contracts",
-        ("agents", "agent", "registry", "registries", "cis8004", "registered"),
-        group="agents",
-        claims=("agents", "registries"),
-        period="365d",
-    ),
-    Chart(
-        "plt_tvl_30d",
-        "PLT stablecoin TVL, 30d",
-        "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
-        group="tvl",
-        claims=("tvl",),
-        period="30d",
-        default=True,
-    ),
-    Chart(
-        "plt_tvl_90d",
-        "PLT stablecoin TVL, 90d",
-        "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
-        group="tvl",
-        claims=("tvl",),
-        period="90d",
-    ),
-    Chart(
-        "plt_tvl_180d",
-        "PLT stablecoin TVL, 180d",
-        "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
-        group="tvl",
-        claims=("tvl",),
-        period="180d",
-    ),
-    Chart(
-        "plt_tvl_365d",
-        "PLT stablecoin TVL, 365d",
-        "Total value locked in PLT stablecoins, in USD",
-        ("tvl", "locked", "stablecoin", "stablecoins", "plt", "supply"),
-        group="tvl",
-        claims=("tvl",),
-        period="365d",
-    ),
-    Chart(
-        "transactions_count_30d",
-        "Transactions, 30d",
-        "Transactions per day, by category",
-        ("txs", "tx", "transactions", "count", "volume", "activity"),
-        group="txs",
-        claims=("txs",),
-        period="30d",
-        default=True,
-    ),
-    Chart(
-        "transactions_count_90d",
-        "Transactions, 90d",
-        "Transactions per week, by category",
-        ("txs", "tx", "transactions", "count", "volume", "activity"),
-        group="txs",
-        claims=("txs",),
-        period="90d",
-    ),
-    Chart(
-        "transactions_count_180d",
-        "Transactions, 180d",
-        "Transactions per week, by category",
-        ("txs", "tx", "transactions", "count", "volume", "activity"),
-        group="txs",
-        claims=("txs",),
-        period="180d",
-    ),
-    Chart(
-        "transactions_count_365d",
-        "Transactions, 365d",
-        "Transactions per week, by category",
-        ("txs", "tx", "transactions", "count", "volume", "activity"),
-        group="txs",
-        claims=("txs",),
-        period="365d",
+        # The window used to be part of the chart name, so "/c 90d" found
+        # one. It is a button now; the words stay searchable.
+        window_words=("30d", "90d", "180d", "365d", "1y"),
+        spec_name="agent_registries",
     ),
 )
 
@@ -532,8 +616,7 @@ def search(query: str, limit: int = MAX_RESULTS) -> list[Chart]:
     # Filtered after ranking, never instead of it, so the family still leads
     # with the interval it opens at.
     claimed = [
-        row for row in matched
-        if row[2].claims and all(term in row[2].claims for term in terms)
+        row for row in matched if row[2].claims and all(term in row[2].claims for term in terms)
     ]
     if claimed:
         matched = claimed
@@ -551,7 +634,9 @@ def _rank(terms: list[str], require_all: bool) -> list[tuple[tuple[int, int], st
     scored: list[tuple[int, str, Chart]] = []
     for chart in CHARTS:
         name = chart.name.lower()
-        haystack = " ".join((chart.name, chart.title, chart.description, *chart.keywords)).lower()
+        haystack = " ".join(
+            (chart.name, chart.title, chart.description, *chart.keywords, *chart.window_words)
+        ).lower()
         hits = sum(term in haystack for term in terms)
         if hits == 0 or (require_all and hits < len(terms)):
             continue

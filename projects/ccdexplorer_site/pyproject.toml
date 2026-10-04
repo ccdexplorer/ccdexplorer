@@ -70,6 +70,7 @@ dependencies = [
 [tool.polylith.bricks]
 "../../bases/ccdexplorer/ccdexplorer_site" = "ccdexplorer/ccdexplorer_site"
 "../../bases/ccdexplorer/ccdexplorer_api"  = "ccdexplorer/ccdexplorer_api"
+"../../components/ccdexplorer/charts"      = "ccdexplorer/charts"
 "../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
 "../../components/ccdexplorer/env"         = "ccdexplorer/env"
 "../../components/ccdexplorer/site_user"   = "ccdexplorer/site_user"

@@ -21,7 +21,15 @@ import logging
 
 from telegram.constants import ParseMode
 
-from .catalogue import Chart, resolve_families, search, siblings
+from .catalogue import (
+    Chart,
+    image_url,
+    page_url,
+    resolve_families,
+    search,
+    siblings,
+    state_for,
+)
 from .direct import keyboard_for
 
 log = logging.getLogger(__name__)
@@ -39,7 +47,8 @@ PHOTO_HEIGHT = 630
 
 def photo_result(chart: Chart, site_url: str) -> InlineQueryResultPhoto:
     """One chart, as a photo Telegram will fetch for itself."""
-    image = chart.image_url(site_url)
+    state = state_for(chart)
+    image = image_url(chart, site_url, state)
     return InlineQueryResultPhoto(
         id=chart.name,
         photo_url=image,
@@ -48,12 +57,20 @@ def photo_result(chart: Chart, site_url: str) -> InlineQueryResultPhoto:
         photo_height=PHOTO_HEIGHT,
         title=chart.title,
         description=chart.description,
-        caption=f"<b>{chart.title}</b> — {chart.description}\n{chart.page_url(site_url)}",
+        caption=f"<b>{chart.title}</b> — {chart.description}\n{page_url(chart, site_url, state)}",
         parse_mode=ParseMode.HTML,
         # Only the interval series carry a keyboard here. A one-off chart sent
         # into someone else's conversation does not need a button, and the
         # "send to a chat" button makes no sense once it is already in one.
-        reply_markup=keyboard_for(chart, send_button=False) if len(siblings(chart)) > 1 else None,
+        # A spec-backed chart always carries its window and grouping rows; an
+        # unmigrated one only gets a keyboard if it has intervals to switch
+        # between. The "send to a chat" button makes no sense once it is
+        # already in one.
+        reply_markup=(
+            keyboard_for(chart, state, send_button=False)
+            if chart.spec is not None or len(siblings(chart)) > 1
+            else None
+        ),
     )
 
 

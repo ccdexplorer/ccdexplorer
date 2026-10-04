@@ -1,29 +1,26 @@
 import datetime as dt
 
-import dateutil
 import pandas as pd
-from typing import Optional
 import plotly.graph_objects as go
-from ccdexplorer.site_user import SiteUser
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
-from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_AccountTransactionEffects,
-    CCD_RejectReason,
-)
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
-import uuid
 
+
+from ccdexplorer.charts import ChartState
+from ccdexplorer.ccdexplorer_site.app.routers.charts.images import (
+    freq_and_period,
+    legacy_redirect_target,
+    subtitle_for,
+)
 
 from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
-    image_freq,
-    image_period,
 )
-from ccdexplorer.ccdexplorer_site.app.state import get_user_detailsv2
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    parse_slider_date,
     get_theme_from_request,
     get_url_from_api,
     return_plot_response,
@@ -31,41 +28,6 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
 from fastapi import HTTPException
 
 router = APIRouter()
-
-
-@router.get("/{net}/charts/transactions-count", response_class=HTMLResponse)
-async def get_sc_transactions_count(
-    request: Request,
-    net: str,
-):
-    user: SiteUser | None = await get_user_detailsv2(request)
-    chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
-    yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime("%Y-%m-%d")
-
-    dropdown_elements = [
-        "account",
-        "staking",
-        "smart ctr",
-        "transfer",
-        "register data",
-    ]
-    filename = (
-        f"/tmp/transactions-types - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
-    )
-    return request.app.templates.TemplateResponse(
-        request,
-        "charts/sc_transactions_count.html",
-        {
-            "request": request,
-            "env": request.app.env,
-            "user": user,
-            "net": net,
-            "chain_start": chain_start,
-            "yesterday": yesterday,
-            "dropdown_elements": dropdown_elements,
-            "filename": filename,
-        },
-    )
 
 
 class TXCountReportingRequest(BaseModel):
@@ -102,10 +64,10 @@ async def ajax_transaction_types_reporting(
 
     start_date_str = post_data.start_date
     end_date_str = post_data.end_date
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = parse_slider_date(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = parse_slider_date(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")
@@ -187,10 +149,10 @@ async def statistics_network_summary_accounts_per_day_standalone(
     theme = post_data.theme
     start_date_str = post_data.start_date
     end_date_str = post_data.end_date
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = parse_slider_date(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = parse_slider_date(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")
@@ -309,22 +271,46 @@ async def statistics_network_summary_accounts_per_day_standalone(
 #: under, and its colour. One table instead of five if-blocks and a parallel
 #: dict that had to agree with them.
 TX_CATEGORIES = (
-    ("account", "Account", "#EE9B54",
-     ["account_creation", "credential_keys_updated", "credentials_updated"]),
-    ("transfer", "Transfer", "#F7D30A",
-     ["account_transfer", "transferred_to_encrypted", "transferred_to_public",
-      "encrypted_amount_transferred", "transferred_with_schedule"]),
-    ("smart ctr", "Smart Contracts", "#6E97F7",
-     ["contract_initialized", "contract_update_issued", "module_deployed"]),
-    ("staking", "Staking", "#F36F85",
-     ["baker_configured", "baker_added", "baker_removed", "baker_keys_updated",
-      "baker_restake_earnings_updated", "baker_stake_updated", "delegation_configured"]),
+    (
+        "account",
+        "Account",
+        "#EE9B54",
+        ["account_creation", "credential_keys_updated", "credentials_updated"],
+    ),
+    (
+        "transfer",
+        "Transfer",
+        "#F7D30A",
+        [
+            "account_transfer",
+            "transferred_to_encrypted",
+            "transferred_to_public",
+            "encrypted_amount_transferred",
+            "transferred_with_schedule",
+        ],
+    ),
+    (
+        "smart ctr",
+        "Smart Contracts",
+        "#6E97F7",
+        ["contract_initialized", "contract_update_issued", "module_deployed"],
+    ),
+    (
+        "staking",
+        "Staking",
+        "#F36F85",
+        [
+            "baker_configured",
+            "baker_added",
+            "baker_removed",
+            "baker_keys_updated",
+            "baker_restake_earnings_updated",
+            "baker_stake_updated",
+            "delegation_configured",
+        ],
+    ),
     ("register data", "Data", "#AE7CF7", ["data_registered"]),
 )
-
-#: The windows the chart bot's buttons offer. One route each -- see the note in
-#: sc_agent_registries.
-IMAGE_WINDOWS = (30, 90, 180, 365)
 
 
 def build_transactions_count_figure(
@@ -388,47 +374,52 @@ def build_transactions_count_figure(
     return fig
 
 
-async def transactions_count_image(request: Request, net: str, days: int):
-    """One window of the transaction counts chart, as a PNG the bot can fetch."""
+async def transactions_count_image(request: Request, net: str, state: ChartState):
+    """The transaction counts chart at the requested window and grouping."""
     if net != "mainnet":
         raise HTTPException(status_code=404, detail="Transaction counts are mainnet only.")
 
-    end = dt.date.today()
-    start = end - dt.timedelta(days=days)
     all_data = await get_all_data_for_analysis_limited(
-        "statistics_mongo_transactions", request.app, start.isoformat(), end.isoformat()
+        "statistics_mongo_transactions",
+        request.app,
+        state.start.isoformat(),
+        state.end.isoformat(),
     )
     theme = await get_theme_from_request(request)
+    freq, period = freq_and_period(state)
     fig = build_transactions_count_figure(
         all_data,
         theme=theme,
-        freq=image_freq(days),
+        freq=freq,
         traces=[key for key, _l, _c, _cols in TX_CATEGORIES],
-        subtitle=f"last {days} days",
-        per=image_period(days),
+        subtitle=subtitle_for(state),
+        per=period,
     )
-    return await return_plot_response(fig, request, f"Transactions, {days}d")
+    return await return_plot_response(fig, request, f"Transactions, {state.window.value}")
 
 
-@router.get("/plots/{net}/transactions_count_30d", response_class=Response)
-@router.get("/plots/{net}/transactions_count_30d/image.png", response_class=Response)
-async def transactions_count_30d(request: Request, net: str):
-    return await transactions_count_image(request, net, 30)
+# The /plots image routes for this chart used to live here. They moved to
+# charts/generated.py, which registers the same paths for every spec -- and
+# because this router is included first, these shadowed those and won every
+# request. The difference showed up as a theme: the generated handler reads
+# theme_from_query, which falls back to light for a request carrying neither
+# parameter nor cookie, and that is exactly what Telegram sends. These read
+# get_theme_from_request, which falls back to dark, so this chart arrived in
+# chats as a black rectangle while its neighbours arrived light.
+#
+# The legacy `<name>_<window>` redirects below stay: generated.py does not
+# register those, and the urls are in Telegram's file cache.
 
 
-@router.get("/plots/{net}/transactions_count_90d", response_class=Response)
-@router.get("/plots/{net}/transactions_count_90d/image.png", response_class=Response)
-async def transactions_count_90d(request: Request, net: str):
-    return await transactions_count_image(request, net, 90)
+@router.get("/plots/{net}/transactions_count_{window}", response_class=Response)
+@router.get("/plots/{net}/transactions_count_{window}/image.png", response_class=Response)
+async def transactions_count_legacy(request: Request, net: str, window: str):
+    """One route per window became one route with parameters.
 
-
-@router.get("/plots/{net}/transactions_count_180d", response_class=Response)
-@router.get("/plots/{net}/transactions_count_180d/image.png", response_class=Response)
-async def transactions_count_180d(request: Request, net: str):
-    return await transactions_count_image(request, net, 180)
-
-
-@router.get("/plots/{net}/transactions_count_365d", response_class=Response)
-@router.get("/plots/{net}/transactions_count_365d/image.png", response_class=Response)
-async def transactions_count_365d(request: Request, net: str):
-    return await transactions_count_image(request, net, 365)
+    These urls are in Telegram's own file cache and in links people have
+    already shared, so they redirect rather than 404.
+    """
+    target = legacy_redirect_target(net, "transactions_count", window, request.url.query)
+    if target is None:
+        raise HTTPException(status_code=404, detail="No such chart.")
+    return RedirectResponse(target, status_code=308)

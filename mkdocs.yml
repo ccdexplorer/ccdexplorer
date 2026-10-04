@@ -28,6 +28,35 @@ nav:
         - Unique Active Addresses: projects/timed_services/statistics_unique_addresses.md
         - Statistics Transaction Fees: projects/timed_services/statistics_fees.md
         - Realized Prices: projects/timed_services/statistics_realized_prices.md
+    - Charts:
+      - Chain:
+        - Transactions: charts/transactions_count.md
+        - Transaction fees: charts/transaction_fees.md
+        - Network activity: charts/network_activity.md
+        - Fee stabilization: charts/fee_stabilization.md
+      - Accounts:
+        - Accounts growth: charts/accounts_growth.md
+        - Active addresses: charts/active_addresses.md
+        - Holders: charts/holders.md
+        - Daily limits: charts/daily_limits.md
+        - Realized price: charts/realized_prices.md
+      - Staking:
+        - Validator count: charts/staking_validator_count.md
+        - Open pools: charts/staking_open_pool_count.md
+        - Delegator count: charts/staking_delegator_count.md
+        - Delegators per pool: charts/staking_avg_delegator_per_pool_count.md
+        - Average delegator stake: charts/staking_avg_delegator_stake.md
+        - Percentage staked: charts/staking_percentage_staked.md
+        - Reward distribution: charts/staking_distribution_of_rewards.md
+        - Restaked rewards: charts/staking_restaked_rewards.md
+      - Exchanges:
+        - CCD on exchanges: charts/ccd_on_exchanges.md
+        - Exchange wallets: charts/exchange_wallets.md
+        - CCD price charts: charts/ccd_price.md
+      - PLT:
+        - PLT stablecoin TVL: charts/plt_tvl.md
+      - Agents:
+        - Agent registries: charts/agent_registries.md
     - Real-time Services:
       - Heartbeat: projects/every_block/heartbeat.md
       - Block Analyzer: projects/every_block/block_analyzer.md

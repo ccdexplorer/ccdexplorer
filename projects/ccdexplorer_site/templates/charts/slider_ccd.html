@@ -33,6 +33,12 @@
         document.getElementById("event-end-ccd-pretty"),
       ]
       ccdValuesPretty[handle].innerHTML = values[handle];
+      // The number, beside the way it is written. toLocaleString() follows
+      // the browser's locale, so a French one renders 65000000 as
+      // "65 000 000 CCD" -- and the server, which strips "," and splits on
+      // a space, read that as sixty-five. The search ran, and quietly
+      // answered a different question.
+      ccdValuesPretty[handle].dataset.value = String(Math.round(unencoded[handle]));
       var event = new CustomEvent('update_event');
                   document.getElementById('update').dispatchEvent(event);
       

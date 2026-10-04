@@ -39,16 +39,42 @@
         <div class="row">
             <div class=" col-sm-6 mb-3">
               
+            {# Absent where grouping changes nothing about the number: a
+               chart of closing values redraws the same measurement at a
+               different point count, so the span picks the resolution.
+               Asked, a reader could take monthly over thirty days and
+               get a two-point chart. #}
+            {# `spec is defined` because this template is shared with the
+               handwritten pages, and the PLT one renders it without one.
+               Without the guard that page answered a 500. #}
+            {% if not (spec.automatic_grouping if spec is defined else false) %}
             <div class="btn-group-sm" role="group"  id="btnradio_grouping">
-              Group By:<input type="radio" class="btn-check" name="group_by" id="daily" autocomplete="off" checked>
+              Group By:<input type="radio" class="btn-check" name="group_by" id="daily" autocomplete="off" {% if (state.grouping.value if state else 'weekly') == 'daily' %}checked{% endif %}>
               <label class="btn btn-outline-secondary " for="daily">Daily</label>
             
-              <input type="radio" class="btn-check" name="group_by" id="weekly" autocomplete="off">
+              <input type="radio" class="btn-check" name="group_by" id="weekly" autocomplete="off" {% if (state.grouping.value if state else 'weekly') == 'weekly' %}checked{% endif %}>
               <label class="btn btn-outline-secondary " for="weekly">Weekly</label>
             
-              <input type="radio" class="btn-check" name="group_by" id="monthly" autocomplete="off">
+              <input type="radio" class="btn-check" name="group_by" id="monthly" autocomplete="off" {% if (state.grouping.value if state else 'weekly') == 'monthly' %}checked{% endif %}>
               <label class="btn btn-outline-secondary" for="monthly">Monthly</label>
             </div>
+            {% endif %}
+
+            {# What happens to the days inside a period. Obvious for a sum,
+               not for a closing value or a mean -- and that difference is
+               why some of these charts are right. #}
+            {% if aggregation_notes %}
+              <div class="small text-secondary mt-2">
+                {% for label, note in aggregation_notes %}
+                  {# No label when every trace does the same thing: the
+                     wording stands on its own rather than being repeated
+                     against names the legend already carries. #}
+                  <div>{% if label %}{{ label }}: {% endif %}<span
+                      class="fst-italic">{{ note }}</span></div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
           </div>
       
       {% if include_kpis %}

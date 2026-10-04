@@ -120,9 +120,7 @@ class TokenModuleEvent(betterproto.Message):
     details: "Cbor" = betterproto.message_field(2)
     """The CBOR encoded event details."""
 
-    token_id: Optional["TokenId"] = betterproto.message_field(
-        3, optional=True, group="_token_id"
-    )
+    token_id: Optional["TokenId"] = betterproto.message_field(3, optional=True, group="_token_id")
     """
     The Token ID of the token generating the event. In the context of a
     `TokenEvent`, this should be absent (as it is already specified). In the
@@ -158,35 +156,27 @@ class TokenTransferEvent(betterproto.Message):
     amount: "TokenAmount" = betterproto.message_field(3)
     """The amount of tokens transferred."""
 
-    memo: Optional["__v2__.Memo"] = betterproto.message_field(
-        4, optional=True, group="_memo"
-    )
+    memo: Optional["__v2__.Memo"] = betterproto.message_field(4, optional=True, group="_memo")
     """
     An optional memo field that can be used to attach a message to the token
     transfer.
     """
 
-    from_lock: Optional["LockId"] = betterproto.message_field(
-        5, optional=True, group="_from_lock"
-    )
+    from_lock: Optional["LockId"] = betterproto.message_field(5, optional=True, group="_from_lock")
     """
     When the funds originate on the locked balance of an account, the  identity
     of the lock controlling the funds. Absent when the funds are not on the
     locked balance of the originating account.
     """
 
-    to_lock: Optional["LockId"] = betterproto.message_field(
-        6, optional=True, group="_to_lock"
-    )
+    to_lock: Optional["LockId"] = betterproto.message_field(6, optional=True, group="_to_lock")
     """
     When the funds are transferred into the control of a lock, the identity of
     the lock assuming control of the funds. Absent when the funds are sent to
     the available balance of the receiving account.
     """
 
-    token_id: Optional["TokenId"] = betterproto.message_field(
-        7, optional=True, group="_token_id"
-    )
+    token_id: Optional["TokenId"] = betterproto.message_field(7, optional=True, group="_token_id")
     """
     The token being transferred. In the context of a `TokenEvent`, which
     already specifies the token, this is absent. In the context of a
@@ -207,9 +197,7 @@ class TokenSupplyUpdateEvent(betterproto.Message):
     amount: "TokenAmount" = betterproto.message_field(2)
     """The balance difference to be applied to the target."""
 
-    token_id: Optional["TokenId"] = betterproto.message_field(
-        3, optional=True, group="_token_id"
-    )
+    token_id: Optional["TokenId"] = betterproto.message_field(3, optional=True, group="_token_id")
     """
     The Token ID of the token generating the event. In the context of a
     `TokenEvent`, this should be absent (as it is already specified). In the
@@ -325,9 +313,7 @@ class TokenModuleRejectReason(betterproto.Message):
     type: str = betterproto.string_field(2)
     """The type of the reject reason."""
 
-    details: Optional["Cbor"] = betterproto.message_field(
-        3, optional=True, group="_details"
-    )
+    details: Optional["Cbor"] = betterproto.message_field(3, optional=True, group="_details")
     """(Optional) CBOR-encoded details."""
 
 

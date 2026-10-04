@@ -11,7 +11,7 @@ from ccdexplorer.ccdexplorer_chart_bot import direct
 from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS, family_default
 
 SITE = "https://ccdexplorer.io"
-CATEGORY_ORDER = ["price", "txs", "agents", "tvl", "other"]
+CATEGORY_ORDER = ["price", "chain", "plt", "agents", "other"]
 
 
 class _Message:
@@ -34,9 +34,7 @@ def _update(text=""):
 
 
 def _context(*args):
-    return SimpleNamespace(
-        bot=SimpleNamespace(username="ccdexplorer_chart_bot"), args=list(args)
-    )
+    return SimpleNamespace(bot=SimpleNamespace(username="ccdexplorer_chart_bot"), args=list(args))
 
 
 async def _run(*args):
@@ -58,10 +56,17 @@ async def test_a_family_word_opens_the_family_default():
 
 
 async def test_a_non_family_chart_is_sent_as_itself():
-    """A word matching something in `other`, which has no family default."""
-    message = await _run("exchanges")
+    """A word matching one thing in `other`, which has no family default.
+
+    Was "exchanges", which matches two charts and now opens the picker. The
+    property this guards -- that a chart outside a family is sent as itself
+    rather than resolved to some family's default -- needs a word that
+    matches exactly one.
+    """
+    message = await _run("whales")
 
     assert message.photos, "a chart in other was not sent"
+    assert "daily_limits" in message.photos[0][0]
 
 
 async def test_a_word_matching_nothing_says_so():
@@ -179,7 +184,7 @@ async def test_a_family_word_sends_the_chart_once():
 
 
 async def test_the_overflow_count_counts_what_is_left_after_collapsing():
-    """"…and 6 more" when two distinct charts remain is a lie."""
+    """ "…and 6 more" when two distinct charts remain is a lie."""
     message = await _run("price")
 
     assert not message.htmls, f"claimed there were more: {message.htmls}"
@@ -273,3 +278,150 @@ async def test_start_says_what_to_do_when_another_bot_claims_the_command():
     await main.start(SimpleNamespace(message=message), _context())
 
     assert "/ccd" in message.htmls[0] or "@" in message.htmls[0]
+
+
+# --- a word that matches more than one chart -------------------------------
+#
+# /c validator sent two charts, /c staking sent three and said "and 6 more".
+# A wall of near-identical line charts is the thing the reader has to sort
+# out, and the bot is the one holding the list. So a query that matches more
+# than one asks which, and sends nothing until it knows.
+
+
+async def test_a_word_matching_two_charts_asks_which():
+    message = await _run("validator")
+
+    assert not message.photos, "sent charts instead of asking"
+    assert message.htmls, "asked nothing"
+    markup = message.markups[0]
+    assert markup is not None, "no buttons to pick from"
+    labels = [b.text for row in markup.inline_keyboard for b in row]
+    assert len(labels) == 2, labels
+
+
+async def test_the_buttons_are_the_charts_that_matched():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families, search
+
+    message = await _run("validator")
+    expected = {c.name for c in resolve_families(search("validator"))}
+
+    markup = message.markups[0]
+    offered = {
+        b.callback_data.removeprefix(direct.CALLBACK_PREFIX)
+        for row in markup.inline_keyboard
+        for b in row
+    }
+    assert offered == expected
+
+
+async def test_the_buttons_are_titles_not_route_names():
+    message = await _run("validator")
+    labels = [b.text for row in message.markups[0].inline_keyboard for b in row]
+
+    assert "Validator count" in labels
+    assert not any("_" in label for label in labels), labels
+
+
+async def test_one_match_still_arrives_as_a_chart():
+    """Asking "which?" about a single answer is a question with one option."""
+    for word in ("price", "tps", "whales", "accounts"):
+        message = await _run(word)
+        assert message.photos, f"{word} no longer sends its chart"
+        assert not message.markups or message.markups == [None] * len(message.markups)
+
+
+async def test_every_match_is_offered_rather_than_three_and_a_note():
+    """`staking` matches nine. Three charts and "…and 6 more" made the reader
+    retype; nine buttons is the whole answer in one message."""
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import resolve_families, search
+
+    message = await _run("staking")
+    expected = len(resolve_families(search("staking")))
+    assert expected > 3, "pick a word that actually overflows"
+
+    labels = [b.text for row in message.markups[0].inline_keyboard for b in row]
+    assert len(labels) == expected
+    assert not any("more" in h for h in message.htmls), message.htmls
+
+
+async def test_the_question_names_the_word_that_was_asked():
+    message = await _run("validator")
+    assert "validator" in message.htmls[0].lower()
+
+
+async def test_no_match_is_unchanged():
+    message = await _run("zzzznothing")
+    assert not message.photos
+    assert "No chart matches" in message.htmls[0]
+
+
+# --- picking from a message that has no photo in it ------------------------
+#
+# editMessageMedia needs media to edit. The picker is a text message, so a tap
+# on one of its buttons has to answer with a new message instead.
+#
+# That was already broken before the picker existed: `other` has no default,
+# so tapping it writes "Which one?" as text, and tapping a chart there went
+# straight to edit_message_media -- which Telegram refuses.
+
+
+class _PhotolessMessage:
+    """A text message: `photo` is an empty tuple on a real one."""
+
+    photo = ()
+
+    def __init__(self):
+        self.photos = []
+
+    async def reply_photo(self, photo, **kw):
+        self.photos.append((photo, kw))
+
+
+class _PhotoMessage(_PhotolessMessage):
+    photo = ("a-photo-size",)
+
+
+async def _tap_on(data, message):
+    query = _CallbackQuery(data)
+    query.message = message
+    await direct.callback_handler(SITE)(SimpleNamespace(callback_query=query), _context())
+    return query
+
+
+async def test_picking_from_a_text_message_sends_a_new_chart():
+    message = _PhotolessMessage()
+    query = await _tap_on(f"{direct.CALLBACK_PREFIX}staking_validator_count", message)
+
+    assert not query.media, "edit_message_media on a text message is refused by Telegram"
+    assert message.photos, "nothing was sent"
+    assert "staking_validator_count" in message.photos[0][0]
+
+
+async def test_the_chart_it_sends_carries_its_own_buttons():
+    message = _PhotolessMessage()
+    await _tap_on(f"{direct.CALLBACK_PREFIX}staking_validator_count", message)
+
+    markup = message.photos[0][1]["reply_markup"]
+    assert markup is not None and markup.inline_keyboard
+
+
+async def test_picking_from_a_chart_still_swaps_it_in_place():
+    """The period and grouping buttons sit on a photo, and replacing the
+    message for each tap would fill the chat with near-identical charts."""
+    message = _PhotoMessage()
+    query = await _tap_on(f"{direct.CALLBACK_PREFIX}staking_validator_count", message)
+
+    assert query.media, "the in-place swap is gone"
+    assert not message.photos, "sent a new message as well as editing"
+
+
+async def test_the_category_which_one_path_now_answers():
+    """`/c` -> other -> "Which one?" -> a chart. The last step errored."""
+    menu = await _tap(f"{direct.MENU_PREFIX}other")
+    first = menu.messages[0][1]["reply_markup"].inline_keyboard[0][0]
+
+    message = _PhotolessMessage()
+    query = await _tap_on(first.callback_data, message)
+
+    assert message.photos, "the category picker still leads nowhere"
+    assert not query.media

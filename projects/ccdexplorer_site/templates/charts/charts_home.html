@@ -2,13 +2,31 @@
 
 {% block content %}
 {% include 'base/search_bar_non_home_inclusion.html' %}
-    <div class="row  mt-12">
-        Charts
-        <a href="/{{net}}/charts/accounts-growth" class="btn btn-outline-secondary">Accounts Growth</a>
-        <a href="/{{net}}/charts/transactions-count" class="btn btn-outline-secondary">Transactions Count</a>
-        <a href="/{{net}}/charts/active-addresses" class="btn btn-outline-secondary">Active Addresses</a>
-        <a href="/{{net}}/charts/holders" class="btn btn-outline-secondary">Holders</a>
-</div>  
 
+{# Stored files, not live renders: six full-size figures through kaleido
+   was the reason this page was slow. Two per category, because a stored
+   image cannot follow the theme toggle the way an htmx plot can -- the
+   switcher swaps data-theme-src. Regenerate with `just chart-covers`. #}
+{% set title = "Charts" %}{% include 'base/box_title.html' %}
+
+<div class="row row-flex">
+  {% for category, count in categories %}
+    <div class="col-md-4 col-sm-6 mb-3">
+      <a href="/{{net}}/charts/category/{{category}}" class="text-decoration-none">
+        <div class="border curved-border content h-100 p-2">
+          <div><b>{{ category_label(category) }}</b></div>
+          <div class="small text-secondary mb-2">
+            {{count}} chart{% if count != 1 %}s{% endif %}
+          </div>
+          {% if cover_image(category, theme) %}
+            <img src="{{ cover_image(category, theme) }}"
+                 data-theme-src="{{ cover_image(category, '{theme}') }}"
+                 class="img-fluid" loading="lazy" alt="" aria-hidden="true">
+          {% endif %}
+        </div>
+      </a>
+    </div>
+  {% endfor %}
+</div>
 
 {% endblock %}

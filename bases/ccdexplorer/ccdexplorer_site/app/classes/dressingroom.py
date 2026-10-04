@@ -1190,9 +1190,7 @@ class MakeUp:
             }
 
             plt_token_id = markupsafe.escape(t.token_creation.create_plt.token_id)
-            plt_name = markupsafe.escape(
-                t.token_creation.create_plt.initialization_parameters.name
-            )
+            plt_name = markupsafe.escape(t.token_creation.create_plt.initialization_parameters.name)
             new_event = EventType(
                 f'Protocol-Level Token created: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_name} ({plt_token_id})</span></a>',
                 None,
@@ -1742,9 +1740,7 @@ class MakeUp:
                     plt.get("initialization_parameters", {}).get("name", "") if plt else None
                 )
                 plt_token_id = markupsafe.escape(token_id)
-                plt_display = (
-                    plt_token_id if not display_name else markupsafe.escape(display_name)
-                )
+                plt_display = plt_token_id if not display_name else markupsafe.escape(display_name)
                 plt_string = f'PLT: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_display}</span></a>'
             else:
                 decimals = 0
@@ -1778,10 +1774,22 @@ class MakeUp:
                     lock_id = lock.to_str()
                     lock_link = f'<a href="/{self.net}/tokens/plt/lock/{lock_id}"><span class="ccd">{lock_id}</span></a>'
                     if event.transfer_event.to_lock:
-                        account = account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)
+                        account = account_link(
+                            event.transfer_event.from_.account,
+                            self.net,
+                            user=self.user,
+                            tags=self.tags,
+                            app=self.makeup_request.app,
+                        )
                         description = f"{account} funded lock {lock_link} with {amount_str}"
                     else:
-                        account = account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)
+                        account = account_link(
+                            event.transfer_event.to.account,
+                            self.net,
+                            user=self.user,
+                            tags=self.tags,
+                            app=self.makeup_request.app,
+                        )
                         description = f"{account} received {amount_str} from lock {lock_link}"
                     new_event = EventType(description, plt_string, memo if memo else None)
                 else:

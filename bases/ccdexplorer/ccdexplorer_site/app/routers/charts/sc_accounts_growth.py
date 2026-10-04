@@ -12,7 +12,6 @@
 
 import datetime as dt
 
-import dateutil
 import pandas as pd
 import plotly.graph_objects as go
 from dateutil.relativedelta import relativedelta
@@ -21,50 +20,19 @@ from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 import uuid
 
+from ccdexplorer.charts import ChartState
+from ccdexplorer.charts.registry import BY_NAME
+
 from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
 )
-from ccdexplorer.ccdexplorer_site.app.utils import get_url_from_api
+from ccdexplorer.ccdexplorer_site.app.utils import (
+    get_url_from_api,
+    parse_slider_date,
+)
 
 router = APIRouter()
-
-
-@router.get("/{net}/charts/accounts-growth", response_class=HTMLResponse)
-async def get_accounts_growth(
-    request: Request,
-    net: str,
-):
-    if net == "mainnet":
-        chain_start = dt.date(2021, 6, 9).strftime("%Y-%m-%d")
-        yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime(
-            "%Y-%m-%d"
-        )
-        filename = (
-            f"/tmp/accounts-growth - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
-        )
-        return request.app.templates.TemplateResponse(
-            request,
-            "charts/sc_accounts_growth.html",
-            {
-                "env": request.app.env,
-                "net": net,
-                "request": request,
-                "chain_start": chain_start,
-                "yesterday": yesterday,
-                "filename": filename,
-            },
-        )
-    else:
-        return request.app.templates.TemplateResponse(
-            request,
-            "testnet/not-available.html",
-            {
-                "env": request.app.env,
-                "net": net,
-                "request": request,
-            },
-        )
 
 
 class PostData(BaseModel):
@@ -90,10 +58,10 @@ async def statistics_network_summary_accounts_per_day_standalone(
     theme = post_data.theme
     start_date_str = post_data.start_date
     end_date_str = post_data.end_date
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = parse_slider_date(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = parse_slider_date(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")

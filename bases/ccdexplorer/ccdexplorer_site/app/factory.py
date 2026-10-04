@@ -73,6 +73,7 @@ from ccdexplorer.ccdexplorer_site.app.routers import (
 )
 from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     charts_home,
+    generated,
     sc_accounts_growth,
     sc_active_addresses,
     sc_holders,
@@ -86,9 +87,9 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     add_account_info_to_cache,
     forcing_plot_render,
     get_url_from_api,
-    plot_cache_key,
-    plot_image_paths,
+    plot_warm_targets,
 )
+from ccdexplorer.charts.registry import spec_for_plot
 from ccdexplorer.env import ADMIN_CHAT_ID, LOGIN_SECRET, environment, sentry_dsn
 from fastapi.middleware.gzip import GZipMiddleware
 
@@ -575,6 +576,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.state.templates = Jinja2Templates(directory=app_settings.templates_dir)
     app.state.templates = app.state.templates
     app.templates = app.state.templates
+    # So the shared chart tile can find the page for whatever plot_name it was
+    # given, without every dashboard template having to pass it in.
+    app.state.templates.env.globals["spec_for_plot"] = spec_for_plot
 
     origins = [
         "http://127.0.0.1:7000",
@@ -660,6 +664,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(sc_holders.router)
     app.include_router(sc_plt_transfers.router)
     app.include_router(sc_agent_registries.router)
+    # Last, so a handwritten page still wins the slug over a generated one.
+    app.include_router(generated.router)
 
     allow_head_on_images(app)
 
@@ -669,10 +675,18 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             request,
             "base/error.html",
             {
-                "env": request.app.env,
+                # environment, not request.app.env: an error handler that
+                # needs app state fails exactly when that state is what went
+                # wrong, replacing the real error with one about itself.
+                "env": environment,
                 "request": request,
                 "error": "Can't find the page you are looking for!",
             },
+            # Said in the status as well as on the page. TemplateResponse
+            # defaults to 200, so every missing page on the site claimed to be
+            # one -- which matters more now chart state lives in the path,
+            # where a crawler can walk any number of made-up months.
+            status_code=404,
         )
 
     @app.exception_handler(500)
@@ -681,10 +695,16 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             request,
             "base/error.html",
             {
-                "env": request.app.env,
+                "env": environment,
                 "request": request,
                 "error": "Something's not quite right!",
             },
+            # The same omission as the 404 handler above had: TemplateResponse
+            # defaults to 200, so every unhandled error on the site reported
+            # success. A monitor watching status codes saw none of them, and
+            # an htmx swap put the error page where a chart had been as
+            # though it had worked.
+            status_code=500,
         )
 
     @scheduler.scheduled_job(
@@ -714,7 +734,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         request arriving mid-sweep waits for one redraw rather than all of
         them.
         """
-        paths = plot_image_paths(app)
+        # Each chart in the one state it opens in, not every window and
+        # grouping: that would be 600 renders a sweep instead of 80.
+        targets = plot_warm_targets(app)
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(
             transport=transport, base_url="http://plot-warmer", timeout=180.0
@@ -724,8 +746,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             # light, and they are separate cache entries. Warming only one
             # leaves the other paying a cold render on first use, which is
             # exactly the wait this job exists to remove.
-            wanted = [(path, theme) for path in paths for theme in PLOT_THEMES]
-            for path, theme in wanted:
+            wanted = [(path, params, theme) for path, params in targets for theme in PLOT_THEMES]
+            for path, params, theme in wanted:
+                query = {**params, "theme": theme}
                 try:
                     # Not evicted first. Clearing the entry and then drawing its
                     # replacement left the chart blank for the length of a
@@ -734,7 +757,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                     # pay for. forcing_plot_render redraws and overwrites, so
                     # the old image is served until the new one exists.
                     with forcing_plot_render():
-                        response = await client.get(path, params={"theme": theme})
+                        response = await client.get(path, params=query)
                 except Exception as error:  # a cold chart is not worth an outage
                     print(f"plot warmer: {path} [{theme}] failed ({error})")
                     continue

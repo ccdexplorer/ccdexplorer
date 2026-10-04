@@ -92,9 +92,7 @@ async def request_block(
     request.state.api_calls["Special Events"] = (
         f"{request.app.api_url}/docs#/Block/get_block_special_events"
     )
-    request.state.api_calls["Transactions"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_txs"
-    )
+    request.state.api_calls["Transactions"] = f"{request.app.api_url}/docs#/Block/get_block_txs"
     request.state.api_calls["Payday Yes/No"] = (
         f"{request.app.api_url}/docs#/Block/get_block_payday_true_false"
     )

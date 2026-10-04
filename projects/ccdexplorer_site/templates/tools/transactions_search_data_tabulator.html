@@ -106,10 +106,10 @@
       // build the exact same JSON body you were sending via HTMX
       const body = {
         theme: document.querySelector("html").getAttribute("data-bs-theme"),
-        start_date: document.getElementById("event-start-pretty").innerText,
-        end_date:   document.getElementById("event-end-pretty").innerText,
-        gte:        document.getElementById("event-start-ccd-pretty").innerText,
-        lte:        document.getElementById("event-end-ccd-pretty").innerText,
+        start_date: (document.getElementById("event-start-pretty")?.dataset.iso || document.getElementById("event-start-pretty").innerText),
+        end_date:   (document.getElementById("event-end-pretty")?.dataset.iso || document.getElementById("event-end-pretty").innerText),
+        gte:        (document.getElementById("event-start-ccd-pretty")?.dataset.value || document.getElementById("event-start-ccd-pretty").innerText),
+        lte:        (document.getElementById("event-end-ccd-pretty")?.dataset.value || document.getElementById("event-end-ccd-pretty").innerText),
         memo:       document.getElementById("memo_search").value,
         // **Paging parameters the server expects:**
         page: params.page || 1,

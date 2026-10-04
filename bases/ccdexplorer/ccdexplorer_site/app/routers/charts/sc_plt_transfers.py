@@ -1,23 +1,32 @@
 import datetime as dt
 
-import dateutil
 import pandas as pd
 import plotly.graph_objects as go
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel
 import uuid
 from typing import Any, Optional
 
+from ccdexplorer.charts import ChartState
+from ccdexplorer.charts.paths import state_from_path
+from ccdexplorer.ccdexplorer_site.app.routers.charts.images import (
+    freq_and_period,
+    image_path,
+    legacy_redirect_target,
+    state_for,
+    subtitle_for,
+)
+from ccdexplorer.charts.registry import BY_NAME
+
 from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
-    image_freq,
-    image_period,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
-    get_theme_from_request,
+    parse_slider_date,
+    theme_from_query,
     get_url_from_api,
     return_plot_response,
 )
@@ -60,6 +69,7 @@ async def get_plt_transfers(
                 "net": net,
                 "request": request,
                 "chain_start": chain_start,
+                "state": ChartState.from_query(BY_NAME["plt_tvl"], request.query_params),
                 "yesterday": yesterday,
                 "filename": filename,
                 "include_dropdown_fancy": True,
@@ -125,15 +135,14 @@ async def statistics_plt_transfers(
     net: str,
     post_data: PostData,
 ):
-    # theme = await get_theme_from_request(request)
     tracks = post_data.dropdown_values_fancy
     theme = post_data.theme
     start_date_str = post_data.start_date
     end_date_str = post_data.end_date
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = parse_slider_date(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = parse_slider_date(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")
@@ -243,11 +252,6 @@ async def statistics_plt_transfers(
     )
 
 
-#: The windows the chart bot's buttons offer. One route each -- see the note in
-#: sc_agent_registries: plot_image_paths scans route paths.
-IMAGE_WINDOWS = (30, 90, 180, 365)
-
-
 def build_plt_tvl_figure(
     all_data: list[dict],
     *,
@@ -316,15 +320,13 @@ def build_plt_tvl_figure(
     return fig
 
 
-async def plt_tvl_image(request: Request, net: str, days: int):
+async def plt_tvl_image(request: Request, net: str, state: ChartState):
     """One window of total PLT stablecoin TVL, as a PNG the bot can fetch."""
     if net != "mainnet":
         raise HTTPException(status_code=404, detail="PLT TVL is mainnet only.")
 
-    end = dt.date.today()
-    start = end - dt.timedelta(days=days)
     all_data = await get_all_data_for_analysis_limited(
-        "statistics_plt", request.app, start.isoformat(), end.isoformat()
+        "statistics_plt", request.app, state.start.isoformat(), state.end.isoformat()
     )
 
     # Which PLTs are stablecoins is not in the statistics data, so it comes
@@ -336,41 +338,77 @@ async def plt_tvl_image(request: Request, net: str, days: int):
     )
     plts: dict = overview.return_value if overview.ok else {}
     stablecoins = {
-        str(plt.get("_id"))
-        for plt in plts.values()
-        if plt.get("stablecoin_tracks") is not None
+        str(plt.get("_id")) for plt in plts.values() if plt.get("stablecoin_tracks") is not None
     }
 
-    theme = await get_theme_from_request(request)
+    # theme_from_query, not get_theme_from_request: this is a GET with no
+    # body, and the latter falls back to dark. Telegram sends neither a
+    # parameter nor a cookie, so every PLT chart in a chat was a black
+    # rectangle. Light is what a request that says nothing should get.
+    theme = theme_from_query(request)
     fig = build_plt_tvl_figure(
         all_data,
         theme=theme,
-        freq=image_freq(days),
+        freq=freq_and_period(state)[0],
         stablecoins=stablecoins,
-        subtitle=f"last {days} days, by {image_period(days).lower()}",
+        subtitle=f"{subtitle_for(state)}, by {freq_and_period(state)[1].lower()}",
     )
-    return await return_plot_response(fig, request, f"PLT stablecoin TVL, {days}d")
+    return await return_plot_response(fig, request, f"PLT stablecoin TVL, {state.window.value}")
 
 
-@router.get("/plots/{net}/plt_tvl_30d", response_class=Response)
-@router.get("/plots/{net}/plt_tvl_30d/image.png", response_class=Response)
-async def plt_tvl_30d(request: Request, net: str):
-    return await plt_tvl_image(request, net, 30)
+@router.get("/plots/{net}/plt_tvl", response_class=Response)
+@router.get("/plots/{net}/plt_tvl/image.png", response_class=Response)
+async def plt_tvl_plot(request: Request, net: str):
+    """The chart as it opens, and what the share button copies.
+
+    A url still carrying the old ?grouping=&window= is sent to the path that
+    says the same thing, so anything already shared lands somewhere clean.
+    """
+    spec = BY_NAME["plt_tvl"]
+    query = request.query_params
+    if any(k in query for k in ("grouping", "window", "from", "to")):
+        state = state_for(spec, request)
+        return RedirectResponse(
+            image_path("plt_tvl", net, state, str(request.url.query)), status_code=308
+        )
+    return await plt_tvl_image(request, net, state_for(spec, request))
 
 
-@router.get("/plots/{net}/plt_tvl_90d", response_class=Response)
-@router.get("/plots/{net}/plt_tvl_90d/image.png", response_class=Response)
-async def plt_tvl_90d(request: Request, net: str):
-    return await plt_tvl_image(request, net, 90)
+@router.get(
+    "/plots/{net}/plt_tvl/{grouping}/{start}/{end}/image.png",
+    response_class=Response,
+)
+async def plt_tvl_plot_at(request: Request, net: str, grouping: str, start: str, end: str):
+    spec = BY_NAME["plt_tvl"]
+    state = state_from_path(spec, grouping, start, end)
+    if state is None:
+        raise HTTPException(status_code=404, detail="No such chart view.")
+    return await plt_tvl_image(request, net, state)
 
 
-@router.get("/plots/{net}/plt_tvl_180d", response_class=Response)
-@router.get("/plots/{net}/plt_tvl_180d/image.png", response_class=Response)
-async def plt_tvl_180d(request: Request, net: str):
-    return await plt_tvl_image(request, net, 180)
+@router.get(
+    "/plots/{net}/plt_tvl/{grouping}/{start}/{end}/{traces}/image.png",
+    response_class=Response,
+)
+async def plt_tvl_plot_at_traces(
+    request: Request, net: str, grouping: str, start: str, end: str, traces: str
+):
+    spec = BY_NAME["plt_tvl"]
+    state = state_from_path(spec, grouping, start, end, traces)
+    if state is None:
+        raise HTTPException(status_code=404, detail="No such chart view.")
+    return await plt_tvl_image(request, net, state)
 
 
-@router.get("/plots/{net}/plt_tvl_365d", response_class=Response)
-@router.get("/plots/{net}/plt_tvl_365d/image.png", response_class=Response)
-async def plt_tvl_365d(request: Request, net: str):
-    return await plt_tvl_image(request, net, 365)
+@router.get("/plots/{net}/plt_tvl_{window}", response_class=Response)
+@router.get("/plots/{net}/plt_tvl_{window}/image.png", response_class=Response)
+async def plt_tvl_legacy(request: Request, net: str, window: str):
+    """One route per window became one route with parameters.
+
+    These urls are in Telegram's own file cache and in links people have
+    already shared, so they redirect rather than 404.
+    """
+    target = legacy_redirect_target(net, "plt_tvl", window, request.url.query)
+    if target is None:
+        raise HTTPException(status_code=404, detail="No such chart.")
+    return RedirectResponse(target, status_code=308)

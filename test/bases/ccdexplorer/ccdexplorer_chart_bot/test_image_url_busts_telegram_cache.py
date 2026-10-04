@@ -23,17 +23,19 @@ SITE = "https://ccdexplorer.io"
 
 
 def _bare(url: str) -> str:
-    """The url without its cache-busting parameter."""
-    return url.split("&t=")[0]
+    """The url without its cache-busting parameter.
+
+    It is the only parameter left now that the theme is a cookie, so this
+    drops the whole query rather than one entry in it.
+    """
+    return url.split("?")[0]
 
 
 def test_the_url_is_stable_within_a_bucket():
     """Two sends a second apart must reuse Telegram's copy, not refetch it."""
     chart = BY_NAME["ccd_kraken_1h"]
 
-    assert chart.image_url(SITE, now=1_790_000_000.0) == chart.image_url(
-        SITE, now=1_790_000_001.0
-    )
+    assert chart.image_url(SITE, now=1_790_000_000.0) == chart.image_url(SITE, now=1_790_000_001.0)
 
 
 def test_the_url_changes_once_the_bucket_rolls_over():
@@ -83,21 +85,19 @@ def test_no_chart_asks_for_less_than_the_site_can_give():
         assert 60 <= chart.refresh_seconds <= 3600
 
 
-def test_busting_leaves_the_path_and_theme_exactly_as_they_were():
-    """The site keys its png cache on path plus theme, so both must be untouched.
+def test_busting_leaves_the_path_exactly_as_it_was():
+    """The site keys its png cache on the path, so it must be untouched.
 
     If this drifted, every bucket would become a fresh kaleido render.
     """
     for chart in CHARTS:
-        assert _bare(chart.image_url(SITE)) == (
-            f"{SITE}/plots/mainnet/{chart.name}/image.png?theme=light"
-        )
+        assert _bare(chart.image_url(SITE)) == (f"{SITE}/plots/mainnet/{chart.name}/image.png")
 
 
 def test_the_parameter_is_a_plain_integer():
     """A float would change on every call and defeat the bucketing."""
     chart = BY_NAME["ccd_kraken_1d"]
-    value = chart.image_url(SITE, now=1_790_000_000.5).split("&t=")[1]
+    value = chart.image_url(SITE, now=1_790_000_000.5).split("t=")[1]
 
     assert value.isdigit()
 

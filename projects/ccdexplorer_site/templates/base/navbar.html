@@ -38,8 +38,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link " href="/{{net}}/statistics" role="button" aria-expanded="false">
-                        Statistics
+                    {# /statistics is still there and still works -- its urls
+                       have been shared, and it is the only place some charts
+                       are drawn yet. The charts gallery is what a reader can
+                       actually configure, so it is what the menu offers. #}
+                    <a class="nav-link " href="/{{net}}/charts" role="button" aria-expanded="false">
+                        Charts
                     </a>
                 </li>
                 {% endif %}

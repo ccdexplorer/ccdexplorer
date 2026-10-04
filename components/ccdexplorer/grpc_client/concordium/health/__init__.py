@@ -48,7 +48,7 @@ class HealthStub(betterproto.ServiceStub):
         *,
         timeout: Optional[float] = None,
         deadline: Optional["Deadline"] = None,
-        metadata: Optional["MetadataLike"] = None
+        metadata: Optional["MetadataLike"] = None,
     ) -> "NodeHealthResponse":
         return await self._unary_unary(
             "/concordium.health.Health/Check",
@@ -61,10 +61,7 @@ class HealthStub(betterproto.ServiceStub):
 
 
 class HealthBase(ServiceBase):
-
-    async def check(
-        self, node_health_request: "NodeHealthRequest"
-    ) -> "NodeHealthResponse":
+    async def check(self, node_health_request: "NodeHealthRequest") -> "NodeHealthResponse":
         raise grpclib.GRPCError(grpclib.const.Status.UNIMPLEMENTED)
 
     async def __rpc_check(

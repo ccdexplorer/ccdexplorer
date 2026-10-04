@@ -28,10 +28,14 @@ def test_everything_in_other_still_appears():
 
 
 def test_the_picker_is_one_entry_per_family_plus_all_of_other():
+    # A group is a family only when its members carry a period -- `chain`,
+    # `plt` and `agents` hold one chart each and collapse to themselves, the
+    # same as everything in `other`. Counting spec-backed charts separately
+    # double-counted nearly the whole catalogue once most of them had a spec.
     families = {c.group for c in CHARTS if c.period}
-    others = [c for c in CHARTS if c.group == "other"]
+    standalone = [c for c in CHARTS if c.group not in families]
 
-    assert len(pickable(CHARTS)) == len(families) + len(others)
+    assert len(pickable(CHARTS)) == len(families) + len(standalone)
 
 
 def test_collapsing_preserves_catalogue_order():

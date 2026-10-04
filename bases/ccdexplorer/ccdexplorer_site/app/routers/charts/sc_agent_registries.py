@@ -1,68 +1,32 @@
 import datetime as dt
 
-import dateutil
 import pandas as pd
 import plotly.graph_objects as go
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import RedirectResponse, Response
 from pydantic import BaseModel
-import uuid
-from typing import Any, Optional
+from typing import Optional
+
+from ccdexplorer.charts import ChartState
+from ccdexplorer.ccdexplorer_site.app.routers.charts.images import (
+    freq_and_period,
+    legacy_redirect_target,
+    subtitle_for,
+)
 
 from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     ccdexplorer_plotly_template,
     get_all_data_for_analysis_limited,
-    image_freq,
-    image_period,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    parse_slider_date,
     get_theme_from_request,
-    get_url_from_api,
     return_plot_response,
 )
 from fastapi import HTTPException
 
 router = APIRouter()
-
-
-@router.get("/{net}/charts/agent-registries", response_class=HTMLResponse)
-async def get_agent_registries(
-    request: Request,
-    net: str,
-):
-    if net == "mainnet":
-        chain_start = dt.date(2026, 5, 27).strftime("%Y-%m-%d")
-        yesterday = (dt.datetime.now().astimezone(dt.UTC) - dt.timedelta(days=1)).strftime(
-            "%Y-%m-%d"
-        )
-        filename = (
-            f"/tmp/agent-registries - {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
-        )
-        return request.app.templates.TemplateResponse(
-            request,
-            "charts/sc_agent_registries.html",
-            {
-                "env": request.app.env,
-                "net": net,
-                "request": request,
-                "chain_start": chain_start,
-                "yesterday": yesterday,
-                "filename": filename,
-                "include_dropdown_fancy": False,
-                "include_kpis": False,
-            },
-        )
-    else:
-        return request.app.templates.TemplateResponse(
-            request,
-            "testnet/not-available.html",
-            {
-                "env": request.app.env,
-                "net": net,
-                "request": request,
-            },
-        )
 
 
 class PostData(BaseModel):
@@ -161,10 +125,10 @@ async def statistics_agent_registries(
     theme = post_data.theme
     start_date_str = post_data.start_date
     end_date_str = post_data.end_date
-    parsed_date: dt.datetime = dateutil.parser.parse(post_data.start_date)
+    parsed_date: dt.datetime = parse_slider_date(post_data.start_date, "start_date")
     post_data.start_date = dt.datetime(parsed_date.year, parsed_date.month, 1).strftime("%Y-%m-%d")
 
-    end_parsed: dt.datetime = dateutil.parser.parse(post_data.end_date)
+    end_parsed: dt.datetime = parse_slider_date(post_data.end_date, "end_date")
     next_month = dt.datetime(end_parsed.year, end_parsed.month, 1) + relativedelta(months=1)
     last_day = next_month - relativedelta(days=1)
     post_data.end_date = last_day.strftime("%Y-%m-%d")
@@ -222,50 +186,48 @@ async def statistics_agent_registries(
     )
 
 
-#: The windows the chart bot's buttons offer. One route each, never a
-#: parameterised path: plot_image_paths scans route paths to build the warmer's
-#: list, and _PLOT_IMAGE_ROUTE only matches a literal chart name.
-IMAGE_WINDOWS = (30, 90, 180, 365)
-
-
-async def agent_registries_image(request: Request, net: str, days: int):
+async def agent_registries_image(request: Request, net: str, state: ChartState):
     """One window of the agent registries chart, as a PNG the bot can fetch."""
     if net != "mainnet":
         # Not the page's "not available" template: Telegram fetches this url
         # itself and would render an HTML body as a broken image.
         raise HTTPException(status_code=404, detail="Agent registries are mainnet only.")
 
-    end = dt.date.today()
-    start = end - dt.timedelta(days=days)
     all_data = await get_all_data_for_analysis_limited(
-        "statistics_agent_registry", request.app, start.isoformat(), end.isoformat()
+        "statistics_agent_registry", request.app, state.start.isoformat(), state.end.isoformat()
     )
     theme = await get_theme_from_request(request)
     fig = build_agent_registries_figure(
-        all_data, theme=theme, freq=image_freq(days), subtitle=f"last {days} days, by {image_period(days).lower()}"
+        all_data,
+        theme=theme,
+        freq=freq_and_period(state)[0],
+        subtitle=f"{subtitle_for(state)}, by {freq_and_period(state)[1].lower()}",
     )
-    return await return_plot_response(fig, request, f"Agent Registries, {days}d")
+    return await return_plot_response(fig, request, f"Agent Registries, {state.window.value}")
 
 
-@router.get("/plots/{net}/agent_registries_30d", response_class=Response)
-@router.get("/plots/{net}/agent_registries_30d/image.png", response_class=Response)
-async def agent_registries_30d(request: Request, net: str):
-    return await agent_registries_image(request, net, 30)
+# The /plots image routes for this chart used to live here. They moved to
+# charts/generated.py, which registers the same paths for every spec -- and
+# because this router is included first, these shadowed those and won every
+# request. The difference showed up as a theme: the generated handler reads
+# theme_from_query, which falls back to light for a request carrying neither
+# parameter nor cookie, and that is exactly what Telegram sends. These read
+# get_theme_from_request, which falls back to dark, so this chart arrived in
+# chats as a black rectangle while its neighbours arrived light.
+#
+# The legacy `<name>_<window>` redirects below stay: generated.py does not
+# register those, and the urls are in Telegram's file cache.
 
 
-@router.get("/plots/{net}/agent_registries_90d", response_class=Response)
-@router.get("/plots/{net}/agent_registries_90d/image.png", response_class=Response)
-async def agent_registries_90d(request: Request, net: str):
-    return await agent_registries_image(request, net, 90)
+@router.get("/plots/{net}/agent_registries_{window}", response_class=Response)
+@router.get("/plots/{net}/agent_registries_{window}/image.png", response_class=Response)
+async def agent_registries_legacy(request: Request, net: str, window: str):
+    """One route per window became one route with parameters.
 
-
-@router.get("/plots/{net}/agent_registries_180d", response_class=Response)
-@router.get("/plots/{net}/agent_registries_180d/image.png", response_class=Response)
-async def agent_registries_180d(request: Request, net: str):
-    return await agent_registries_image(request, net, 180)
-
-
-@router.get("/plots/{net}/agent_registries_365d", response_class=Response)
-@router.get("/plots/{net}/agent_registries_365d/image.png", response_class=Response)
-async def agent_registries_365d(request: Request, net: str):
-    return await agent_registries_image(request, net, 365)
+    These urls are in Telegram's own file cache and in links people have
+    already shared, so they redirect rather than 404.
+    """
+    target = legacy_redirect_target(net, "agent_registries", window, request.url.query)
+    if target is None:
+        raise HTTPException(status_code=404, detail="No such chart.")
+    return RedirectResponse(target, status_code=308)

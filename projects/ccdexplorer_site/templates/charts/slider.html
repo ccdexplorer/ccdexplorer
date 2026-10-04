@@ -12,6 +12,16 @@
       function toFormat(v) {
         return formatDate(new Date(v))
       }
+
+      // What the server reads. Built from the slider's own number rather
+      // than from the text beside it, so no amount of reformatting of the
+      // display can change the value that is sent.
+      function isoDate(v) {
+        const when = new Date(Number(v));
+        const month = String(when.getMonth() + 1).padStart(2, '0');
+        const day = String(when.getDate()).padStart(2, '0');
+        return `${when.getFullYear()}-${month}-${day}`;
+      }
   
       function mergeTooltips(slider, threshold, separator) {
   
@@ -126,7 +136,7 @@
           max: timestamp(date),
         },
         step:MONTH_MS,
-        start: [timestamp('{% if date_start%}{{date_start|safe}}{%else%}{{chain_start|safe}}{%endif%}'), timestamp(date)],
+        start: [timestamp('{% if state %}{{state.start.isoformat()}}{% elif date_start %}{{date_start|safe}}{% else %}{{chain_start|safe}}{% endif %}'), timestamp(date)],
       })
   
       var dateValuesPretty = [
@@ -134,8 +144,15 @@
         document.getElementById("event-end-pretty"),
       ]
   
-      dateSliderPretty.noUiSlider.on("update", function (values, handle) {
+      dateSliderPretty.noUiSlider.on("update", function (values, handle, unencoded) {
         dateValuesPretty[handle].innerHTML = values[handle];
+        // The text is for a person and may not survive the trip. Chrome
+        // offers to translate the page, and a reader who accepts gets every
+        // text node rewritten -- these hidden spans included -- so the
+        // "Jun 2021" written here was read back out as "Juin 2021" and sent
+        // to a server that parses English. Attributes are not translated,
+        // so what the server reads travels in one.
+        dateValuesPretty[handle].dataset.iso = isoDate(unencoded[handle]);
         var event = new CustomEvent('update_event');
                   document.getElementById('update').dispatchEvent(event);
       })

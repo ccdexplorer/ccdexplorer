@@ -112,9 +112,11 @@ def test_a_readable_date_is_still_widened_to_its_whole_month(given, month_start,
     The route searches whole months: the start date is pulled back to the first
     of its month and the end date pushed out to the last.
     """
-    from ccdexplorer.ccdexplorer_site.app.routers.tools import _parse_month_boundary
+    # Shared with the chart sliders now: the same string broke both, so
+    # one helper guards both rather than two drifting copies.
+    from ccdexplorer.ccdexplorer_site.app.utils import parse_slider_date
 
-    parsed = _parse_month_boundary(given, "start_date")
+    parsed = parse_slider_date(given, "start_date")
 
     assert dt.datetime(parsed.year, parsed.month, 1).strftime("%Y-%m-%d") == month_start
 

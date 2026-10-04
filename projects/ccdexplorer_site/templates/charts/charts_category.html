@@ -1,0 +1,35 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+{% include 'base/search_bar_non_home_inclusion.html' %}
+
+<div class="mb-2"><a href="/{{net}}/charts">&larr; All charts</a></div>
+{% set title = category|capitalize %}{% include 'base/box_title.html' %}
+
+<div class="row row-flex">
+  {% for spec in specs %}
+    <div class="col-md-4 col-sm-6 mb-3">
+      {# A configurable page where there is one, the chart's own page
+         otherwise: a tile that leads nowhere is worse than no tile. #}
+      {% set href = tile_href(spec, net) %}
+      <a {% if href %}href="{{ href }}"{% endif %} class="text-decoration-none">
+        <div class="border curved-border content h-100 p-2">
+          {% if has_image(spec) %}
+            {# data-plot-src so the theme toggle can re-point it. The src
+               itself carries no theme: the server reads the bsTheme cookie,
+               which is right on first load. After a toggle the cookie has
+               changed but the browser still holds the picture it fetched,
+               so the switcher appends the theme to make it a new url. #}
+            <img src="/plots/{{net}}/{{spec.name}}/image.png?theme={{theme}}"
+                 data-plot-src="/plots/{{net}}/{{spec.name}}/image.png"
+                 class="img-fluid" loading="lazy" alt="{{spec.title}}">
+          {% endif %}
+          <div class="mt-2"><b>{{spec.title}}</b></div>
+          <div class="small text-secondary">{{spec.blurb}}</div>
+        </div>
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
