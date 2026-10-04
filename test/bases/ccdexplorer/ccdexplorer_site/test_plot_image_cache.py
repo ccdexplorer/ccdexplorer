@@ -463,3 +463,29 @@ async def test_a_chart_with_no_spec_keeps_whatever_it_had():
     this change's business."""
     link = await _page_link("ccd_balance_usd_value")
     assert link is None or "/charts/" not in link
+
+
+async def test_not_one_plot_page_links_to_statistics():
+    """Asked of every chart rather than a sample.
+
+    The previous version of this derived the link from the registry and
+    fell back to plot_info for anything with no spec -- and
+    staking_validator_staked_amounts has none, so it kept the
+    /mainnet/statistics/validators link it always had. Spot-checking two
+    charts missed it.
+    """
+    offenders = []
+    for name in utils.plot_info:
+        if name == "ccd_balance_usd_value":
+            # Per-account, and its link is to the account, not to a chart.
+            continue
+        link = await _page_link(name)
+        if link is None or "/statistics" in link or "/charts/" not in link:
+            offenders.append((name, link))
+    assert offenders == [], offenders
+
+
+async def test_a_chart_with_no_spec_still_lands_somewhere_showing_it():
+    assert await _page_link("staking_validator_staked_amounts") == (
+        "/mainnet/charts/category/staking"
+    )
