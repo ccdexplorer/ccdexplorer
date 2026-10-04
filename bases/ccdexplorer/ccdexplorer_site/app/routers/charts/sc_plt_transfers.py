@@ -35,10 +35,46 @@ from fastapi import HTTPException
 router = APIRouter()
 
 
+@router.get("/{net}/charts/plt-transfers/{grouping}/{start}/{end}", response_class=HTMLResponse)
+async def get_plt_transfers_at(
+    request: Request,
+    net: str,
+    grouping: str,
+    start: str,
+    end: str,
+):
+    """The page at the state its path names.
+
+    plt_tvl has a page, so chart_path builds it a path-shaped address and
+    that is what the bot's caption and the share button hand out. Only the
+    bare slug was registered, so every one of those links answered a 404.
+    This chart is drawn by hand -- build_grouping_pipeline refuses
+    statistics_plt -- so it never got the path routes the generated pages
+    all have.
+    """
+    state = state_from_path(BY_NAME["plt_tvl"], grouping, start, end)
+    if state is None:
+        # Refused rather than defaulted: the path is the address, and
+        # drawing something else would make the url a lie.
+        raise HTTPException(status_code=404, detail="No such chart view.")
+    return await _plt_transfers_page(request, net, state)
+
+
 @router.get("/{net}/charts/plt-transfers", response_class=HTMLResponse)
 async def get_plt_transfers(
     request: Request,
     net: str,
+):
+    """The page as it opens."""
+    return await _plt_transfers_page(
+        request, net, ChartState.from_query(BY_NAME["plt_tvl"], request.query_params)
+    )
+
+
+async def _plt_transfers_page(
+    request: Request,
+    net: str,
+    state,
 ):
     if net == "mainnet":
         request.state.api_calls = {}
@@ -69,7 +105,7 @@ async def get_plt_transfers(
                 "net": net,
                 "request": request,
                 "chain_start": chain_start,
-                "state": ChartState.from_query(BY_NAME["plt_tvl"], request.query_params),
+                "state": state,
                 "yesterday": yesterday,
                 "filename": filename,
                 "include_dropdown_fancy": True,
