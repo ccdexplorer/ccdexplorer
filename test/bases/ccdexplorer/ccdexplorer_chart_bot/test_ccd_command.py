@@ -225,17 +225,7 @@ async def test_start_does_not_claim_more_charts_than_the_picker_shows():
     assert str(len(pickable(CHARTS))) in text
 
 
-async def test_start_mentions_the_command():
-    """Plain text now tells people to use /ccd; the help must know it exists."""
-    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
-
-    message = _Message()
-    await main.start(SimpleNamespace(message=message), _context())
-
-    assert "/ccd" in message.htmls[0]
-
-
-# --- /c, with /ccd kept as the unambiguous fallback -------------------------
+# --- the command, and the names it used to answer to -----------------------
 #
 # /c is short enough to collide: any other bot in the same group may claim it.
 # PTB ignores /c@otherbot (it compares the part after @ to its own username),
@@ -243,30 +233,25 @@ async def test_start_mentions_the_command():
 # /ccd stays registered as the form that cannot be mistaken.
 
 
-def test_both_c_and_ccd_are_registered():
+def test_e_is_the_command_that_works():
     import inspect
 
     import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
 
     source = inspect.getsource(main)
-    assert 'CommandHandler(["c", "ccd"]' in source, "expected /c with /ccd as an alias"
+    assert 'CommandHandler(["e"], command_handler(site_url))' in source
 
 
-async def test_the_nudge_points_at_the_short_command():
-    update, ctx = _update("price"), _context()
+def test_the_old_commands_are_registered_to_say_so():
+    """Unregistering them would make /c do nothing at all -- an unknown
+    command is not routed to the plain-text handler either, so anyone who
+    learned /c would get silence rather than a redirect."""
+    import inspect
 
-    await direct.nudge_handler()(update, ctx)
-
-    assert "/c " in update.message.htmls[0] or "/c<" in update.message.htmls[0]
-
-
-async def test_start_teaches_the_short_command():
     import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
 
-    message = _Message()
-    await main.start(SimpleNamespace(message=message), _context())
-
-    assert "/c " in message.htmls[0] or "/c<" in message.htmls[0]
+    source = inspect.getsource(main)
+    assert 'CommandHandler(["c", "ccd"], retired_command_handler())' in source
 
 
 async def test_start_says_what_to_do_when_another_bot_claims_the_command():
@@ -425,3 +410,66 @@ async def test_the_category_which_one_path_now_answers():
 
     assert message.photos, "the category picker still leads nowhere"
     assert not query.media
+
+
+# --- the command is /e now -------------------------------------------------
+#
+# /c was two things at once: short enough to be convenient and short enough
+# that another bot in the same group claims it. /e is for explorer.
+
+
+async def test_the_old_command_points_at_the_new_one():
+    update, ctx = _update("/c price"), _context("price")
+
+    await direct.retired_command_handler()(update, ctx)
+
+    assert not update.message.photos, "the old command still did the work"
+    assert any("/e" in html for html in update.message.htmls), update.message.htmls
+
+
+async def test_the_nudge_points_at_the_new_command():
+    update, ctx = _update("price"), _context()
+
+    await direct.nudge_handler()(update, ctx)
+
+    said = update.message.htmls[0]
+    assert "/e" in said
+    assert "/c " not in said and "/c<" not in said, said
+
+
+async def test_an_empty_command_offers_the_categories_under_the_new_name():
+    message = await _run()
+
+    assert message.markups[0] is not None, "no category menu"
+    assert any("/e" in html for html in message.htmls), message.htmls
+
+
+async def test_start_teaches_the_new_command():
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+    said = message.htmls[0]
+
+    assert "/e " in said or "/e&" in said or "/e<" in said, said[:200]
+
+
+async def test_start_still_says_what_to_do_when_another_bot_claims_it():
+    """/e is shorter than /c, so the collision it warned about is more
+    likely rather than less. The qualified form has to be the new one."""
+    import ccdexplorer.ccdexplorer_chart_bot.__main__ as main
+
+    message = _Message()
+    await main.start(SimpleNamespace(message=message), _context())
+
+    assert "/e@" in message.htmls[0]
+
+
+async def test_the_no_match_reply_names_the_new_command_too():
+    """The one place /c survived: a dead end that told the reader to try a
+    command the bot no longer does anything with."""
+    message = await _run("zzzznothing")
+
+    said = message.htmls[0]
+    assert "/e" in said
+    assert "/c<" not in said and "/c " not in said, said

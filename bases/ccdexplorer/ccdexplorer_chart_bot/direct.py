@@ -144,7 +144,7 @@ def caption(chart: Chart, site_url: str, state: ChartState | None = None) -> str
 
 
 def command_handler(site_url: str):
-    """/ccd <word> sends a chart; /ccd on its own offers the categories."""
+    """/e <word> sends a chart; /e on its own offers the categories."""
 
     async def reply_to_command(update, context) -> None:
         message = update.message
@@ -154,8 +154,8 @@ def command_handler(site_url: str):
         query = " ".join(getattr(context, "args", None) or []).strip()
         if not query:
             await message.reply_html(
-                "Which chart? Pick a category, or say <code>/c &lt;word&gt;</code> "
-                "— for example <code>/c staking</code>.",
+                "Which chart? Pick a category, or say <code>/e &lt;word&gt;</code> "
+                "— for example <code>/e staking</code>.",
                 reply_markup=category_menu(),
             )
             return
@@ -165,13 +165,13 @@ def command_handler(site_url: str):
         # default once per match -- three identical charts for the command the
         # nudge tells everyone to type.
         matches = resolve_families(search(query))
-        log.info("/ccd %r -> %d chart(s)", query, len(matches))
+        log.info("/e %r -> %d chart(s)", query, len(matches))
         # Escaped because the reply is HTML and the word is the reader's: a
         # query containing < made Telegram reject the message outright, so
         # the bot answered a slightly odd question with silence.
         asked = html.escape(query)
         if not matches:
-            await message.reply_html(f"No chart matches “{asked}”. Try <code>/c</code> on its own.")
+            await message.reply_html(f"No chart matches “{asked}”. Try <code>/e</code> on its own.")
             return
 
         # More than one match is a question, not an answer. "validator" sent
@@ -197,6 +197,27 @@ def command_handler(site_url: str):
     return reply_to_command
 
 
+def retired_command_handler():
+    """/c and /ccd say where the command went.
+
+    Left registered rather than removed. An unknown command is not routed
+    to the plain-text handler either, so unregistering these would answer
+    anyone who learned /c with silence -- which reads as the bot being
+    broken rather than as the command having moved.
+    """
+
+    async def point_at_the_new_command(update, context) -> None:
+        message = update.message
+        if message is None:
+            return
+        await message.reply_html(
+            "I answer <code>/e</code> now — try <code>/e price</code>, "
+            "or <code>/e</code> on its own for the list."
+        )
+
+    return point_at_the_new_command
+
+
 def nudge_handler():
     """Plain text no longer searches -- it points at the command.
 
@@ -209,8 +230,8 @@ def nudge_handler():
         if message is None or not message.text:
             return
         await message.reply_html(
-            "I answer commands now — try <code>/c price</code>, "
-            "or <code>/c</code> on its own for the list."
+            "I answer commands now — try <code>/e price</code>, "
+            "or <code>/e</code> on its own for the list."
         )
 
     return nudge

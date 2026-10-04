@@ -25,7 +25,12 @@ from telegram.ext import (
 )
 
 from .catalogue import CHARTS
-from .direct import callback_handler, command_handler, nudge_handler
+from .direct import (
+    callback_handler,
+    command_handler,
+    nudge_handler,
+    retired_command_handler,
+)
 from .inline import handler as inline_handler
 from .inline import pickable
 
@@ -51,8 +56,8 @@ async def start(update: Update, context) -> None:
     lines = [
         "I put Concordium charts into any chat.",
         "",
-        "Here: <code>/c &lt;word&gt;</code> — for example <code>/c price</code>. "
-        "<code>/c</code> on its own lists the categories.",
+        "Here: <code>/e &lt;word&gt;</code> — for example <code>/e price</code>. "
+        "<code>/e</code> on its own lists the categories.",
         "",
         f"Anywhere else: type <code>@{username}</code>, then any of these:",
         "",
@@ -67,8 +72,8 @@ async def start(update: Update, context) -> None:
         "",
         "Charts with intervals arrive with buttons for their other periods.",
         "",
-        "In a group where another bot also answers <code>/c</code>, use "
-        "<code>/ccd</code> or <code>/c@" + username + "</code>.",
+        "In a group where another bot also answers <code>/e</code>, use "
+        "<code>/e@" + username + "</code>.",
         "",
         "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
     ]
@@ -86,12 +91,16 @@ def main() -> None:
     application.add_handler(CommandHandler(["start", "help"], start))
     application.add_handler(InlineQueryHandler(inline_handler(site_url)))
     application.add_handler(CallbackQueryHandler(callback_handler(site_url)))
-    # /c is short enough that another bot in the same group may claim it. PTB
-    # ignores /c@other_bot -- it compares the part after @ to its own username
-    # -- so the only ambiguous case is a bare /c in a group, where both bots
-    # answer. /ccd stays registered as the form that cannot be mistaken.
-    application.add_handler(CommandHandler(["c", "ccd"], command_handler(site_url)))
-    # Plain text no longer searches -- it points at /ccd. Registered last, so
+    # /e for explorer. Short enough that another bot in the same group may
+    # claim it -- PTB ignores /e@other_bot, comparing the part after @ to its
+    # own username, so the only ambiguous case is a bare /e in a group, where
+    # both bots answer. The help says to qualify it there.
+    application.add_handler(CommandHandler(["e"], command_handler(site_url)))
+    # The names it used to answer to. Registered rather than dropped: an
+    # unknown command does not reach the plain-text handler either, so
+    # removing these would answer anyone who learned /c with silence.
+    application.add_handler(CommandHandler(["c", "ccd"], retired_command_handler()))
+    # Plain text no longer searches -- it points at /e. Registered last, so
     # it cannot swallow the commands above. Answering everything typed at the
     # bot made it noisy in group chats; going silent instead would read as the
     # bot being broken, so it says one line and nothing more.
