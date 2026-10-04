@@ -553,115 +553,87 @@ def add_watermark_to_plot(fig: go.Figure, request: Request) -> go.Figure:
 plot_info = {
     "ccd_kraken_1m": {
         "description": "CCD/USD 1-minute candles and volume from Kraken. Thinly traded at this resolution -- many candles have no trades at all.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_5m": {
         "description": "CCD/USD 5-minute candles and volume from Kraken. Thinly traded at this resolution -- many candles have no trades at all.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_15m": {
         "description": "CCD/USD 15-minute candles and volume from Kraken. Thinly traded at this resolution -- many candles have no trades at all.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_30m": {
         "description": "CCD/USD 30-minute candles and volume from Kraken. Thinly traded at this resolution -- many candles have no trades at all.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_1h": {
         "description": "CCD/USD 1-hour candles and volume from Kraken, the order book rather than the chain's fee rate.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_4h": {
         "description": "CCD/USD 4-hour candles and volume from Kraken, the order book rather than the chain's fee rate.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_kraken_1d": {
         "description": "CCD/USD daily candles and volume from Kraken, the order book rather than the chain's fee rate.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_price_24h": {
         "description": "The CCD price over the last 24 hours, from the chain's own CCD/EUR rate, ending on the current spot price.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_price_90d": {
         "description": "The CCD price over the last 90 days, from the chain's own CCD/EUR rate, ending on the current spot price.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "ccd_price_1y": {
         "description": "The CCD price over the last year, from the chain's own CCD/EUR rate, ending on the current spot price.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "accounts_per_day": {
         "description": "Number of new accounts created per day on the Concordium blockchain.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
     "daily_limits": {
         "description": "How many CCD do you need to hold to reach the top 100/250?",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
     "realized_prices": {
         "description": "Realized Price is a valuation metric showing the average price at which all existing coins were last moved or purchased on-chain, acting as the network's collective cost basis.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/accounts",
     },
     "network_activity_tps": {
         "description": "This chart displays both a measure for activity as measured as CCD transferred per day, as well as the traditional TPS (transactions per second) metric.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
     "transaction_types": {
         "description": "This chart displays different high level transaction types.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
     "fee_stabilization": {
         "description": "This chart measures the cost for a regular transfer on the blockchain, highlighting the fee stabilization mechanism.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
     "transaction_fees": {
         "description": "This chart shows how much transaction fees have been paid on the Concordium blockchain over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/chain",
     },
     "ccd_on_exchanges": {
         "description": "This chart shows the balance of CCD held on various exchanges over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "exchange_wallets": {
         "description": "This chart shows the count of exchange wallets (=aliases) over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/exchanges",
     },
     "staking_open_pool_count": {
         "description": "This chart shows the count of open pools for staking over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_delegator_count": {
         "description": "This chart shows the count of delegators over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_avg_delegator_per_pool_count": {
         "description": "This chart shows the average count of delegators per pool over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_avg_delegator_stake": {
         "description": "This chart shows the average stake of delegators over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_restaked_rewards": {
         "description": "This chart shows the percentage of daily rewards restaked over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_distribution_of_rewards": {
         "description": "This chart shows the daily breakdown of rewards over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_percentage_staked": {
         "description": "This chart shows the daily percentage of all outstanding CCD that is staked over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/staking",
     },
     "staking_validator_count": {
         "description": "This chart shows the count of validators over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/validators",
     },
     "staking_validator_staked_amounts": {
         "description": "This chart shows the amounts validators have staked and their (delegated) pool sizes over time.",
-        "page_url": "https://ccdexplorer.io/mainnet/statistics/validators",
     },
     "ccd_balance_usd_value": {
         "description": "This chart shows the USD value of an account's CCD balance over time.",
@@ -862,6 +834,19 @@ def as_cover(fig: go.Figure) -> go.Figure:
     return fig
 
 
+#: Charts served under /plots that are not in the chart registry, and the
+#: gallery category that shows them. Only one so far: the top-50 validator
+#: stake chart is a live snapshot of the current payday rather than a
+#: date-keyed series, so it has no spec -- and so it was the one chart whose
+#: "View chart on CCDExplorer.io" still fell back to a /statistics tab.
+#:
+#: ccd_balance_usd_value is deliberately absent: it is per-account, and its
+#: link belongs to the account rather than to any chart category.
+CATEGORY_FOR_SPECLESS_PLOT = {
+    "staking_validator_staked_amounts": "staking",
+}
+
+
 def chart_page_url(name: str, request: Request) -> str:
     """Where "View chart on CCDExplorer.io" should lead, or "" if unknown.
 
@@ -876,11 +861,13 @@ def chart_page_url(name: str, request: Request) -> str:
     """
     from ccdexplorer.charts.registry import spec_for_plot
 
-    spec = spec_for_plot(name)
-    if spec is None:
-        return ""
     segments = request.url.path.strip("/").split("/")
     net = segments[1] if len(segments) > 1 else "mainnet"
+
+    spec = spec_for_plot(name)
+    if spec is None:
+        category = CATEGORY_FOR_SPECLESS_PLOT.get(name)
+        return f"/{net}/charts/category/{category}" if category else ""
     if spec.has_page:
         return f"/{net}/charts/{spec.slug}"
     return f"/{net}/charts/category/{spec.category}"
