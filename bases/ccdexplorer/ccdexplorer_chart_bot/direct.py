@@ -44,7 +44,12 @@ MENU_PREFIX = "g:"
 
 #: The order the categories read in. price first because it is what most
 #: people open the bot for; other last because it is the leftovers.
-CATEGORY_ORDER = ("price", "chain", "plt", "agents", "other")
+#:
+#: Each name is a group in the catalogue and each is the whole of the
+#: button's label, so a group holding one chart had better be named after
+#: it: "chain" held only Transactions, and nobody reading the menu could
+#: tell.
+CATEGORY_ORDER = ("price", "txs", "plt", "agents", "other")
 
 
 def keyboard_for(

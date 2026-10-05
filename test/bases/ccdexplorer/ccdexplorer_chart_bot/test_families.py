@@ -13,7 +13,7 @@ from ccdexplorer.ccdexplorer_chart_bot.catalogue import (
     siblings,
 )
 
-GROUPS = {"price", "chain", "plt", "agents", "other"}
+GROUPS = {"price", "txs", "plt", "agents", "other"}
 
 
 def _families() -> set[str]:

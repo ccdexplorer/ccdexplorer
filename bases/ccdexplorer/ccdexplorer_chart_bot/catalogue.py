@@ -490,7 +490,11 @@ CHARTS: tuple[Chart, ...] = (
         title="Transactions",
         description="Transactions by category",
         keywords=("txs", "tx", "transactions", "count", "volume", "activity"),
-        group="chain",
+        # "txs", not "chain". It is the only chart in its group, so the
+        # group name is the button name, and a button called "chain" said
+        # nothing about the transactions behind it -- people looked for
+        # them under "other", which holds the seventeen that are not this.
+        group="txs",
         claims=("txs",),
         # The window used to be part of the chart name, so "/c 90d" found
         # one. It is a button now; the words stay searchable.

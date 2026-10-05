@@ -11,7 +11,9 @@ from ccdexplorer.ccdexplorer_chart_bot import direct
 from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS, family_default
 
 SITE = "https://ccdexplorer.io"
-CATEGORY_ORDER = ["price", "chain", "plt", "agents", "other"]
+# Mirrors direct.CATEGORY_ORDER. "txs" rather than "chain": the group
+# holds only the transactions chart, and the group name is the button.
+CATEGORY_ORDER = ["price", "txs", "plt", "agents", "other"]
 
 
 class _Message:
@@ -473,3 +475,55 @@ async def test_the_no_match_reply_names_the_new_command_too():
     said = message.htmls[0]
     assert "/e" in said
     assert "/c<" not in said and "/c " not in said, said
+
+
+# --- the category menu names what is behind each button --------------------
+#
+# /e offered price, chain, PLT, agents and other. "chain" held exactly one
+# chart -- Transactions -- so the most-asked-for chart on the bot was behind
+# a button whose name did not say so, and anyone who looked under "other"
+# for it found seventeen charts and no transactions.
+
+
+def test_the_menu_offers_txs_rather_than_chain():
+    assert "txs" in direct.CATEGORY_ORDER
+    assert "chain" not in direct.CATEGORY_ORDER
+
+
+def test_the_transactions_chart_is_the_one_behind_it():
+    from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
+
+    assert BY_NAME["transactions_count"].group == "txs"
+
+
+async def test_tapping_txs_sends_the_transactions_chart():
+    query = await _tap(f"{direct.MENU_PREFIX}txs")
+
+    assert query.media or query.messages, "the txs button answered nothing"
+    if query.media:
+        assert "transactions_count" in query.media[0][0].media
+
+
+def test_the_menu_reaches_every_chart():
+    """Completeness, asked of the whole catalogue rather than eyeballed.
+
+    Every chart has to sit behind one of the buttons, or it can only be
+    found by already knowing its name.
+    """
+    buttons = {
+        b.callback_data.removeprefix(direct.MENU_PREFIX)
+        for row in direct.category_menu().inline_keyboard
+        for b in row
+    }
+    unreachable = [c.name for c in CHARTS if c.group not in buttons]
+
+    assert unreachable == [], unreachable
+
+
+def test_every_button_has_something_behind_it():
+    """The other direction: a button leading to an empty list is a promise
+    of nothing."""
+    groups = {c.group for c in CHARTS}
+    empty = [g for g in direct.CATEGORY_ORDER if g not in groups]
+
+    assert empty == [], empty
