@@ -13,7 +13,9 @@ from ccdexplorer.ccdexplorer_chart_bot.catalogue import (
     siblings,
 )
 
-GROUPS = {"price", "chain", "plt", "agents", "other"}
+# The site gallery's categories, plus txs. "other" is gone: it held
+# seventeen charts the gallery had already sorted into three categories.
+GROUPS = {"price", "txs", "chain", "accounts", "staking", "exchanges", "plt", "agents"}
 
 
 def _families() -> set[str]:
@@ -34,23 +36,30 @@ def test_kraken_is_now_the_price_family():
     assert len(siblings(BY_NAME["ccd_kraken_4h"])) == 7
 
 
-def test_a_chart_in_other_has_no_siblings():
-    """The regression that would give eighteen charts seventeen buttons each."""
-    chart = BY_NAME["accounts_growth"]
+def test_a_chart_sharing_a_group_still_has_no_siblings():
+    """The regression this guards is now live in a way it was not before.
 
-    assert chart.group == "other"
+    siblings() keys on period, not group. When the standalone charts all
+    sat in `other` that distinction was invisible; now nine of them share
+    the group `staking`, so keying on group would hand each of those nine
+    eight sibling buttons.
+    """
+    chart = BY_NAME["staking_delegator_count"]
+
+    assert chart.group == "staking"
+    assert len([c for c in CHARTS if c.group == "staking"]) > 1
     assert siblings(chart) == []
 
 
 def test_only_interval_family_members_carry_a_period():
-    """Three shapes now. `other` is standalone charts; a spec-backed chart
-    carries its windows on its spec, not as a period; and what is left is the
-    interval families, where the period is the button's label."""
+    """A period marks a chart as one of a series at several intervals, and
+    only the Kraken candles are that. Everything else is a chart in its
+    own right, whether or not it has a spec carrying windows."""
     for chart in CHARTS:
-        if chart.group == "other" or chart.spec_name:
-            assert not chart.period, f"{chart.name} should carry no period"
-        else:
+        if chart.group == "price" and not chart.spec_name:
             assert chart.period, f"{chart.name} is in a family but has no period"
+        else:
+            assert not chart.period, f"{chart.name} should carry no period"
 
 
 def test_each_family_has_exactly_one_default():
@@ -59,8 +68,10 @@ def test_each_family_has_exactly_one_default():
         assert len(members) == 1, f"{group} has {len(members)} defaults"
 
 
-def test_nothing_in_other_is_a_default():
-    assert not any(c.default for c in CHARTS if c.group == "other")
+def test_nothing_outside_a_family_is_a_default():
+    """A default is how a family collapses to one entry. A group that is
+    not a family has nothing to collapse."""
+    assert not any(c.default for c in CHARTS if not c.period)
 
 
 def test_the_price_default_is_the_four_hour_chart():

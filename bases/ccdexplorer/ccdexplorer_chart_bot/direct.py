@@ -42,9 +42,27 @@ BUTTONS_PER_ROW = 4
 #: so a tap on a category cannot be read as a chart name.
 MENU_PREFIX = "g:"
 
-#: The order the categories read in. price first because it is what most
-#: people open the bot for; other last because it is the leftovers.
-CATEGORY_ORDER = ("price", "chain", "plt", "agents", "other")
+#: The order the categories read in. price and txs first because they are
+#: what most people open the bot for.
+#:
+#: These are the site gallery's categories, so one set of charts is sorted
+#: one way rather than two. "other" used to hold seventeen -- staking,
+#: accounts and exchanges charts in one undifferentiated list -- while the
+#: gallery had already sorted exactly those.
+#:
+#: txs is the one departure: transactions_count is "chain" on the site,
+#: but each name here is the whole of a button's label, and "chain" said
+#: nothing about the transactions behind it.
+CATEGORY_ORDER = (
+    "price",
+    "txs",
+    "chain",
+    "accounts",
+    "staking",
+    "exchanges",
+    "plt",
+    "agents",
+)
 
 
 def keyboard_for(
