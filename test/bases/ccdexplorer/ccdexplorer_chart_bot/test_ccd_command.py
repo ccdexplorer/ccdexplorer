@@ -11,9 +11,18 @@ from ccdexplorer.ccdexplorer_chart_bot import direct
 from ccdexplorer.ccdexplorer_chart_bot.catalogue import CHARTS, family_default
 
 SITE = "https://ccdexplorer.io"
-# Mirrors direct.CATEGORY_ORDER. "txs" rather than "chain": the group
-# holds only the transactions chart, and the group name is the button.
-CATEGORY_ORDER = ["price", "txs", "plt", "agents", "other"]
+# Mirrors direct.CATEGORY_ORDER: the site gallery's categories, plus txs
+# for the transactions chart, which the site files under chain.
+CATEGORY_ORDER = [
+    "price",
+    "txs",
+    "chain",
+    "accounts",
+    "staking",
+    "exchanges",
+    "plt",
+    "agents",
+]
 
 
 class _Message:
@@ -142,16 +151,6 @@ async def test_tapping_a_family_category_sends_its_default():
 
     assert query.media, "no chart swapped in"
     assert family_default("price").name in query.media[0][0].media
-
-
-async def test_tapping_other_offers_the_charts_in_it():
-    query = await _tap(f"{direct.MENU_PREFIX}other")
-    others = [c for c in CHARTS if c.group == "other"]
-
-    assert query.messages, "other offered nothing"
-    markup = query.messages[0][1]["reply_markup"]
-    labels = [b.text for row in markup.inline_keyboard for b in row]
-    assert len(labels) == len(others)
 
 
 async def test_tapping_an_unknown_category_is_answered_not_hung():
@@ -403,8 +402,8 @@ async def test_picking_from_a_chart_still_swaps_it_in_place():
 
 
 async def test_the_category_which_one_path_now_answers():
-    """`/c` -> other -> "Which one?" -> a chart. The last step errored."""
-    menu = await _tap(f"{direct.MENU_PREFIX}other")
+    """`/e` -> staking -> "Which one?" -> a chart. The last step errored."""
+    menu = await _tap(f"{direct.MENU_PREFIX}staking")
     first = menu.messages[0][1]["reply_markup"].inline_keyboard[0][0]
 
     message = _PhotolessMessage()
@@ -485,9 +484,13 @@ async def test_the_no_match_reply_names_the_new_command_too():
 # for it found seventeen charts and no transactions.
 
 
-def test_the_menu_offers_txs_rather_than_chain():
+def test_the_menu_offers_txs_as_well_as_chain():
+    """chain is back, but holding the other three chain charts rather than
+    standing in for the transactions one."""
     assert "txs" in direct.CATEGORY_ORDER
-    assert "chain" not in direct.CATEGORY_ORDER
+    assert "chain" in direct.CATEGORY_ORDER
+    assert [c.title for c in CHARTS if c.group == "txs"] == ["Transactions"]
+    assert "Transactions" not in [c.title for c in CHARTS if c.group == "chain"]
 
 
 def test_the_transactions_chart_is_the_one_behind_it():
@@ -527,3 +530,71 @@ def test_every_button_has_something_behind_it():
     empty = [g for g in direct.CATEGORY_ORDER if g not in groups]
 
     assert empty == [], empty
+
+
+# --- the menu uses the site's categories -----------------------------------
+#
+# "other" was a junk drawer of seventeen: staking, accounts and exchanges
+# charts in one undifferentiated list, while the gallery on the site had
+# already sorted exactly those into categories. Two taxonomies for one set
+# of charts, and the worse one was the one in the bot.
+
+
+def test_there_is_no_junk_drawer_left():
+    assert "other" not in direct.CATEGORY_ORDER
+    assert [c.name for c in CHARTS if c.group == "other"] == []
+
+
+def test_the_menu_is_the_site_categories_plus_txs():
+    assert direct.CATEGORY_ORDER == (
+        "price",
+        "txs",
+        "chain",
+        "accounts",
+        "staking",
+        "exchanges",
+        "plt",
+        "agents",
+    )
+
+
+def test_each_chart_sits_where_the_site_puts_it():
+    """One taxonomy, read off the registry rather than kept by hand.
+
+    Two deliberate departures: the Kraken intervals are "price" in the bot
+    because they are one chart at seven intervals rather than seven
+    charts, and transactions_count is "txs" because it is the chart people
+    open the bot for and "chain" did not say so.
+    """
+    from ccdexplorer.charts.registry import spec_for_plot
+
+    departures = {"transactions_count": "txs"}
+    wrong = []
+    for chart in CHARTS:
+        spec = spec_for_plot(chart.name)
+        if spec is None or chart.period:
+            continue
+        expected = departures.get(chart.name, spec.category)
+        if chart.group != expected:
+            wrong.append((chart.name, chart.group, expected))
+
+    assert wrong == [], wrong
+
+
+async def test_a_category_holding_several_offers_them_all():
+    """staking is nine now, where it used to be nine of seventeen."""
+    staking = [c for c in CHARTS if c.group == "staking"]
+    assert len(staking) > 1
+
+    query = await _tap(f"{direct.MENU_PREFIX}staking")
+    labels = [b.text for row in query.messages[0][1]["reply_markup"].inline_keyboard for b in row]
+
+    assert sorted(labels) == sorted(c.title for c in staking)
+
+
+async def test_a_category_holding_one_sends_it_straight_away():
+    """No point asking "which one?" about a list of one."""
+    query = await _tap(f"{direct.MENU_PREFIX}agents")
+
+    assert query.media, "agents asked instead of answering"
+    assert not query.messages

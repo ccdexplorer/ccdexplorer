@@ -351,7 +351,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Percentage staked",
         description="Share of all CCD that is staked",
         keywords=("staked", "percentage", "ratio", "share", "supply", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_percentage_staked",
     ),
     Chart(
@@ -359,7 +359,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Validator count",
         description="Validators over time",
         keywords=("validators", "bakers", "nodes", "count", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_validator_count",
     ),
     Chart(
@@ -367,7 +367,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Delegator count",
         description="Delegators over time",
         keywords=("delegators", "delegation", "count", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_delegator_count",
     ),
     Chart(
@@ -375,7 +375,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Open pools",
         description="Pools open for delegation over time",
         keywords=("pools", "open", "delegation", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_open_pool_count",
     ),
     Chart(
@@ -383,14 +383,14 @@ CHARTS: tuple[Chart, ...] = (
         title="Validator stake",
         description="What validators have staked",
         keywords=("validators", "bakers", "stake", "amounts", "staking"),
-        group="other",
+        group="staking",
     ),
     Chart(
         name="staking_restaked_rewards",
         title="Restaked rewards",
         description="Share of daily rewards restaked",
         keywords=("restake", "compounding", "rewards", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_restaked_rewards",
     ),
     Chart(
@@ -398,7 +398,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Reward distribution",
         description="Daily breakdown of rewards",
         keywords=("rewards", "distribution", "payday", "staking", "earnings"),
-        group="other",
+        group="staking",
         spec_name="staking_distribution_of_rewards",
     ),
     Chart(
@@ -406,7 +406,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Average delegator stake",
         description="Average stake per delegator",
         keywords=("average", "delegator", "stake", "mean", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_avg_delegator_stake",
     ),
     Chart(
@@ -414,7 +414,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Delegators per pool",
         description="Average number of delegators in a pool",
         keywords=("average", "delegators", "pool", "mean", "staking"),
-        group="other",
+        group="staking",
         spec_name="staking_avg_delegator_per_pool_count",
     ),
     Chart(
@@ -424,7 +424,7 @@ CHARTS: tuple[Chart, ...] = (
         # "per day" stays a keyword although the chart no longer is: the
         # grouping is a button now, but it is still what people type.
         keywords=("accounts", "new", "growth", "signups", "users", "adoption", "per", "day"),
-        group="other",
+        group="accounts",
         spec_name="accounts_growth",
     ),
     Chart(
@@ -432,7 +432,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Network activity",
         description="CCD transferred, and transactions per second",
         keywords=("tps", "throughput", "activity", "volume", "speed", "usage"),
-        group="other",
+        group="chain",
         spec_name="network_activity",
     ),
     Chart(
@@ -440,7 +440,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Transaction fees",
         description="Fees paid on the chain over time",
         keywords=("fees", "revenue", "paid", "cost", "transactions"),
-        group="other",
+        group="chain",
         spec_name="transaction_fees",
     ),
     Chart(
@@ -448,7 +448,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Fee stabilization",
         description="Cost of a regular transfer over time",
         keywords=("fees", "cost", "transfer", "stable", "cheap"),
-        group="other",
+        group="chain",
         spec_name="fee_stabilization",
     ),
     Chart(
@@ -456,7 +456,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Daily limits",
         description="CCD needed to reach the top 100 and top 250",
         keywords=("rich", "top", "whales", "leaderboard", "ranking", "holders"),
-        group="other",
+        group="accounts",
         spec_name="daily_limits",
     ),
     Chart(
@@ -464,7 +464,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Realized price",
         description="Average price at which coins last moved",
         keywords=("realized", "valuation", "cost", "basis", "market"),
-        group="other",
+        group="accounts",
         spec_name="realized_prices",
     ),
     Chart(
@@ -472,7 +472,7 @@ CHARTS: tuple[Chart, ...] = (
         title="CCD on exchanges",
         description="Balance held on exchange wallets",
         keywords=("exchanges", "cex", "listed", "custody", "binance"),
-        group="other",
+        group="exchanges",
         spec_name="ccd_on_exchanges",
     ),
     Chart(
@@ -480,7 +480,7 @@ CHARTS: tuple[Chart, ...] = (
         title="Exchange wallets",
         description="Count of exchange wallets over time",
         keywords=("exchanges", "wallets", "aliases", "custody"),
-        group="other",
+        group="exchanges",
         spec_name="exchange_wallets",
     ),
     # The three families that have specs. One entry each instead of four:
