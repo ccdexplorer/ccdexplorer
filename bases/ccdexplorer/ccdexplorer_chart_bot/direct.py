@@ -161,6 +161,45 @@ def caption(chart: Chart, site_url: str, state: ChartState | None = None) -> str
     return f"<b>{chart.title}</b> — {chart.description}\n{page_url(chart, site_url, state)}"
 
 
+#: Chats where more than one person could have asked.
+GROUP_CHATS = ("group", "supergroup")
+
+
+def requester_note(query) -> str:
+    """Who pressed the button, for a caption, or "" where it adds nothing.
+
+    Telegram delivers a button press to the bot alone -- the group sees no
+    trace of it -- and the chart arrives as a reply to the bot's own
+    "Which one?" menu rather than to anything the asker wrote. So a chart
+    appears in a busy group attached to nobody. The bot is the only one
+    who knows, and this is it saying so.
+
+    Silent in a private chat, where there is one person it could be, and
+    on an inline result, where Telegram already names the sender above the
+    message.
+    """
+    message = getattr(query, "message", None)
+    chat = getattr(message, "chat", None)
+    if getattr(chat, "type", None) not in GROUP_CHATS:
+        return ""
+
+    user = getattr(query, "from_user", None)
+    if user is None:
+        return ""
+
+    # Escaped: a display name is whatever its owner typed, the caption is
+    # HTML, and a name containing a tag would have Telegram reject the
+    # message rather than render it -- so the chart would not arrive.
+    name = html.escape(user.first_name or user.username or "someone")
+    # A tg:// mention rather than @username, which not everyone has.
+    return f'\n<i>asked by <a href="tg://user?id={user.id}">{name}</a></i>'
+
+
+def caption_for_button(chart: Chart, site_url: str, state, query) -> str:
+    """The caption a chart gets when a button produced it."""
+    return caption(chart, site_url, state) + requester_note(query)
+
+
 def command_handler(site_url: str):
     """/e <word> sends a chart; /e on its own offers the categories."""
 
@@ -324,7 +363,7 @@ def callback_handler(site_url: str):
         if picked_from is not None and not getattr(picked_from, "photo", None):
             await query.message.reply_photo(
                 photo=image_url(chart, site_url, state),
-                caption=caption(chart, site_url, state),
+                caption=caption_for_button(chart, site_url, state, query),
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard_for(chart, state),
             )
@@ -333,7 +372,7 @@ def callback_handler(site_url: str):
         await query.edit_message_media(
             media=InputMediaPhoto(
                 media=image_url(chart, site_url, state),
-                caption=caption(chart, site_url, state),
+                caption=caption_for_button(chart, site_url, state, query),
                 parse_mode=ParseMode.HTML,
             ),
             reply_markup=keyboard_for(chart, state),
