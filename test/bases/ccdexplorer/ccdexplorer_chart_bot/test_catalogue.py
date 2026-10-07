@@ -424,14 +424,17 @@ async def test_a_whole_question_works_in_the_chat_too():
     assert "Percentage staked" in offered, offered
 
 
-async def test_each_reply_offers_to_send_it_to_a_chat():
-    """So the private chat doubles as a way to find the right chart first."""
+async def test_each_reply_carries_the_chart_s_own_controls():
+    """Was: every reply offered a "Send to a chat" button. Telegram
+    forwards any message from its own interface, so the button duplicated
+    something that already worked better; what a reply carries now is the
+    chart's periods and groupings."""
     message = await _send("accounts")
     _, _, markup = message.photos[0]
-    # Last row: the configuration buttons come first, and "send it on" is
-    # what you do once the chart says what you wanted.
-    button = markup.inline_keyboard[-1][0]
-    assert button.switch_inline_query == "accounts_growth"
+    labels = {b.text.strip("· ") for row in markup.inline_keyboard for b in row}
+
+    assert not any(b.switch_inline_query for row in markup.inline_keyboard for b in row)
+    assert {"30d", "1y"} <= labels, labels
 
 
 async def test_a_broad_query_offers_every_match_and_sends_none():
@@ -480,7 +483,8 @@ def test_the_keyboard_marks_which_interval_is_showing():
     from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
 
     rows = keyboard_for(BY_NAME["ccd_kraken_4h"]).inline_keyboard
-    labels = [b.text for row in rows[:-1] for b in row]
+    # All of them: there is no send button taking up the last row now.
+    labels = [b.text for row in rows for b in row]
     assert labels == ["1m", "5m", "15m", "30m", "1h", "· 4h ·", "1d"]
 
 
@@ -490,17 +494,17 @@ def test_the_interval_row_wraps_before_it_gets_too_narrow():
     from ccdexplorer.ccdexplorer_chart_bot.direct import BUTTONS_PER_ROW, keyboard_for
 
     for chart in CHARTS:
-        for row in keyboard_for(chart).inline_keyboard:
+        markup = keyboard_for(chart)
+        for row in markup.inline_keyboard if markup else []:
             assert len(row) <= BUTTONS_PER_ROW
 
 
-def test_a_standalone_chart_gets_no_interval_row():
+def test_a_standalone_chart_gets_no_keyboard():
+    """No spec, no family, and no send button any more -- so nothing."""
     from ccdexplorer.ccdexplorer_chart_bot.catalogue import BY_NAME
     from ccdexplorer.ccdexplorer_chart_bot.direct import keyboard_for
 
-    rows = keyboard_for(BY_NAME["staking_validator_staked_amounts"]).inline_keyboard
-    assert len(rows) == 1
-    assert rows[0][0].switch_inline_query == "staking_validator_staked_amounts"
+    assert keyboard_for(BY_NAME["staking_validator_staked_amounts"]) is None
 
 
 def test_callback_data_round_trips_and_fits():
@@ -509,7 +513,8 @@ def test_callback_data_round_trips_and_fits():
     from ccdexplorer.ccdexplorer_chart_bot.direct import CALLBACK_PREFIX, keyboard_for
 
     for chart in CHARTS:
-        for row in keyboard_for(chart).inline_keyboard:
+        markup = keyboard_for(chart)
+        for row in markup.inline_keyboard if markup else []:
             for button in row:
                 if button.callback_data:
                     assert len(button.callback_data.encode()) <= 64

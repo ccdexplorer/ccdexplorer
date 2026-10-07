@@ -67,7 +67,7 @@ def photo_result(chart: Chart, site_url: str) -> InlineQueryResultPhoto:
         # between. The "send to a chat" button makes no sense once it is
         # already in one.
         reply_markup=(
-            keyboard_for(chart, state, send_button=False)
+            keyboard_for(chart, state)
             if chart.spec is not None or len(siblings(chart)) > 1
             else None
         ),

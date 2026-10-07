@@ -133,15 +133,12 @@ def test_an_unmigrated_chart_keeps_its_interval_family():
 
 
 def test_an_unmigrated_standalone_chart_gets_no_configuration_row():
-    """A chart with neither a spec nor siblings has nothing to offer but
-    sending it onward.
+    """A chart with neither a spec nor siblings has nothing to offer.
 
-    Validator stake is the last one: every other standalone chart in the
-    catalogue now names a spec and gets period and grouping buttons.
+    It used to get a lone "Send to a chat" button; with that gone there is
+    nothing under it at all, which is None rather than an empty markup.
     """
-    rows = keyboard_for(_chart("staking_validator_staked_amounts"), None).inline_keyboard
-    assert len(rows) == 1
-    assert rows[0][0].switch_inline_query == "staking_validator_staked_amounts"
+    assert keyboard_for(_chart("staking_validator_staked_amounts"), None) is None
 
 
 def test_a_legacy_callback_still_resolves():
@@ -208,14 +205,11 @@ def test_a_chart_with_no_spec_still_gets_no_window_buttons():
     redraw the identical image -- the dead control this avoids.
 
     Daily limits used to be the example here. It has a spec now, so it is
-    the opposite case: it gets the buttons, and the test above holds the
-    one chart that still cannot use them.
+    the opposite case: it gets the buttons, and the chart above holds the
+    one that still cannot use them.
     """
-    rows = keyboard_for(_chart("staking_validator_staked_amounts"), None).inline_keyboard
-    assert len(rows) == 1
-
-    configured = keyboard_for(_chart("daily_limits"), None).inline_keyboard
-    assert len(configured) > 1
+    assert keyboard_for(_chart("staking_validator_staked_amounts"), None) is None
+    assert keyboard_for(_chart("daily_limits"), None).inline_keyboard
 
 
 def test_an_intraday_chart_keeps_its_plots_link():
@@ -312,3 +306,39 @@ def test_the_period_buttons_still_redraw_it():
     chart = _chart("fee_stabilization")
     rows = keyboard_for(chart, None).inline_keyboard
     assert any(b.callback_data for row in rows for b in row if b.callback_data)
+
+
+# --- no "Send to a chat" button --------------------------------------------
+#
+# It duplicated something Telegram already does better: every message can be
+# forwarded from the standard interface, to any chat, with no button.
+
+
+def test_no_chart_offers_a_send_button():
+    for chart in CHARTS:
+        markup = keyboard_for(_chart(chart.name), None)
+        for row in markup.inline_keyboard if markup else []:
+            for button in row:
+                assert button.switch_inline_query is None, chart.name
+
+
+def test_a_chart_with_nothing_to_configure_gets_no_keyboard_at_all():
+    """Validator stake has no spec and no family, so the send button was
+    the only thing under it. An empty keyboard is not the answer -- it is
+    a markup Telegram refuses -- so there is none."""
+    assert keyboard_for(_chart("staking_validator_staked_amounts"), None) is None
+
+
+def test_a_chart_with_something_to_configure_still_has_its_rows():
+    rows = keyboard_for(_chart("transaction_fees"), None).inline_keyboard
+    labels = {b.text.strip("· ") for row in rows for b in row}
+
+    assert {"30d", "90d", "1y"} <= labels
+    assert {"daily", "weekly", "monthly"} <= labels
+
+
+def test_an_interval_family_still_has_its_row():
+    rows = keyboard_for(_chart("ccd_kraken_4h"), None).inline_keyboard
+    labels = {b.text.strip("· ") for row in rows for b in row}
+
+    assert {"1m", "4h", "1d"} <= labels
