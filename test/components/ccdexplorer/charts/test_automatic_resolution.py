@@ -185,3 +185,33 @@ def test_all_resolves_to_the_charts_own_start():
     spec = BY_NAME["exchange_wallets"]
     start, _end = resolve_window(spec, Window.ALL, dt.date(2026, 10, 3))
     assert start == spec.chain_start
+
+
+# --- stake in cooldown -----------------------------------------------------
+
+
+def test_cooldowns_starts_at_protocol_version_7():
+    """Not at genesis and not at the staking start. Cooldowns in this form
+    arrived with P7 on 30 October 2024; before that the node's cooldown
+    streams are empty by definition, so the slider's left stop and "all"
+    would both begin in sixteen months of flat zero."""
+    assert BY_NAME["cooldowns"].chain_start == dt.date(2024, 10, 30)
+
+
+def test_cooldowns_picks_its_own_resolution():
+    """Every state is a standing balance, so grouping changes nothing
+    about the number."""
+    assert BY_NAME["cooldowns"].automatic_grouping
+
+
+def test_cooldowns_draws_the_whole_queue():
+    """Three states, stacked: stake enters pre-pre-cooldown, reaches
+    pre-cooldown at the snapshot epoch and cooldown at the next payday.
+    None of it is spendable, so the stack is what is locked."""
+    spec = BY_NAME["cooldowns"]
+    assert [s.key for s in spec.display_series] == [
+        "cooldown_amount",
+        "pre_cooldown_amount",
+        "pre_pre_cooldown_amount",
+    ]
+    assert all(s.scale == 1_000_000 for s in spec.series), "amounts are stored in microCCD"

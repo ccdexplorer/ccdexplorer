@@ -273,6 +273,65 @@ AGENT_REGISTRIES = ChartSpec(
     docs_path="charts/agent_registries/",
 )
 
+#: Protocol version 7 reached mainnet on 30 October 2024. Cooldowns in this
+#: form are a P7 feature: before it the node's cooldown streams are empty by
+#: definition, so the chart would open on sixteen months of flat zero.
+COOLDOWNS_START = dt.date(2024, 10, 30)
+
+COOLDOWNS = ChartSpec(
+    name="cooldowns",
+    slug="cooldowns",
+    title="Stake in cooldown",
+    description="Stake locked after a validator or delegator reduced it.",
+    blurb="Stake locked while it waits to be released",
+    keywords=(
+        "cooldown",
+        "cooldowns",
+        "locked",
+        "unstaking",
+        "unbonding",
+        "released",
+        "pending",
+    ),
+    claims=("cooldown", "cooldowns"),
+    category="staking",
+    source="statistics_cooldowns",
+    series=(
+        # The three states are one queue: stake enters pre-pre-cooldown,
+        # reaches pre-cooldown at the snapshot epoch and cooldown at the
+        # following payday. Stacked, because together they are what is
+        # locked and none of them is spendable.
+        Series(
+            key="cooldown_amount",
+            url_name="cooldown",
+            label="Cooldown",
+            colour="#549FF2",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+        Series(
+            key="pre_cooldown_amount",
+            url_name="pre",
+            label="Pre-cooldown",
+            colour="#E87E90",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+        Series(
+            key="pre_pre_cooldown_amount",
+            url_name="prepre",
+            label="Pre-pre-cooldown",
+            colour="#F6DB9A",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+    ),
+    kind=Kind.AREA,
+    chain_start=COOLDOWNS_START,
+    has_page=True,
+    has_image=True,
+)
+
 PLT_TVL = ChartSpec(
     name="plt_tvl",
     # The page at this slug stacks a bar per token; the image this spec names
@@ -950,6 +1009,7 @@ ALL_SPECS: tuple[ChartSpec, ...] = (
     STAKING_AVG_DELEGATOR_PER_POOL,
     STAKING_AVG_DELEGATOR_STAKE,
     STAKING_PERCENTAGE_STAKED,
+    COOLDOWNS,
     TRANSACTION_FEES,
     NETWORK_ACTIVITY,
     FEE_STABILIZATION,

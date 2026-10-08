@@ -355,6 +355,23 @@ CHARTS: tuple[Chart, ...] = (
         spec_name="staking_percentage_staked",
     ),
     Chart(
+        name="cooldowns",
+        title="Stake in cooldown",
+        description="Stake locked while it waits to be released",
+        keywords=(
+            "cooldown",
+            "cooldowns",
+            "locked",
+            "unstaking",
+            "unbonding",
+            "released",
+            "pending",
+        ),
+        claims=("cooldown", "cooldowns"),
+        group="staking",
+        spec_name="cooldowns",
+    ),
+    Chart(
         name="staking_validator_count",
         title="Validator count",
         description="Validators over time",

@@ -9,12 +9,20 @@ from ._partitions import (
     partitions_def_tokens,
     partitions_def_from_plts,
     partitions_def_from_agent_registry,
+    partitions_def_from_cooldowns,
 )
 
 job_from_agent_registry = define_asset_job(
     name="j_from_agent_registry",
     partitions_def=partitions_def_from_agent_registry,
     selection=AssetSelection.assets("agent_registry_statistics"),
+    executor_def=dg.in_process_executor,
+)
+
+job_from_cooldowns = define_asset_job(
+    name="j_from_cooldowns",
+    partitions_def=partitions_def_from_cooldowns,
+    selection=AssetSelection.assets("cooldowns"),
     executor_def=dg.in_process_executor,
 )
 
@@ -101,5 +109,6 @@ defs = dg.Definitions(
         job_forex,
         job_from_plts,
         job_from_agent_registry,
+        job_from_cooldowns,
     ]
 )
