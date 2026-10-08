@@ -215,3 +215,23 @@ def test_cooldowns_draws_the_whole_queue():
         "pre_pre_cooldown_amount",
     ]
     assert all(s.scale == 1_000_000 for s in spec.series), "amounts are stored in microCCD"
+
+
+def test_both_cooldown_charts_are_in_staking():
+    """One asks how much was locked on a day, the other asks which day it
+    comes back. Different questions, same part of the site."""
+    for name in ("cooldowns", "cooldown_schedule"):
+        assert BY_NAME[name].category == "staking", name
+        assert BY_NAME[name].listed, name
+
+
+def test_the_schedule_has_no_series_to_generate_from():
+    """It is the node's current state, not a date-keyed collection, so it
+    keeps its own route in charts/sc_cooldown_schedule.py and must not be
+    handed a generated page that would draw nothing."""
+    from ccdexplorer.ccdexplorer_site.app.routers.charts.generated import can_be_generated
+
+    spec = BY_NAME["cooldown_schedule"]
+    assert spec.series == ()
+    assert not can_be_generated(spec)
+    assert not spec.has_page

@@ -331,6 +331,25 @@ COOLDOWNS = ChartSpec(
     has_image=True,
 )
 
+COOLDOWN_SCHEDULE = ChartSpec(
+    name="cooldown_schedule",
+    slug="cooldown-schedule",
+    title="Cooldown schedule",
+    description="When stake currently in cooldown is released.",
+    blurb="When locked stake comes back",
+    keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
+    category="staking",
+    # No series and no source, the way the Kraken candles have none: this is
+    # the node's current state rather than a date-keyed collection, so there
+    # is nothing for a grouping or a date range to select and no generated
+    # page to make. charts/sc_cooldown_schedule.py draws it.
+    source="",
+    series=(),
+    chain_start=COOLDOWNS_START,
+    has_page=False,
+    has_image=True,
+)
+
 PLT_TVL = ChartSpec(
     name="plt_tvl",
     # The page at this slug stacks a bar per token; the image this spec names
@@ -1009,6 +1028,7 @@ ALL_SPECS: tuple[ChartSpec, ...] = (
     STAKING_AVG_DELEGATOR_STAKE,
     STAKING_PERCENTAGE_STAKED,
     COOLDOWNS,
+    COOLDOWN_SCHEDULE,
     TRANSACTION_FEES,
     NETWORK_ACTIVITY,
     FEE_STABILIZATION,
