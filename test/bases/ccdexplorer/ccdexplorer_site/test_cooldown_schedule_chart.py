@@ -11,6 +11,8 @@ history. The history is the cooldowns chart, which is a different question.
 
 import datetime as dt
 
+import pytest
+
 from ccdexplorer.ccdexplorer_site.app.routers.tools import (
     cooldown_schedule_by_day,
     cooldown_summary,
@@ -80,3 +82,57 @@ def test_a_datetime_end_time_reads_the_same_as_a_string():
     per_day = cooldown_schedule_by_day(cooldown_summary([_account((when, 5))]))
 
     assert per_day == {"2026-10-09": 5}
+
+
+# --- the reference line ----------------------------------------------------
+#
+# Bars alone say when stake comes back but not whether that is a lot. The
+# dashed line is what the history says a day's release usually looks like.
+
+
+from ccdexplorer.ccdexplorer_site.app.routers.charts.sc_cooldown_schedule import (  # noqa: E402
+    average_daily_release,
+)
+
+
+def _history(*totals):
+    return [{"date": f"2026-01-{i + 1:02d}", "total_amount": t} for i, t in enumerate(totals)]
+
+
+def test_a_fall_in_the_balance_is_a_release():
+    """Nothing stores what was released; what is stored is how much stood
+    in cooldown each day. A day where the balance fell is a day stake came
+    back, and by how much."""
+    assert average_daily_release(_history(100, 60)) == 40
+
+
+def test_a_rise_is_not_a_negative_release():
+    """New stake entering cooldown lifts the balance. Counting that as a
+    negative release would net it off and understate the average."""
+    assert average_daily_release(_history(100, 140, 100)) == 20
+
+
+def test_the_average_is_over_every_day_not_only_moving_ones():
+    """Most days nothing is released. A mean over only the days something
+    moved describes a different, rarer thing, and would sit far above the
+    bars."""
+    assert average_daily_release(_history(100, 100, 100, 50)) == pytest.approx(50 / 3)
+
+
+def test_no_history_has_no_average():
+    """Before the asset has run there is nothing to compare against, and a
+    line at zero would read as a measurement."""
+    assert average_daily_release([]) is None
+    assert average_daily_release(_history(100)) is None
+
+
+def test_a_day_missing_its_total_is_skipped_rather_than_read_as_zero():
+    """An older document, or one the asset failed on, would otherwise look
+    like the entire balance being released and then restored."""
+    history = [
+        {"date": "2026-01-01", "total_amount": 100},
+        {"date": "2026-01-02"},
+        {"date": "2026-01-03", "total_amount": 80},
+    ]
+
+    assert average_daily_release(history) == 20
