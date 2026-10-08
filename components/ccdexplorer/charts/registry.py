@@ -477,18 +477,36 @@ STAKING_OPEN_POOL_COUNT = ChartSpec(
 STAKING_DELEGATOR_COUNT = ChartSpec(
     name="staking_delegator_count",
     slug="staking-delegator-count",
-    title="Delegator count",
-    description="Delegators over time.",
-    blurb="Delegators over time",
-    keywords=("delegators", "delegation", "count", "staking"),
+    title="Delegators",
+    description="Delegators over time, and how many of them delegate passively.",
+    blurb="Delegators, and how many delegate passively",
+    keywords=(
+        "delegators",
+        "delegation",
+        "count",
+        "staking",
+        "passive",
+    ),
     category="staking",
     source="statistics_classified_pools",
     series=(
+        # Passive is part of the total, not beside it: measured against
+        # mainnet for 2026-10-06 the count is 1803, being 1194 passive and
+        # 609 across the pools. The labels say so, because a chart of two
+        # lines where one contains the other is otherwise read as two
+        # separate populations.
         Series(
             key="delegator_count",
             url_name="delegators",
-            label="Delegators",
+            label="All delegators",
             colour="#EE9B54",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="passive_delegator_count",
+            url_name="passive",
+            label="Passive (of those)",
+            colour="#549FF2",
             agg=Agg.LAST,
         ),
     ),
@@ -504,7 +522,10 @@ STAKING_AVG_DELEGATOR_PER_POOL = ChartSpec(
     name="staking_avg_delegator_per_pool_count",
     slug="staking-avg-delegator-per-pool-count",
     title="Delegators per pool",
-    description="Average number of delegators in a pool.",
+    description=(
+        "Average number of delegators in a pool, counting the pools that can "
+        "hold one and leaving out passive delegation, which is in no pool."
+    ),
     blurb="Average number of delegators in a pool",
     keywords=("average", "delegators", "pool", "mean", "staking"),
     category="staking",

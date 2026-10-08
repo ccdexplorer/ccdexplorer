@@ -235,3 +235,24 @@ def test_the_schedule_has_no_series_to_generate_from():
     assert spec.series == ()
     assert not can_be_generated(spec)
     assert not spec.has_page
+
+
+def test_delegators_shows_the_passive_share():
+    """The count has always included passive delegators without saying so:
+    measured for 2026-10-06 it was 1803, being 1194 passive and 609 across
+    the pools. Two thirds of it was a fact the chart did not show."""
+    spec = BY_NAME["staking_delegator_count"]
+
+    assert [s.key for s in spec.display_series] == [
+        "delegator_count",
+        "passive_delegator_count",
+    ]
+    assert spec.title == "Delegators"
+
+
+def test_the_delegator_labels_say_passive_is_part_of_the_total():
+    """Two lines where one contains the other read as two populations
+    unless the labels say otherwise."""
+    labels = [s.label for s in BY_NAME["staking_delegator_count"].display_series]
+
+    assert labels == ["All delegators", "Passive (of those)"]

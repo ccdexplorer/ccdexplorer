@@ -393,9 +393,9 @@ CHARTS: tuple[Chart, ...] = (
     ),
     Chart(
         name="staking_delegator_count",
-        title="Delegator count",
-        description="Delegators over time",
-        keywords=("delegators", "delegation", "count", "staking"),
+        title="Delegators",
+        description="Delegators, and how many delegate passively",
+        keywords=("delegators", "delegation", "count", "staking", "passive"),
         group="staking",
         spec_name="staking_delegator_count",
     ),

@@ -3,8 +3,10 @@ import dagster as dg
 from ..nightrunner.update_classified_pools import perform_data_for_classified_pools
 from .accounts_repo import accounts_repo
 from ._resources import (
+    GRPCResource,
     MongoDBResource,
     RepoResource,
+    grpc_resource_instance,
     mongodb_resource_instance,
     repo_resource_instance,
 )
@@ -24,6 +26,7 @@ def classified_pools(
     context: dg.AssetExecutionContext,
     repo_resource: dg.ResourceParam[RepoResource],
     mongo_resource: dg.ResourceParam[MongoDBResource],
+    grpc_resource: dg.ResourceParam[GRPCResource],
 ) -> dict:
     """
     Statistics on staking pools.
@@ -34,7 +37,11 @@ def classified_pools(
     partition_date = context.partition_key
     context.log.info(f"Processing data for {partition_date}")
     dct = {}
-    dct: dict = perform_data_for_classified_pools(context, partition_date, commits_by_day, mongodb)
+    # grpc as well as the repo snapshot: the passive delegator count is not
+    # in the accounts csv, and it is two thirds of the total.
+    dct: dict = perform_data_for_classified_pools(
+        context, partition_date, commits_by_day, mongodb, grpc_resource.get_client()
+    )
     return dct
 
 
@@ -43,5 +50,6 @@ defs = dg.Definitions(
     resources={
         "repo_resource": repo_resource_instance,
         "mongo_resource": mongodb_resource_instance,
+        "grpc_resource": grpc_resource_instance,
     },
 )

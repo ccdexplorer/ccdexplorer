@@ -104,6 +104,7 @@ def test_a_source_read_by_several_charts_carries_all_their_fields():
     assert {s.key for s in pools.series} == {
         "open_pool_count",
         "delegator_count",
+        "passive_delegator_count",
         "delegator_avg_count_per_pool",
         "delegator_avg_stake",
     }
@@ -194,7 +195,12 @@ def test_the_staking_fields_are_the_ones_the_old_handlers_read():
         "suspended_count",
     }
     assert {s.key for s in BY_NAME["staking_open_pool_count"].series} == {"open_pool_count"}
-    assert {s.key for s in BY_NAME["staking_delegator_count"].series} == {"delegator_count"}
+    # Plus the passive count, which the old handler never drew: the total
+    # has always included passive delegators without showing how many.
+    assert {s.key for s in BY_NAME["staking_delegator_count"].series} == {
+        "delegator_count",
+        "passive_delegator_count",
+    }
     assert {s.key for s in BY_NAME["staking_avg_delegator_stake"].series} == {"delegator_avg_stake"}
     assert {s.key for s in BY_NAME["staking_percentage_staked"].series} == {
         "staked",
