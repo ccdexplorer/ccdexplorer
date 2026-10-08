@@ -11,6 +11,7 @@ from ._jobs import (
     job_unique_addresses,
     job_from_plts,
     job_from_agent_registry,
+    job_from_cooldowns,
 )
 from ._resources import MongoDBResource, mongodb_resource_instance
 from ._partitions import (
@@ -102,6 +103,7 @@ def accounts_repo_sensor(
         job_forex,
         job_from_plts,
         job_from_agent_registry,
+        job_from_cooldowns,
     ],
 )
 def trigger_downstream_jobs(context: dg.SensorEvaluationContext, asset_event):
@@ -121,6 +123,7 @@ def trigger_downstream_jobs(context: dg.SensorEvaluationContext, asset_event):
             job_forex,
             job_from_plts,
             job_from_agent_registry,
+            job_from_cooldowns,
         ]
     ]
 

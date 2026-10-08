@@ -50,6 +50,11 @@ partitions_def_from_trading = dg.DailyPartitionsDefinition(start_date="2022-02-1
 partitions_def_from_staking = dg.DailyPartitionsDefinition(start_date="2022-06-23")
 partitions_def_from_plts = dg.DailyPartitionsDefinition(start_date="2025-09-22")
 partitions_def_from_agent_registry = dg.DailyPartitionsDefinition(start_date="2026-05-27")
+# Protocol version 7, which is what cooldowns in this form are. It reached
+# mainnet on 30 October 2024; before it the node answers the cooldown
+# streams with nothing, so partitions from genesis would be ~1200 runs
+# measuring zero.
+partitions_def_from_cooldowns = dg.DailyPartitionsDefinition(start_date="2024-10-30")
 partitions_def_grouping = dg.StaticPartitionsDefinition(["daily", "weekly", "monthly"])
 
 

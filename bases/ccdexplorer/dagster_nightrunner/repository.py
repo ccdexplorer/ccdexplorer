@@ -23,6 +23,7 @@ import ccdexplorer.dagster_nightrunner.src.forex as forex
 import ccdexplorer.dagster_nightrunner.src._jobs as _jobs
 import ccdexplorer.dagster_nightrunner.src.realized_prices as realized_prices
 import ccdexplorer.dagster_nightrunner.src.agent_registry_statistics as agent_registry
+import ccdexplorer.dagster_nightrunner.src.cooldowns as cooldowns
 
 defs = dg.Definitions.merge(
     accounts_repo.defs,
@@ -46,6 +47,7 @@ defs = dg.Definitions.merge(
     mongo_transactions.defs,
     plt_statistics.defs,
     agent_registry.defs,
+    cooldowns.defs,
     forex.defs,
     _jobs.defs,
     realized_prices.defs,

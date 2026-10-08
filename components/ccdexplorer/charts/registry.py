@@ -273,6 +273,83 @@ AGENT_REGISTRIES = ChartSpec(
     docs_path="charts/agent_registries/",
 )
 
+#: Protocol version 7 reached mainnet on 30 October 2024. Cooldowns in this
+#: form are a P7 feature: before it the node's cooldown streams are empty by
+#: definition, so the chart would open on sixteen months of flat zero.
+COOLDOWNS_START = dt.date(2024, 10, 30)
+
+COOLDOWNS = ChartSpec(
+    name="cooldowns",
+    slug="cooldowns",
+    title="Stake in cooldown",
+    description="Stake locked after a validator or delegator reduced it.",
+    blurb="Stake locked while it waits to be released",
+    keywords=(
+        "cooldown",
+        "cooldowns",
+        "locked",
+        "unstaking",
+        "unbonding",
+        "released",
+        "pending",
+    ),
+    category="staking",
+    source="statistics_cooldowns",
+    series=(
+        # The three states are one queue: stake enters pre-pre-cooldown,
+        # reaches pre-cooldown at the snapshot epoch and cooldown at the
+        # following payday. Stacked, because together they are what is
+        # locked and none of them is spendable.
+        Series(
+            key="cooldown_amount",
+            url_name="cooldown",
+            label="Cooldown",
+            colour="#549FF2",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+        Series(
+            key="pre_cooldown_amount",
+            url_name="pre",
+            label="Pre-cooldown",
+            colour="#E87E90",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+        Series(
+            key="pre_pre_cooldown_amount",
+            url_name="prepre",
+            label="Pre-pre-cooldown",
+            colour="#F6DB9A",
+            agg=Agg.LAST,
+            scale=1_000_000,
+        ),
+    ),
+    kind=Kind.AREA,
+    chain_start=COOLDOWNS_START,
+    has_page=True,
+    has_image=True,
+)
+
+COOLDOWN_SCHEDULE = ChartSpec(
+    name="cooldown_schedule",
+    slug="cooldown-schedule",
+    title="Cooldown schedule",
+    description="When stake currently in cooldown is released.",
+    blurb="When locked stake comes back",
+    keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
+    category="staking",
+    # No series and no source, the way the Kraken candles have none: this is
+    # the node's current state rather than a date-keyed collection, so there
+    # is nothing for a grouping or a date range to select and no generated
+    # page to make. charts/sc_cooldown_schedule.py draws it.
+    source="",
+    series=(),
+    chain_start=COOLDOWNS_START,
+    has_page=False,
+    has_image=True,
+)
+
 PLT_TVL = ChartSpec(
     name="plt_tvl",
     # The page at this slug stacks a bar per token; the image this spec names
@@ -400,18 +477,36 @@ STAKING_OPEN_POOL_COUNT = ChartSpec(
 STAKING_DELEGATOR_COUNT = ChartSpec(
     name="staking_delegator_count",
     slug="staking-delegator-count",
-    title="Delegator count",
-    description="Delegators over time.",
-    blurb="Delegators over time",
-    keywords=("delegators", "delegation", "count", "staking"),
+    title="Delegators",
+    description="Delegators over time, and how many of them delegate passively.",
+    blurb="Delegators, and how many delegate passively",
+    keywords=(
+        "delegators",
+        "delegation",
+        "count",
+        "staking",
+        "passive",
+    ),
     category="staking",
     source="statistics_classified_pools",
     series=(
+        # Passive is part of the total, not beside it: measured against
+        # mainnet for 2026-10-06 the count is 1803, being 1194 passive and
+        # 609 across the pools. The labels say so, because a chart of two
+        # lines where one contains the other is otherwise read as two
+        # separate populations.
         Series(
             key="delegator_count",
             url_name="delegators",
-            label="Delegators",
+            label="All delegators",
             colour="#EE9B54",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="passive_delegator_count",
+            url_name="passive",
+            label="Passive (of those)",
+            colour="#549FF2",
             agg=Agg.LAST,
         ),
     ),
@@ -427,7 +522,10 @@ STAKING_AVG_DELEGATOR_PER_POOL = ChartSpec(
     name="staking_avg_delegator_per_pool_count",
     slug="staking-avg-delegator-per-pool-count",
     title="Delegators per pool",
-    description="Average number of delegators in a pool.",
+    description=(
+        "Average number of delegators in a pool, counting the pools that can "
+        "hold one and leaving out passive delegation, which is in no pool."
+    ),
     blurb="Average number of delegators in a pool",
     keywords=("average", "delegators", "pool", "mean", "staking"),
     category="staking",
@@ -950,6 +1048,8 @@ ALL_SPECS: tuple[ChartSpec, ...] = (
     STAKING_AVG_DELEGATOR_PER_POOL,
     STAKING_AVG_DELEGATOR_STAKE,
     STAKING_PERCENTAGE_STAKED,
+    COOLDOWNS,
+    COOLDOWN_SCHEDULE,
     TRANSACTION_FEES,
     NETWORK_ACTIVITY,
     FEE_STABILIZATION,

@@ -185,3 +185,74 @@ def test_all_resolves_to_the_charts_own_start():
     spec = BY_NAME["exchange_wallets"]
     start, _end = resolve_window(spec, Window.ALL, dt.date(2026, 10, 3))
     assert start == spec.chain_start
+
+
+# --- stake in cooldown -----------------------------------------------------
+
+
+def test_cooldowns_starts_at_protocol_version_7():
+    """Not at genesis and not at the staking start. Cooldowns in this form
+    arrived with P7 on 30 October 2024; before that the node's cooldown
+    streams are empty by definition, so the slider's left stop and "all"
+    would both begin in sixteen months of flat zero."""
+    assert BY_NAME["cooldowns"].chain_start == dt.date(2024, 10, 30)
+
+
+def test_cooldowns_picks_its_own_resolution():
+    """Every state is a standing balance, so grouping changes nothing
+    about the number."""
+    assert BY_NAME["cooldowns"].automatic_grouping
+
+
+def test_cooldowns_draws_the_whole_queue():
+    """Three states, stacked: stake enters pre-pre-cooldown, reaches
+    pre-cooldown at the snapshot epoch and cooldown at the next payday.
+    None of it is spendable, so the stack is what is locked."""
+    spec = BY_NAME["cooldowns"]
+    assert [s.key for s in spec.display_series] == [
+        "cooldown_amount",
+        "pre_cooldown_amount",
+        "pre_pre_cooldown_amount",
+    ]
+    assert all(s.scale == 1_000_000 for s in spec.series), "amounts are stored in microCCD"
+
+
+def test_both_cooldown_charts_are_in_staking():
+    """One asks how much was locked on a day, the other asks which day it
+    comes back. Different questions, same part of the site."""
+    for name in ("cooldowns", "cooldown_schedule"):
+        assert BY_NAME[name].category == "staking", name
+        assert BY_NAME[name].listed, name
+
+
+def test_the_schedule_has_no_series_to_generate_from():
+    """It is the node's current state, not a date-keyed collection, so it
+    keeps its own route in charts/sc_cooldown_schedule.py and must not be
+    handed a generated page that would draw nothing."""
+    from ccdexplorer.ccdexplorer_site.app.routers.charts.generated import can_be_generated
+
+    spec = BY_NAME["cooldown_schedule"]
+    assert spec.series == ()
+    assert not can_be_generated(spec)
+    assert not spec.has_page
+
+
+def test_delegators_shows_the_passive_share():
+    """The count has always included passive delegators without saying so:
+    measured for 2026-10-06 it was 1803, being 1194 passive and 609 across
+    the pools. Two thirds of it was a fact the chart did not show."""
+    spec = BY_NAME["staking_delegator_count"]
+
+    assert [s.key for s in spec.display_series] == [
+        "delegator_count",
+        "passive_delegator_count",
+    ]
+    assert spec.title == "Delegators"
+
+
+def test_the_delegator_labels_say_passive_is_part_of_the_total():
+    """Two lines where one contains the other read as two populations
+    unless the labels say otherwise."""
+    labels = [s.label for s in BY_NAME["staking_delegator_count"].display_series]
+
+    assert labels == ["All delegators", "Passive (of those)"]

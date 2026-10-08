@@ -54,6 +54,7 @@ class AnalysisType(Enum):
     statistics_plt = "statistics_plt"
     statistics_realized_prices = "statistics_realized_prices"
     statistics_agent_registry = "statistics_agent_registry"
+    statistics_cooldowns = "statistics_cooldowns"
 
 
 def write_queue_to_collection(mongodb: MongoDB, queue: list[ReplaceOne], analysis: AnalysisType):
