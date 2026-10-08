@@ -1122,6 +1122,42 @@ async def accounts_cooldown(
     )
 
 
+def cooldown_summary(accounts: list[dict]) -> list[dict]:
+    """What is locked, grouped by the moment it is released.
+
+    Shared by the table and the chart above it, so the two cannot drift
+    into disagreeing about the same numbers.
+    """
+    aggregates = defaultdict(lambda: {"total_amount": 0, "count": 0})
+    for row in accounts:
+        for cooldown in row.get("account_cooldowns", []):
+            aggregates[cooldown["end_time"]]["total_amount"] += cooldown["amount"]
+            aggregates[cooldown["end_time"]]["count"] += 1
+
+    return sorted(
+        [
+            {"end_time": k, "total_amount": v["total_amount"], "count": v["count"]}
+            for k, v in aggregates.items()
+        ],
+        key=lambda x: dt.datetime.fromisoformat(str(x["end_time"]).replace("Z", "+00:00")),
+    )
+
+
+def cooldown_schedule_by_day(summary: list[dict]) -> dict[str, int]:
+    """The same totals, per release day.
+
+    A cooldown expires at a precise moment, which makes a bar per
+    end_time a row of hairlines at arbitrary offsets. The question the
+    chart answers is which day stake comes back, so the bars are days.
+    """
+    per_day: dict[str, int] = {}
+    for row in summary:
+        when = dt.datetime.fromisoformat(str(row["end_time"]).replace("Z", "+00:00"))
+        day = when.date().isoformat()
+        per_day[day] = per_day.get(day, 0) + row["total_amount"]
+    return dict(sorted(per_day.items()))
+
+
 @router.get(
     "/{net}/ajax_accounts_cooldown",
     response_class=HTMLResponse | RedirectResponse,
@@ -1139,23 +1175,7 @@ async def ajax_accounts_cooldown(
         httpx_client,
     )
     accounts = api_result.return_value if api_result.ok else []
-    aggregates = defaultdict(lambda: {"total_amount": 0, "count": 0})
-
-    for row in accounts:
-        for cooldown in row.get("account_cooldowns", []):
-            end_time = cooldown["end_time"]
-            amount = cooldown["amount"]
-            aggregates[end_time]["total_amount"] += amount
-            aggregates[end_time]["count"] += 1
-
-    # Convert to list of dicts
-    summary = sorted(
-        [
-            {"end_time": k, "total_amount": v["total_amount"], "count": v["count"]}
-            for k, v in aggregates.items()
-        ],
-        key=lambda x: dt.datetime.fromisoformat(x["end_time"].replace("Z", "+00:00")),
-    )
+    summary = cooldown_summary(accounts)
     summary_totals = {
         "total_amount": sum([x["total_amount"] for x in summary]),
         "count": sum([x["count"] for x in summary]),
