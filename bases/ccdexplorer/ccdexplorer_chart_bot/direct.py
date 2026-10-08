@@ -65,15 +65,19 @@ CATEGORY_ORDER = (
 )
 
 
-def keyboard_for(
-    chart: Chart, state: ChartState | None = None, send_button: bool = True
-) -> InlineKeyboardMarkup:
-    """The rows this chart can actually offer, and a way to send it onward.
+def keyboard_for(chart: Chart, state: ChartState | None = None) -> InlineKeyboardMarkup | None:
+    """The rows this chart can actually offer, or None if it has none.
 
     A spec-backed chart gets a window row and a grouping row built from what
     its spec allows. One that has not been migrated keeps its interval family,
     if it has one. A row with a single entry is a button that does nothing, so
     it is absent rather than empty.
+
+    There used to be a "Send to a chat" button under every chart. It
+    duplicated something Telegram does better from its own interface --
+    forwarding, to any chat, from any message -- and it was the only thing
+    under a chart with nothing to configure. None rather than an empty
+    markup, which Telegram refuses.
     """
     rows = []
     spec = chart.spec
@@ -119,9 +123,7 @@ def keyboard_for(
             rows.extend(
                 buttons[i : i + BUTTONS_PER_ROW] for i in range(0, len(buttons), BUTTONS_PER_ROW)
             )
-    if send_button:
-        rows.append([InlineKeyboardButton("Send to a chat", switch_inline_query=chart.name)])
-    return InlineKeyboardMarkup(rows)
+    return InlineKeyboardMarkup(rows) if rows else None
 
 
 def chart_picker(charts) -> InlineKeyboardMarkup:
