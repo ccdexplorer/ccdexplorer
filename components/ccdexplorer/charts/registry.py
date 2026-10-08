@@ -293,7 +293,6 @@ COOLDOWNS = ChartSpec(
         "released",
         "pending",
     ),
-    claims=("cooldown", "cooldowns"),
     category="staking",
     source="statistics_cooldowns",
     series=(

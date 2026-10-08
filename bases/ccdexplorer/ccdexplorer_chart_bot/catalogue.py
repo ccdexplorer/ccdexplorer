@@ -367,9 +367,21 @@ CHARTS: tuple[Chart, ...] = (
             "released",
             "pending",
         ),
-        claims=("cooldown", "cooldowns"),
+        # No claim on "cooldown": there are two cooldown charts now, the
+        # history and the schedule, and both answer to the word. A claim
+        # would hand it to one and hide the other, where the picker can
+        # just ask which.
         group="staking",
         spec_name="cooldowns",
+    ),
+    Chart(
+        name="cooldown_schedule",
+        title="Cooldown schedule",
+        description="When stake currently in cooldown is released",
+        keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
+        group="staking",
+        # No spec: it is the node's current state, not a date-keyed series,
+        # so there is no window or grouping for a button to set.
     ),
     Chart(
         name="staking_validator_count",

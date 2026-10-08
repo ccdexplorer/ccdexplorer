@@ -77,6 +77,7 @@ from ccdexplorer.ccdexplorer_site.app.routers.charts import (
     sc_accounts_growth,
     sc_active_addresses,
     sc_holders,
+    sc_cooldown_schedule,
     sc_plt_transfers,
     sc_transactions_count,
     sc_agent_registries,
@@ -662,6 +663,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     app.include_router(sc_transactions_count.router)
     app.include_router(sc_active_addresses.router)
     app.include_router(sc_holders.router)
+    app.include_router(sc_cooldown_schedule.router)
     app.include_router(sc_plt_transfers.router)
     app.include_router(sc_agent_registries.router)
     # Last, so a handwritten page still wins the slug over a generated one.
