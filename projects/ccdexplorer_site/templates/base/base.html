@@ -5,13 +5,23 @@
       // Applied synchronously, before any stylesheet loads, so the page never
       // paints the wrong theme and then flips (FOUC). Keep this as the very
       // first thing in <head>.
-      const bsTheme = localStorage.getItem('bsTheme') || 'dark';
-      document.documentElement.setAttribute('data-bs-theme', bsTheme);
+      const storedTheme = localStorage.getItem('bsTheme');
+      document.documentElement.setAttribute('data-bs-theme', storedTheme || 'dark');
       // Mirrored into a cookie because localStorage is invisible to an
       // <img src>, and the chart thumbnails are images: without this the
       // server has no idea which theme to draw them in, and drew every one
       // dark whatever the reader had chosen.
-      document.cookie = `bsTheme=${bsTheme}; path=/; max-age=31536000; samesite=lax`;
+      //
+      // Only when there is something to mirror. Writing it unconditionally
+      // set a cookie on every first visit, before the reader had chosen
+      // anything or been asked -- a default asserted rather than a
+      // preference remembered, which is what the site was flagged for.
+      // Nobody needs it until they pick: page_theme() falls back to dark,
+      // the same default the page itself uses, so a reader with no cookie
+      // gets a dark page and dark charts.
+      if (storedTheme) {
+        document.cookie = `bsTheme=${storedTheme}; path=/; max-age=31536000; samesite=lax`;
+      }
     </script>
     <title>ccdexplorer.io: The most comprehensive explorer for the Concordium blockchain.</title>
     <script src="/static/js/net_switcher.js?v=2"></script>
@@ -41,7 +51,7 @@
     <link rel="stylesheet" href="/node/tabulator-tables/dist/css/tabulator_bootstrap5.min.css">  
     <link rel="stylesheet" href="/node/bootstrap-icons/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/static/css/custom_bootstrap.css?v=1.5">
-    <link rel="stylesheet" href="/static/css/custom_ccdexplorer.css?v=1.9">
+    <link rel="stylesheet" href="/static/css/custom_ccdexplorer.css?v=2.0">
     <link rel="stylesheet" href="/node/flatpickr/dist/flatpickr.min.css" type="text/css">
     <link rel="stylesheet" href="/node/flatpickr/dist/plugins/monthSelect/style.css" type="text/css">
     <link rel="stylesheet" href="/node/nouislider/dist/nouislider.css" type="text/css">
@@ -49,12 +59,9 @@
     
 
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
-    <link
-            href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Space+Grotesk:wght@300..700&display=swap"
-            rel="stylesheet">
+    {# Outfit is served from this origin; see the @font-face in
+       custom_ccdexplorer.css. Space Grotesk used to be requested here
+       alongside it and nothing ever referenced it. #}
 
     <meta id="meta_data_net" title="{{net}}">
     <script>base_url = '{{env.SITE_URL}}'</script>
