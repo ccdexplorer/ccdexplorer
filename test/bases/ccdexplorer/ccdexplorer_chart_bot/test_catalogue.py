@@ -404,8 +404,11 @@ async def _send(text):
 
 
 async def test_the_command_returns_the_chart():
-    """Open the bot, say /ccd accounts, get the chart."""
-    message = await _send("accounts")
+    """Open the bot, say /ccd growth, get the chart.
+
+    Was "accounts", which is a category word and now offers its category.
+    """
+    message = await _send("growth")
     assert message.photos
     photo, caption, _ = message.photos[0]
     # The url carries the state the buttons will change: grouping, then the
@@ -429,7 +432,7 @@ async def test_each_reply_carries_the_chart_s_own_controls():
     forwards any message from its own interface, so the button duplicated
     something that already worked better; what a reply carries now is the
     chart's periods and groupings."""
-    message = await _send("accounts")
+    message = await _send("growth")
     _, _, markup = message.photos[0]
     labels = {b.text.strip("· ") for row in markup.inline_keyboard for b in row}
 
@@ -550,3 +553,49 @@ def test_inline_standalone_charts_carry_no_keyboard():
     from ccdexplorer.ccdexplorer_chart_bot.inline import photo_result
 
     assert photo_result(BY_NAME["staking_validator_staked_amounts"], SITE).reply_markup is None
+
+
+# --- a chart is findable by its own category -------------------------------
+
+
+def test_every_chart_is_findable_by_its_category_word():
+    """`/e staking` is the usage the bot's own help advertises, so every
+    chart in a category has to answer to that category's word.
+
+    It did not. The haystack was built from name, title, description and
+    keywords, and a chart matched its own category only where the word
+    happened to appear in one of those -- nine staking charts because they
+    are named staking_*, and cooldowns because its keywords repeated the
+    word. cooldown_schedule, network_activity, fee_stabilization,
+    daily_limits and realized_prices matched nothing.
+    """
+    missed = [chart.name for chart in CHARTS if chart not in search(chart.group, limit=len(CHARTS))]
+
+    assert missed == []
+
+
+def test_the_staking_search_finds_the_cooldown_schedule():
+    """The one that prompted this: a staking chart absent from `/e staking`
+    while sitting in the staking category menu."""
+    found = {chart.name for chart in search("staking", limit=len(CHARTS))}
+
+    assert "cooldown_schedule" in found
+    assert "cooldowns" in found
+
+
+def test_a_category_word_does_not_drag_in_other_categories():
+    """Widening the haystack must not turn a category word into a wildcard."""
+    for chart in search("staking", limit=len(CHARTS)):
+        assert chart.group == "staking", f"{chart.name} is {chart.group}, not staking"
+
+
+async def test_a_category_word_offers_the_category():
+    """`/e accounts` used to send accounts growth and nothing else, because
+    that was the only accounts chart whose text happened to carry the word.
+    The other two were unreachable by it. A category word now offers the
+    category, the way `/e staking` always did."""
+    message = await _send("accounts")
+
+    assert not message.photos, "a category word should ask, not guess"
+    offered = {b.text for row in message.markups[-1].inline_keyboard for b in row}
+    assert {"Accounts growth", "Daily limits", "Realized price"} == offered, offered

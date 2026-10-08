@@ -667,8 +667,21 @@ def _rank(terms: list[str], require_all: bool) -> list[tuple[tuple[int, int], st
     scored: list[tuple[int, str, Chart]] = []
     for chart in CHARTS:
         name = chart.name.lower()
+        # The group is in here because `/e staking` is the usage the help
+        # text advertises, and without it a chart answered to its own
+        # category only by accident -- nine staking charts because they are
+        # named staking_*, and cooldowns because its keywords repeated the
+        # word. The five that did neither were missing from their own
+        # category's search while sitting in its menu.
         haystack = " ".join(
-            (chart.name, chart.title, chart.description, *chart.keywords, *chart.window_words)
+            (
+                chart.name,
+                chart.title,
+                chart.description,
+                chart.group,
+                *chart.keywords,
+                *chart.window_words,
+            )
         ).lower()
         hits = sum(term in haystack for term in terms)
         if hits == 0 or (require_all and hits < len(terms)):
