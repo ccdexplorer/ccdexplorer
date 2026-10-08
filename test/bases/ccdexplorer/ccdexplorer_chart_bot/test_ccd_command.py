@@ -309,8 +309,12 @@ async def test_the_buttons_are_titles_not_route_names():
 
 
 async def test_one_match_still_arrives_as_a_chart():
-    """Asking "which?" about a single answer is a question with one option."""
-    for word in ("price", "tps", "whales", "accounts"):
+    """Asking "which?" about a single answer is a question with one option.
+
+    "accounts" used to belong here and now does not: it is a category word,
+    and a category word offers its category.
+    """
+    for word in ("price", "tps", "whales", "growth"):
         message = await _run(word)
         assert message.photos, f"{word} no longer sends its chart"
         assert not message.markups or message.markups == [None] * len(message.markups)
