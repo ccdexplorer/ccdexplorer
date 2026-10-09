@@ -9,7 +9,7 @@ import datetime as dt
 
 from pydantic import BaseModel, ConfigDict
 
-from .models import ChartSpec, Grouping, Window
+from .models import Axis, ChartSpec, Grouping, Interval, Window
 
 
 def latest_complete_day(today: dt.date | None = None) -> dt.date:
@@ -71,6 +71,9 @@ class ChartState(BaseModel):
     #: True when start/end came from the query rather than from the window,
     #: so to_query() round-trips what the reader actually chose.
     explicit_dates: bool = False
+    #: The candle interval, for a chart configured by one. None elsewhere:
+    #: the calendar charts have no such thing and a value would be a lie.
+    interval: Interval | None = None
 
     @classmethod
     def from_query(cls, spec: ChartSpec, params, today: dt.date | None = None) -> "ChartState":
@@ -93,6 +96,23 @@ class ChartState(BaseModel):
         asked = [t for t in (params.get("traces") or "").split(",") if t in known]
         traces = tuple(asked) if asked else tuple(s.key for s in spec.display_series)
 
+        interval = None
+        if spec.axis is Axis.INTERVAL:
+            interval = _one_of(
+                params.get("interval"), Interval, spec.intervals, spec.default_interval
+            )
+
+        # A LOOKBACK chart's x-axis is a fixed span forward from today, and
+        # its window is the lookback for a reference figure rather than the
+        # range. Read as a range -- which is what every other chart does --
+        # the cooldown schedule would draw the last thirty days, a chart of a
+        # schedule that has already happened. Last here, so a from/to in a
+        # shared link cannot put it back in the past either.
+        if spec.axis is Axis.LOOKBACK:
+            start = today or dt.datetime.now(dt.UTC).date()
+            end = start + dt.timedelta(days=spec.horizon_days - 1)
+            explicit = False
+
         # Last, because it needs the range: a chart that picks its own
         # resolution has nothing to read from the request, and a grouping
         # left over in an old url would otherwise draw two points.
@@ -106,6 +126,7 @@ class ChartState(BaseModel):
             end=end,
             traces=traces,
             explicit_dates=explicit,
+            interval=interval,
         )
 
     def to_query(self) -> dict[str, str]:
@@ -114,7 +135,25 @@ class ChartState(BaseModel):
             query["from"] = self.start.isoformat()
             query["to"] = self.end.isoformat()
         query["traces"] = ",".join(self.traces)
+        if self.interval is not None:
+            query["interval"] = self.interval.value
         return query
+
+
+def lookback_range(
+    spec: ChartSpec, state: ChartState, today: dt.date | None = None
+) -> tuple[dt.date, dt.date]:
+    """The history a LOOKBACK chart's reference figure is measured over.
+
+    Not state.start/state.end, which are the forward horizon. This is the
+    other direction: the stored days behind today that the dashed average on
+    the cooldown schedule is an average of.
+
+    resolve_window already ends at the last complete day and clamps the start
+    to the chain start, which is what this needs: the stored history stops at
+    yesterday and does not reach back before the collection existed.
+    """
+    return resolve_window(spec, state.window, today)
 
 
 def _one_of(raw, enum, allowed, default):
