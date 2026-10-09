@@ -285,6 +285,16 @@ def test_every_warm_target_renders_rather_than_redirecting(renders, monkeypatch)
 
     monkeypatch.setattr(generated, "_fetch", no_rows)
 
+    # The live charts do not go through _fetch: their figures come from a
+    # provider that calls the api. Stubbed for the same reason -- this is
+    # about which status code a warm target answers, not about the data.
+    import plotly.graph_objects as go
+
+    async def no_figure(spec, app, net, state, theme):
+        return go.Figure()
+
+    monkeypatch.setattr(generated, "FIGURES", {name: no_figure for name in generated.FIGURES})
+
     # The generated router alone: the charts statistics.py still draws fetch
     # from the api, which is not what this is about, and whether statistics
     # shadows a generated route is asked in test_generated_image_routes.py.
@@ -442,10 +452,10 @@ async def test_a_chart_with_a_page_links_to_its_page():
     assert await _page_link("transaction_fees") == "/mainnet/charts/transaction-fees"
 
 
-async def test_a_chart_with_no_page_links_to_its_category():
-    """The Kraken candles have no configurable page, so the nearest thing
-    that shows them is the category they sit in."""
-    assert await _page_link("ccd_kraken_4h") == "/mainnet/charts/category/exchanges"
+async def test_a_chart_on_a_shared_page_links_to_that_page():
+    """The Kraken candles have a page now, shared by all seven intervals.
+    Built from the slug it would be /charts/ccd-kraken-4h, which is a 404."""
+    assert await _page_link("ccd_kraken_4h") == "/mainnet/charts/ccd-kraken"
 
 
 async def test_no_plot_page_still_points_at_statistics():

@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ccdexplorer.ccdexplorer_site.app.factory import AppSettings, create_app
+from ccdexplorer.charts import Axis
 from ccdexplorer.charts.registry import ALL_SPECS
 from ccdexplorer.ccdexplorer_site.app.routers.charts.generated import (
     can_be_generated,
@@ -52,7 +53,11 @@ def test_every_such_spec_says_it_has_a_page(client, spec):
     assert spec.has_page is True, spec.name
 
 
-GENERATED_SPECS = [s for s in ALL_SPECS if can_be_generated(s)]
+#: The calendar charts, which are what the invariants below are about: a
+#: grouping and a date range in the path, and series for build_figure to
+#: draw. A live chart is generated too, and configured by one segment
+#: instead -- see test_generated_live_charts.py.
+GENERATED_SPECS = [s for s in ALL_SPECS if can_be_generated(s) and s.axis is Axis.CALENDAR]
 
 
 @pytest.mark.parametrize("spec", GENERATED_SPECS, ids=[s.name for s in GENERATED_SPECS])

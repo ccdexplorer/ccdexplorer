@@ -29,7 +29,11 @@
 	color: #a7acb1;
 }
 </style>
-{% include 'charts/graph_htmx_div.html' %}
+{# A live chart cannot use graph_htmx_div.html: that reads .innerText off
+   the slider's #event-start-pretty span, which does not exist here, and
+   reading it off null throws inside hx-vals before the post is ever made. #}
+{% if is_live %}{% include 'charts/live_graph_htmx_div.html' %}
+{% else %}{% include 'charts/graph_htmx_div.html' %}{% endif %}
 
 
 <div class="row mt-4">
@@ -38,6 +42,20 @@
         {% set title= "Graph Settings" %}{% include 'base/box_title.html' %} 
         <div class="row">
             <div class=" col-sm-6 mb-3">
+
+            {# Links, not radios. A live chart has one value and it is the
+               whole of the address, so each option is simply the url it
+               leads to -- which means the row works before any javascript
+               runs, and a tapped option is a page someone can bookmark. #}
+            {% if is_live %}
+            <div class="btn-group-sm" role="group" id="btnradio_axis">
+              {{ 'Interval:' if axis == 'interval' else 'Average over:' }}
+              {% for value, href in axis_options %}
+                <a class="btn btn-outline-secondary btn-sm{% if value == axis_selected %} active{% endif %}"
+                   href="{{ href }}">{{ value }}</a>
+              {% endfor %}
+            </div>
+            {% endif %}
               
             {# Absent where grouping changes nothing about the number: a
                chart of closing values redraws the same measurement at a
@@ -47,7 +65,7 @@
             {# `spec is defined` because this template is shared with the
                handwritten pages, and the PLT one renders it without one.
                Without the guard that page answered a 500. #}
-            {% if not (spec.automatic_grouping if spec is defined else false) %}
+            {% if not is_live and not (spec.automatic_grouping if spec is defined else false) %}
             <div class="btn-group-sm" role="group"  id="btnradio_grouping">
               Group By:<input type="radio" class="btn-check" name="group_by" id="daily" autocomplete="off" {% if (state.grouping.value if state else 'weekly') == 'daily' %}checked{% endif %}>
               <label class="btn btn-outline-secondary " for="daily">Daily</label>
@@ -99,7 +117,7 @@
 
      
 
-      {% if include_trace_selection %}
+      {% if include_trace_selection and not is_live %}
       <div class="btn-group-sm" role="group" id="btncheckgroup">
         Select Traces:
         {% for trace_value, trace_name in traces.items() %}
@@ -131,10 +149,15 @@
           <p></p>
           <div class=" col-sm-12 mt-4">
             
+            {# No range to drag on a live chart: the schedule is a fixed
+               seven days, and Kraken serves a fixed number of bars per
+               interval. #}
+            {% if not is_live %}
             <div class=" ms-3 me-3" id="slider-date-pretty"></div>
             
             <span id="event-start-pretty" class="d-none"></span><br/>
               <span id="event-end-pretty" class="d-none"></span>
+            {% endif %}
               <button  type="button" id="update" class="d-none ">Update</button>
       </div>  
       </div>  
@@ -150,5 +173,5 @@
 
 {% include 'charts/event_emit.html' %}
 
-{% include 'charts/slider.html' %}
+{% if not is_live %}{% include 'charts/slider.html' %}{% endif %}
 {% endblock %}

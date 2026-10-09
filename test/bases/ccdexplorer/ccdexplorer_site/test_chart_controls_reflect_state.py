@@ -29,10 +29,12 @@ def _render(params):
     # From the guard, not from the div inside it: the row is wrapped in
     # `{% if not spec.automatic_grouping %}` now, and slicing past that
     # left the fragment with an orphan {% endif %}.
-    start = source.index("{% if not (spec.automatic_grouping")
+    start = source.index("{% if not is_live and not (spec.automatic_grouping")
     end = source.index("{% if include_kpis %}")
+    # is_live=False: this is a calendar chart, which is what the panel below
+    # belongs to. The live charts' one control is covered by the e2e tests.
     return env.from_string(source[start:end]).render(
-        spec=SPEC, state=ChartState.from_query(SPEC, params)
+        spec=SPEC, state=ChartState.from_query(SPEC, params), is_live=False
     )
 
 
@@ -72,10 +74,13 @@ def test_a_page_that_passes_no_spec_still_renders():
     right!" -- a 500 on a page that had been fine.
 
     A caller with no spec keeps its controls, which is what it had before.
+    Rendered with no `is_live` either, for the same reason: that page does
+    not pass one, and an undefined value has to read as "not live" rather
+    than hiding every control on it.
     """
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATES))
     source = env.loader.get_source(env, "charts/standalone_chart.html")[0]
-    start = source.index("{% if not (spec.automatic_grouping")
+    start = source.index("{% if not is_live and not (spec.automatic_grouping")
     end = source.index("{% if include_kpis %}")
 
     html = env.from_string(source[start:end]).render(state=None)

@@ -18,17 +18,19 @@ from pydantic import BaseModel
 
 from ccdexplorer.charts import (
     Agg,
+    Axis,
     ChartSpec,
     ChartState,
     build_grouping_pipeline,
     chart_path,
 )
-from ccdexplorer.charts.paths import format_month, state_from_path
+from ccdexplorer.charts.paths import format_month, state_from_axis_path, state_from_path
 from ccdexplorer.charts.state import DAILY_UP_TO_DAYS, WEEKLY_UP_TO_DAYS
 from ccdexplorer.env import environment
 from ccdexplorer.charts.registry import ALL_SPECS
 
 from ccdexplorer.ccdexplorer_site.app.routers.charts.generic import build_figure
+from ccdexplorer.ccdexplorer_site.app.routers.charts.providers import FIGURES, ROWS
 from ccdexplorer.ccdexplorer_site.app.routers.charts.images import (
     PERIOD_LABEL,
     image_path,
@@ -409,6 +411,172 @@ def register_chart_page(spec: ChartSpec) -> None:
     data.__name__ = f"data_{spec.name}"
 
 
+class LiveChartPostData(BaseModel):
+    """What a live chart's page sends back.
+
+    Only the theme. Its one control is in its address, so changing it is a
+    page load rather than a post carrying a new configuration -- which is
+    also why this cannot reuse ChartPostData, whose start_date, end_date and
+    group_by_selection are all required and none of which exists here.
+    """
+
+    theme: str = ""
+
+
+#: One page per page_slug, not per spec. The seven Kraken intervals are one
+#: chart seven ways: they share a page on which the interval is the control,
+#: and registering it seven times would leave six routes shadowed by the
+#: first.
+_LIVE_PAGES: set[str] = set()
+
+
+def register_live_chart_page(spec: ChartSpec) -> None:
+    """A page, a png and a csv for a chart whose figure comes from a provider.
+
+    The same affordances every other chart page has -- a share card carrying
+    the state, a csv of what is on screen, a documentation link -- over data
+    that is live rather than a collection. What differs is the control: one
+    segment in the path instead of a grouping and a date range.
+    """
+    options = spec.intervals or spec.windows
+
+    def _selected(state: ChartState) -> str:
+        return state.interval.value if spec.axis is Axis.INTERVAL else state.window.value
+
+    def _state_or_404(segment: str) -> ChartState:
+        state = state_from_axis_path(spec, segment)
+        if state is None:
+            raise HTTPException(status_code=404, detail="No such chart view.")
+        return state
+
+    async def _figure(request: Request, net: str, state: ChartState, theme: str):
+        # Looked up per request rather than captured at registration, so a
+        # test can substitute a provider. can_be_generated already refused
+        # the spec if the name is not registered.
+        return await FIGURES[spec.live_source](spec, request.app, net, state, theme)
+
+    def _render(request: Request, net: str, state: ChartState, user):
+        selected = _selected(state)
+        return request.app.templates.TemplateResponse(
+            request,
+            "charts/generated_chart.html",
+            {
+                "request": request,
+                "env": environment,
+                "user": user,
+                "net": net,
+                "spec": spec,
+                "state": state,
+                # Suppresses the three controls this chart has none of -- the
+                # grouping radios, the trace checkboxes and the date slider
+                # -- and swaps in the one it has.
+                "is_live": True,
+                "axis": spec.axis.value,
+                # What the control offers, and where each choice leads. A link
+                # per option rather than a radio posting back, because the
+                # value IS the address: the row works before any javascript
+                # runs, and a tapped option is a page someone can bookmark.
+                "axis_options": [
+                    (option.value, f"/{net}/charts/{spec.page_slug}/{option.value}")
+                    for option in options
+                ],
+                "axis_selected": selected,
+                "hx_post_url": f"/{net}/charts/{spec.page_slug}/{selected}/data",
+                "csv_url": f"/{net}/charts/{spec.page_slug}/{selected}/data.csv",
+                "docs": spec.docs_path,
+                **share_context(spec, net, state),
+            },
+        )
+
+    async def _page(request: Request, net: str, state: ChartState):
+        if net != "mainnet" and spec.mainnet_only:
+            return request.app.templates.TemplateResponse(
+                request,
+                "testnet/not-available.html",
+                {"env": environment, "net": net, "request": request},
+            )
+        return _render(request, net, state, await get_user_detailsv2(request))
+
+    async def _image(request: Request, net: str, state: ChartState):
+        if net != "mainnet" and spec.mainnet_only:
+            raise HTTPException(status_code=404, detail=f"{spec.title} is mainnet only.")
+        figure = await _figure(request, net, state, theme_from_query(request))
+        return await return_plot_response(figure, request, spec.title)
+
+    # --- the png, at the names that already exist -------------------------
+    #
+    # Per spec, and at the identical paths the handwritten routes served:
+    # these are in Telegram's file cache and in links people have shared.
+
+    @router.get(f"/plots/{{net}}/{spec.name}", response_class=Response)
+    @router.get(f"/plots/{{net}}/{spec.name}/image.png", response_class=Response)
+    async def image(request: Request, net: str):
+        """The chart as it opens."""
+        return await _image(request, net, ChartState.from_query(spec, {}))
+
+    @router.get(f"/plots/{{net}}/{spec.name}/{{segment}}/image.png", response_class=Response)
+    async def image_at(request: Request, net: str, segment: str):
+        return await _image(request, net, _state_or_404(segment))
+
+    image.__name__ = f"image_{spec.name}"
+    image_at.__name__ = f"image_at_{spec.name}"
+
+    if spec.page_slug in _LIVE_PAGES:
+        return
+    _LIVE_PAGES.add(spec.page_slug)
+
+    # --- the page, once per shared slug -----------------------------------
+
+    @router.get(f"/{{net}}/charts/{spec.page_slug}", response_class=HTMLResponse)
+    async def page(request: Request, net: str):
+        return await _page(request, net, ChartState.from_query(spec, {}))
+
+    # Registered before the {segment} route below, and it has to stay that
+    # way. FastAPI matches in registration order and {segment} is happy to
+    # capture the literal "data.csv" -- which is exactly what it did once,
+    # so every chart's Download Data link answered 404.
+    @router.get(f"/{{net}}/charts/{spec.page_slug}/{{segment}}/data.csv", response_class=Response)
+    async def data_csv(request: Request, net: str, segment: str):
+        """The rows behind the chart, in the state the path names."""
+        state = _state_or_404(segment)
+        rows = await ROWS[spec.live_source](spec, request.app, net, state)
+        header = list(rows[0]) if rows else ["date"]
+        lines = [",".join(header)]
+        for row in rows:
+            lines.append(",".join(str(row.get(key, "")) for key in header))
+        return Response(
+            "\n".join(lines),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{spec.name}-{segment}.csv"'},
+        )
+
+    @router.post(f"/{{net}}/charts/{spec.page_slug}/{{segment}}/data", response_class=Response)
+    async def data(request: Request, net: str, segment: str, post_data: LiveChartPostData):
+        state = _state_or_404(segment)
+        theme = post_data.theme or await get_theme_from_request(request)
+        figure = await _figure(request, net, state, theme)
+        return figure.to_html(
+            config={"responsive": True, "displayModeBar": False},
+            full_html=False,
+            include_plotlyjs=False,
+        )
+
+    @router.get(f"/{{net}}/charts/{spec.page_slug}/{{segment}}", response_class=HTMLResponse)
+    async def page_at(request: Request, net: str, segment: str):
+        """The chart at a named interval or lookback.
+
+        Refused rather than defaulted when the path does not name a real
+        state: a query parameter decorates an address, but the path is the
+        address, and drawing something else would make the url a lie.
+        """
+        return await _page(request, net, _state_or_404(segment))
+
+    page.__name__ = f"page_{spec.page_slug}"
+    page_at.__name__ = f"page_at_{spec.page_slug}"
+    data_csv.__name__ = f"data_csv_{spec.page_slug}"
+    data.__name__ = f"data_{spec.page_slug}"
+
+
 def can_be_generated(spec: ChartSpec) -> bool:
     """Whether a generated page could actually serve this chart.
 
@@ -416,7 +584,14 @@ def can_be_generated(spec: ChartSpec) -> bool:
     refuses to build -- a page for either would fail on every request. Asked
     of the pipeline rather than listed here, so a source that gains support
     gets its page without anyone remembering to come back.
+
+    A live chart qualifies on its provider instead: there is no pipeline to
+    build, because its rows do not come from Mongo. A spec naming a provider
+    the site has not registered does not qualify -- that page would answer
+    500 to every caller.
     """
+    if spec.live_source is not None:
+        return spec.live_source in FIGURES
     if not spec.source or not spec.series:
         return False
     today = dt.date.today().isoformat()
@@ -428,5 +603,9 @@ def can_be_generated(spec: ChartSpec) -> bool:
 
 
 for _registered in ALL_SPECS:
-    if can_be_generated(_registered):
+    if not can_be_generated(_registered):
+        continue
+    if _registered.live_source is not None:
+        register_live_chart_page(_registered)
+    else:
         register_chart_page(_registered)

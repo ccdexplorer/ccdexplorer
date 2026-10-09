@@ -90,7 +90,7 @@ def test_a_datetime_end_time_reads_the_same_as_a_string():
 # dashed line is what the history says a day's release usually looks like.
 
 
-from ccdexplorer.ccdexplorer_site.app.routers.charts.sc_cooldown_schedule import (  # noqa: E402
+from ccdexplorer.ccdexplorer_site.app.routers.charts.providers import (  # noqa: E402
     average_daily_release,
 )
 

@@ -15,10 +15,15 @@ from fastapi.testclient import TestClient
 
 from ccdexplorer.ccdexplorer_site.app.factory import AppSettings, create_app
 from ccdexplorer.ccdexplorer_site.app.routers.charts.generated import can_be_generated
+from ccdexplorer.charts import Axis
 from ccdexplorer.charts.registry import ALL_SPECS
 
 PROJECT = Path(__file__).resolve().parents[4] / "projects" / "ccdexplorer_site"
-GENERATED = [s for s in ALL_SPECS if can_be_generated(s)]
+#: The calendar charts, which are what the invariants below are about: a
+#: grouping and a date range in the path, and series for build_figure to
+#: draw. A live chart is generated too, and configured by one segment
+#: instead -- see test_generated_live_charts.py.
+GENERATED = [s for s in ALL_SPECS if can_be_generated(s) and s.axis is Axis.CALENDAR]
 
 
 @pytest.fixture(scope="module")

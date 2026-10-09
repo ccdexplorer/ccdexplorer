@@ -3,7 +3,7 @@
 {# The configurable page for this chart, if one exists. A tile whose chart
    has no page is left unlinked rather than pointed somewhere approximate. #}
 {% set _spec = spec_for_plot(plot_name) %}
-{% set page_slug = _spec.slug if _spec and _spec.has_page else None %}
+{% set page_slug = _spec.page_slug if _spec and _spec.has_page else None %}
 
 <div class="position-relative">
   <button

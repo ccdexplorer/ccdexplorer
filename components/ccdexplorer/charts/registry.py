@@ -11,7 +11,7 @@ Getting that backwards draws a chart that looks completely normal.
 
 import datetime as dt
 
-from .models import Agg, ChartSpec, Grouping, Kind, Series
+from .models import Agg, Axis, ChartSpec, Grouping, Interval, Kind, Series, Window
 
 CHAIN_START = dt.date(2021, 6, 9)
 
@@ -335,18 +335,32 @@ COOLDOWN_SCHEDULE = ChartSpec(
     name="cooldown_schedule",
     slug="cooldown-schedule",
     title="Cooldown schedule",
-    description="When stake currently in cooldown is released.",
+    description=(
+        "When stake currently in cooldown is released, over the next seven "
+        "days, against what a day usually releases."
+    ),
     blurb="When locked stake comes back",
     keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
     category="staking",
-    # No series and no source, the way the Kraken candles have none: this is
-    # the node's current state rather than a date-keyed collection, so there
-    # is nothing for a grouping or a date range to select and no generated
-    # page to make. charts/sc_cooldown_schedule.py draws it.
+    # No series and no source: this is the node's current state rather than a
+    # date-keyed collection, so there is nothing for a date range to select
+    # and nothing for the grouping pipeline to read. What the reader
+    # configures instead is the lookback the dashed average is measured over
+    # -- see Axis.LOOKBACK -- and the figure comes from a provider.
     source="",
     series=(),
+    axis=Axis.LOOKBACK,
+    live_source="cooldown_schedule",
+    # Seven days, fixed, including the days inside it on which nothing is
+    # released: absent, those read as a schedule that ends early.
+    horizon_days=7,
+    groupings=(),
+    windows=(Window.D30, Window.D90, Window.Y1, Window.ALL),
+    # What average_daily_release was handed before this was a control. A
+    # chart does not change what it draws because it gained a button.
+    default_window=Window.ALL,
     chain_start=COOLDOWNS_START,
-    has_page=False,
+    has_page=True,
     has_image=True,
 )
 
@@ -1010,19 +1024,54 @@ def _intraday(
     )
 
 
-KRAKEN_CHARTS = tuple(
-    _intraday(
-        f"ccd_kraken_{code}",
-        f"CCD on Kraken, {label}",
-        blurb,
-        Kind.CANDLE,
-        ("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc", code),
-        # Four hours is the one the gallery and the bot open at: short
-        # enough to be current, long enough to have a shape.
+#: Every interval the family offers, in the order the button row reads.
+ALL_KRAKEN_INTERVALS = tuple(Interval(code) for code, _, _ in _KRAKEN_INTERVALS)
+
+
+def _kraken(code: str, label: str, blurb: str) -> ChartSpec:
+    """One Kraken interval.
+
+    Seven specs rather than one, because the bot already offers all seven by
+    name and those buttons are sitting in people's chats. They share a page
+    -- the interval is what the page configures -- which page_slug carries,
+    because seven specs cannot share a slug: that keys BY_SLUG.
+
+    No windows. The api serves a fixed number of bars per interval, so the
+    interval IS the reach: 120 one-minute candles is two hours and 120 daily
+    ones is four months. A date range here could not do what it claimed.
+    """
+    return ChartSpec(
+        name=f"ccd_kraken_{code}",
+        slug=f"ccd-kraken-{code}",
+        page_slug="ccd-kraken",
+        title=f"CCD on Kraken, {label}",
+        description=blurb + ".",
+        blurb=blurb,
+        keywords=("price", "ccd", "usd", "value", "chart", "kraken", "candles", "ohlc", code),
+        claims=("price", "ccd", "usd", "value"),
+        category="exchanges",
+        source="",
+        series=(),
+        axis=Axis.INTERVAL,
+        live_source="kraken_ohlc",
+        intervals=ALL_KRAKEN_INTERVALS,
+        default_interval=Interval(code),
+        groupings=(),
+        windows=(),
+        kind=Kind.CANDLE,
+        has_page=True,
+        has_image=True,
+        # Four hours is the one the gallery and the bot open at: short enough
+        # to be current, long enough to have a shape.
         listed=code == "4h",
+        # One page covers both intraday families: neither aggregates, and
+        # what they have to say they have to say together.
+        docs_path="charts/ccd_price/",
+        chain_start=CHAIN_START,
     )
-    for code, label, blurb in _KRAKEN_INTERVALS
-)
+
+
+KRAKEN_CHARTS = tuple(_kraken(code, label, blurb) for code, label, blurb in _KRAKEN_INTERVALS)
 
 PRICE_CHARTS = tuple(
     _intraday(

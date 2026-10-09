@@ -858,7 +858,12 @@ def chart_page_url(name: str, request: Request) -> str:
     Read off the registry instead -- the chart's own page where it has one,
     and otherwise the category it sits in, which is the nearest thing that
     does show it.
+
+    Through chart_path rather than built from the slug, because a page is not
+    always at its chart's own slug: the seven Kraken intervals share one, and
+    /mainnet/charts/ccd-kraken-4h is a 404.
     """
+    from ccdexplorer.charts import chart_path
     from ccdexplorer.charts.registry import spec_for_plot
 
     segments = request.url.path.strip("/").split("/")
@@ -869,7 +874,7 @@ def chart_page_url(name: str, request: Request) -> str:
         category = CATEGORY_FOR_SPECLESS_PLOT.get(name)
         return f"/{net}/charts/category/{category}" if category else ""
     if spec.has_page:
-        return f"/{net}/charts/{spec.slug}"
+        return chart_path(spec, None, net)
     return f"/{net}/charts/category/{spec.category}"
 
 

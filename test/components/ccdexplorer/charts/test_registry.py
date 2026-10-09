@@ -6,7 +6,7 @@ asserted literally here, and getting one wrong is a visible diff rather than a
 chart that is quietly seven times too large.
 """
 
-from ccdexplorer.charts import Agg, Grouping, Kind, Window
+from ccdexplorer.charts import Agg, Axis, Grouping, Kind, Window
 from ccdexplorer.charts.registry import ALL_SPECS, BY_NAME, BY_SLUG, BY_SOURCE
 
 
@@ -24,6 +24,14 @@ def test_the_originally_configurable_charts_are_registered():
 def test_every_spec_opens_weekly_over_a_year():
     for spec in ALL_SPECS:
         assert spec.default_grouping is Grouping.WEEKLY, spec.name
+        if spec.axis is Axis.LOOKBACK:
+            # Its window is not a range, so "a year of history" is not what
+            # a default window means here. The cooldown schedule averages
+            # over all of it, which is what average_daily_release was handed
+            # before the lookback became a control -- the line a reader sees
+            # does not move because it gained a button.
+            assert spec.default_window is Window.ALL, spec.name
+            continue
         assert spec.default_window is Window.Y1, spec.name
 
 
@@ -216,11 +224,27 @@ def test_a_chart_that_can_be_grouped_has_a_page():
     assert BY_NAME["staking_validator_count"].has_page is True
 
 
-def test_an_intraday_chart_has_no_page_to_configure():
-    """No series, no source, nothing to group -- so nothing a settings panel
-    could change."""
-    assert BY_NAME["ccd_kraken_1h"].has_page is False
-    assert BY_NAME["ccd_price_24h"].has_page is False
+def test_the_chain_rate_price_charts_have_no_page_to_configure():
+    """No series, no source, nothing to group, and no other axis declared --
+    so nothing a settings panel could change.
+
+    The Kraken family is no longer one of these: it has no calendar grouping
+    either, but the candle interval is a real control, so it has a page.
+    """
+    for code in ("24h", "90d", "1y"):
+        assert BY_NAME[f"ccd_price_{code}"].has_page is False, code
+
+
+def test_the_kraken_charts_are_configured_by_their_interval():
+    """One page for the family, on which the interval is the control -- and
+    its reach as well: the api serves a fixed number of bars, so 1m is two
+    hours and 1d four months, and a date range could not mean anything."""
+    spec = BY_NAME["ccd_kraken_1h"]
+    assert spec.has_page is True
+    assert spec.axis is Axis.INTERVAL
+    assert spec.page_slug == "ccd-kraken"
+    assert spec.windows == ()
+    assert spec.groupings == ()
 
 
 def test_every_spec_says_it_has_an_image_route():
@@ -389,10 +413,17 @@ def test_the_kraken_charts_are_candles_and_the_price_charts_are_lines():
         assert BY_NAME[name].kind is expected, name
 
 
-def test_the_intraday_charts_have_images_but_no_page():
+def test_every_intraday_chart_has_an_image():
     for name in INTRADAY:
         assert BY_NAME[name].has_image is True, name
-        assert BY_NAME[name].has_page is False, name
+
+
+def test_only_the_intraday_charts_with_a_second_axis_have_a_page():
+    """None of these has a calendar grouping. The seven Kraken intervals
+    have a page all the same, because the interval is a control; the three
+    chain-rate price charts have nothing to configure and so have none."""
+    with_page = sorted(name for name in INTRADAY if BY_NAME[name].has_page)
+    assert with_page == sorted(name for name in INTRADAY if name.startswith("ccd_kraken"))
 
 
 def test_an_intraday_spec_is_never_handed_to_the_grouping_pipeline():

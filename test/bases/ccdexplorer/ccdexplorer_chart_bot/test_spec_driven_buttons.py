@@ -212,10 +212,16 @@ def test_a_chart_with_no_spec_still_gets_no_window_buttons():
     assert keyboard_for(_chart("daily_limits"), None).inline_keyboard
 
 
-def test_an_intraday_chart_keeps_its_plots_link():
-    """It has no configurable page: nothing to group, nothing to set."""
+def test_the_kraken_caption_leads_to_the_shared_page():
+    """It had no page, so the caption linked to the bare png -- a picture
+    with no controls on it. It has one now, and page_for resolves it through
+    the registry, so this entry needed no change to pick it up.
+
+    The bot's own interval buttons are untouched: they come from its
+    `price` family, which is what the user already had working.
+    """
     url = page_url(_chart("ccd_kraken_4h"), SITE, None)
-    assert "/plots/mainnet/ccd_kraken_4h" in url
+    assert url == f"{SITE}/mainnet/charts/ccd-kraken"
 
 
 def test_a_spec_backed_chart_still_carries_its_state_in_the_link():
@@ -342,3 +348,51 @@ def test_an_interval_family_still_has_its_row():
     labels = {b.text.strip("· ") for row in rows for b in row}
 
     assert {"1m", "4h", "1d"} <= labels
+
+
+# --- the cooldown schedule, configurable in the bot too -------------------
+#
+# It had no spec, so no window for a button to set: the one chart in the
+# staking menu that arrived with nothing to change about it. Its seven days
+# of bars are still fixed -- what the buttons set is the span the dashed
+# average is measured over.
+
+
+def test_the_schedule_offers_its_lookbacks_as_buttons():
+    rows = keyboard_for(_chart("cooldown_schedule")).inline_keyboard
+    assert [b.text.strip(" ·") for b in rows[0]] == ["30d", "90d", "1y", "all"]
+
+
+def test_the_schedule_offers_no_grouping_row():
+    """Seven days has nothing to group."""
+    rows = keyboard_for(_chart("cooldown_schedule")).inline_keyboard
+    assert len(rows) == 1
+
+
+def test_a_lookback_button_marks_the_one_it_is_on():
+    chart = _chart("cooldown_schedule")
+    rows = keyboard_for(chart, state_for(chart, Window.D90)).inline_keyboard
+    assert "· 90d ·" in [b.text for b in rows[0]]
+
+
+def test_a_lookback_press_resolves():
+    chart = _chart("cooldown_schedule")
+    resolved = parse_callback(callback_data(chart, Window.D30, Grouping.WEEKLY))
+    assert resolved is not None
+    assert resolved[0].name == "cooldown_schedule"
+    assert resolved[1].window is Window.D30
+
+
+def test_the_schedule_image_url_carries_its_lookback():
+    """Not a grouping and two months: that path does not exist for this
+    chart, and the button would have fetched a 404."""
+    chart = _chart("cooldown_schedule")
+    url = image_url(chart, SITE, state_for(chart, Window.D30), now=0)
+    assert url.startswith(f"{SITE}/plots/mainnet/cooldown_schedule/30d/image.png?")
+
+
+def test_the_schedule_links_to_its_page():
+    chart = _chart("cooldown_schedule")
+    assert page_url(chart, SITE, state_for(chart, Window.D90)) == (
+        f"{SITE}/mainnet/charts/cooldown-schedule/90d"
+    )
