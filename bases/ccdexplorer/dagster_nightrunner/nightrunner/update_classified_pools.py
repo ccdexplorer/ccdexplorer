@@ -1,10 +1,13 @@
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.mongodb import Collections, MongoDB
 from pymongo import ReplaceOne
 
 from ..nightrunner.utils import AnalysisType, get_df_from_git, write_queue_to_collection
 
 
-def passive_delegator_count(d_date: str, mongodb: MongoDB, grpcclient, net) -> int | None:
+def passive_delegator_count(
+    d_date: str, mongodb: MongoDB, grpcclient, net: NET = NET.MAINNET
+) -> int | None:
     """How many accounts delegate to the passive pool, or None if unknown.
 
     Not in the accounts snapshot this asset otherwise reads: it carries a
@@ -51,7 +54,16 @@ def average_delegators_per_pool(
 
 
 def perform_data_for_classified_pools(
-    context, d_date: str, commits_by_day: dict, mongodb: MongoDB, grpcclient=None, net=None
+    context,
+    d_date: str,
+    commits_by_day: dict,
+    mongodb: MongoDB,
+    grpcclient=None,
+    # Not None. It was, and the asset did not pass one, so None reached
+    # the grpc client, which dereferences net.value -- every staking
+    # partition died on AttributeError. This asset reads mongodb.mainnet
+    # directly, so mainnet is the only net it was ever about.
+    net: NET = NET.MAINNET,
 ) -> dict:
     analysis = AnalysisType.statistics_classified_pools
 

@@ -20,6 +20,22 @@ def get_historical_fx_rate_for(date: str, mongodb: MongoDB) -> float:
     return 0.01703143 / 0.91  # EUR RATE * AVG EUR/USD rate for June 2021-June 2022 (roughly)
 
 
+def merge_snapshot_with_state(snap: pl.DataFrame, state: pl.DataFrame) -> pl.DataFrame:
+    """Today's balances beside yesterday's basis, keeping every account.
+
+    Both sides matter: an account missing from today's snapshot still holds
+    a basis, and an account appearing for the first time has none, which is
+    what fill_null(0) turns into the formula's balance_prev == 0 branch.
+
+    coalesce=True is not decoration. Polars renamed how="outer" to
+    how="full" and made non-coalescing the default in the same move, so the
+    bare rename keeps the rows but splits the key: an account only in the
+    state lands in account_right with account left null, and every later
+    pl.col("account") reads that null instead of the name.
+    """
+    return snap.join(state, on="account", how="full", coalesce=True).fill_null(0)
+
+
 def perform_realized_prices(context, commits_by_day: dict, mongodb: MongoDB) -> dict:
     analysis = AnalysisType.statistics_realized_prices
     state = pl.DataFrame(
@@ -42,9 +58,8 @@ def perform_realized_prices(context, commits_by_day: dict, mongodb: MongoDB) -> 
             .with_columns(pl.lit(fx_today).alias("fx"))
         )
 
-        # outer join to preserve all accounts
         state = state.rename({"balance": "balance_prev", "basis": "basis_prev"})
-        merged = snap.join(state, on="account", how="outer").fill_null(0)
+        merged = merge_snapshot_with_state(snap, state)
 
         merged = merged.with_columns((pl.col("balance") - pl.col("balance_prev")).alias("delta"))
 

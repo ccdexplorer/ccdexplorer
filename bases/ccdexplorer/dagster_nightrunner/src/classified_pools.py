@@ -1,4 +1,5 @@
 import dagster as dg
+from ccdexplorer.domain.generic import NET
 
 from ..nightrunner.update_classified_pools import perform_data_for_classified_pools
 from .accounts_repo import accounts_repo
@@ -40,7 +41,12 @@ def classified_pools(
     # grpc as well as the repo snapshot: the passive delegator count is not
     # in the accounts csv, and it is two thirds of the total.
     dct: dict = perform_data_for_classified_pools(
-        context, partition_date, commits_by_day, mongodb, grpc_resource.get_client()
+        context,
+        partition_date,
+        commits_by_day,
+        mongodb,
+        grpc_resource.get_client(),
+        NET.MAINNET,
     )
     return dct
 

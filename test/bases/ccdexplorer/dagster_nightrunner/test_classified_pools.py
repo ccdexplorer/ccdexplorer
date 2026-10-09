@@ -89,3 +89,53 @@ def test_an_unknown_average_is_stored_as_unknown_not_as_the_old_answer(monkeypat
     assert doc["delegator_count"] == 2
     assert doc["open_pool_count"] == 1
     assert "passive_delegator_count" not in doc
+
+
+# --- the net the node is asked on ------------------------------------------
+
+
+class _RecordingClient:
+    """A grpc client that remembers the net it was asked for."""
+
+    def __init__(self):
+        self.nets = []
+
+    def get_delegators_for_passive_delegation(self, block_hash, net):
+        self.nets.append(net)
+        return [object(), object(), object()]
+
+
+def _run_with_grpc(monkeypatch, client, **kwargs):
+    from ccdexplorer.dagster_nightrunner.nightrunner import update_classified_pools as m
+
+    monkeypatch.setattr(m, "get_df_from_git", lambda _: _one_pool_with_two_delegators())
+    written = []
+    monkeypatch.setattr(m, "write_queue_to_collection", lambda *a: written.append(a))
+    from ccdexplorer.mongodb import Collections
+
+    mongodb = SimpleNamespace(
+        mainnet={
+            Collections.blocks_per_day: SimpleNamespace(
+                find_one=lambda _q: {"hash_for_last_block": "abc"},
+            )
+        }
+    )
+    context = SimpleNamespace(log=SimpleNamespace(info=lambda *_: None, error=lambda *_: None))
+    m.perform_data_for_classified_pools(
+        context, "2024-02-12", {"2024-02-12": "deadbeef"}, mongodb, client, **kwargs
+    )
+    return written
+
+
+def test_the_node_is_asked_on_a_real_net(monkeypatch):
+    """The asset handed the client through but not the net, so the default
+    None reached the grpc client and `net.value` raised AttributeError --
+    every staking partition failed with it. None is never a net.
+    """
+    client = _RecordingClient()
+    _run_with_grpc(monkeypatch, client)
+
+    assert client.nets, "the passive count was never read"
+    for net in client.nets:
+        assert net is not None
+        assert net.value, f"{net!r} has no .value, which is what grpc dereferences"
