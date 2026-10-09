@@ -14,8 +14,17 @@ KRAKEN = [s for s in ALL_SPECS if s.name.startswith("ccd_kraken")]
 def test_the_schedule_is_a_lookback_chart():
     spec = BY_NAME["cooldown_schedule"]
     assert spec.axis is Axis.LOOKBACK
-    assert spec.horizon_days == 7
     assert spec.live_source == "cooldown_schedule"
+
+
+def test_the_schedule_declares_no_fixed_window():
+    """Its x-axis comes from the data -- today to the farthest release the
+    node knows about. A length fixed on the spec was wrong either way: too
+    short and it clipped a release the accounts-cooldown table placed six
+    days out, too long and it drew empty weeks past the schedule."""
+    spec = BY_NAME["cooldown_schedule"]
+    assert not hasattr(spec, "horizon_days")
+    assert spec.windows, "the lookback is what it does configure"
 
 
 def test_the_schedule_offers_four_lookbacks_and_opens_at_all():

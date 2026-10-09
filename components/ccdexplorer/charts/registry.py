@@ -336,8 +336,8 @@ COOLDOWN_SCHEDULE = ChartSpec(
     slug="cooldown-schedule",
     title="Cooldown schedule",
     description=(
-        "When stake currently in cooldown is released, over the next seven "
-        "days, against what a day usually releases."
+        "When stake currently in cooldown is released, which accounts it "
+        "belongs to, and how that compares with what a day usually releases."
     ),
     blurb="When locked stake comes back",
     keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
@@ -351,14 +351,18 @@ COOLDOWN_SCHEDULE = ChartSpec(
     series=(),
     axis=Axis.LOOKBACK,
     live_source="cooldown_schedule",
-    # Seven days, fixed, including the days inside it on which nothing is
-    # released: absent, those read as a schedule that ends early.
-    horizon_days=7,
+    # The x-axis comes from the data: today to the farthest release the
+    # node knows about, which the cooldown period bounds anyway. A length
+    # fixed here was wrong either way -- too short and it clipped the end
+    # of the schedule, too long and it drew empty weeks past it.
     groupings=(),
     windows=(Window.D30, Window.D90, Window.Y1, Window.ALL),
     # What average_daily_release was handed before this was a control. A
     # chart does not change what it draws because it gained a button.
     default_window=Window.ALL,
+    # A band per account within each day: a bar is often several accounts
+    # and sometimes one large one, which a single total cannot show.
+    kind=Kind.STACKED_BAR,
     chain_start=COOLDOWNS_START,
     has_page=True,
     has_image=True,

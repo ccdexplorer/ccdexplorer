@@ -232,10 +232,6 @@ class ChartSpec(BaseModel):
     #: The intervals an INTERVAL chart offers, and which it opens at.
     intervals: tuple[Interval, ...] = ()
     default_interval: Interval | None = None
-    #: How many days forward a LOOKBACK chart draws. Fixed: the cooldown
-    #: schedule is the next seven days, including the ones on which nothing
-    #: is released -- which, absent, read as a schedule that ends early.
-    horizon_days: int = 0
     #: Names the figure builder the site registers for this chart, for the
     #: charts whose data is live rather than a Mongo collection. A name
     #: rather than a callable, the way `derived` is, so this module stays
@@ -305,10 +301,11 @@ class ChartSpec(BaseModel):
                     f"{self.name}: {self.default_interval.value} is not one of its intervals"
                 )
         if self.axis is Axis.LOOKBACK:
-            if self.horizon_days <= 0:
-                raise ValueError(f"{self.name}: a lookback chart needs a horizon")
+            if not self.windows:
+                raise ValueError(f"{self.name}: a lookback chart must offer lookbacks")
             if len(self.groupings) > 1:
                 raise ValueError(
-                    f"{self.name}: a {self.horizon_days}-day span has nothing to group"
+                    f"{self.name}: a lookback chart's x-axis is not a calendar range, "
+                    "so there is nothing for a grouping to collapse"
                 )
         return self

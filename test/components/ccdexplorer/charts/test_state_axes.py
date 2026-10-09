@@ -61,7 +61,6 @@ def _lookback_spec() -> ChartSpec:
         series=(),
         axis=Axis.LOOKBACK,
         live_source="cooldown_schedule",
-        horizon_days=7,
         groupings=(),
         windows=(Window.D30, Window.D90, Window.Y1, Window.ALL),
         default_window=Window.ALL,
@@ -104,22 +103,14 @@ def test_a_calendar_chart_has_no_interval():
     assert ChartState.from_query(_calendar_spec(), {}, today=TODAY).interval is None
 
 
-def test_a_lookback_chart_draws_its_horizon_not_its_window():
-    """Seven days forward from today, inclusive, whatever the window says."""
+def test_a_lookback_state_carries_the_span_its_window_selects():
+    """Not the x-axis. The cooldown schedule's x-axis comes from the data --
+    today to the farthest release -- and is not in the state at all; what
+    the window picks is the stored history behind today that the dashed
+    average is measured over."""
     state = ChartState.from_query(_lookback_spec(), {"window": "30d"}, today=TODAY)
-    assert state.start == TODAY
-    assert state.end == dt.date(2026, 10, 15)
-
-
-def test_a_lookback_horizon_ignores_an_explicit_range():
-    """A from/to in the query would otherwise override the horizon, and a
-    shared link carrying one would draw a schedule in the past."""
-    state = ChartState.from_query(
-        _lookback_spec(), {"from": "2026-01-01", "to": "2026-02-01"}, today=TODAY
-    )
-    assert state.start == TODAY
-    assert state.end == dt.date(2026, 10, 15)
-    assert not state.explicit_dates
+    assert state.end == dt.date(2026, 10, 8), "history stops at the last complete day"
+    assert state.start == dt.date(2026, 9, 8)
 
 
 def test_a_lookback_window_is_the_averaging_span():

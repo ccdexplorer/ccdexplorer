@@ -28,10 +28,6 @@ from ccdexplorer.charts.state import lookback_range
 from ccdexplorer.ccdexplorer_site.app.routers.statistics import (
     get_all_data_for_analysis_limited,
 )
-from ccdexplorer.ccdexplorer_site.app.routers.tools import (
-    cooldown_schedule_by_day,
-    cooldown_summary,
-)
 from ccdexplorer.ccdexplorer_site.app.utils import (
     ccdexplorer_plotly_template,
     empty_chart_figure,
@@ -45,11 +41,15 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
 # is the `cooldowns` chart, which answers a different question -- how much
 # was locked on a given day, rather than which day it returns.
 
-#: The blue the other staking charts use for the amount they are about.
-BAR_COLOUR = "#549FF2"
-
 #: microCCD to CCD, the unit the axis is labelled in.
 MICRO_CCD = 1_000_000
+
+#: The band holding every account past the ones the palette can colour.
+OTHERS_LABEL = "Other accounts"
+
+#: Grey, for the things on this chart that are not one account: the
+#: grouped tail and the reference line.
+GROUPED_COLOUR = "#8A8F98"
 
 
 def average_daily_release(history: list[dict]) -> float | None:
@@ -78,78 +78,151 @@ def average_daily_release(history: list[dict]) -> float | None:
     return sum(releases) / len(releases)
 
 
-def cooldown_schedule_days(
-    schedule: dict[str, int], today: dt.date, horizon: int
-) -> dict[str, int]:
-    """The horizon's days, every one of them, with what releases on each.
+def releases_by_day(accounts: list[dict]) -> dict[str, dict[str, int]]:
+    """What releases on each day, and whose it is.
 
-    Zero-filled, because a day on which nothing is released is a fact about
-    the schedule. Absent -- which is what grouping the api's rows by day
-    gives -- six quiet days read as a schedule that ends on the one busy
-    day.
+    Built from the accounts rather than from cooldown_summary, which
+    aggregates by release moment and so throws the account away. A day's
+    bar is often several accounts and sometimes one large one, and which
+    of those it is cannot be read off a single total.
 
-    Clipped rather than folded: a bar on the last day carrying everything
-    beyond it would be the chart's largest and would mean nothing.
+    Keyed by account index as a string, because that is what the label and
+    the csv both want and the index is only ever an identifier here.
     """
-    days = [(today + dt.timedelta(days=offset)).isoformat() for offset in range(horizon)]
-    return {day: schedule.get(day, 0) for day in days}
+    by_day: dict[str, dict[str, int]] = {}
+    for row in accounts:
+        account = str(row.get("account_index", "unknown"))
+        for cooldown in row.get("account_cooldowns") or []:
+            when = dt.datetime.fromisoformat(str(cooldown["end_time"]).replace("Z", "+00:00"))
+            day = when.date().isoformat()
+            per_account = by_day.setdefault(day, {})
+            per_account[account] = per_account.get(account, 0) + cooldown["amount"]
+    return dict(sorted(by_day.items()))
+
+
+def schedule_span(by_day: dict[str, dict[str, int]], today: dt.date) -> list[str]:
+    """Every date from today to the farthest release, inclusive.
+
+    The data decides how far this reaches, not a fixed window. A fixed one
+    was wrong twice over: seven dates counting today as the first clipped a
+    release the accounts-cooldown table placed six days out, and any length
+    chosen in advance either hides the end of the schedule or draws empty
+    weeks past it. The cooldown period is bounded anyway -- the farthest
+    out is a payday plus the cooldown -- so the span is short by
+    construction.
+
+    Zero-filled between, because a day on which nothing is released is a
+    fact about the schedule. Absent -- which is what grouping by day gives
+    -- a quiet stretch reads as a schedule that ends at the last busy day.
+
+    Days already past are left out: a cooldown that has expired is stake
+    that has come back, and this is a chart of what has not.
+    """
+    ahead = [day for day in by_day if day >= today.isoformat()]
+    if not ahead:
+        return []
+    last = dt.date.fromisoformat(max(ahead))
+    return [
+        (today + dt.timedelta(days=offset)).isoformat() for offset in range((last - today).days + 1)
+    ]
+
+
+def stacked_segments(
+    by_day: dict[str, dict[str, int]], span: list[str], limit: int
+) -> list[tuple[str, list[int]]]:
+    """One stack segment per account, largest first, the tail grouped.
+
+    Largest first so the biggest holder is the band nearest the axis and
+    the stack reads consistently across days. Grouped past `limit` because
+    the segments are told apart by colour: more bands than the template has
+    colours is a legend in which two entries look identical.
+    """
+    totals: dict[str, int] = {}
+    for day in span:
+        for account, amount in by_day.get(day, {}).items():
+            totals[account] = totals.get(account, 0) + amount
+
+    ranked = sorted(totals, key=lambda account: totals[account], reverse=True)
+    kept, tail = ranked[:limit], ranked[limit:]
+
+    segments = [
+        (account, [by_day.get(day, {}).get(account, 0) for day in span]) for account in kept
+    ]
+    if tail:
+        segments.append(
+            (
+                OTHERS_LABEL,
+                [sum(by_day.get(day, {}).get(account, 0) for account in tail) for day in span],
+            )
+        )
+    return segments
 
 
 def build_cooldown_schedule_figure(
-    per_day: dict[str, int],
+    by_day: dict[str, dict[str, int]],
+    span: list[str],
     theme: str,
     average: float | None = None,
     locked_total: int = 0,
 ) -> go.Figure:
-    """One bar per day of the horizon, against what a day usually releases."""
-    if not per_day:
-        # Only reachable with a zero horizon, which the spec refuses. Kept
-        # so a figure is always returned rather than an index error.
+    """The schedule, as a stack per day showing which accounts make it up."""
+    if not span:
+        # Not an empty pair of axes, which reads as "nothing happens ever"
+        # rather than "nothing is locked right now".
         return empty_chart_figure(theme, "No stake is in cooldown")
 
-    days = [dt.date.fromisoformat(d) for d in per_day]
-    amounts = [v / MICRO_CCD for v in per_day.values()]
+    template = ccdexplorer_plotly_template(theme)
+    # Read off the template rather than restated here, so the number of
+    # bands the chart will colour distinctly cannot drift from the number
+    # of colours it has to do it with.
+    colours = list(template.layout.colorway or ())
+    segments = stacked_segments(by_day, span, len(colours) or 1)
 
-    figure = go.Figure(
-        data=[
+    days = [dt.date.fromisoformat(day) for day in span]
+    figure = go.Figure()
+    for index, (label, amounts) in enumerate(segments):
+        grouped = label == OTHERS_LABEL
+        figure.add_trace(
             go.Bar(
                 x=days,
-                y=amounts,
-                name="Released",
-                marker=dict(color=BAR_COLOUR),
-                hovertemplate="%{x|%d %b %Y}<br>%{y:,.0f} CCD<extra></extra>",
+                y=[amount / MICRO_CCD for amount in amounts],
+                name=label if grouped else f"#{label}",
+                # Grey for the grouped tail, because it is not an account
+                # and a palette colour would claim it was one.
+                marker=dict(color=GROUPED_COLOUR if grouped else colours[index % len(colours)]),
+                hovertemplate=(
+                    f"%{{x|%d %b %Y}}<br>{'' if grouped else 'Account '}"
+                    f"{label}: %{{y:,.0f}} CCD<extra></extra>"
+                ),
             )
-        ]
-    )
+        )
+
     if average:
         # Said against the bars because it is the same measurement: CCD
         # released on a day. The bars say when stake comes back; this says
         # whether that is a lot.
         figure.add_hline(
             y=average / MICRO_CCD,
-            line=dict(color="#8A8F98", width=1, dash="dash"),
+            line=dict(color=GROUPED_COLOUR, width=1, dash="dash"),
             annotation_text=f"average day: {average / MICRO_CCD:,.0f} CCD",
             annotation_position="top left",
-            annotation_font=dict(size=11, color="#8A8F98"),
+            annotation_font=dict(size=11, color=GROUPED_COLOUR),
         )
-
-    # Two numbers, because the bars are a window onto the schedule rather
-    # than the whole of it. This printed the sum of the bars as "CCD locked"
-    # while the bars were everything; clipped to the horizon that sum is no
-    # longer what is locked, and saying so would understate it by however
-    # much releases later.
-    week = sum(amounts)
-    subtitle = (
-        f"{week:,.0f} CCD releasing in the next {len(per_day)} days"
-        f"   ·   {locked_total / MICRO_CCD:,.0f} CCD locked in all"
-    )
 
     figure.update_xaxes(type="date", title=None)
     figure.update_yaxes(title="CCD released")
     figure.update_layout(
-        title=f"<b>Stake leaving cooldown</b><br><sup>{subtitle}</sup>",
+        barmode="stack",
+        title=(
+            "<b>Stake leaving cooldown</b><br>"
+            f"<sup>{locked_total / MICRO_CCD:,.0f} CCD locked</sup>"
+        ),
+        # No legend. It is a list of account indexes, which is not something
+        # a reader recognises or can do anything with, and on a day of seven
+        # bands it took a third of the chart to say so. Which account a band
+        # is belongs in the hover, where it is asked for.
         showlegend=False,
-        template=ccdexplorer_plotly_template(theme),
+        template=template,
         height=400,
     )
     return figure
@@ -162,7 +235,7 @@ async def _cooldown_schedule(app, net: str, state: ChartState, spec: ChartSpec):
         app.httpx_client,
     )
     accounts = api_result.return_value if api_result.ok else []
-    schedule = cooldown_schedule_by_day(cooldown_summary(accounts))
+    by_day = releases_by_day(accounts)
 
     # The lookback the reader chose, not the whole history: "what a day
     # usually releases" over five years and over the last thirty days are
@@ -171,38 +244,46 @@ async def _cooldown_schedule(app, net: str, state: ChartState, spec: ChartSpec):
     history = await get_all_data_for_analysis_limited(
         "statistics_cooldowns", app, start.isoformat(), end.isoformat()
     )
-    return schedule, history
+    return by_day, history
 
 
 async def cooldown_schedule_figure(
     spec: ChartSpec, app, net: str, state: ChartState, theme: str
 ) -> go.Figure:
-    schedule, history = await _cooldown_schedule(app, net, state, spec)
+    by_day, history = await _cooldown_schedule(app, net, state, spec)
     return build_cooldown_schedule_figure(
-        cooldown_schedule_days(schedule, dt.date.today(), spec.horizon_days),
+        by_day,
+        schedule_span(by_day, dt.date.today()),
         theme,
         average=average_daily_release(history),
-        locked_total=sum(schedule.values()),
+        # Everything in cooldown, including anything dated before today
+        # that the node has not yet released: it is still locked.
+        locked_total=sum(sum(day.values()) for day in by_day.values()),
     )
 
 
 async def cooldown_schedule_rows(spec: ChartSpec, app, net: str, state: ChartState) -> list[dict]:
-    """The bars, as rows, with the reference line beside them.
+    """One row per account per release day, with the reference line beside.
+
+    Per account rather than per day, because that is what the chart draws
+    now: a day's total is the sum of its bands and a csv of totals alone
+    could not be checked against it.
 
     The average repeats down the column rather than being a second file:
-    it is what the chart compares each day against, and a csv of the bars
-    alone loses the comparison the chart is about.
+    it is what the chart compares each day against, and the rows without it
+    lose the comparison the chart is about.
     """
-    schedule, history = await _cooldown_schedule(app, net, state, spec)
+    by_day, history = await _cooldown_schedule(app, net, state, spec)
     average = average_daily_release(history)
-    per_day = cooldown_schedule_days(schedule, dt.date.today(), spec.horizon_days)
     return [
         {
             "date": day,
+            "account": account,
             "released": amount,
             "average_daily_release": "" if average is None else round(average),
         }
-        for day, amount in per_day.items()
+        for day in schedule_span(by_day, dt.date.today())
+        for account, amount in sorted(by_day.get(day, {}).items())
     ]
 
 

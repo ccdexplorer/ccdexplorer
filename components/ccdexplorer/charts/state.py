@@ -102,17 +102,6 @@ class ChartState(BaseModel):
                 params.get("interval"), Interval, spec.intervals, spec.default_interval
             )
 
-        # A LOOKBACK chart's x-axis is a fixed span forward from today, and
-        # its window is the lookback for a reference figure rather than the
-        # range. Read as a range -- which is what every other chart does --
-        # the cooldown schedule would draw the last thirty days, a chart of a
-        # schedule that has already happened. Last here, so a from/to in a
-        # shared link cannot put it back in the past either.
-        if spec.axis is Axis.LOOKBACK:
-            start = today or dt.datetime.now(dt.UTC).date()
-            end = start + dt.timedelta(days=spec.horizon_days - 1)
-            explicit = False
-
         # Last, because it needs the range: a chart that picks its own
         # resolution has nothing to read from the request, and a grouping
         # left over in an old url would otherwise draw two points.
@@ -145,13 +134,15 @@ def lookback_range(
 ) -> tuple[dt.date, dt.date]:
     """The history a LOOKBACK chart's reference figure is measured over.
 
-    Not state.start/state.end, which are the forward horizon. This is the
-    other direction: the stored days behind today that the dashed average on
-    the cooldown schedule is an average of.
+    Which is the range its window selects, because on this kind of chart
+    the window is not the x-axis: the cooldown schedule's x-axis comes from
+    the data -- today to the farthest release it knows about -- and what
+    the window picks is the span of stored days the dashed average is an
+    average of.
 
-    resolve_window already ends at the last complete day and clamps the start
-    to the chain start, which is what this needs: the stored history stops at
-    yesterday and does not reach back before the collection existed.
+    Named rather than left as state.start/state.end at the call site, so
+    the reading is on the page: these dates are behind today, not ahead of
+    it, and the chart draws neither of them.
     """
     return resolve_window(spec, state.window, today)
 

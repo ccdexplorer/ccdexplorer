@@ -7,6 +7,8 @@ defaulted when it names something the chart does not offer: the path IS the
 address, and drawing a different chart under it makes the url a lie.
 """
 
+import datetime as dt
+
 from ccdexplorer.charts.models import Interval, Window
 from ccdexplorer.charts.paths import chart_path, state_from_axis_path
 from ccdexplorer.charts.state import ChartState
@@ -69,7 +71,10 @@ def test_a_lookback_segment_resolves():
     state = state_from_axis_path(_lookback_spec(), "30d", today=TODAY)
     assert state is not None
     assert state.window is Window.D30
-    assert state.start == TODAY, "the horizon does not move with the lookback"
+    # The dates are the span the lookback selects -- stored history behind
+    # today -- and not the chart's x-axis, which comes from the data.
+    assert state.start == dt.date(2026, 9, 8)
+    assert state.end == dt.date(2026, 10, 8)
 
 
 def test_a_window_the_chart_does_not_offer_is_refused():

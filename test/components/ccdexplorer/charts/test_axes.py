@@ -90,30 +90,29 @@ def test_an_interval_default_outside_the_offered_set_is_refused():
         )
 
 
-def test_a_lookback_chart_has_a_horizon_and_windows():
+def test_a_lookback_chart_declares_its_lookbacks():
     spec = _spec(
         axis=Axis.LOOKBACK,
         source="",
         series=(),
         groupings=(),
-        horizon_days=7,
         windows=(Window.D30, Window.ALL),
         default_window=Window.ALL,
         live_source="cooldown_schedule",
     )
-    assert spec.horizon_days == 7
     assert spec.windows == (Window.D30, Window.ALL)
 
 
-def test_a_lookback_chart_without_a_horizon_is_refused():
-    """The horizon is its x-axis. Without one there is nothing to draw."""
+def test_a_lookback_chart_without_lookbacks_is_refused():
+    """The lookbacks are the only thing it offers. Without them the page
+    has no control on it at all."""
     with pytest.raises(ValidationError):
         _spec(
             axis=Axis.LOOKBACK,
             source="",
             series=(),
             groupings=(),
-            horizon_days=0,
+            windows=(),
             live_source="cooldown_schedule",
         )
 
@@ -126,7 +125,7 @@ def test_a_lookback_chart_offers_no_grouping():
             source="",
             series=(),
             groupings=(Grouping.DAILY, Grouping.MONTHLY),
-            horizon_days=7,
+            windows=(Window.D30,),
             live_source="cooldown_schedule",
         )
 
