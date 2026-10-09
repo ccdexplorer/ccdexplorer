@@ -20,7 +20,7 @@ import time
 
 from pydantic import BaseModel, ConfigDict
 
-from ccdexplorer.charts import ChartSpec, ChartState, Grouping, Window, chart_path
+from ccdexplorer.charts import Axis, ChartSpec, ChartState, Grouping, Window, chart_path
 from ccdexplorer.charts.registry import BY_NAME as SPEC_BY_NAME
 from ccdexplorer.charts.registry import spec_for_plot
 
@@ -152,6 +152,12 @@ def image_url(
     if state is None or chart.spec is None:
         # Its route takes no state, so there is none to put in the path.
         return f"{base}/image.png?{query}"
+    if chart.spec.axis is not Axis.CALENDAR:
+        # One segment, because one thing is configurable. The calendar form
+        # below would name a path this chart has no route for, and the
+        # button would have fetched a 404.
+        segment = state.interval.value if chart.spec.axis is Axis.INTERVAL else state.window.value
+        return f"{base}/{segment}/image.png?{query}"
     return (
         f"{base}/{state.grouping.value}"
         f"/{format_month(state.start)}/{format_month(state.end)}/image.png?{query}"
@@ -380,8 +386,11 @@ CHARTS: tuple[Chart, ...] = (
         description="When stake currently in cooldown is released",
         keywords=("cooldown", "schedule", "released", "unlock", "unlocking", "when"),
         group="staking",
-        # No spec: it is the node's current state, not a date-keyed series,
-        # so there is no window or grouping for a button to set.
+        # Four buttons for the lookback the dashed average is measured over.
+        # Not the x-axis: those seven days of bars are fixed, which is why
+        # the spec offers windows and no grouping at all.
+        spec_name="cooldown_schedule",
+        window_words=("30d", "90d", "1y", "all", "average"),
     ),
     Chart(
         name="staking_validator_count",

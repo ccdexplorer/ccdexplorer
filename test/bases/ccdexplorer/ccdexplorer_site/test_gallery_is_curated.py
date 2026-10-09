@@ -74,7 +74,7 @@ def test_every_listed_tile_leads_somewhere():
 
 
 def test_an_intraday_tile_leads_to_its_own_chart_page():
-    assert tile_href(BY_NAME["ccd_kraken_4h"], "mainnet") == "/plots/mainnet/ccd_kraken_4h"
+    assert tile_href(BY_NAME["ccd_kraken_4h"], "mainnet") == "/mainnet/charts/ccd-kraken"
 
 
 def test_a_configurable_tile_leads_to_its_configurable_page():

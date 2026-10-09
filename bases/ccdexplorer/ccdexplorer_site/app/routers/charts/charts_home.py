@@ -12,6 +12,7 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_user_detailsv2,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import page_theme
+from ccdexplorer.charts import chart_path
 
 router = APIRouter()
 
@@ -106,9 +107,12 @@ def tile_href(spec, net: str) -> str:
 
     A configurable page where there is one; otherwise the chart's own page,
     because a tile that leads nowhere is worse than no tile.
+
+    Asked of chart_path rather than built here, because a chart's page is not
+    always at its own slug: the seven Kraken intervals share one.
     """
     if spec.has_page:
-        return f"/{net}/charts/{spec.slug}"
+        return chart_path(spec, None, net)
     if spec.has_image:
         return f"/plots/{net}/{spec.name}"
     return ""

@@ -14,7 +14,7 @@ makes the url a lie.
 
 import datetime as dt
 
-from .models import ChartSpec, Grouping
+from .models import Axis, ChartSpec, Grouping, Interval, Window
 from .state import ChartState, latest_complete_day
 
 MONTH_FORMAT = "%Y%m"
@@ -133,13 +133,49 @@ def chart_path(spec: ChartSpec, state: ChartState | None, net: str = "") -> str:
     thing to hand anyone.
     """
     prefix = f"/{net}" if net else ""
+    # page_slug, not slug: the seven Kraken specs are one chart seven ways
+    # and share a page. They cannot share a slug -- that keys BY_SLUG.
+    base = f"{prefix}/charts/{spec.page_slug}"
     if state is None:
-        return f"{prefix}/charts/{spec.slug}"
-    path = (
-        f"{prefix}/charts/{spec.slug}/{state.grouping.value}"
-        f"/{format_month(state.start)}/{format_month(state.end)}"
-    )
+        return base
+    # One segment for a chart with one control, because that one value is
+    # the whole of its address.
+    if spec.axis is Axis.INTERVAL:
+        return f"{base}/{state.interval.value}"
+    if spec.axis is Axis.LOOKBACK:
+        return f"{base}/{state.window.value}"
+    path = f"{base}/{state.grouping.value}/{format_month(state.start)}/{format_month(state.end)}"
     # Every trace is the default, and a default is not spelled out.
     if len(state.traces) < len(spec.display_series):
         path += f"/{format_traces(spec, state.traces)}"
     return path
+
+
+def state_from_axis_path(
+    spec: ChartSpec, segment: str, today: dt.date | None = None
+) -> ChartState | None:
+    """The state a one-segment path names, or None if it does not name one.
+
+    For the charts whose configuration is a single value rather than a
+    grouping and a range. Refused rather than defaulted, like state_from_path
+    and for the same reason: the path is the address. "weekly" is a real
+    Grouping and not a real interval; accepted, it would draw four-hour
+    candles under a url saying something else entirely.
+    """
+    if not segment or spec.axis is Axis.CALENDAR:
+        return None
+    if spec.axis is Axis.INTERVAL:
+        try:
+            interval = Interval(segment)
+        except ValueError:
+            return None
+        if interval not in spec.intervals:
+            return None
+        return ChartState.from_query(spec, {"interval": interval.value}, today=today)
+    try:
+        window = Window(segment)
+    except ValueError:
+        return None
+    if window not in spec.windows:
+        return None
+    return ChartState.from_query(spec, {"window": window.value}, today=today)

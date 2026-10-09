@@ -170,3 +170,67 @@ test(`a chart with no grouping control still rewrites its address`, async ({ pag
   // says which picture it is.
   await expect(page).toHaveURL(/\/fee-stabilization\/(daily|weekly|monthly)\/\d{6}\/\d{6}/);
 });
+
+// --- the two charts configured by one segment -----------------------------
+//
+// Both are live -- one exchange's order book, and the node's current cooldown
+// state -- so what is asserted here is the control and the address, which the
+// server renders either way. The figure arrives over htmx and depends on
+// Kraken being up, which is not something to fail a build on.
+
+const AXIS_ROW = '#btnradio_axis';
+
+for (const path of [`/${NET}/charts/ccd-kraken`, `/${NET}/charts/cooldown-schedule`]) {
+  test(`${path} renders`, async ({ page }) => {
+    const response = await page.goto(path);
+    await expectPageRendered(page, response);
+  });
+}
+
+test(`the Kraken page offers every interval and says which it is on`, async ({ page }) => {
+  await page.goto(`/${NET}/charts/ccd-kraken/1h`);
+
+  const row = page.locator(AXIS_ROW);
+  await expect(row).toBeVisible();
+  for (const code of ['1m', '5m', '15m', '30m', '1h', '4h', '1d']) {
+    await expect(row.getByRole('link', { name: code, exact: true })).toBeVisible();
+  }
+  await expect(row.locator('a.active')).toHaveText('1h');
+});
+
+test(`an interval leads to its own address`, async ({ page }) => {
+  await page.goto(`/${NET}/charts/ccd-kraken/4h`);
+
+  await page.locator(AXIS_ROW).getByRole('link', { name: '1d', exact: true }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/${NET}/charts/ccd-kraken/1d$`));
+  await expect(page.locator(`${AXIS_ROW} a.active`)).toHaveText('1d');
+});
+
+test(`a live chart offers no grouping, traces or slider`, async ({ page }) => {
+  // Three controls that cannot do anything here: seven days has nothing to
+  // group, one series has nothing to select, and Kraken serves a fixed
+  // number of bars so there is no range to drag.
+  await page.goto(`/${NET}/charts/cooldown-schedule/30d`);
+
+  await expect(page.locator('#btnradio_grouping')).toHaveCount(0);
+  await expect(page.locator('#btncheckgroup')).toHaveCount(0);
+  await expect(page.locator('#slider-date-pretty')).toHaveCount(0);
+});
+
+test(`the schedule's lookback is in its address and its share link`, async ({ page }) => {
+  await page.goto(`/${NET}/charts/cooldown-schedule`);
+
+  await page.locator(AXIS_ROW).getByRole('link', { name: '90d', exact: true }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/${NET}/charts/cooldown-schedule/90d$`));
+  const share = await page.locator('[data-share-url]').getAttribute('data-share-url');
+  expect(share).toContain('/charts/cooldown-schedule/90d');
+});
+
+test(`an interval the chart does not offer is a 404`, async ({ page }) => {
+  // The path is the address. Drawing 4h under a url saying 7s would make the
+  // url a lie, so it is refused rather than defaulted.
+  const response = await page.goto(`/${NET}/charts/ccd-kraken/7s`);
+  expect(response?.status()).toBe(404);
+});

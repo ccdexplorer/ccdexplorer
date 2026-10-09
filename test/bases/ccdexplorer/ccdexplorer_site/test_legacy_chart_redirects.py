@@ -75,11 +75,15 @@ def test_every_spec_claiming_a_page_has_one(client):
     """A gallery tile linking to a 404 is worse than no tile.
 
     Only the specs that claim a page: a chart gets a spec before it gets a
-    page, and statistics.py still draws the rest."""
+    page, and statistics.py still draws the rest.
+
+    page_slug rather than slug, because a page is not always at its chart's
+    own slug: the seven Kraken intervals are one chart seven ways and share
+    one."""
     paths = {getattr(r, "path", "") for r in client.app.routes}
     for spec in ALL_SPECS:
         if spec.has_page:
-            assert f"/{{net}}/charts/{spec.slug}" in paths, spec.slug
+            assert f"/{{net}}/charts/{spec.page_slug}" in paths, spec.page_slug
 
 
 def test_a_spec_without_a_page_really_has_no_route(client):
@@ -87,7 +91,7 @@ def test_a_spec_without_a_page_really_has_no_route(client):
     paths = {getattr(r, "path", "") for r in client.app.routes}
     for spec in ALL_SPECS:
         if not spec.has_page:
-            assert f"/{{net}}/charts/{spec.slug}" not in paths, spec.slug
+            assert f"/{{net}}/charts/{spec.page_slug}" not in paths, spec.page_slug
 
 
 def test_the_category_home_routes_redirect_into_the_gallery(client):

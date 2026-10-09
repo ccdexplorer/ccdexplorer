@@ -33,6 +33,41 @@ class Grouping(str, Enum):
     MONTHLY = "monthly"
 
 
+class Axis(str, Enum):
+    """What the reader configures on this chart.
+
+    Every chart used to be the first of these: a grouping and a date range
+    over a date-keyed collection. The two that are not had no page at all,
+    because the page only knew how to offer a grouping and a range.
+    """
+
+    #: A grouping and a date range over daily documents.
+    CALENDAR = "calendar"
+    #: A candle interval, which is also the chart's reach -- Kraken serves a
+    #: fixed number of bars, so 1m is two hours and 1d is four months. There
+    #: is no date range to offer.
+    INTERVAL = "interval"
+    #: A fixed forward span, where what the reader configures is the lookback
+    #: some reference figure is measured over rather than the x-axis.
+    LOOKBACK = "lookback"
+
+
+class Interval(str, Enum):
+    """A candle interval.
+
+    Not a Grouping: these are not calendar buckets, and the calendar
+    groupings stop at a day in both directions.
+    """
+
+    M1 = "1m"
+    M5 = "5m"
+    M15 = "15m"
+    M30 = "30m"
+    H1 = "1h"
+    H4 = "4h"
+    D1 = "1d"
+
+
 class Window(str, Enum):
     D30 = "30d"
     D90 = "90d"
@@ -193,6 +228,20 @@ class ChartSpec(BaseModel):
     #: written daily, weekly and monthly by the nightly job.
     source_by_grouping: dict[Grouping, str] = {}
 
+    axis: Axis = Axis.CALENDAR
+    #: The intervals an INTERVAL chart offers, and which it opens at.
+    intervals: tuple[Interval, ...] = ()
+    default_interval: Interval | None = None
+    #: Names the figure builder the site registers for this chart, for the
+    #: charts whose data is live rather than a Mongo collection. A name
+    #: rather than a callable, the way `derived` is, so this module stays
+    #: free of plotly and the bot can import it.
+    live_source: str | None = None
+    #: The page this chart is configured on, where that is not its own slug.
+    #: The seven Kraken specs are one chart seven ways and share a page; they
+    #: cannot share a `slug`, which keys BY_SLUG.
+    page_slug: str = ""
+
     @property
     def automatic_grouping(self) -> bool:
         """Whether this chart picks its own resolution rather than asking.
@@ -222,3 +271,41 @@ class ChartSpec(BaseModel):
     def source_for(self, grouping: Grouping) -> str:
         """The mongo `type` to read for this grouping."""
         return self.source_by_grouping.get(grouping, self.source)
+
+    @model_validator(mode="after")
+    def _default_page_slug(self):
+        if not self.page_slug:
+            object.__setattr__(self, "page_slug", self.slug)
+        return self
+
+    @model_validator(mode="after")
+    def _check_axis(self):
+        """That an off-calendar chart declares enough to be drawable.
+
+        Refused at import rather than at request time: a spec missing its
+        interval list or its provider registers a page that answers 500 to
+        every caller, and the registry is built once at startup where a
+        failure is loud.
+        """
+        if self.axis is Axis.CALENDAR:
+            return self
+        if not self.live_source:
+            raise ValueError(f"{self.name}: a {self.axis.value} chart must name a live_source")
+        if self.axis is Axis.INTERVAL:
+            if not self.intervals:
+                raise ValueError(f"{self.name}: an interval chart must offer intervals")
+            if self.default_interval is None:
+                object.__setattr__(self, "default_interval", self.intervals[0])
+            elif self.default_interval not in self.intervals:
+                raise ValueError(
+                    f"{self.name}: {self.default_interval.value} is not one of its intervals"
+                )
+        if self.axis is Axis.LOOKBACK:
+            if not self.windows:
+                raise ValueError(f"{self.name}: a lookback chart must offer lookbacks")
+            if len(self.groupings) > 1:
+                raise ValueError(
+                    f"{self.name}: a lookback chart's x-axis is not a calendar range, "
+                    "so there is nothing for a grouping to collapse"
+                )
+        return self

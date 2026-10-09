@@ -5,6 +5,12 @@
     {% set include_dropdown_fancy = False %}
     {# The address bar is rewritten as a path, so the script needs the chart's
        own slug and the url name of each trace. #}
+    {# Not for a live chart. Its state is already in its address -- the one
+       control is a link -- and the rewriter below would overwrite
+       /charts/ccd-kraken/1h with a grouping and two months, naming a chart
+       that does not exist. Setting no CHART_SLUG makes the handler in
+       event_emit.html return on its first line. #}
+    {% if not is_live %}
     <script>
       window.CHART_SLUG = {{ spec.slug | tojson }};
       window.CHART_NET = {{ net | tojson }};
@@ -12,6 +18,7 @@
       {# null where the reader chooses the grouping. #}
       window.CHART_AUTO_GROUPING = {{ auto_grouping | tojson }};
     </script>
+    {% endif %}
 
     {# Top left, where the statistics tiles kept it, because these pages
        replaced those tiles and that is where people already look.

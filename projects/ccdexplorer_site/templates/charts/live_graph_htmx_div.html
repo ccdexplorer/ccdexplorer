@@ -1,0 +1,17 @@
+{# A live chart's one control is in its address, so the only thing this has
+   to send back is the theme.
+
+   Its own partial rather than graph_htmx_div.html, which reads
+   .innerText off the slider's #event-start-pretty and #event-end-pretty
+   spans. A live chart has no slider, so those elements do not exist, and
+   reading innerText off null throws inside hx-vals -- before the post is
+   ever made, so the chart simply never appeared. #}
+<div
+    hx-ext='json-enc'
+    hx-encoding="json"
+    hx-trigger="load, switched-theme from:body"
+    hx-post="{{hx_post_url}}"
+    hx-vals='js:{
+        theme: document.querySelector("HTML").getAttribute("data-bs-theme")
+        }'
+></div>

@@ -225,16 +225,18 @@ def test_both_cooldown_charts_are_in_staking():
         assert BY_NAME[name].listed, name
 
 
-def test_the_schedule_has_no_series_to_generate_from():
-    """It is the node's current state, not a date-keyed collection, so it
-    keeps its own route in charts/sc_cooldown_schedule.py and must not be
-    handed a generated page that would draw nothing."""
+def test_the_schedule_is_generated_from_its_provider_not_its_series():
+    """It has no series -- it is the node's current state, not a date-keyed
+    collection -- and it gets a page all the same, because what the page
+    offers is the lookback its average line is measured over and the figure
+    comes from a provider rather than from the grouping pipeline."""
     from ccdexplorer.ccdexplorer_site.app.routers.charts.generated import can_be_generated
 
     spec = BY_NAME["cooldown_schedule"]
     assert spec.series == ()
-    assert not can_be_generated(spec)
-    assert not spec.has_page
+    assert spec.live_source == "cooldown_schedule"
+    assert spec.has_page
+    assert can_be_generated(spec)
 
 
 def test_delegators_shows_the_passive_share():
