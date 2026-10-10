@@ -106,17 +106,9 @@ e2e:
 accounts:
     python -m bases.ccdexplorer.accounts_retrieval
 
-# On demand rather than on every commit: the eight pickles total ~79MB and are
-# tracked, so regenerating them per commit would add that much binary to
-# history each time, and would make committing require a live database.
-
 # Redraw the charts index covers (greyscale pngs, one per category)
 chart-covers:
     uv run python bases/ccdexplorer/ccdexplorer_site/covers/make_chart_covers.py
-
-# Refresh the address->index pickles the site loads at boot (live Mongo, all nets)
-addresses:
-    uv run python bases/ccdexplorer/ccdexplorer_site/addresses/get_addresses_from_collection.py
 
 # --- Devnet ---
 

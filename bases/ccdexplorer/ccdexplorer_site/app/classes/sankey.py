@@ -15,7 +15,6 @@ from enum import Enum
 from ..utils import (
     account_label_on_index,
     contract_tag,
-    # get_address_identifiers,
     from_address_to_index,
 )  # , convert_contract_str_to_type
 from ccdexplorer.domain.mongo import MongoImpactedAddress, MongoTypeLoggedEventV2

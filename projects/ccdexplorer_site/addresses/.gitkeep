@@ -1,0 +1,5 @@
+The address maps come from the api now, not from pickles in here.
+
+This directory is kept because factory.py mounts it as static files, and
+StaticFiles refuses to mount a path that does not exist -- an empty
+directory boots, a missing one does not.
