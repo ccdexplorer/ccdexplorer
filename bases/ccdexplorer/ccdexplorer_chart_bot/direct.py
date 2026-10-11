@@ -19,6 +19,7 @@ from telegram.error import TelegramError
 
 from ccdexplorer.charts import ChartState
 
+from . import validator as validator_charts
 from .catalogue import (
     CALLBACK_PREFIX,
     CHARTS,
@@ -236,6 +237,80 @@ async def dismiss_picker(query) -> None:
 def caption_for_button(chart: Chart, site_url: str, state, query) -> str:
     """The caption a chart gets when a button produced it."""
     return caption(chart, site_url, state) + requester_note(query)
+
+
+async def fetch_validator(index: int) -> dict | None:
+    """The api routes the site's validator tab reads, in parallel.
+
+    Imported here rather than at module scope so the rest of the bot --
+    which fetches nothing -- does not pay for an http client it never
+    uses.
+    """
+    import asyncio
+
+    import httpx2 as httpx
+
+    from ccdexplorer.env import API_URL, environment
+
+    paths = validator_charts.api_paths(index)
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
+        ) as client:
+            responses = await asyncio.gather(
+                *(client.get(f"{API_URL.rstrip('/')}/v2/{path}") for path in paths.values())
+            )
+    except Exception as error:  # noqa: BLE001
+        # Broad and only here: the reader gets a sentence rather than a
+        # silence, and Telegram does not retry a command that raised.
+        log.warning("validator %s lookup failed: %s", index, error)
+        return None
+    return {
+        name: (response.json() if response.status_code == 200 else None)
+        for name, response in zip(paths, responses)
+    }
+
+
+async def send_validator(message, args: list[str], site_url: str) -> None:
+    """Answer `/v <index>` with what the site's validator tab says."""
+    index = validator_charts.index_or_none(args)
+    if index is None:
+        await message.reply_html(
+            "Which validator? Say <code>/v 72723</code> — an account index, not an address."
+        )
+        return
+
+    got = await fetch_validator(index)
+    if got is None:
+        await message.reply_html(f"Could not look up validator {index} just now.")
+        return
+    if not validator_charts.is_validator(got["pool"]):
+        await message.reply_html(
+            f"Account {index} is not a validator. "
+            f"{html.escape(site_url.rstrip('/'))}/mainnet/account/{index}"
+        )
+        return
+
+    log.info("/v %s", index)
+    await message.reply_html(
+        validator_charts.summary(
+            index, got["pool"], got["node"], got["payday"], got["win"], got["tally"], site_url
+        ),
+        disable_web_page_preview=True,
+    )
+
+
+def validator_command_handler(site_url: str):
+    """/v 72723 -- one validator, rather than charts about validators."""
+
+    async def reply_to_command(update, context) -> None:
+        message = update.message
+        if message is None:
+            return
+        await send_validator(message, list(getattr(context, "args", None) or []), site_url)
+
+    return reply_to_command
 
 
 def command_handler(site_url: str):
