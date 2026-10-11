@@ -46,6 +46,8 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     create_dict_for_tabulator_display,
     create_dict_for_tabulator_display_for_rewards,
     return_plot_response,
+    theme_from_query,
+    empty_chart_figure,
 )
 import math
 
@@ -105,20 +107,13 @@ async def get_paginated_account_rewards(
     )
 
 
-@router.post("/{net}/account/apy-graph/{index_or_hash}/{request_type}", response_class=Response)
-async def account_apy_graph(
-    request: Request,
-    net: str,
-    index_or_hash: int | str,
-    request_type: str,
-    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
-    tags: dict = Depends(get_labeled_accounts),
-):
-    theme = "dark"
-    body = await request.body()
-    if body:
-        theme = body.decode("utf-8").split("=")[1]
+async def _apy_figure(request, net, index_or_hash, request_type, httpx_client, theme):
+    """The APY graph, built once and served as html or as a png.
 
+    The page posts for html; the chart bot can only hand Telegram a GET
+    that answers with an image, so the same figure goes out both ways
+    rather than being drawn twice.
+    """
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index_or_hash}/apy-data/{request_type}",
         httpx_client,
@@ -181,30 +176,75 @@ async def account_apy_graph(
         title_y=0.35,
         margin=dict(l=0, r=0, t=0, b=0),
     )
-    html = fig.to_html(
-        config={"responsive": True, "displayModeBar": False},
-        full_html=False,
-        include_plotlyjs=False,
+    return fig
+
+
+def _as_standalone(fig, title: str):
+    """Reframe a page figure for a png that stands on its own.
+
+    The graphs on the account page are laid out for a short embedded box:
+    no margins, the title pushed down into the middle, the legend hung
+    below the plot. Sent to Telegram as an image that is a title floating
+    in white space. Only the framing changes -- the data and the colours
+    are the page's.
+    """
+    fig.update_layout(
+        title=dict(text=f"<b>{title}</b>", x=0.5, xanchor="center", y=0.95, yanchor="top"),
+        height=420,
+        margin=dict(l=60, r=30, t=70, b=60),
+        legend=dict(orientation="h", y=-0.18, x=0.5, xanchor="center"),
     )
+    return fig
 
-    return html
 
-
-@router.post(
-    "/{net}/account/rewards-bucketed/{account_id}/{account_index}",
-    response_class=Response,
-)
-async def account_rewards_bucketed(
+@router.post("/{net}/account/apy-graph/{index_or_hash}/{request_type}", response_class=Response)
+async def account_apy_graph(
     request: Request,
     net: str,
-    account_id: str,
-    account_index: int,
+    index_or_hash: int | str,
+    request_type: str,
     httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
 ):
     theme = "dark"
     body = await request.body()
     if body:
         theme = body.decode("utf-8").split("=")[1]
+    fig = await _apy_figure(request, net, index_or_hash, request_type, httpx_client, theme)
+    if fig is None:
+        return None
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.get("/{net}/account/apy-graph/{index_or_hash}/{request_type}/png", response_class=Response)
+async def account_apy_graph_png(
+    request: Request,
+    net: str,
+    index_or_hash: int | str,
+    request_type: str,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    """The same graph as a png, for the chart bot.
+
+    A GET, because Telegram fetches an image url itself and will not post
+    to get one.
+    """
+    fig = await _apy_figure(
+        request, net, index_or_hash, request_type, httpx_client, theme_from_query(request)
+    )
+    if fig is None:
+        fig = empty_chart_figure(theme_from_query(request), "No APY recorded yet")
+    else:
+        _as_standalone(fig, f"Validator {index_or_hash} — APY")
+    return await return_plot_response(fig, request, f"{request_type} APY")
+
+
+async def _rewards_figure(request, net, account_id, account_index, httpx_client, theme):
+    """The staking rewards graph, built once and served as html or png."""
     if net == "mainnet":
         api_result = await get_url_from_api(
             f"{request.app.api_url}/v2/{net}/account/{account_id}/staking-rewards-bucketed",
@@ -306,17 +346,57 @@ async def account_rewards_bucketed(
             )
             if "last_requests" not in request.state._state:
                 request.state.last_requests = {}
-            html = fig.to_html(
-                config={"responsive": True, "displayModeBar": False},
-                full_html=False,
-                include_plotlyjs=False,
-            )
-
-            return html
+            return fig
         else:
-            return ""
+            return None
     else:
+        return None
+
+
+@router.post(
+    "/{net}/account/rewards-bucketed/{account_id}/{account_index}",
+    response_class=Response,
+)
+async def account_rewards_bucketed(
+    request: Request,
+    net: str,
+    account_id: str,
+    account_index: int,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    theme = "dark"
+    body = await request.body()
+    if body:
+        theme = body.decode("utf-8").split("=")[1]
+    fig = await _rewards_figure(request, net, account_id, account_index, httpx_client, theme)
+    if fig is None:
         return ""
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.get(
+    "/{net}/account/rewards-bucketed/{account_id}/{account_index}/png",
+    response_class=Response,
+)
+async def account_rewards_bucketed_png(
+    request: Request,
+    net: str,
+    account_id: str,
+    account_index: int,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    """The same graph as a png, for the chart bot."""
+    theme = theme_from_query(request)
+    fig = await _rewards_figure(request, net, account_id, account_index, httpx_client, theme)
+    if fig is None:
+        fig = empty_chart_figure(theme, "No staking rewards recorded yet")
+    else:
+        _as_standalone(fig, f"Validator {account_index} — staking rewards")
+    return await return_plot_response(fig, request, f"Validator {account_index} rewards")
 
 
 async def get_account_rewards_download(

@@ -14,18 +14,29 @@ POOL = {
     },
     "current_payday_info": {"missed_rounds": 0, "is_primed_for_suspension": False},
 }
-NODE = {"nodeName": "ccdexplorer.io 2", "client": "10.0.12", "uptime": "770205394",
-        "averagePing": 265.4, "peersCount": "7"}
+NODE = {
+    "nodeName": "ccdexplorer.io 2",
+    "client": "10.0.12",
+    "uptime": "770205394",
+    "averagePing": 265.4,
+    "peersCount": "7",
+}
 TALLY = {"data": [{"date": "2026-10-11", "missed": 0}, {"date": "2026-10-10", "missed": 5}]}
 SITE = "https://ccdexplorer.io"
 
 
 def _text(**kw):
-    args = {"pool": POOL, "node": NODE, "payday": "68 / 360 blocks",
-            "win": "2026-10-11T13:11:43.139000Z", "tally": TALLY}
+    args = {
+        "pool": POOL,
+        "node": NODE,
+        "payday": "68 / 360 blocks",
+        "win": "2026-10-11T13:11:43.139000Z",
+        "tally": TALLY,
+    }
     args.update(kw)
-    return validator.summary(72723, args["pool"], args["node"], args["payday"],
-                             args["win"], args["tally"], SITE)
+    return validator.summary(
+        72723, args["pool"], args["node"], args["payday"], args["win"], args["tally"], SITE
+    )
 
 
 def test_an_index_is_digits_only():
@@ -53,8 +64,14 @@ def test_an_account_that_bakes_nothing_is_not_a_validator():
     assert validator.is_validator(POOL)
 
 
-def test_the_name_and_index_lead():
-    assert _text().startswith("<b>ccdexplorer.io 2</b> — validator 72723")
+def test_the_index_leads_not_the_node_name():
+    """The node name is the operator's machine, not the validator;
+    leading with it labelled the whole message with one of its own
+    footnotes."""
+    text = _text()
+
+    assert text.startswith("<b>Validator 72723</b>")
+    assert "ccdexplorer.io 2" in text.split("<b>Node</b>")[1], "it belongs under Node"
 
 
 def test_delegation_space_is_a_number():
@@ -82,8 +99,8 @@ def test_todays_blocks_are_whatever_the_api_said():
 def test_missed_is_given_for_today_and_for_the_window():
     text = _text()
 
-    assert "<b>Missed today</b> 0" in text
-    assert "<b>Missed last 2 days</b> 5" in text
+    assert "Missed today 0" in text
+    assert "Missed last 2 days 5" in text
 
 
 def test_the_three_commissions_are_quoted():
@@ -92,8 +109,8 @@ def test_the_three_commissions_are_quoted():
     assert "10.0% baking" in text and "100.0% finalization" in text
 
 
-def test_the_next_win_is_readable():
-    assert "11 Oct 13:11 UTC" in _text()
+def test_the_next_win_keeps_the_absolute_time():
+    assert "13:11 UTC" in _text()
 
 
 def test_an_unparseable_win_time_is_passed_through_rather_than_crashing():
@@ -114,8 +131,9 @@ def test_a_node_not_reporting_says_so():
     assert "not reporting" in _text(node={})
 
 
-def test_a_pool_name_cannot_break_the_message():
-    """Operator-supplied, and this is HTML."""
+def test_a_node_name_cannot_break_the_message():
+    """Operator-supplied, and this is HTML: a tag would make Telegram
+    reject the message and nothing would arrive."""
     text = _text(node={**NODE, "nodeName": "<b>pwn</b>"})
 
     assert "&lt;b&gt;pwn&lt;/b&gt;" in text
@@ -127,3 +145,134 @@ def test_the_account_link_is_there():
 
 def test_it_fits_a_telegram_message():
     assert len(_text()) < 4096
+
+
+# --- sections -------------------------------------------------------------
+
+
+def test_the_three_sections_are_headed():
+    """Eleven lines of facts with no headings is a wall. What is fixed
+    about a validator, what is true right now, and what its node is doing
+    are three different questions."""
+    text = _text()
+
+    assert "<b>Validator</b>" in text
+    assert "<b>Live</b>" in text
+    assert "<b>Node</b>" in text
+
+
+def test_the_statics_are_under_validator():
+    text = _text()
+    section = text.split("<b>Validator</b>")[1].split("<b>Live</b>")[0]
+
+    assert "Stake" in section and "Commission" in section and "Delegation space" in section
+
+
+def test_what_is_true_now_is_under_live():
+    text = _text()
+    section = text.split("<b>Live</b>")[1].split("<b>Node</b>")[0]
+
+    assert "Today" in section and "Missed today" in section and "Next win" in section
+    assert "Missed last" not in section, "the six-month total is a standing fact, not a live one"
+
+
+# --- the next win ---------------------------------------------------------
+
+
+def test_the_next_win_is_relative_because_telegram_gives_no_timezone():
+    """The Bot API's User carries language_code and no timezone, so there
+    is nothing to localise to. "in 23 min" is right in every zone."""
+    import datetime as dt
+
+    # Half a minute of slack: the clock moves between building this and
+    # formatting it, and 23 minutes exactly rounds down to 22.
+    soon = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=23, seconds=30)
+
+    assert "in 23 min" in _text(win=soon.isoformat().replace("+00:00", "Z"))
+
+
+def test_a_win_due_within_the_minute_says_so():
+    import datetime as dt
+
+    # Not exactly now: by the time it is formatted that is already past.
+    soon = dt.datetime.now(dt.UTC) + dt.timedelta(seconds=20)
+
+    assert "any moment" in _text(win=soon.isoformat().replace("+00:00", "Z"))
+
+
+def test_a_win_already_past_is_not_reported_as_the_future():
+    import datetime as dt
+
+    gone = dt.datetime.now(dt.UTC) - dt.timedelta(minutes=5)
+
+    assert "in " not in _text(win=gone.isoformat().replace("+00:00", "Z")).split("Next win")[1][:20]
+
+
+def test_the_absolute_time_is_still_given_for_anyone_who_wants_it():
+    import datetime as dt
+
+    soon = dt.datetime.now(dt.UTC) + dt.timedelta(minutes=23)
+
+    assert "UTC)" in _text(win=soon.isoformat().replace("+00:00", "Z"))
+
+
+# --- the three charts -----------------------------------------------------
+
+
+def test_the_three_views_are_the_three_boxes_on_the_validator_page():
+    assert validator.VIEWS == ("apy", "performance", "rewards")
+
+
+def test_apy_is_the_default():
+    assert validator.VIEWS[0] == "apy"
+
+
+def test_each_view_points_at_the_page_s_own_graph_route():
+    """The same figures the validator page draws, asked for with /png on
+    the end because Telegram will not post to fetch an image."""
+    urls = {
+        v: validator.image_url(SITE, 72723, v, address="3BFChz", now=0) for v in validator.VIEWS
+    }
+
+    assert "/account/apy-graph/72723/validator/png" in urls["apy"]
+    assert "/account/baker-performance/72723/3000/png" in urls["performance"]
+    assert "/account/rewards-bucketed/3BFChz/72723/png" in urls["rewards"]
+
+
+def test_rewards_is_keyed_by_address_because_the_index_answers_nothing():
+    """staking-rewards-bucketed takes an address; asked by index it comes
+    back as an empty list rather than an error, so the chart would be
+    blank for every validator."""
+    assert validator.address_of(POOL_WITH_ADDRESS) == "3BFChzvx3783jGUK"
+    assert validator.address_of({}) == ""
+    assert validator.address_of(None) == ""
+
+
+POOL_WITH_ADDRESS = {**POOL, "address": "3BFChzvx3783jGUK"}
+
+
+def test_there_is_one_button_per_chart_and_the_current_one_is_marked():
+    labels = [b.text for row in validator.keyboard(72723, "rewards").inline_keyboard for b in row]
+
+    assert labels == ["APY", "Performance", "· Rewards ·"]
+
+
+def test_a_press_resolves_to_an_index_and_a_view():
+    assert validator.parse_callback("v:72723:performance") == (72723, "performance")
+
+
+def test_a_press_for_an_unknown_view_is_refused():
+    assert validator.parse_callback("v:72723:nonsense") is None
+
+
+def test_a_chart_catalogue_press_is_not_ours():
+    assert validator.parse_callback("c:staking_validator_count") is None
+
+
+def test_the_six_month_total_closes_the_validator_section():
+    """It describes what this validator is like, not what is happening
+    now, so it belongs with the stake and the commission."""
+    section = _text().split("<b>Validator</b>")[1].split("<b>Live</b>")[0]
+
+    assert "Missed last" in section
+    assert section.strip().endswith("Missed last 2 days 5")
