@@ -54,21 +54,36 @@ lint:
 format:
     uv run ruff format .
 
+# How many test workers. Deliberately not `-n auto`, which asks for one per
+# core and leaves the suite no headroom: anything else running on the machine
+# -- a backup, a Spotlight reindex, a photo library pass -- then starves the
+# workers, and a starved worker blows pytest-timeout's 150s ceiling on a test
+# that normally takes 0.2s. That arrives as a failing test name, which is a
+# lie: the test is fine and the machine is busy.
+#
+# Measured on an 8-core laptop with a backup running: `-n auto` took 739s and
+# failed two tests, `-n 4` took 162s clean, `-n 3` took 155s clean. Half the
+# cores is the default because it is the one that holds up when the machine
+# is not idle.
+#
+# Override for a quiet machine or a bigger one: `just workers=12 test-fast`.
+workers := "4"
+
 test:
-	uv run pytest -n auto
+	uv run pytest -n {{workers}}
 
 # Everything that does not need a Concordium node. This is what the pre-commit
 # hook runs: the live tests depend on a remote host, and one of them has taken
 # 220s inside a full run while taking 2s on its own.
 test-fast:
-	uv run pytest -n auto -m "not live"
+	uv run pytest -n {{workers}} -m "not live"
 
 # Only the tests that reach a real node.
 test-live:
-	uv run pytest -n auto -m live
+	uv run pytest -n {{workers}} -m live
 
 test-coverage:
-	uv run pytest --cov=. --cov-report=xml:cov.xml --cov-report=term -n auto && \
+	uv run pytest --cov=. --cov-report=xml:cov.xml --cov-report=term -n {{workers}} && \
 	uv run coverage html
 	# open htmlcov/index.html
 
