@@ -15,6 +15,7 @@ import logging
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.constants import ParseMode
+from telegram.error import TelegramError
 
 from ccdexplorer.charts import ChartState
 
@@ -197,6 +198,41 @@ def requester_note(query) -> str:
     return f'\n<i>asked by <a href="tg://user?id={user.id}">{name}</a></i>'
 
 
+async def dismiss_picker(query) -> None:
+    """Take the menu away once it has answered its question.
+
+    /e offers a category, tapping one turns that same message into a list
+    of charts, and tapping a chart sends the chart -- leaving eleven
+    buttons under a question that has been answered. On a phone that list
+    is most of a screen.
+
+    Deleted rather than replaced, because it cannot be replaced: Telegram
+    refuses editMessageMedia on a text message, so the chart has to arrive
+    as its own message and the menu has to go behind it. A bot may always
+    delete its own messages, so no admin rights are involved.
+
+    Dropping the markup is the fallback for when the delete is refused --
+    a message past Telegram's forty-eight hours, which a button tapped on
+    an old menu reaches. "Which one?" with nothing under it is a worse
+    thing to leave than a tidy chat, but it is better than a wall of dead
+    buttons, and either beats raising out of a button press: Telegram
+    retries those.
+    """
+    message = getattr(query, "message", None)
+    if message is None:
+        return
+    try:
+        await message.delete()
+        return
+    except TelegramError:
+        pass
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except TelegramError:
+        # Nothing left to try, and the chart is already sent.
+        pass
+
+
 def caption_for_button(chart: Chart, site_url: str, state, query) -> str:
     """The caption a chart gets when a button produced it."""
     return caption(chart, site_url, state) + requester_note(query)
@@ -363,12 +399,19 @@ def callback_handler(site_url: str):
         # edit_message_media addresses it by inline_message_id instead.
         picked_from = getattr(query, "message", None)
         if picked_from is not None and not getattr(picked_from, "photo", None):
-            await query.message.reply_photo(
+            await picked_from.reply_photo(
                 photo=image_url(chart, site_url, state),
                 caption=caption_for_button(chart, site_url, state, query),
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard_for(chart, state),
+                # Unquoted, because the message it would quote is the menu
+                # that is about to go -- and a quote of a deleted message
+                # is what the reader would be left looking at. Nothing is
+                # lost: the caption already names whoever pressed, which is
+                # the only thing the quote was carrying.
+                do_quote=False,
             )
+            await dismiss_picker(query)
             return
 
         await query.edit_message_media(

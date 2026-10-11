@@ -362,9 +362,14 @@ class _PhotolessMessage:
 
     def __init__(self):
         self.photos = []
+        self.deleted = False
 
     async def reply_photo(self, photo, **kw):
         self.photos.append((photo, kw))
+
+    async def delete(self):
+        """A real Message always has this; the bot clears the menu with it."""
+        self.deleted = True
 
 
 class _PhotoMessage(_PhotolessMessage):
