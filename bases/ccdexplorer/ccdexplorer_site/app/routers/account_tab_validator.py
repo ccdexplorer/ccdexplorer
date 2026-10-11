@@ -30,7 +30,10 @@ from ccdexplorer.ccdexplorer_site.app.state import (
 from ccdexplorer.ccdexplorer_site.app.utils import (
     ccdexplorer_plotly_template,
     create_dict_for_tabulator_display,
+    empty_chart_figure,
     get_url_from_api,
+    return_plot_response,
+    theme_from_query,
     verbose_timedelta,
 )
 from ccdexplorer.env import environment
@@ -168,19 +171,8 @@ async def account_validator_inactive(
     return html
 
 
-@router.post("/{net}/account/baker-performance/{validator_id}/{days}", response_class=Response)
-async def account_baker_performance_graph(
-    request: Request,
-    net: str,
-    validator_id: str,
-    days: int,
-    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
-    tags: dict = Depends(get_labeled_accounts),
-):
-    theme = "dark"
-    body = await request.body()
-    if body:
-        theme = body.decode("utf-8").split("=")[1]
+async def _performance_figure(request, net, validator_id, days, httpx_client, theme):
+    """The validator performance graph, built once and served as html or png."""
     if net == "mainnet":
         show_x_number_of_days = days
         api_result = await get_url_from_api(
@@ -271,14 +263,59 @@ async def account_baker_performance_graph(
             height=250,
             margin=dict(l=0, r=0, t=0, b=0),
         )
-        return fig.to_html(
-            config={"responsive": True, "displayModeBar": False},
-            full_html=False,
-            include_plotlyjs=False,
-        )
+        return fig
 
     else:
+        return None
+
+
+@router.post("/{net}/account/baker-performance/{validator_id}/{days}", response_class=Response)
+async def account_baker_performance_graph(
+    request: Request,
+    net: str,
+    validator_id: str,
+    days: int,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+    tags: dict = Depends(get_labeled_accounts),
+):
+    theme = "dark"
+    body = await request.body()
+    if body:
+        theme = body.decode("utf-8").split("=")[1]
+    fig = await _performance_figure(request, net, validator_id, days, httpx_client, theme)
+    if fig is None:
         return ""
+    return fig.to_html(
+        config={"responsive": True, "displayModeBar": False},
+        full_html=False,
+        include_plotlyjs=False,
+    )
+
+
+@router.get("/{net}/account/baker-performance/{validator_id}/{days}/png", response_class=Response)
+async def account_baker_performance_png(
+    request: Request,
+    net: str,
+    validator_id: str,
+    days: int,
+    httpx_client: httpx.AsyncClient = Depends(get_httpx_client),
+):
+    """The same graph as a png, for the chart bot.
+
+    A GET, because Telegram fetches an image url itself and will not post
+    to get one.
+    """
+    theme = theme_from_query(request)
+    fig = await _performance_figure(request, net, validator_id, days, httpx_client, theme)
+    if fig is None:
+        fig = empty_chart_figure(theme, "No performance history yet")
+    else:
+        fig.update_layout(
+            height=420,
+            margin=dict(l=60, r=30, t=70, b=60),
+            legend=dict(orientation="h", y=-0.18, x=0.5, xanchor="center"),
+        )
+    return await return_plot_response(fig, request, f"Validator {validator_id} performance")
 
 
 @router.get("/{net}/account/{index}/earliest-win-time", response_class=HTMLResponse)

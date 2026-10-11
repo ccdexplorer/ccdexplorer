@@ -293,11 +293,16 @@ async def send_validator(message, args: list[str], site_url: str) -> None:
         return
 
     log.info("/v %s", index)
-    await message.reply_html(
-        validator_charts.summary(
+    view = validator_charts.VIEWS[0]
+    await message.reply_photo(
+        photo=validator_charts.image_url(
+            site_url, index, view, validator_charts.address_of(got["pool"])
+        ),
+        caption=validator_charts.summary(
             index, got["pool"], got["node"], got["payday"], got["win"], got["tally"], site_url
         ),
-        disable_web_page_preview=True,
+        parse_mode=ParseMode.HTML,
+        reply_markup=validator_charts.keyboard(index, view),
     )
 
 
@@ -420,6 +425,35 @@ def callback_handler(site_url: str):
         if query is None:
             return
         data = query.data or ""
+
+        picked = validator_charts.parse_callback(data)
+        if picked is not None:
+            index, view = picked
+            await query.answer()
+            got = await fetch_validator(index)
+            if got is None:
+                return
+            # Photo to photo, so the chart swaps in place rather than
+            # filling the chat with the same validator three times.
+            await query.edit_message_media(
+                media=InputMediaPhoto(
+                    media=validator_charts.image_url(
+                        site_url, index, view, validator_charts.address_of(got["pool"])
+                    ),
+                    caption=validator_charts.summary(
+                        index,
+                        got["pool"],
+                        got["node"],
+                        got["payday"],
+                        got["win"],
+                        got["tally"],
+                        site_url,
+                    ),
+                    parse_mode=ParseMode.HTML,
+                ),
+                reply_markup=validator_charts.keyboard(index, view),
+            )
+            return
 
         state = None
         if data.startswith(MENU_PREFIX):
