@@ -30,7 +30,7 @@ import plotly.io as pio
 # bounded store of finished PNGs.
 from ccdexplorer.ccdexplorer_site.app.og_cards import PngCache
 from ccdexplorer.cis.core import CIS
-from ccdexplorer.domain.generic import NET, AccountInfoStable
+from ccdexplorer.domain.generic import NET
 from ccdexplorer.domain.mongo import (
     MongoTypeLoggedEventV2,
     MongoTypeTokensTag,
@@ -1419,7 +1419,6 @@ def account_label_on_index(
         # account index 64. Only apply it when actually viewing mainnet.
         if community_labels and net == "mainnet":
             account_labeled = str(account_index) in community_labels["labels_melt"]
-            # get_address_identifiers(str(account_index), net)
             if account_labeled:
                 account_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{community_labels["labels_melt"][str(account_index)]["label"]}</span>'
                 account_labeled = True
@@ -1435,59 +1434,6 @@ def hex_to_rgba(hex: str, opacity: float):
     rgb = tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
     rgba = rgb + (opacity,)
     return rgba
-
-
-async def get_address_identifiers(account_address_or_index: str | int, net: str, app):
-    """Tranlate account_address to index. Note that this endpoint looks for canonical addresses."""
-    if isinstance(account_address_or_index, str):
-        account_address = account_address_or_index
-        canonical = account_address[:29]
-        account_index = None
-        if canonical not in app.addresses_to_indexes[net]:
-            api_response: APIResponseResult = await post_url_from_api(
-                f"{app.api_url}/v2/{net}/accounts/get-indexes",
-                app.httpx_client,
-                json_post_content=[canonical],
-            )
-            if api_response.ok:
-                app.addresses_to_indexes[net].update(
-                    {canonical: api_response.return_value[canonical]}  # type: ignore
-                )
-
-                account_index = api_response.return_value[canonical] if api_response.ok else None  # type: ignore
-                return account_address, canonical, account_index
-            else:
-                return account_address, canonical, account_index
-        else:
-            account_index = app.addresses_to_indexes[net][canonical]
-            return account_address, canonical, account_index
-
-    else:
-        account_address = None
-        canonical = None
-        account_index = account_address_or_index
-
-        if account_index not in app.indexes_to_addresses[net]:
-            api_response: APIResponseResult = await post_url_from_api(
-                f"{app.api_url}/v2/{net}/accounts/get-addresses",
-                app.httpx_client,
-                json_post_content=[account_index],
-            )
-            if api_response.ok:
-                app.indexes_to_addresses[net].update(
-                    {account_index: api_response.return_value[account_index]}  # type: ignore
-                )
-
-                account_address = (
-                    api_response.return_value[canonical] if api_response.ok else account_address  # type: ignore
-                )
-                canonical = account_address[:29]  # type: ignore
-                return account_address, canonical, account_index
-
-        else:
-            account_address = app.addresses_to_indexes[net][canonical]
-            canonical = account_address[:29]
-            return account_address, canonical, account_index
 
 
 def from_address_to_index(account_address: str | int, net: str, app):
@@ -1506,21 +1452,53 @@ def from_address_to_index(account_address: str | int, net: str, app):
             return int(account_index)
 
 
+def address_maps_from_rows(rows) -> tuple[dict[str, int], dict[str, str]]:
+    """The two maps the site holds, from the api's [[address, index], ...].
+
+    Keyed on the canonical 29-character prefix, which is what identifies an
+    account across its aliases and what the collection's _id already is --
+    so the api does not send the key and this derives it.
+
+    Two flat maps rather than one of whole documents. The document map was
+    62MB of pickle rehydrating into a dict per account with a nested
+    credentials list, and its only reader wanted one field off it. Flat,
+    they cost 37MB and 5,188 objects instead of 437MB and 427,000, which is
+    what made the gc pause worth working around.
+
+    A bad row costs that account rather than the map: without the maps every
+    account link on the site renders as an address instead of an index, so
+    one malformed entry is not worth that.
+    """
+    indexes: dict[str, int] = {}
+    canonical: dict[str, str] = {}
+    for row in rows or ():
+        try:
+            address, index = row
+            key = address[:29]
+        except (TypeError, ValueError):
+            continue
+        indexes[key] = index
+        canonical[key] = address
+    return indexes, canonical
+
+
 def account_address_is_alias(account_address: str, net: str, app) -> bool:
+    """Whether this is an alias rather than the account's own address.
+
+    Aliases share the canonical 29-character prefix and differ after it, so
+    the question is only answerable against the account's real address --
+    which is the whole reason the site keeps a map of them.
+
+    False for an account the map has never heard of, which now includes any
+    created since boot: "alias" would be a claim about it, and not knowing
+    is the truth. add_account_info_to_cache fills it in as those are seen.
+    """
     if len(account_address) == 29:
         return False
-    account_address_entry = app.addresses_to_indexes_complete[net].get(account_address[:29], None)  # type: ignore
-    if isinstance(account_address_entry, CCD_AccountInfo):
-        is_alias = account_address_entry.address != account_address
-    elif isinstance(account_address_entry, AccountInfoStable):
-        is_alias = account_address_entry.account_address != account_address
-    else:
-        if not account_address_entry:
-            return False
-
-        is_alias = account_address_entry["account_address"] != account_address
-
-    return is_alias
+    canonical = app.canonical_addresses[net].get(account_address[:29])  # type: ignore
+    if not canonical:
+        return False
+    return canonical != account_address
 
 
 def account_alias_link(
@@ -2745,10 +2723,17 @@ def split_contract_into_url_slug_and_token_id(contract_str: str, token_id: str):
 
 
 def add_account_info_to_cache(account_info: CCD_AccountInfo, app: FastAPI, net: str):
-    app.addresses_to_indexes[net][account_info.address[:29]] = account_info.index  # type: ignore
-    app.addresses_to_indexes_complete[net][account_info.address[:29]] = (
-        AccountInfoStable.from_account_info(account_info)
-    )  # type: ignore
+    """Remember an account the boot-time maps did not have.
+
+    Both maps, because the alias check reads the second one: filling only
+    the index map would make an account created since boot render as an
+    alias of itself. The canonical address, not an AccountInfoStable --
+    that field is all the alias check ever wanted, and building the model
+    here is what made the map cost 62MB.
+    """
+    canonical = account_info.address[:29]
+    app.addresses_to_indexes[net][canonical] = account_info.index  # type: ignore
+    app.canonical_addresses[net][canonical] = account_info.address  # type: ignore
 
     if account_info.index > app.max_index_known[net]:  # type: ignore
         app.max_index_known[net] = account_info.index  # type: ignore

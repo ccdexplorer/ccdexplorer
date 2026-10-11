@@ -41,7 +41,6 @@ from pydantic import BaseModel
 
 urllib3.disable_warnings()
 
-import pickle
 
 import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -333,38 +332,48 @@ async def log_response(response):
     )
 
 
-def read_addresses_if_available(app):
+async def read_addresses_if_available(app):
+    """The address maps, from the api, once at boot.
+
+    These were two pickles per net, committed to the repo and refreshed by
+    hand with `just addresses`. That cost 79MB of tracked binary, a local
+    step nobody remembers, a map six weeks stale by the time it shipped, and
+    437MB resident -- because the larger pickle rehydrated a whole document
+    per account, leaving 427,000 containers for the collector to re-scan on
+    every pass. The gc.freeze() below was the workaround for that.
+
+    Two flat maps built from the api instead: 6.6MB over the wire, 0.06s to
+    build, 37MB resident, 5,188 objects. Measured on 123,911 accounts.
+
+    Failure is survivable and must stay survivable: the maps are a cache in
+    front of /accounts/get-indexes, so an empty one costs a round trip per
+    unknown address rather than a broken site, and the boot carries on.
+    """
     print("Start getting addresses to indexes.")
     app.addresses_to_indexes = {"mainnet": {}, "testnet": {}, "devnet": {}}
-    app.addresses_to_indexes_complete = {"mainnet": {}, "testnet": {}, "devnet": {}}
+    app.canonical_addresses = {"mainnet": {}, "testnet": {}, "devnet": {}}
     app.max_index_known = {"mainnet": 0, "testnet": 0, "devnet": 0}
-    try:
-        for net in ["mainnet", "testnet", "devnet"]:
-            print(f"Start getting addresses to indexes for {net}.")
-            with open(
-                f"{app.app_settings.addresses_dir}/{net}_addresses_to_indexes.pickle", "rb"
-            ) as fp:  # Unpickling
-                app.addresses_to_indexes[net] = pickle.load(fp)
-                app.max_index_known[net] = max(app.addresses_to_indexes[net].values())
+    for net in ["mainnet", "testnet", "devnet"]:
+        try:
+            result = await get_url_from_api(
+                f"{app.api_url}/v2/{net}/accounts/address-index-map",
+                app.httpx_client,
+            )
+            indexes, canonical = address_maps_from_rows(result.return_value if result.ok else None)
+        except Exception as error:
+            print(f"ERROR getting addresses for {net}: {error}")
+            continue
+        app.addresses_to_indexes[net] = indexes
+        app.canonical_addresses[net] = canonical
+        # default=0 because a net with no accounts is a real state -- a
+        # fresh devnet -- and max() of nothing raises, which took the whole
+        # boot down with it.
+        app.max_index_known[net] = max(indexes.values(), default=0)
+        print(f"{net}: {len(indexes)} addresses.")
 
-            with open(
-                f"{app.app_settings.addresses_dir}/{net}_addresses_to_indexes_complete.pickle", "rb"
-            ) as fp:  # Unpickling
-                app.addresses_to_indexes_complete[net] = pickle.load(fp)
-    except Exception as error:
-        print(f"ERROR getting addresses: {error}")
-
-    # These pickles unpickle into millions of GC-tracked containers (one
-    # AccountInfoStable + its credentials list/dicts per account, ~70MB
-    # across the nets). They live for the whole process lifetime, but
-    # CPython's gen-2 collector still re-scans every one of them on every
-    # full collection -- measured at ~150ms of stop-the-world CPU per pass
-    # for ~400k accounts, and it only gets worse as the process runs.
-    # That pause is what starves the event loop: scheduled jobs get
-    # "skipped: maximum number of running instances reached" and wake-ups
-    # get missed by tens of seconds, while CPU climbs to 100% over hours.
-    # Moving them to the permanent generation takes them out of every
-    # future GC pass (measured: ~150ms -> ~0ms).
+    # Far smaller than the pickles were, but still long-lived and still
+    # pointless to re-scan: these two maps live for the process lifetime and
+    # never become garbage, so the permanent generation is where they belong.
     gc.collect()
     gc.freeze()
     print("Addresses moved to GC permanent generation.")
@@ -425,7 +434,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.exchange_rates_last_requested = init_time
         app.tags = None
         app.nodes = None
-        read_addresses_if_available(app)
+        await read_addresses_if_available(app)
 
         # Keyed by contract address / CNS token id, i.e. unbounded cardinality
         # for an explorer -- as plain dicts these only ever grew, so every

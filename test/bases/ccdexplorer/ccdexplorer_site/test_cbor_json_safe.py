@@ -168,7 +168,7 @@ async def _events_for(hex_payload: str):
                 user=None,
                 # Only the alias lookup touches the app, and an empty map is the
                 # answer for a sender that is not an alias.
-                app=SimpleNamespace(addresses_to_indexes_complete={"mainnet": {}}),
+                app=SimpleNamespace(canonical_addresses={"mainnet": {}}),
                 requesting_route=RequestingRoute.other,
             )
         ).prepare_for_display(_data_registered_tx(hex_payload), None, account_view=False)

@@ -10,7 +10,7 @@
 import json
 import re
 import asyncio
-from typing import Any
+from typing import Any, AsyncIterator
 
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
 import httpx2 as httpx
@@ -44,7 +44,7 @@ from ccdexplorer.mongodb import (
     net_db,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from grpc._channel import _InactiveRpcError
 
 router = APIRouter(tags=["Accounts"], prefix="/v2")
@@ -254,6 +254,91 @@ async def get_account_indexes(
             status_code=404,
             detail=f"Error retrieving accounts list on {net}, {error_message}.",
         )
+
+
+#: How many accounts go out per chunk. Large enough that the per-chunk
+#: overhead is noise, small enough that the api never holds the whole map:
+#: mainnet is 105,000 accounts and 6.6MB assembled, per caller.
+ADDRESS_MAP_CHUNK = 2_000
+
+
+def address_map_row(doc: dict) -> list:
+    """One account, as [address, index].
+
+    The key the caller builds its map on is account_address[:29], which is
+    exactly what _id is -- AccountInfoStable.to_collection sets it that way
+    -- so sending the key as well would be three megabytes of data the
+    caller can slice off the address it already has.
+    """
+    return [doc["account_address"], doc["account_index"]]
+
+
+async def address_map_chunks(docs) -> AsyncIterator[str]:
+    """The rows as one json array, a batch of them at a time.
+
+    Hand-assembled rather than handed to a json encoder whole, because the
+    whole point is not to hold every account at once. The array stays valid
+    json: the separator goes before each row except the first, so an empty
+    collection -- a fresh devnet -- is "[]" and not a truncated "[".
+
+    Async because the only real caller is a motor cursor. Written once and
+    used by the route directly: a sync twin for the tests to check would be
+    a second implementation, and the one that ships would be the untested
+    one.
+    """
+    yield "["
+    batch: list[str] = []
+    first = True
+    async for doc in docs:
+        batch.append(("" if first else ",") + json.dumps(address_map_row(doc)))
+        first = False
+        if len(batch) >= ADDRESS_MAP_CHUNK:
+            yield "".join(batch)
+            batch = []
+    if batch:
+        yield "".join(batch)
+    yield "]"
+
+
+@router.get("/{net}/accounts/address-index-map", response_class=StreamingResponse)
+async def get_address_index_map(
+    request: Request,
+    net: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+):
+    """Every account's address and index, as [[address, index], ...].
+
+    For a caller that wants the whole map rather than a lookup: the site
+    holds it in memory to turn an address into an index without a round trip
+    per link it renders. get-indexes above answers for a known list, which
+    is the wrong shape when the list is every account there is.
+
+    Streamed, because mainnet is 105,000 accounts and 6.6MB assembled.
+
+    Args:
+        request: FastAPI request.
+        net: Network identifier, must be ``mainnet``, ``testnet`` or ``devnet``.
+        mongomotor: Mongo client dependency used to read ``stable_address_info``.
+        api_key: API key extracted from the request headers.
+
+    Returns:
+        A json array of [address, index] pairs, streamed.
+
+    Raises:
+        HTTPException: If the network is unsupported.
+    """
+    if net not in ["mainnet", "testnet", "devnet"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Don't be silly. We only support mainnet, testnet, and devnet.",
+        )
+
+    db_to_use = net_db(mongomotor, net)
+    cursor = db_to_use[Collections.stable_address_info].find(
+        {}, {"_id": 0, "account_address": 1, "account_index": 1}
+    )
+    return StreamingResponse(address_map_chunks(cursor), media_type="application/json")
 
 
 @router.get("/{net}/accounts/search/{value}", response_class=JSONResponse)
