@@ -16,6 +16,7 @@ dependencies = [
     # models; the bot had no direct pydantic dependency before.
     "pydantic",
     "python-dotenv",
+    "httpx2",
     "python-telegram-bot[job-queue]>=22.5",
 ]
 

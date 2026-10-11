@@ -28,6 +28,7 @@ from .catalogue import CHARTS
 from .direct import (
     callback_handler,
     command_handler,
+    validator_command_handler,
     nudge_handler,
     retired_command_handler,
 )
@@ -96,6 +97,7 @@ def main() -> None:
     # own username, so the only ambiguous case is a bare /e in a group, where
     # both bots answer. The help says to qualify it there.
     application.add_handler(CommandHandler(["e"], command_handler(site_url)))
+    application.add_handler(CommandHandler(["v", "validator"], validator_command_handler(site_url)))
     # The names it used to answer to. Registered rather than dropped: an
     # unknown command does not reach the plain-text handler either, so
     # removing these would answer anyone who learned /c with silence.
