@@ -198,16 +198,18 @@ def image_url(
     """The png the site already draws for this box on the validator page.
 
     Each is the same figure that page builds, asked for over GET with
-    /png on the end, because Telegram fetches an image url itself and
-    will not post to get one.
+    /image.png on the end, because Telegram fetches an image url itself
+    and will not post to get one. The name is not cosmetic: the site
+    renders a png only for a path carrying exactly that, and answers
+    anything else with the interactive page.
     """
     bucket = int((time.time() if now is None else now) // REFRESH_SECONDS)
     if view == "performance":
-        path = f"{NET}/account/baker-performance/{index}/{PERFORMANCE_DAYS}/png"
+        path = f"{NET}/account/baker-performance/{index}/{PERFORMANCE_DAYS}/image.png"
     elif view == "rewards":
-        path = f"{NET}/account/rewards-bucketed/{address}/{index}/png"
+        path = f"{NET}/account/rewards-bucketed/{address}/{index}/image.png"
     else:
-        path = f"{NET}/account/apy-graph/{index}/validator/png"
+        path = f"{NET}/account/apy-graph/{index}/validator/image.png"
     return f"{site_url.rstrip('/')}/{path}?t={bucket}"
 
 

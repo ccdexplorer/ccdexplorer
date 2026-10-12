@@ -292,7 +292,9 @@ async def account_baker_performance_graph(
     )
 
 
-@router.get("/{net}/account/baker-performance/{validator_id}/{days}/png", response_class=Response)
+@router.get(
+    "/{net}/account/baker-performance/{validator_id}/{days}/image.png", response_class=Response
+)
 async def account_baker_performance_png(
     request: Request,
     net: str,

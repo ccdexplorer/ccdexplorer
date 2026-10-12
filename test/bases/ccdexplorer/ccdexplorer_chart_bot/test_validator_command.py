@@ -228,15 +228,16 @@ def test_apy_is_the_default():
 
 
 def test_each_view_points_at_the_page_s_own_graph_route():
-    """The same figures the validator page draws, asked for with /png on
-    the end because Telegram will not post to fetch an image."""
+    """The same figures the validator page draws, asked for with
+    /image.png on the end because Telegram will not post to fetch an
+    image -- and because the site renders a png only for that name."""
     urls = {
         v: validator.image_url(SITE, 72723, v, address="3BFChz", now=0) for v in validator.VIEWS
     }
 
-    assert "/account/apy-graph/72723/validator/png" in urls["apy"]
-    assert "/account/baker-performance/72723/3000/png" in urls["performance"]
-    assert "/account/rewards-bucketed/3BFChz/72723/png" in urls["rewards"]
+    assert "/account/apy-graph/72723/validator/image.png" in urls["apy"]
+    assert "/account/baker-performance/72723/3000/image.png" in urls["performance"]
+    assert "/account/rewards-bucketed/3BFChz/72723/image.png" in urls["rewards"]
 
 
 def test_rewards_is_keyed_by_address_because_the_index_answers_nothing():

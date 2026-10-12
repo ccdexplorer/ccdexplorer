@@ -220,7 +220,9 @@ async def account_apy_graph(
     )
 
 
-@router.get("/{net}/account/apy-graph/{index_or_hash}/{request_type}/png", response_class=Response)
+@router.get(
+    "/{net}/account/apy-graph/{index_or_hash}/{request_type}/image.png", response_class=Response
+)
 async def account_apy_graph_png(
     request: Request,
     net: str,
@@ -379,7 +381,7 @@ async def account_rewards_bucketed(
 
 
 @router.get(
-    "/{net}/account/rewards-bucketed/{account_id}/{account_index}/png",
+    "/{net}/account/rewards-bucketed/{account_id}/{account_index}/image.png",
     response_class=Response,
 )
 async def account_rewards_bucketed_png(
