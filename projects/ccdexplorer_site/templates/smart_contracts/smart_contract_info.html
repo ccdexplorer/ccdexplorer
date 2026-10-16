@@ -3,12 +3,12 @@
 <table class="table table-borderless">
     <tr class="table-row-line-height sm-text">
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Contract Name</td>
-            <td class="text-end text-secondary-emphasis">{{ details.name[5:] }}</td>
+            <td class="text-start">Contract Name</td>
+            <td class="text-end">{{ details.name[5:] }}</td>
         </tr>
         <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Contract Reference</td>
-        <td class="text-end text-secondary-emphasis">
+        <td class="text-start">Contract Reference</td>
+        <td class="text-end">
             {% set copy_value = contract.id %}
             {% set value_type = "contract_id" %}
             {% set display_value = contract.id|safe %}
@@ -19,14 +19,14 @@
     
     
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Creator</td>
-        <td class="text-end text-secondary-emphasis">{{ details.owner|account_link(net,user,tags,request.app)|safe}}
+        <td class="text-start">Creator</td>
+        <td class="text-end">{{ details.owner|account_link(net,user,tags,request.app)|safe}}
             
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Module</td>
-        <td class="text-end text-secondary-emphasis">
+        <td class="text-start">Module</td>
+        <td class="text-end">
             {% set copy_value = details.source_module %}
             {% set value_type = "source_module" %}
             {% set display_value = details.source_module[:4]|safe %}
@@ -36,8 +36,8 @@
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Verification Status</td>
-        <td class="text-end text-secondary-emphasis">{% if contract.module_verification.verification_status == "not_started" %}Not Started{%elif contract.module_verification.verification_status == "verified_success"%}Verified <i class="text-success bi bi-patch-check-fill"></i>{% else %}Unverifiable{% endif %}
+        <td class="text-start">Verification Status</td>
+        <td class="text-end">{% if contract.module_verification.verification_status == "not_started" %}Not Started{%elif contract.module_verification.verification_status == "verified_success"%}Verified <i class="text-success bi bi-patch-check-fill"></i>{% else %}Unverifiable{% endif %}
             
             </td>
     </tr>

@@ -3,16 +3,16 @@
 
 <table class="table table-borderless">
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Token Name</td>
-            <td class="text-end text-secondary-emphasis text-break">
+            <td class="text-start">Token Name</td>
+            <td class="text-end text-break">
                 {% if "token_metadata" in stored_token_address %}
                     {{ stored_token_address.token_metadata.name }}
                 {% else %}{{stored_token_address._id}}
                 {% endif%} </td>
         </tr>
         <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Token Contract</td>
-        <td class="text-end text-secondary-emphasis">
+        <td class="text-start">Token Contract</td>
+        <td class="text-end">
             {% set copy_value = stored_token_address.contract %}
             {% set value_type = "contract" %}
             {% set display_value = stored_token_address.contract|safe %}
@@ -21,8 +21,8 @@
         </tr>
         <!-- {% if "token_metadata" in stored_token_address %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Balance</td>
-            <td class="text-end text-secondary-emphasis">
+            <td class="text-start">Balance</td>
+            <td class="text-end">
                 {{(stored_token_address.token_amount|
                     token_amount_using_decimals_rounded(stored_token_address.token_metadata.decimals, 0))}} {{stored_token_address.token_metadata.symbol}}
                 
@@ -31,39 +31,39 @@
         {% endif %} -->
     {% if tx_deployed %}
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Deployed in block</td>
-        <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
+        <td class="text-start">Deployed in block</td>
+        <td class="text-end ccd">{{tx_deployed.block_info.height|round_x_decimal_with_comma(0)}}
 
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Deployed in tx</td>
-        <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
+        <td class="text-start">Deployed in tx</td>
+        <td class="text-end"><span style="font-family: monospace, monospace;">{{tx_deployed.hash|tx_hash_link(net)|safe}}</span>
 
             </td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Age</td>
-        <td class="text-end text-secondary-emphasis ccd">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
+        <td class="text-start">Age</td>
+        <td class="text-end ccd">{{tx_deployed.block_info.slot_time|datetime_delta_format_since}}</td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Creator</td>
-        <td class="text-end text-secondary-emphasis">{{ tx_deployed.account_transaction.sender|account_link(net,user,tags,request.app)|safe}}
+        <td class="text-start">Creator</td>
+        <td class="text-end">{{ tx_deployed.account_transaction.sender|account_link(net,user,tags,request.app)|safe}}
 
             </td>
     </tr>
     {% endif %}
 
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Last Activity in block</td>
-        <td class="text-end text-secondary-emphasis ccd">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}
+        <td class="text-start">Last Activity in block</td>
+        <td class="text-end ccd">{{stored_token_address.last_height_processed|round_x_decimal_with_comma(0)}}
             
             </td>
     </tr>
     {% if not md %}
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Metadata URL</td>
-        <td class="text-end text-secondary-emphasis"><a href="{{stored_token_address.metadata_url|safe_url}}">{{stored_token_address.metadata_url|shorten_address(true)|safe}}</a>
+        <td class="text-start">Metadata URL</td>
+        <td class="text-end"><a href="{{stored_token_address.metadata_url|safe_url}}">{{stored_token_address.metadata_url|shorten_address(true)|safe}}</a>
             {% if stored_token_address.failed_attempt %}<a href="#" data-bs-toggle="popover" tabindex="0" id="failed_attempt" data-bs-trigger="focus" data-bs-title="Error fetching metadata" data-bs-content="
             I've tried already <b>{{stored_token_address.failed_attempt.attempts}}</b> times to fetch this metadata.</br></br>The last error recorded is: </br></br><i>{{stored_token_address.failed_attempt.last_error}}.</i><br/><br/>
             Will try again {{stored_token_address.failed_attempt.do_not_try_before|datetime_delta_format_between_dates}} from now. <br/><br/>Do you want me to retry now? Then send a POST request to <a href='{{env.API_URL}}/v2/{{net}}/token/{{stored_token_address._id|split_into_url_slug}}/refresh'>Token Refresh URL</a>
@@ -73,14 +73,14 @@
     </tr>
     {% endif %}
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis"># Current Holders</td>
-        <td class="text-end text-secondary-emphasis ccd">{{stored_token_address.current_holders_count|round_x_decimal_with_comma(0)}}
+        <td class="text-start"># Current Holders</td>
+        <td class="text-end ccd">{{stored_token_address.current_holders_count|round_x_decimal_with_comma(0)}}
             
             </td>
     </tr>
     {% if stored_token_address.special_type %}
     <tr class="table-row-line-height sm-text">
-        <td class="text-start  text-warning" colspan="2">This is a non CIS-2 SpaceSeven NFT that we have imported from the archive. NFT Metadata and holder information for informational purposes only.</td>
+        <td class="text-start text-warning" colspan="2">This is a non CIS-2 SpaceSeven NFT that we have imported from the archive. NFT Metadata and holder information for informational purposes only.</td>
         
     </tr>
     {% endif %}

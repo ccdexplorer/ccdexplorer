@@ -13,8 +13,8 @@
           {% set title= "Lock " + lock_id_str %}{% include 'base/box_title.html' %}
           <table class="table table-borderless">
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Lock ID</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Lock ID</td>
+                  <td class="text-end">
                       {% set copy_value = lock_id_str %}
                       {% set value_type = "lock_id" %}
                       {% set display_value = lock_id_str|safe %}
@@ -22,8 +22,8 @@
                   </td>
               </tr>
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Status</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Status</td>
+                  <td class="text-end">
                       {% if lock_info.status == "open" %}<span class="badge text-bg-success">Open</span>
                       {% elif lock_info.status == "cancelled" %}<span class="badge text-bg-secondary">Cancelled</span>
                       {% else %}<span class="badge text-bg-warning">Unknown</span>{% endif %}
@@ -36,8 +36,8 @@
               </tr>
               {% if lock_info.controller %}
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Keep Alive</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Keep Alive</td>
+                  <td class="text-end">
                       {% if lock_info.controller.keep_alive %}<span class="badge text-bg-info">Yes</span>
                       {% else %}<span class="badge text-bg-secondary">No</span>{% endif %}
                       <a href="#" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="lock-keep-alive-info" data-bs-trigger="focus" data-bs-title="Keep Alive" data-bs-content="
@@ -49,8 +49,8 @@
               {% endif %}
               {% if lock_info.expiry %}
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Expiry</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Expiry</td>
+                  <td class="text-end">
                       {% if lock_info.expired %}
                           <span class="badge text-bg-secondary">Expired</span> <span class="text-secondary-emphasis">({{ lock_info.expiry|datetime_regular_parse }})</span>
                       {% else %}
@@ -60,8 +60,8 @@
               </tr>
               {% endif %}
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Recipients</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Recipients</td>
+                  <td class="text-end">
                       {% if not lock_info.recipients %}<span class="text-muted">Unknown</span>
                       {% elif lock_info.recipients == "any" %}Any
                       {% else %}
@@ -70,8 +70,8 @@
                   </td>
               </tr>
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Supported Tokens</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">Supported Tokens</td>
+                  <td class="text-end">
                       {% if not lock_info.controller %}<span class="text-muted">Unknown</span>
                       {% else %}
                           {% for supported_token_id in lock_info.controller.tokens %}<a href="/{{net}}/tokens/{{supported_token_id}}"><span class="ccd">{{ supported_token_id }}</span></a>{% if not loop.last %}, {% endif %}{% endfor %}
@@ -80,8 +80,8 @@
               </tr>
               {% if lock_info.controller and lock_info.controller.memo %}
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">Create Memo</td>
-                  <td class="text-end text-secondary-emphasis">{{ lock_info.controller.memo }}</td>
+                  <td class="text-start">Create Memo</td>
+                  <td class="text-end">{{ lock_info.controller.memo }}</td>
               </tr>
               {% endif %}
           </table>
@@ -106,15 +106,15 @@
           <table class="table table-borderless">
               <thead>
                   <tr class="sm-text">
-                      <th class="text-start text-secondary-emphasis">Account</th>
-                      <th class="text-end text-secondary-emphasis">Roles</th>
+                      <th class="text-start">Account</th>
+                      <th class="text-end">Roles</th>
                   </tr>
               </thead>
               {% if lock_info.controller %}
               {% for grant in lock_info.controller.grants %}
               <tr class="table-row-line-height sm-text">
-                  <td class="text-start text-secondary-emphasis">{{ grant.account|account_link(net,user,tags,request.app)|safe }}</td>
-                  <td class="text-end text-secondary-emphasis">
+                  <td class="text-start">{{ grant.account|account_link(net,user,tags,request.app)|safe }}</td>
+                  <td class="text-end">
                       {% for role in grant.roles %}<span class="badge {{ role_badge_colors.get(role, 'text-bg-secondary') }} me-1">{{ role }}</span>{% endfor %}
                   </td>
               </tr>
@@ -134,15 +134,15 @@
           <table class="table table-borderless">
               <thead>
                   <tr class="sm-text">
-                      <th class="text-start text-secondary-emphasis">Account</th>
-                      <th class="text-end text-secondary-emphasis">Balance</th>
+                      <th class="text-start">Account</th>
+                      <th class="text-end">Balance</th>
                   </tr>
               </thead>
               {% for fund in lock_info.funds %}
                 {% for amount in fund.amounts %}
                 <tr class="table-row-line-height sm-text">
-                    <td class="text-start text-secondary-emphasis">{{ fund.account|account_link(net,user,tags,request.app)|safe }}</td>
-                    <td class="text-end text-secondary-emphasis">{{ amount.amount.value|token_amount_using_decimals_rounded(amount.amount.decimals)|safe }} <span class="ccd">{{ amount.token }}</span></td>
+                    <td class="text-start">{{ fund.account|account_link(net,user,tags,request.app)|safe }}</td>
+                    <td class="text-end">{{ amount.amount.value|token_amount_using_decimals_rounded(amount.amount.decimals)|safe }} <span class="ccd">{{ amount.token }}</span></td>
                 </tr>
                 {% endfor %}
               {% endfor %}

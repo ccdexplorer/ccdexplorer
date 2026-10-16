@@ -4,14 +4,14 @@
 <!--- account/account_baker.html table-->
 <table class="table table-borderless">
     {% if node %}
-        <tr class="sm-text"><td  class="text-start text-secondary-emphasis">Node name</td><td class="   text-secondary-emphasis text-end">
+        <tr class="sm-text"><td class="text-start">Node name</td><td class="text-end">
             {% if node.nodeName %}
                 <a href="/{{net}}/node/{{node.nodeId}}">{{node.nodeName}}</a>
             {% else %}
                 (not currently active)
             {% endif %}
         </td></tr>
-        <tr class="sm-text"><td  class="text-start text-secondary-emphasis">Uptime</td><td class=" ccd text-secondary-emphasis text-end">
+        <tr class="sm-text"><td class="text-start">Uptime</td><td class="ccd text-end">
             {% if node.nodeName %}
                 {{ node.uptime|int|uptime }}
             {% else %}
@@ -20,7 +20,7 @@
             
         </td></tr>
 
-        <tr class="sm-text"><td  class="text-start text-secondary-emphasis">Version</td><td class=" ccd text-secondary-emphasis text-end">
+        <tr class="sm-text"><td class="text-start">Version</td><td class="ccd text-end">
             {% if node.nodeName %}
                 {{ node.client }}
             {% else %}
@@ -32,10 +32,10 @@
     {% if account_is_validator %}
     
     <tr class="sm-text">
-        <td class="text-start text-secondary-emphasis">Validator id
+        <td class="text-start">Validator id
             
         </td>
-        <td  class="text-end text-secondary-emphasis ccd">{{account.stake.baker.baker_info.baker_id|round_x_decimal_with_comma(0)}} 
+        <td class="text-end ccd">{{account.stake.baker.baker_info.baker_id|round_x_decimal_with_comma(0)}} 
             {% if "is_suspended" in account.stake.baker.model_fields_set %}
                 {% if account.stake.baker.is_suspended %}
                 <i style="color:red;" class="bi bi-exclamation-square">(SUSPENDED)</i>
@@ -49,7 +49,7 @@
     {% if "is_suspended" in account.stake.baker.model_fields_set %}
       {% if pool.current_payday_info %}
         <tr class="sm-text">
-            <td class="text-start text-secondary-emphasis">Consecutive Missed Rounds
+            <td class="text-start">Consecutive Missed Rounds
 
             <a href="#" data-bs-toggle="popover" tabindex="0" id="missed-rounds" data-bs-trigger="focus" data-bs-title="Consecutive missed rounds explanation" data-bs-content="
 
@@ -62,7 +62,7 @@
             ">(i)</a>
 
             </td>
-            <td  class="text-end text-secondary-emphasis ccd">
+            <td class="text-end ccd">
                     {{pool.current_payday_info.missed_rounds|round_x_decimal_with_comma(0)}}{% if maximum_missed_rounds %} / {{maximum_missed_rounds}}{% endif %}
             </td>
         </tr>
@@ -83,28 +83,28 @@
     
                 {% if account.stake.baker.pending_change.remove %}
                 <tr class="sm-text">
-                    <td  class="text-start text-secondary-emphasis" colspan="3"><b>Pending Change</b>
+                    <td class="text-start" colspan="3"><b>Pending Change</b>
                 </tr>
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis"><i>Change Type</i></td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2" ><span class="ccd"><i>Remove Validator</i></span>
+                    <td class="text-start"><i>Change Type</i></td>
+                    <td class="text-end"colspan="2"><span class="ccd"><i>Remove Validator</i></span>
                     </td>
                 </tr>
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis"><i>Effective Time</i></td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2"><span
+                    <td class="text-start"><i>Effective Time</i></td>
+                    <td class="text-end"colspan="2"><span
                             class="ccd"><i>{{account.stake.baker.pending_change.remove|regular_datetime_format}}</i></span>
                     </td>
                 </tr>
                 {% endif %}
                 {% if account.stake.baker.pending_change.reduce %}
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis"><i>New Staked Amount</i></td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2" ><i>{{account.pending_change.reduce.new_stake|micro_ccd_no_decimals|safe}}</i></td>
+                    <td class="text-start"><i>New Staked Amount</i></td>
+                    <td class="text-end"colspan="2"><i>{{account.pending_change.reduce.new_stake|micro_ccd_no_decimals|safe}}</i></td>
                 </tr>
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis"><i>Effective Time</i></td>
-                    <td  class="text-start text-secondary-emphasis"colspan="2" ><span
+                    <td class="text-start"><i>Effective Time</i></td>
+                    <td class="text-start"colspan="2"><span
                             class="ccd"><i>{{account.pending_change.reduce.effective_time|regular_datetime_format}}</i></span>
                     </td>
                 </tr>
@@ -112,7 +112,7 @@
              
 
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">
+                    <td class="text-start">
                         {% if open_pool %}
                         Own Stake
                         {% else %}
@@ -120,17 +120,17 @@
                         {% endif %}
 
                         </td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2">{{pool.current_payday_info.baker_equity_capital | micro_ccd_no_decimals|safe}}</td>
+                    <td class="text-end"colspan="2">{{pool.current_payday_info.baker_equity_capital | micro_ccd_no_decimals|safe}}</td>
                 </tr>
 
                 {% if open_pool %}
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">Delegated</td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2" >{{pool.current_payday_info.delegated_capital |micro_ccd_no_decimals|safe}}</td>
+                    <td class="text-start">Delegated</td>
+                    <td class="text-end"colspan="2">{{pool.current_payday_info.delegated_capital |micro_ccd_no_decimals|safe}}</td>
                 </tr>
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">Total Stake</td>
-                    <td class="text-end text-secondary-emphasis" colspan="2" >{{pool.current_payday_info.effective_stake
+                    <td class="text-start">Total Stake</td>
+                    <td class="text-end" colspan="2">{{pool.current_payday_info.effective_stake
                             |micro_ccd_no_decimals|safe}}</td>
                 </tr>
                 {% endif %}
@@ -138,20 +138,20 @@
 
 
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">Restake Earnings</td>
-                    <td  class="text-end text-secondary-emphasis"colspan="2" ><span class="ccd">{{account.stake.baker.restake_earnings}}</span>
+                    <td class="text-start">Restake Earnings</td>
+                    <td class="text-end"colspan="2"><span class="ccd">{{account.stake.baker.restake_earnings}}</span>
                     </td>
                 </tr>
 
                 {% if pool.current_payday_info %}
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">Lottery Power</td>
-                    <td  class="text-end text-secondary-emphasis ccd"colspan="2" >
+                    <td class="text-start">Lottery Power</td>
+                    <td class="text-end ccd"colspan="2">
                         {{pool.current_payday_info.lottery_power | lottery_power}}%</td>
                 </tr>
 
                 <tr class="sm-text">
-                    <td class="text-start text-secondary-emphasis">Current Payday
+                    <td class="text-start">Current Payday
 
                     <a href="#" data-bs-toggle="popover" tabindex="0" id="payday" data-bs-trigger="focus" data-bs-title="Current payday explanation" data-bs-content="
             
@@ -164,19 +164,19 @@
                 <img  hx-ext="class-tools" class="breathing" classes="toggle faded:1s" width="10px" src="/static/misc/green_dot.png"/>
                     </td>
                     
-                    <td  class="text-end text-secondary-emphasis ccd"colspan="2" id="current-payday-stats" hx-get="/{{net}}/account/{{account.stake.baker.baker_info.baker_id}}/current-payday-stats" hx-trigger="every 3s" ></td>
+                    <td class="text-end ccd"colspan="2" id="current-payday-stats" hx-get="/{{net}}/account/{{account.stake.baker.baker_info.baker_id}}/current-payday-stats" hx-trigger="every 3s"></td>
                     
                 </tr>
                 {% endif %}
                 {% if earliest_win_time %}
-                    <tr class="sm-text"><td class="text-start text-secondary-emphasis">Earliest Win Time 
+                    <tr class="sm-text"><td class="text-start">Earliest Win Time 
                         <a href="#" data-bs-toggle="popover" tabindex="0" id="earliest" data-bs-trigger="focus" data-bs-title="Earliest win time explanation" data-bs-content="
                         Get the projected earliest time at which a particular validator will be required to validate a block. For node operators, this is helpful to schedule maintenance on the node. 
                         ">(i)</a>
                         <img  hx-ext="class-tools" class="breathing" classes="toggle faded:1s" width="10px" src="/static/misc/green_dot.png"/></h2> 
 
                     </td>
-                    <td  class="text-end text-secondary-emphasis ccd" id="earliest-win-time" hx-get="/{{net}}/account/{{account.stake.baker.baker_info.baker_id}}/earliest-win-time" hx-trigger="every 3s" colspan="2" ></td></tr>
+                    <td class="text-end ccd" id="earliest-win-time" hx-get="/{{net}}/account/{{account.stake.baker.baker_info.baker_id}}/earliest-win-time" hx-trigger="every 3s" colspan="2"></td></tr>
                 {% endif %}
             
 

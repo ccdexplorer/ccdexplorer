@@ -11,8 +11,8 @@
         {% set total_locked = 0 %}
         {% endif %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Address</td>
-            <td  class=" text-end align-middle text-secondary-emphasis">
+            <td class="text-start">Address</td>
+            <td class="text-end align-middle">
                 {% set copy_value = account.address %}
                 {% set value_type = "account_id" %}
                 {% set display_value = account.address | shorten_address(address=True)|safe %}
@@ -20,8 +20,8 @@
             </td>
         </tr>
         <tr class="table-row-line-height sm-text">
-            <td  class="text-start text-secondary-emphasis">Account Balance</td>
-            <td class=" text-end text-secondary-emphasis">
+            <td class="text-start">Account Balance</td>
+            <td class="text-end">
                 {% if total_locked == 0 %}
                 
                         {{account.amount | micro_ccd_display | safe}} 
@@ -31,29 +31,29 @@
                 <table class="align-end">
                     <tr  class=" text-end">
                         <td></td>
-                        <td class="text-end text-secondary-emphasis">
+                        <td class="text-end">
                             {{account.amount | micro_ccd_display | safe}} 
                         </td>
-                        <td  class="text-end text-secondary-emphasis">
+                        <td class="text-end">
                             {% if total_locked > 0 %}(total){% endif %}
                         </td>
                     </tr>
                     {% if total_locked > 0 %}
                         <tr class="table-row-line-height sm-text">
                             <td></td>
-                            <td class="text-end text-secondary-emphasis">
+                            <td class="text-end">
                                 {{(account.amount - total_locked) | micro_ccd_display | safe}}
                             </td>
-                            <td class="text-end text-secondary-emphasis">
+                            <td class="text-end">
                                  (unlocked)
                             </td>
                         </tr>
 
                         <tr class="table-row-line-height sm-text"><td></td>
-                            <td class="text-end text-secondary-emphasis">
+                            <td class="text-end">
                                     {{total_locked | micro_ccd_display | safe}}
                             </td>
-                            <td class="text-end text-secondary-emphasis">
+                            <td class="text-end">
                                 <a data-bs-toggle="collapse" href="#collapseExample" role="button" aria-expanded="false"
                                     aria-controls="collapseExample">
                                     (locked)</a>
@@ -64,14 +64,14 @@
                             <tr class="collapse px-0 sm-text" id="collapseExample">
 
 
-                                <td class="ps-1 text-end text-secondary-emphasis ccd">{{schedule.timestamp | datetime_regular}}</td>
-                                <td class="text-center text-secondary-emphasis">
+                                <td class="ps-1 text-end ccd">{{schedule.timestamp | datetime_regular}}</td>
+                                <td class="text-center">
                                     {% for tx in schedule.transactions %}
                                         {{tx |tx_hash_link (net)|safe }}  
                                     {% endfor %}
                                 </td>
                                 
-                                <td ><span class=" text-end pe-1 text-secondary-emphasis">{{schedule.amount | micro_ccd_display | safe}}</span></td>
+                                <td><span class=" text-end pe-1 text-secondary-emphasis">{{schedule.amount | micro_ccd_display | safe}}</span></td>
                                 <td></td>    
                         {% endfor %}
                         </tr>
@@ -83,16 +83,16 @@
 
         {% if account.available_balance %}
             <tr class="table-row-line-height sm-text">
-                <td class="text-start text-secondary-emphasis">Available Balance</td>
-                <td class=" text-end text-secondary-emphasis">{{account.available_balance| micro_ccd_display | safe }}</td>
+                <td class="text-start">Available Balance</td>
+                <td class="text-end">{{account.available_balance| micro_ccd_display | safe }}</td>
             </tr>
             {% endif %}  
             
             
         
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Index</td>
-            <td title="{{account.index}}" id="account_index" class=" text-end text-secondary-emphasis ccd">{{account.index|round_x_decimal_with_comma(0) }}</td>
+            <td class="text-start">Index</td>
+            <td title="{{account.index}}" id="account_index" class="text-end ccd">{{account.index|round_x_decimal_with_comma(0) }}</td>
         </tr>
         
     <!-- </tbody>
@@ -101,20 +101,20 @@
     <tr class="table-row-line-height sm-text"><td></td><td></td></tr>
     
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Net Worth (CCD)</td>
-            <td  class=" text-end text-secondary-emphasis"><span class="ccd">${{ccd_balance_USD|round_x_decimal_with_comma(0)}}</span></td>
+            <td class="text-start">Net Worth (CCD)</td>
+            <td class="text-end"><span class="ccd">${{ccd_balance_USD|round_x_decimal_with_comma(0)}}</span></td>
             
         </tr>
         {% if tokens_available %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Net Worth (Tokens)</td>
-            <td  class=" text-end text-secondary-emphasis"><span class="ccd">${{tokens_value_USD|round_x_decimal_with_comma(0)}}</span></td>
+            <td class="text-start">Net Worth (Tokens)</td>
+            <td class="text-end"><span class="ccd">${{tokens_value_USD|round_x_decimal_with_comma(0)}}</span></td>
         </tr>
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Net Worth (Total)
+            <td class="text-start">Net Worth (Total)
                 
             </td>
-            <td  class=" text-end text-secondary-emphasis"><span class="ccd">${{(ccd_balance_USD+tokens_value_USD)|round_x_decimal_with_comma(0)}}</span></td>
+            <td class="text-end"><span class="ccd">${{(ccd_balance_USD+tokens_value_USD)|round_x_decimal_with_comma(0)}}</span></td>
         </tr>
         
         {% endif %}

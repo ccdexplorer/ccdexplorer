@@ -20,7 +20,7 @@
                   <span class="ccd_decimals text-secondary-emphasis">{{token_info.token_value|round_x_decimal_with_comma(token_decimals)}} {{vi._id}}</span>
                 </td>
                 <!-- Second column with values -->
-                <td class="text-end text-secondary-emphasis">
+                <td class="text-end">
                   {% if token_info.token_value %}
                   <span class="ccd text-secondary-emphasis">${{token_info.token_value_USD|round_x_decimal_with_comma(0)}}
                   </span>
@@ -62,7 +62,7 @@
             {% endif %}
           </td>
              <!-- Second column with values -->
-         <td class="text-end text-secondary-emphasis">
+         <td class="text-end">
           <span class="ccd text-secondary-emphasis">{{token_info.balance}}
           </span>
           

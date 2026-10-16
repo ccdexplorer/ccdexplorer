@@ -2,8 +2,8 @@
 <table class="table table-borderless">
 <tbody>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Transaction Hash</td>
-        <td class="text-end text-secondary-emphasis">
+        <td class="text-start">Transaction Hash</td>
+        <td class="text-end">
             {% set copy_value = tx.hash %}
             {% set value_type = "tx_hash" %}
             {% set display_value = tx.hash[:4]|safe %}
@@ -11,24 +11,24 @@
             
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Block Height</td>
-        <td class="text-end text-secondary-emphasis ccd">{{tx.block_info.height|round_x_decimal_with_comma(0)|safe}}</td>
+        <td class="text-start">Block Height</td>
+        <td class="text-end ccd">{{tx.block_info.height|round_x_decimal_with_comma(0)|safe}}</td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Block Hash</td>
-        <td class="text-end text-secondary-emphasis"><span style="font-family: monospace, monospace;">{{tx.block_info.hash|block_hash_link(net)|safe}}</span></td>
+        <td class="text-start">Block Hash</td>
+        <td class="text-end"><span style="font-family: monospace, monospace;">{{tx.block_info.hash|block_hash_link(net)|safe}}</span></td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Timestamp</td>
-        <td class="text-end text-secondary-emphasis ccd">{{tx.block_info.slot_time|datetime_regular}}</td>
+        <td class="text-start">Timestamp</td>
+        <td class="text-end ccd">{{tx.block_info.slot_time|datetime_regular}}</td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Age</td>
-        <td class="text-end text-secondary-emphasis ccd">{{tx.block_info.slot_time|datetime_delta_format_since}}</td>
+        <td class="text-start">Age</td>
+        <td class="text-end ccd">{{tx.block_info.slot_time|datetime_delta_format_since}}</td>
     </tr>
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Sender</td>
-        <td class="text-end text-secondary-emphasis">{% if tx.account_transaction %}
+        <td class="text-start">Sender</td>
+        <td class="text-end">{% if tx.account_transaction %}
             {{tx.account_transaction.sender|account_link(net,user,tags,request.app)|safe }}
             
           {% else %}
@@ -39,24 +39,24 @@
     {% if tx.account_transaction %}
         {% if tx.account_transaction.outcome == 'success' %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Transaction Type</td>
-            <td class="text-end ">
+            <td class="text-start">Transaction Type</td>
+            <td class="text-end">
                 {{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} 
                 <span class="text-secondary-emphasis">{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
         </tr>
         {%endif%}
     {% elif tx.update %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Transaction Type</td>
-            <td class="text-end ">{{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} 
+            <td class="text-start">Transaction Type</td>
+            <td class="text-end">{{tx.type.contents|tx_type_translator("icon", tx.account_transaction.sponsor)|safe}} 
                 <span class="text-secondary-emphasis">{{tx.type.contents|tx_type_translator("display")|safe}}</span></td>
         </tr>
 
     {%endif%}    
     {% if tx.account_transaction %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Transaction Cost</td>
-            <td class="text-end text-secondary-emphasis">
+            <td class="text-start">Transaction Cost</td>
+            <td class="text-end">
                 {% if tx.account_transaction %}
                     {% if tx.account_transaction.sponsor %}
                         {{tx.account_transaction.sponsor.cost|micro_ccd_display|safe}}
@@ -70,14 +70,14 @@
         </tr>
         {% if tx.account_transaction.sponsor %}
             <tr class="table-row-line-height sm-text">
-                <td class="text-start text-secondary-emphasis">Sponsor</td>
-                <td class="text-end text-secondary-emphasis">{{tx.account_transaction.sponsor.sponsor|account_link(net,user,tags,request.app)|safe }}</td>
+                <td class="text-start">Sponsor</td>
+                <td class="text-end">{{tx.account_transaction.sponsor.sponsor|account_link(net,user,tags,request.app)|safe }}</td>
             </tr>
         {%endif%} 
     {%endif%}    
     <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">Energy Spent</td>
-        <td class="text-end ccd text-secondary-emphasis">{{tx.energy_cost|safe}} NRG
+        <td class="text-start">Energy Spent</td>
+        <td class="text-end ccd">{{tx.energy_cost|safe}} NRG
           </td>
     </tr>
     

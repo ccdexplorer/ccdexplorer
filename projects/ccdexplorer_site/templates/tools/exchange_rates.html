@@ -11,9 +11,9 @@
 <table class="table table-borderless ">
 {% for fx_name, fx in exchange_rates.items() %}
 <tr class="sm-text">
-  <td class="text-secondary-emphasis">{{fx_name}}<br/>
+  <td>{{fx_name}}<br/>
     <span class="text-secondary-emphasis">Source: {{fx.source}}</span></td>
-  <td class="text-end text-secondary-emphasis"><span class="ccd">{{fx.rate}} USD</span><br/>
+  <td class="text-end"><span class="ccd">{{fx.rate}} USD</span><br/>
     <span class="text-secondary-emphasis">Timestamp: {{fx.timestamp|datetime_delta_format_since}} ago</span></td>
 </tr>
 {%endfor%}

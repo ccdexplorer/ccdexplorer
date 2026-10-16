@@ -348,6 +348,19 @@ input:focus {
     font-size: 250%;
 }
 
+/* Bootstrap's .table paints every cell with --bs-emphasis-color, which is
+   #fff in dark and #000 in light -- neither of which is the colour this
+   site reads its tables in. Until this rule existed, every cell carried a
+   text-secondary-emphasis class to drag the colour back, 983 of them across
+   93 templates, each one undoing this single Bootstrap line. Say it once
+   here instead. */
+.table {
+    --bs-table-color: var(--bs-secondary-text-emphasis);
+    --bs-table-striped-color: var(--bs-secondary-text-emphasis);
+    --bs-table-hover-color: var(--bs-secondary-text-emphasis);
+    --bs-table-active-color: var(--bs-secondary-text-emphasis);
+}
+
 .table-row-line-height {
     line-height: 1;
 }

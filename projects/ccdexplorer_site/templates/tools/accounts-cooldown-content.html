@@ -9,25 +9,25 @@
 <table class="table ">
     <thead>
     <tr  class="account-row sm-text">
-      <th class="text-start text-secondary-emphasis"><span style="font-family: monospace, monospace;">Released in...</span></th>
-      <th class="text-end text-secondary-emphasis">Amount</th>
-      <th class="text-end text-secondary-emphasis"># Accounts</th>
+      <th class="text-start"><span style="font-family: monospace, monospace;">Released in...</span></th>
+      <th class="text-end">Amount</th>
+      <th class="text-end"># Accounts</th>
       
     </tr>
   </thead>
   <tbody class="table-group-divider">
   {% for row in summary %}
     <tr class="sm-text ">
-          <td class="text-start text-secondary-emphasis "><span class="ccd">{{row.end_time|datetime_delta_format_until}}</span></td>
-          <td class="text-end text-secondary-emphasis "><span >{{row.total_amount|micro_ccd_no_decimals|safe}}</span></td>
-          <td class="text-end text-secondary-emphasis"><span class="ccd">{{row.count}}</span></td>
+          <td class="text-start"><span class="ccd">{{row.end_time|datetime_delta_format_until}}</span></td>
+          <td class="text-end"><span >{{row.total_amount|micro_ccd_no_decimals|safe}}</span></td>
+          <td class="text-end"><span class="ccd">{{row.count}}</span></td>
           
     </tr>
   {% endfor %}
   <tr class="sm-text ">
-          <td class="text-end text-secondary-emphasis ccd">Totals</td>
-          <td class="text-end text-secondary-emphasis "><span >{{summary_totals.total_amount|micro_ccd_no_decimals|safe}}</span></td>
-          <td class="text-end text-secondary-emphasis "><span class="ccd">{{summary_totals.count}}</span></td>
+          <td class="text-end ccd">Totals</td>
+          <td class="text-end"><span >{{summary_totals.total_amount|micro_ccd_no_decimals|safe}}</span></td>
+          <td class="text-end"><span class="ccd">{{summary_totals.count}}</span></td>
           
     </tr>
   </tbody>
@@ -39,18 +39,18 @@
 <table class="table ">
     <thead>
     <tr  class="account-row sm-text">
-      <th class="text-start text-secondary-emphasis"><span style="font-family: monospace, monospace;">Account</span></th>
-      <th class="text-end text-secondary-emphasis">Amount</th>
-      <th class="text-end text-secondary-emphasis">First Timestamp</th>
+      <th class="text-start"><span style="font-family: monospace, monospace;">Account</span></th>
+      <th class="text-end">Amount</th>
+      <th class="text-end">First Timestamp</th>
       
     </tr>
   </thead>
   <tbody class="table-group-divider">
   {% for row in accounts %}
     <tr class="sm-text ">
-          <td class="text-start text-secondary-emphasis "><a href="/{{net}}/account/{{row.account_index}}"><span class="ccd" >{{row.account_index}}</a></td>
-          <td class="text-end text-secondary-emphasis "><span >{{row.account_cooldowns[0].amount|micro_ccd_no_decimals|safe}}</span></td>
-          <td class="text-end text-secondary-emphasis "><span class="ccd">{{row.account_cooldowns[0].end_time|datetime_regular_parse}}</span></td>
+          <td class="text-start"><a href="/{{net}}/account/{{row.account_index}}"><span class="ccd" >{{row.account_index}}</a></td>
+          <td class="text-end"><span >{{row.account_cooldowns[0].amount|micro_ccd_no_decimals|safe}}</span></td>
+          <td class="text-end"><span class="ccd">{{row.account_cooldowns[0].end_time|datetime_regular_parse}}</span></td>
           
     </tr>
   {% endfor %}

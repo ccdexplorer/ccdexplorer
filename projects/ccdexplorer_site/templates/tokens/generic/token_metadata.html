@@ -4,41 +4,41 @@
 <table class="table table-borderless">
         {% if md.symbol %}
             <tr class="table-row-line-height sm-text">
-                <td class="text-start text-secondary-emphasis">Token Symbol</td>
-                <td class="text-end text-secondary-emphasis">{{ stored_token_address.token_metadata.symbol }}</td>
+                <td class="text-start">Token Symbol</td>
+                <td class="text-end">{{ stored_token_address.token_metadata.symbol }}</td>
             </tr>
         {% endif %}
             <tr class="table-row-line-height sm-text">
-                <td class="text-start text-secondary-emphasis">Description</td>
-                <td class="text-start text-secondary-emphasis word-break">{{ stored_token_address.token_metadata.description }}                
+                <td class="text-start">Description</td>
+                <td class="text-start word-break">{{ stored_token_address.token_metadata.description }}                
                     </td>
             </tr>
         
         {% if md.decimals %}
             <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Decimals</td>
-            <td class="text-end text-secondary-emphasis ccd">
+            <td class="text-start">Decimals</td>
+            <td class="text-end ccd">
                 {{ md.decimals }}
                 </td>
             </tr>
         {% endif %}
         <tr class="table-row-line-height sm-text">
-            <td class="text-start text-secondary-emphasis">Metadata URL</td>
-            <td class="text-end text-secondary-emphasis"><a href="{{stored_token_address.metadata_url|safe_url}}">Metadata URL</a>
+            <td class="text-start">Metadata URL</td>
+            <td class="text-end"><a href="{{stored_token_address.metadata_url|safe_url}}">Metadata URL</a>
                 
                 </td>
         </tr>
         {% if md.attributes %}
             
             <table class="table table-borderless ">
-                <tr><td class=" text-secondary-emphasis" colspan="2">Attributes</td></tr>
+                <tr><td colspan="2">Attributes</td></tr>
         
             {% for a in md.attributes %}
-                <tr class="sm-text"><td class=" text-secondary-emphasis text-break">{{a.name}}</td>
+                <tr class="sm-text"><td class="text-break">{{a.name}}</td>
                 {% if a.type == 'date' %}
-                    <td class="ccd  text-secondary-emphasis">{{a.value|int|datetime_format_day_only_from_ms_timestamp}}</td>
+                    <td class="ccd">{{a.value|int|datetime_format_day_only_from_ms_timestamp}}</td>
                 {% else %}
-                    <td class=" text-secondary-emphasis text-break">{{a.value}}</td>
+                    <td class="text-break">{{a.value}}</td>
                 {% endif %}
                 </tr>
                 {% endfor %}

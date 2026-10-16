@@ -3,8 +3,8 @@
 <table class="table table-borderless">
       <thead>
         <tr class="sm-text">
-          <th class="text-secondary-emphasis " scope="col">Account</th>
-          <th class="text-secondary-emphasis  text-end" scope="col">Staked Amount</th>
+          <th scope="col">Account</th>
+          <th class="text-end" scope="col">Staked Amount</th>
 
         </tr>
       </thead>
@@ -13,7 +13,7 @@
         
         <tr class="sm-text">
           <td>{{account_id|account_link(net, user, tags, app=request.app)|safe}} (to be included in next payday)</td>
-          <td class="text-end text-secondary-emphasis ">{{value.stake | micro_ccd_no_decimals | safe}}</td>
+          <td class="text-end">{{value.stake | micro_ccd_no_decimals | safe}}</td>
         </tr>
         <hr>
 
@@ -57,7 +57,7 @@
                 {% endif %}
               </i>
           </td>
-          <td class="text-end text-secondary-emphasis ">{{row.stake | micro_ccd_no_decimals | safe}}
+          <td class="text-end">{{row.stake | micro_ccd_no_decimals | safe}}
                 </td>
         </tr>
         {% endfor %}

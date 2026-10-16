@@ -25,8 +25,8 @@
   {% for key, value in card.items() %}
     {% if value is not mapping and value is not sequence or value is string %}
       <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">{{ key }}</td>
-        <td class="text-end text-secondary-emphasis word-break">
+        <td class="text-start">{{ key }}</td>
+        <td class="text-end word-break">
           {% if value is string and value.startswith('http') %}
             <a href="{{ value | safe_url }}" title="{{ value }}" style="overflow-wrap:anywhere">{{ value | short_url }}</a>
           {% else %}
@@ -39,8 +39,8 @@
 
   {% if stored_token_address.metadata_url %}
     <tr class="table-row-line-height sm-text">
-      <td class="text-start text-secondary-emphasis">Metadata URL</td>
-      <td class="text-end text-secondary-emphasis word-break">
+      <td class="text-start">Metadata URL</td>
+      <td class="text-end word-break">
         <a href="{{ stored_token_address.metadata_url | safe_url }}"
            title="{{ stored_token_address.metadata_url }}" style="overflow-wrap:anywhere">{{ stored_token_address.metadata_url | short_url }}</a>
       </td>
