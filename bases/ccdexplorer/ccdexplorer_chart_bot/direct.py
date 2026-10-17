@@ -19,6 +19,7 @@ from telegram.error import TelegramError
 
 from ccdexplorer.charts import ChartState
 
+from . import price as price_quote
 from . import validator as validator_charts
 from .catalogue import (
     CALLBACK_PREFIX,
@@ -314,6 +315,74 @@ def validator_command_handler(site_url: str):
         if message is None:
             return
         await send_validator(message, list(getattr(context, "args", None) or []), site_url)
+
+    return reply_to_command
+
+
+async def fetch_price() -> dict | None:
+    """The two routes /p reads, in parallel.
+
+    Imported here rather than at module scope for the same reason
+    fetch_validator does it: the rest of the bot fetches nothing and should
+    not pay for an http client it never uses.
+
+    A route that answered anything but 200 comes back as None rather than
+    raising -- markets/info is a 404 until the dagster job has written the
+    record, and the price half of the message is worth sending without it.
+    """
+    import asyncio
+
+    import httpx2 as httpx
+
+    from ccdexplorer.env import API_URL, environment
+
+    paths = price_quote.api_paths()
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
+        ) as client:
+            responses = await asyncio.gather(
+                *(client.get(f"{API_URL.rstrip('/')}/v2/{path}") for path in paths.values())
+            )
+    except Exception as error:  # noqa: BLE001
+        # Broad and only here, as in fetch_validator: the reader gets a
+        # sentence rather than a silence, and Telegram does not retry a
+        # command that raised.
+        log.warning("price lookup failed: %s", error)
+        return None
+    return {
+        name: (response.json() if response.status_code == 200 else None)
+        for name, response in zip(paths, responses)
+    }
+
+
+def price_command_handler():
+    """/p -- the price, with no chart attached.
+
+    The one command on a chart bot that answers with text. A chart of the
+    last day is what /e price already sends; this is the number somebody
+    wants when they are not going to read a chart.
+    """
+
+    async def reply_to_command(update, context) -> None:
+        message = update.message
+        if message is None:
+            return
+
+        got = await fetch_price()
+        said = price_quote.summary(got.get("ohlc"), got.get("markets")) if got else None
+        if said is None:
+            # Kraken is the only source for the price, and the route it is
+            # read through already falls back to its last good response for
+            # an hour. Nothing left to offer but the reason.
+            await message.reply_html(
+                "No price just now — Kraken is not answering. Try again in a minute."
+            )
+            return
+
+        log.info("/p")
+        await message.reply_html(said, disable_web_page_preview=True)
 
     return reply_to_command
 

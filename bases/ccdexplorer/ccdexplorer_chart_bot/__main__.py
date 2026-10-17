@@ -30,6 +30,7 @@ from .direct import (
     command_handler,
     validator_command_handler,
     nudge_handler,
+    price_command_handler,
     retired_command_handler,
 )
 from .inline import handler as inline_handler
@@ -77,6 +78,9 @@ async def start(update: Update, context) -> None:
         "<code>/e@" + username + "</code>.",
         "",
         "Whole questions work too — <i>how much is staked</i>, <i>what are the fees</i>.",
+        "",
+        "Two commands answer with words instead of a chart: <code>/p</code> for "
+        "the CCD price, and <code>/v &lt;index&gt;</code> for one validator.",
     ]
     await update.message.reply_html("\n".join(lines), disable_web_page_preview=True)
 
@@ -98,6 +102,9 @@ def main() -> None:
     # both bots answer. The help says to qualify it there.
     application.add_handler(CommandHandler(["e"], command_handler(site_url)))
     application.add_handler(CommandHandler(["v", "validator"], validator_command_handler(site_url)))
+    # The one command that answers with text rather than a chart. /e price
+    # already sends the candles; this is for when the number is the answer.
+    application.add_handler(CommandHandler(["p", "price"], price_command_handler()))
     # The names it used to answer to. Registered rather than dropped: an
     # unknown command does not reach the plain-text handler either, so
     # removing these would answer anyone who learned /c with silence.
