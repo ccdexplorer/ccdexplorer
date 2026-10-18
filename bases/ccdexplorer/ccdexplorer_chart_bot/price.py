@@ -241,9 +241,13 @@ def summary(ohlc: dict | None, markets: dict | None) -> str | None:
     borrowed = [
         label for key, label in (("market_cap", "market cap"), ("rank", "rank")) if key in cap
     ]
-    # The legend is not optional. Without it the candle reads as a progress
-    # bar, which would make a cheap market look like a nearly-empty one.
-    credit = "Price from Kraken CCD/USD · body = open→close"
+    # Four of the six figures are Kraken's -- the price, the candle's high and
+    # low, the change and the volume -- so crediting it with "Price" alone
+    # understated it, and left the volume looking like a global number when it
+    # is one venue's. The legend is not optional either: without it the candle
+    # reads as a progress bar, which would make a cheap market look like a
+    # nearly-empty one.
+    credit = "Price, range, change and volume from Kraken CCD/USD · body = open→close"
     if borrowed:
         credit += f" · {' and '.join(borrowed)} from CoinMarketCap"
     lines += ["", f"<i>{credit}</i>"]

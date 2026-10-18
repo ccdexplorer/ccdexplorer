@@ -668,3 +668,48 @@ def test_the_candle_block_reads_in_order():
 
     assert "HI: " in rows[drawn + 1], rows
     assert "LO: " in rows[drawn + 2], rows
+
+
+# --- the footer says which numbers came from where ------------------------
+#
+# It credited Kraken with "Price" alone, when Kraken is where the price, the
+# candle's high and low, the 24h change and the volume all come from -- four
+# of the message's six figures. CoinMarketCap supplies two, and the footer
+# named them accurately all along. Understating one source is as misleading
+# as overstating the other.
+
+
+def test_the_footer_credits_kraken_with_more_than_the_price():
+    said = _summary()
+    footer = _lines(said)[-1]
+
+    assert "Price from Kraken" not in footer, footer
+    for owed in ("range", "volume"):
+        assert owed in footer, f"{owed!r} is Kraken's and the footer does not say so: {footer}"
+
+
+def test_the_footer_still_names_kraken_and_cmc():
+    footer = _lines(_summary())[-1]
+
+    assert "Kraken" in footer
+    assert "CoinMarketCap" in footer
+
+
+def test_the_footer_still_explains_the_body():
+    footer = _lines(_summary())[-1]
+
+    assert "open" in footer and "close" in footer
+
+
+def test_the_footer_claims_no_cmc_figures_when_there_are_none():
+    footer = _lines(_summary(markets=None))[-1]
+
+    assert "CoinMarketCap" not in footer, footer
+    assert "Kraken" in footer
+    assert "volume" in footer, "the Kraken half still owes its own credit"
+
+
+def test_volume_is_credited_even_though_it_is_computed():
+    """The USD figure is ours -- CCD traded x close, summed -- but the trades
+    behind it are Kraken's, and no other venue is in it."""
+    assert "volume" in _lines(_summary())[-1]
