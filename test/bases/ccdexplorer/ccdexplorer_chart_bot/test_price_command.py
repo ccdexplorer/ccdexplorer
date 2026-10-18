@@ -556,12 +556,13 @@ def test_lo_and_hi_are_on_their_own_lines():
     assert _labelled(said, "LO") != _labelled(said, "HI")
 
 
-def test_lo_reads_before_hi():
-    """Left to right on the candle is low to high, so the list under it
-    reads the same way round."""
+def test_hi_reads_before_lo():
+    """High above low, the way a price axis reads. Deliberately not the
+    candle's own left-to-right: the drawing is a shape and the list is a
+    pair of numbers, and numbers are read top-down."""
     said = _summary()
 
-    assert _lines(said).index(_labelled(said, "LO")) < _lines(said).index(_labelled(said, "HI"))
+    assert _lines(said).index(_labelled(said, "HI")) < _lines(said).index(_labelled(said, "LO"))
 
 
 def test_the_two_lines_put_their_values_in_the_same_column():
@@ -609,3 +610,61 @@ def test_the_indent_sits_under_the_candle_not_under_the_emoji():
     said = _summary()
 
     assert _labelled(said, "LO").startswith(f"<code>{price_mod.LABEL_INDENT}LO")
+
+
+# --- the blank lines that group it ----------------------------------------
+#
+# Eight lines of label-and-number read as one undifferentiated block. Two
+# blanks split it into three: what the thing is, what it did over the day,
+# and how big it is.
+
+
+def test_a_blank_line_follows_the_header():
+    said = _summary()
+
+    assert _lines(said)[1] == "", _lines(said)[:3]
+
+
+def test_the_header_is_still_the_first_line():
+    said = _summary()
+
+    assert "Concordium" in _lines(said)[0]
+
+
+def test_a_blank_line_follows_the_candle_block():
+    """Between the candle's numbers and the totals underneath."""
+    said = _summary()
+    rows = _lines(said)
+
+    assert rows[rows.index(_labelled(said, "LO")) + 1] == "", rows
+
+
+def test_the_volume_is_what_follows_that_blank():
+    said = _summary()
+    rows = _lines(said)
+
+    assert "Vol:" in rows[rows.index(_labelled(said, "LO")) + 2], rows
+
+
+def test_the_blanks_do_not_double_up_when_cmc_is_missing():
+    """Dropping the market-cap line must not leave two blanks against the
+    footer's own, which would read as a gap rather than a grouping."""
+    said = _summary(markets=None)
+
+    assert "\n\n\n" not in said, repr(said)
+
+
+def test_the_blanks_do_not_double_up_with_market_data_either():
+    said = _summary()
+
+    assert "\n\n\n" not in said, repr(said)
+
+
+def test_the_candle_block_reads_in_order():
+    """candle, then HI, then LO, with nothing between them."""
+    said = _summary()
+    rows = _lines(said)
+    drawn = next(i for i, line in enumerate(rows) if price_mod.BODY in line)
+
+    assert "HI: " in rows[drawn + 1], rows
+    assert "LO: " in rows[drawn + 2], rows

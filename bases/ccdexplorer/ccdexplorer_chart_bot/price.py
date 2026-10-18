@@ -208,6 +208,7 @@ def summary(ohlc: dict | None, markets: dict | None) -> str | None:
 
     lines = [
         f"<b>Concordium · CCD</b>{rank}",
+        "",
         f"💰 Price: <b>{_price(traded['price'])}</b>",
     ]
     # Before the candle, because it is what says which end of the body is the
@@ -223,8 +224,14 @@ def summary(ohlc: dict | None, markets: dict | None) -> str | None:
     # are what aligns the two values, and "LO: " and "HI: " are equal width
     # only in a monospace font -- in a proportional one I is narrow where O
     # is wide, and the column the labels exist to create would not survive.
-    lines.append(f"<code>{LABEL_INDENT}LO: {_price(traded['low'])}</code>")
+    # High above low, the way a price axis reads, rather than following the
+    # candle's left-to-right. The drawing and the list disagree about which
+    # end comes first, and the list is the one being read as numbers.
     lines.append(f"<code>{LABEL_INDENT}HI: {_price(traded['high'])}</code>")
+    lines.append(f"<code>{LABEL_INDENT}LO: {_price(traded['low'])}</code>")
+    # The candle and its two numbers are one thing; the totals below are
+    # another. A blank line is the cheapest way to say so.
+    lines.append("")
     lines.append(f"📊 24h Vol: {_compact(traded['volume_usd'])}")
     if "market_cap" in cap:
         lines.append(f"💎 MCap: {_compact(cap['market_cap'])}")
