@@ -12,11 +12,12 @@ draws. Calling any of those a 24h figure would be wrong by six hours, so the
 last `BARS_PER_DAY` bars are sliced off first and everything is computed from
 those.
 
-The high and the low are drawn rather than listed. A sideways candlestick --
-the wick spanning the 24h range, the body spanning open to close -- carries
-four numbers in one line, and because the window ends now the close *is* the
-current price. "H/L: a | b" gave two of those and left the reader to imagine
-where the third sat between them.
+The 24h range is drawn as well as listed. A sideways candlestick -- the wick
+spanning low to high, the body spanning open to close -- carries four numbers
+in one glyph run, and because the window ends now the close *is* the current
+price. Underneath it the low and the high are named, one per line, in a
+column: "H/L: a | b" was two numbers on one line with nothing saying which
+was which, and nothing placing the price between them.
 
 Market cap and rank are the two things one venue cannot know, having no
 supply to multiply by. They come from the same CoinMarketCap record the site's
@@ -60,6 +61,11 @@ CANDLE_WIDTH = 20
 #: which is the only property the drawing actually depends on.
 WICK = "─"
 BODY = "█"
+
+#: Indent on the LO and HI lines. Enough to sit them under the candle rather
+#: than under the emoji that labels it, so the two numbers read as belonging
+#: to the drawing above and not to the message's left edge.
+LABEL_INDENT = "   "
 
 
 def api_paths() -> dict[str, str]:
@@ -212,7 +218,13 @@ def summary(ohlc: dict | None, markets: dict | None) -> str | None:
     # <code> because Telegram sets the rest of the message in a proportional
     # font, and a candle whose cells are not all one width is not a candle.
     drawn = candle(traded["open"], traded["price"], traded["high"], traded["low"])
-    lines.append(f"🕯 <code>{_price(traded['low'])} {drawn} {_price(traded['high'])}</code>")
+    lines.append(f"🕯 <code>{drawn}</code>")
+    # One <code> per line rather than one span across all three. The labels
+    # are what aligns the two values, and "LO: " and "HI: " are equal width
+    # only in a monospace font -- in a proportional one I is narrow where O
+    # is wide, and the column the labels exist to create would not survive.
+    lines.append(f"<code>{LABEL_INDENT}LO: {_price(traded['low'])}</code>")
+    lines.append(f"<code>{LABEL_INDENT}HI: {_price(traded['high'])}</code>")
     lines.append(f"📊 24h Vol: {_compact(traded['volume_usd'])}")
     if "market_cap" in cap:
         lines.append(f"💎 MCap: {_compact(cap['market_cap'])}")

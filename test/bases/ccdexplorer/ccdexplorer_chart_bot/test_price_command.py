@@ -490,11 +490,13 @@ def test_the_open_is_the_one_inside_the_window():
 # --- the candle in the message ---------------------------------------------
 
 
-def test_the_candle_line_carries_the_low_and_the_high():
+def test_the_low_and_high_are_labelled():
+    """They used to flank the candle unlabelled, which left the reader to
+    work out which end of a drawing each number belonged to."""
     said = _summary()
 
-    assert "$0.00369 " in said, said
-    assert " $0.00392" in said, said
+    assert "LO: $0.00369" in said, said
+    assert "HI: $0.00414" in said or "HI: $0.00392" in said, said
 
 
 def test_the_candle_is_wrapped_for_a_monospace_font():
@@ -527,3 +529,83 @@ def test_there_is_no_sparkline():
     said = _summary()
 
     assert "▁" not in said and "▂" not in said and "▇" not in said
+
+
+# --- LO and HI in one column ----------------------------------------------
+#
+# The two numbers sit on their own lines under the candle, left-aligned to
+# each other. Each line gets its own <code> span: "LO: " and "HI: " are the
+# same width only in a monospace font -- I is narrow and O is wide in a
+# proportional one -- and equal-width prefixes are the whole of what makes
+# the two values start at the same column.
+
+
+def _lines(said):
+    return said.split("\n")
+
+
+def _labelled(said, label):
+    return next(line for line in _lines(said) if f"{label}: " in line)
+
+
+def test_lo_and_hi_are_on_their_own_lines():
+    said = _summary()
+
+    assert len([line for line in _lines(said) if "LO: " in line]) == 1
+    assert len([line for line in _lines(said) if "HI: " in line]) == 1
+    assert _labelled(said, "LO") != _labelled(said, "HI")
+
+
+def test_lo_reads_before_hi():
+    """Left to right on the candle is low to high, so the list under it
+    reads the same way round."""
+    said = _summary()
+
+    assert _lines(said).index(_labelled(said, "LO")) < _lines(said).index(_labelled(said, "HI"))
+
+
+def test_the_two_lines_put_their_values_in_the_same_column():
+    """The point of the change. Compared on the text Telegram actually
+    lays out, with the markup stripped."""
+    said = _summary()
+    bare = {
+        label: _labelled(said, label).replace("<code>", "").replace("</code>", "")
+        for label in ("LO", "HI")
+    }
+
+    assert bare["LO"].index("$") == bare["HI"].index("$"), bare
+
+
+def test_both_lines_are_monospace():
+    """Without this the column is only as aligned as the font allows, and
+    the font Telegram uses for ordinary text is proportional."""
+    said = _summary()
+
+    for label in ("LO", "HI"):
+        line = _labelled(said, label)
+        assert line.startswith("<code>") and line.endswith("</code>"), line
+
+
+def test_the_candle_keeps_its_own_line():
+    """The numbers moved off it; the drawing did not move onto theirs."""
+    said = _summary()
+    drawn = next(line for line in _lines(said) if price_mod.BODY in line)
+
+    assert "LO" not in drawn and "HI" not in drawn, drawn
+    assert "$" not in drawn, drawn
+
+
+def test_the_candle_is_still_the_full_width():
+    said = _summary()
+    drawn = next(line for line in _lines(said) if price_mod.BODY in line)
+    glyphs = drawn.split("<code>")[1].split("</code>")[0]
+
+    assert len(glyphs) == price_mod.CANDLE_WIDTH, glyphs
+
+
+def test_the_indent_sits_under_the_candle_not_under_the_emoji():
+    """A zero indent would hang the labels off the message's left edge,
+    detached from the drawing they describe."""
+    said = _summary()
+
+    assert _labelled(said, "LO").startswith(f"<code>{price_mod.LABEL_INDENT}LO")
