@@ -221,17 +221,52 @@ HOLDERS = ChartSpec(
     name="holders",
     slug="holders",
     title="Holders",
-    description="Accounts holding at least a given amount of CCD.",
-    blurb="Accounts above a balance threshold",
-    keywords=("holders", "rich", "whales", "distribution", "balances"),
+    description="Accounts holding at least 1M, 5M, 10M, 50M and 100M CCD.",
+    blurb="Accounts above each balance threshold",
+    keywords=("holders", "rich", "whales", "distribution", "balances", "thresholds"),
     category="accounts",
     source="statistics_daily_holders",
+    # Five of the thirteen thresholds the nightly job writes. Not all of
+    # them: 0 and 100 are "every account that exists", and the ones below a
+    # million crowd the top of the axis so hard that the lines this chart
+    # exists for are flat against the bottom. Ascending, so the largest
+    # count heads the legend and the order matches the lines.
     series=(
         Series(
             key="count_>=1000000",
+            # The name saved links already use, from when this was the only
+            # series on the chart.
             url_name="above1m",
             label="> 1M CCD",
             colour="#549FF2",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="count_>=5000000",
+            url_name="above5m",
+            label="> 5M CCD",
+            colour="#AE7CF7",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="count_>=10000000",
+            url_name="above10m",
+            label="> 10M CCD",
+            colour="#70B785",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="count_>=50000000",
+            url_name="above50m",
+            label="> 50M CCD",
+            colour="#EE9B54",
+            agg=Agg.LAST,
+        ),
+        Series(
+            key="count_>=100000000",
+            url_name="above100m",
+            label="> 100M CCD",
+            colour="#E87E90",
             agg=Agg.LAST,
         ),
     ),
@@ -240,11 +275,6 @@ HOLDERS = ChartSpec(
     has_page=True,
     # Generated image route; see routers/charts/generated.py.
     has_image=True,
-    # Off the gallery, like the Kraken intervals and the price charts: it
-    # plots one threshold of a distribution the accounts category already
-    # covers, and its page and image stay reachable for anyone holding a
-    # link.
-    listed=False,
     docs_path="charts/holders/",
 )
 
