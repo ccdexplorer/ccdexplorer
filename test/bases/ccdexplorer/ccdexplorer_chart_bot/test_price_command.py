@@ -208,13 +208,15 @@ def _summary(candles=_DEFAULT, markets=_DEFAULT):
 
 
 def test_the_message_has_the_five_figures_that_were_asked_for():
+    """The high and the low are no longer a label and two numbers -- they are
+    the endpoints of the candle -- so this asks for them where they now are."""
     said = _summary()
 
     assert "Price:" in said
-    assert "H/L:" in said
     assert "24h:" in said
     assert "Vol:" in said
     assert "MCap:" in said
+    assert price_mod.BODY in said, "no candle drawn"
 
 
 def test_the_price_is_written_the_way_the_homepage_writes_it():
@@ -380,3 +382,148 @@ async def test_start_teaches_the_new_command():
     await main.start(SimpleNamespace(message=message), _context())
 
     assert "/p" in message.htmls[0]
+
+
+# --- the 24h candle, lying on its side -------------------------------------
+#
+# A sideways candlestick says four things in one line of text: the wick runs
+# the 24h range, the body runs open to close, and because the window ends now
+# the close is the current price. That is the high, the low and the price in
+# one glyph run, which is what the plain "H/L: a | b" line could not do.
+
+
+def _candle(opened, close, high=0.00414, low=0.00371, width=None):
+    return price_mod.candle(opened, close, high, low, **({} if width is None else {"width": width}))
+
+
+def test_the_candle_is_the_width_it_says_it_is():
+    """Telegram wraps a line that overruns, which would split the candle."""
+    assert len(_candle(0.00382, 0.00386)) == price_mod.CANDLE_WIDTH
+
+
+def test_the_width_does_not_depend_on_the_numbers():
+    narrow = _candle(0.00382, 0.003821)
+    wide = _candle(0.00371, 0.00414)
+
+    assert len(narrow) == len(wide) == price_mod.CANDLE_WIDTH
+
+
+def test_the_body_spans_open_to_close():
+    """open at the low, close a third up: body from the left edge to a third."""
+    drawn = _candle(0.00371, 0.00386, width=20)
+    body = [i for i, cell in enumerate(drawn) if cell == price_mod.BODY]
+
+    assert body[0] == 0, drawn
+    assert 5 <= body[-1] <= 8, drawn
+
+
+def test_a_down_candle_draws_the_same_span():
+    """A fall is the same body, entered from the other end. Which end is the
+    close is said by the signed change on the line above, not by the glyphs."""
+    up = _candle(0.00380, 0.00400)
+    down = _candle(0.00400, 0.00380)
+
+    assert up == down
+
+
+def test_the_wick_fills_the_rest_of_the_range():
+    drawn = _candle(0.00382, 0.00386)
+
+    assert set(drawn) == {price_mod.WICK, price_mod.BODY}
+    assert drawn[0] == price_mod.WICK, "a body at the low when open is not the low"
+    assert drawn[-1] == price_mod.WICK, "a body at the high when close is not the high"
+
+
+def test_a_candle_with_no_wicks_is_all_body():
+    """open at the low and close at the high: nothing left to wick."""
+    drawn = _candle(0.00371, 0.00414)
+
+    assert drawn == price_mod.BODY * price_mod.CANDLE_WIDTH
+
+
+def test_a_doji_still_has_a_visible_body():
+    """open == close rounds to a zero-width body, which would draw a candle
+    with no body at all -- indistinguishable from a plain range bar."""
+    drawn = _candle(0.00386, 0.00386)
+
+    assert price_mod.BODY in drawn
+    assert drawn.count(price_mod.BODY) >= 1
+
+
+def test_a_flat_market_does_not_divide_by_zero():
+    """Every bar at one price: high == low, and the range has no width."""
+    drawn = price_mod.candle(0.0039, 0.0039, 0.0039, 0.0039)
+
+    assert len(drawn) == price_mod.CANDLE_WIDTH
+    assert price_mod.BODY in drawn
+
+
+def test_the_body_never_escapes_the_track():
+    """A close outside the high/low cannot happen from one window, but the
+    route serves stale candles when Kraken is down and arithmetic on a
+    mismatched pair should still draw inside its own box."""
+    drawn = price_mod.candle(0.001, 0.009, 0.00414, 0.00371)
+
+    assert len(drawn) == price_mod.CANDLE_WIDTH
+    assert set(drawn) <= {price_mod.WICK, price_mod.BODY}
+
+
+# --- the open, which the candle needs and the old message did not ----------
+
+
+def test_stats_exposes_the_open():
+    candles = _candles(96, close=0.004)
+    candles[0]["open"] = 0.002
+
+    assert price_mod.stats(candles)["open"] == 0.002
+
+
+def test_the_open_is_the_one_inside_the_window():
+    old = _candles(24, close=0.001)
+    old[0]["open"] = 0.0005
+    recent = _candles(96, close=0.004)
+    recent[0]["open"] = 0.002
+
+    assert price_mod.stats(old + recent)["open"] == 0.002
+
+
+# --- the candle in the message ---------------------------------------------
+
+
+def test_the_candle_line_carries_the_low_and_the_high():
+    said = _summary()
+
+    assert "$0.00369 " in said, said
+    assert " $0.00392" in said, said
+
+
+def test_the_candle_is_wrapped_for_a_monospace_font():
+    """Telegram draws the message in a proportional font unless told not to,
+    and a candle whose cells are different widths is not a candle."""
+    said = _summary()
+
+    assert "<code>" in said
+    body = said.split("<code>")[1].split("</code>")[0]
+    assert price_mod.BODY in body, body
+
+
+def test_the_footer_says_what_the_body_means():
+    """Without it the drawing reads as a progress bar."""
+    assert "open" in _summary() and "close" in _summary()
+
+
+def test_the_legend_survives_cmc_being_down():
+    """The candle is drawn from Kraken alone, so its legend is still owed
+    even when the market half of the message is missing."""
+    said = _summary(markets=None)
+
+    assert price_mod.BODY in said
+    assert "open" in said and "close" in said
+
+
+def test_there_is_no_sparkline():
+    """Dropped deliberately: on a shared scale with the candle it was flat,
+    and on its own scale it claimed a range the labels did not describe."""
+    said = _summary()
+
+    assert "▁" not in said and "▂" not in said and "▇" not in said
