@@ -81,6 +81,11 @@ def test_charts_the_site_serves_but_the_bot_does_not_offer():
 
     Printed by pytest only when something is missing, which is the moment
     somebody should be asked whether it belongs in the bot.
+
+    Served is not the same as listed. A chart can have a route and stay off
+    the gallery while it proves itself, which is the latitude this test
+    exists to keep. Once it is listed the bot has to offer it, and that half
+    is asserted in test_bot_offers_every_listed_chart.
     """
     missing = sorted(site_plot_names() - {chart.name for chart in CHARTS})
     if missing:
@@ -593,9 +598,17 @@ async def test_a_category_word_offers_the_category():
     """`/e accounts` used to send accounts growth and nothing else, because
     that was the only accounts chart whose text happened to carry the word.
     The other two were unreachable by it. A category word now offers the
-    category, the way `/e staking` always did."""
+    category, the way `/e staking` always did.
+
+    Read off the catalogue rather than listed here. Pinned to the three
+    accounts charts that existed when this was written, it failed the day two
+    more were added -- which is the behaviour it is asserting working, not
+    breaking.
+    """
     message = await _send("accounts")
 
     assert not message.photos, "a category word should ask, not guess"
     offered = {b.text for row in message.markups[-1].inline_keyboard for b in row}
-    assert {"Accounts growth", "Daily limits", "Realized price"} == offered, offered
+    expected = {c.title for c in CHARTS if c.group == "accounts"}
+    assert len(expected) > 1, "pick a category that actually offers a choice"
+    assert expected == offered, offered
