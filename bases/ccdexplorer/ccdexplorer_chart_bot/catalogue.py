@@ -490,10 +490,29 @@ CHARTS: tuple[Chart, ...] = (
         spec_name="fee_stabilization",
     ),
     Chart(
+        name="active_addresses",
+        title="Active addresses",
+        description="Addresses that did something, per period",
+        keywords=("active", "addresses", "unique", "dau"),
+        group="accounts",
+        spec_name="active_addresses",
+    ),
+    Chart(
+        name="holders",
+        title="Holders",
+        description="Accounts above each balance threshold",
+        keywords=("holders", "balances", "millionaires", "thresholds"),
+        group="accounts",
+        spec_name="holders",
+    ),
+    Chart(
         name="daily_limits",
         title="Daily limits",
         description="CCD needed to reach the top 100 and top 250",
-        keywords=("rich", "top", "whales", "leaderboard", "ranking", "holders"),
+        # "holders" was here while no holders chart was reachable from the
+        # bot, so the word led to the chart about who is at the top rather
+        # than the one counting accounts by balance. It belongs to Holders.
+        keywords=("rich", "top", "whales", "leaderboard", "ranking"),
         group="accounts",
         spec_name="daily_limits",
     ),
