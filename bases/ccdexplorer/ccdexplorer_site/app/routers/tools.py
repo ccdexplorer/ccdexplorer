@@ -48,6 +48,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     get_url_from_api,
     pagination_calculator,
     post_url_from_api,
+    resolve_missing_indexes,
     tx_type_translation,
     tx_type_translation_for_js,
     account_link,
@@ -474,6 +475,19 @@ async def ajax_today_in(
         httpx_client,
     )
     today_in = api_result.return_value if api_result.ok else []
+
+    # The impacted addresses are whoever was active on this date, so on a
+    # recent one they include accounts created since the site booted -- which
+    # the boot-time address map has never heard of. Resolve them before the
+    # template asks, or account_link renders four characters of address where
+    # the index belongs.
+    if isinstance(today_in, dict):
+        await resolve_missing_indexes(
+            [row.get("_id") for row in today_in.get("impacted_addresses") or ()],
+            net,
+            request.app,
+            httpx_client,
+        )
 
     if net == "mainnet":
         return request.app.templates.TemplateResponse(

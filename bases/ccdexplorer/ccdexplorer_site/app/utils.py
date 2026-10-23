@@ -2722,6 +2722,60 @@ def split_contract_into_url_slug_and_token_id(contract_str: str, token_id: str):
         return None
 
 
+async def resolve_missing_indexes(values, net: str, app, httpx_client) -> None:
+    """Teach the address map any account in `values` it has never heard of.
+
+    The maps are a boot-time snapshot, so an account created since boot is
+    absent from them -- and from_address_to_index answers a miss with the
+    address it was handed, which account_link then renders as four characters
+    of address where the index belongs. today-in is where that surfaces first,
+    being the one page guaranteed to list the newest accounts on the chain.
+
+    This is the round trip read_addresses_if_available has always described
+    the maps as a cache in front of. get-indexes existed for exactly this and
+    was never called from anywhere, so the miss had nowhere to go; one POST
+    now resolves a whole page's worth.
+
+    Canonical 29-character prefixes go over the wire because that is the
+    collection's own _id. Contract addresses (`<index,subindex>`) and the
+    64-character public keys are skipped: neither is an account, and asking
+    after them would spend a request to be told so.
+
+    Nothing here raises. A failure leaves the page rendering exactly as it
+    does without this call, which is the behaviour being improved on, not a
+    reason to take the page down.
+    """
+    if not app.api_url:
+        return
+
+    wanted = set()
+    for value in values or ():
+        if not isinstance(value, str) or value.startswith("<") or len(value) == 64:
+            continue
+        canonical = value[:29]
+        if canonical not in app.addresses_to_indexes[net]:
+            wanted.add(canonical)
+    if not wanted:
+        return
+
+    api_result = await post_url_from_api(
+        f"{app.api_url}/v2/{net}/accounts/get-indexes",
+        httpx_client,
+        sorted(wanted),
+    )
+    # get-indexes answers 404 when it matched nothing, which is a normal
+    # answer for an address that is not an account rather than a fault.
+    if not api_result.ok or not isinstance(api_result.return_value, dict):
+        return
+
+    for canonical, index in api_result.return_value.items():
+        if not isinstance(index, int):
+            continue
+        app.addresses_to_indexes[net][canonical] = index
+        if index > app.max_index_known[net]:
+            app.max_index_known[net] = index
+
+
 def add_account_info_to_cache(account_info: CCD_AccountInfo, app: FastAPI, net: str):
     """Remember an account the boot-time maps did not have.
 
