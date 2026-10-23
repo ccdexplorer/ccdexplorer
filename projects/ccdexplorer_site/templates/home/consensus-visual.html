@@ -93,8 +93,8 @@
           <tbody class="table-group-divider">
             <tr>
               <td><span class="cv-legend-swatch cv-block-finalized"></span></td>
-              <td class="text-secondary-emphasis">Finalized</td>
-              <td class="text-secondary-emphasis">newest at the top, older ones fade below it
+              <td>Finalized</td>
+              <td>newest at the top, older ones fade below it
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-finalized"
                    data-bs-trigger="focus" data-bs-title="Finalized blocks"
                    data-bs-content="A block is finalized once there's a finalization entry for it &mdash; a quorum certificate proving the block itself is valid (finalized_qc), plus proof that a valid successor block exists. From then on it's permanently part of the chain and can't be reverted. The last 5 are shown, newest at the top &mdash; watch a block slide down out of 'in progress' into this stack the moment it finalizes.">(i)</a>
@@ -102,8 +102,8 @@
             </tr>
             <tr>
               <td><span class="cv-legend-swatch cv-block-tip"></span></td>
-              <td class="text-secondary-emphasis">Tip</td>
-              <td class="text-secondary-emphasis">highest certified block right now
+              <td>Tip</td>
+              <td>highest certified block right now
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-tip"
                    data-bs-trigger="focus" data-bs-title="Tip"
                    data-bs-content="RoundStatus.highest_certified_block: the highest certified block in the current round &mdash; the block consensus has most recently converged on building the next one upon.">(i)</a>
@@ -111,8 +111,8 @@
             </tr>
             <tr>
               <td><span class="cv-legend-swatch cv-block-qc"></span></td>
-              <td class="text-secondary-emphasis">Quorum certificate</td>
-              <td class="text-secondary-emphasis">certified, not yet finalized
+              <td>Quorum certificate</td>
+              <td>certified, not yet finalized
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-qc"
                    data-bs-trigger="focus" data-bs-title="Quorum certificate"
                    data-bs-content="A RawQuorumCertificate is the aggregate signature of the finalizers (its signatories) who signed for this specific block, proving a supermajority validated it. That's stronger than just being proposed, but it still needs a full finalization entry before it's irreversible.">(i)</a>
@@ -120,8 +120,8 @@
             </tr>
             <tr>
               <td><span class="cv-legend-swatch cv-block-terminal"></span></td>
-              <td class="text-secondary-emphasis">Terminal block</td>
-              <td class="text-secondary-emphasis">furthest block valid to build on
+              <td>Terminal block</td>
+              <td>furthest block valid to build on
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-terminal"
                    data-bs-trigger="focus" data-bs-title="Terminal block"
                    data-bs-content="The terminal block is the furthest block consensus currently considers valid to build on.">(i)</a>
@@ -129,8 +129,8 @@
             </tr>
             <tr>
               <td><span class="cv-legend-swatch"></span></td>
-              <td class="text-secondary-emphasis">Proposed</td>
-              <td class="text-secondary-emphasis">no quorum certificate yet
+              <td>Proposed</td>
+              <td>no quorum certificate yet
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-proposed"
                    data-bs-trigger="focus" data-bs-title="Proposed block"
                    data-bs-content="A RoundExistingBlock &mdash; a block that exists for its round, with a validator who created it, but no quorum certificate yet. It's the least-confirmed state, and may not have reached the node behind block lookups yet &mdash; so it isn't clickable.">(i)</a>
@@ -138,8 +138,8 @@
             </tr>
             <tr>
               <td><span class="cv-legend-swatch cv-legend-swatch-round"></span></td>
-              <td class="text-secondary-emphasis">Round</td>
-              <td class="text-secondary-emphasis">the consensus round each block was produced in
+              <td>Round</td>
+              <td>the consensus round each block was produced in
                 <a href="#" class="ms-1" data-bs-html="true" data-bs-toggle="popover" tabindex="0" id="cv-legend-round"
                    data-bs-trigger="focus" data-bs-title="Round"
                    data-bs-content="Rounds are a ConcordiumBFT concept, present from protocol version 6 onward. The consensus round a block was produced in is not its block height &mdash; rounds also advance on timeouts with no block, so round numbers drift ahead of height over time.">(i)</a>

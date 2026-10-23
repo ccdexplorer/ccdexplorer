@@ -5,32 +5,32 @@
 <table class="table table-borderless  ">
     <thead>
         <tr class="sm-text">
-            <th class=" text-secondary-emphasis">Account Transfer Summary</th>
-            <th class=" text-end text-secondary-emphasis">Amount</th>
-            <th class=" text-end text-secondary-emphasis"># Txs</th>
-            <th class=" text-end text-secondary-emphasis"># Accounts</th></tr>
+            <th>Account Transfer Summary</th>
+            <th class="text-end">Amount</th>
+            <th class="text-end"># Txs</th>
+            <th class="text-end"># Accounts</th></tr>
     </thead>
     <tbody>
         <tr class="sm-text">
-            <td class=" text-secondary-emphasis">Received</td>
+            <td>Received</td>
             {% if token == "CCD" %}
-                <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_received*1000000)|micro_ccd_no_decimals|safe}}</td>
+                <td class="text-end">{{(graph_dict.amount_received*1000000)|micro_ccd_no_decimals|safe}}</td>
             {% else %}
-                <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_received)|token_value_no_decimals(token)|safe}}</td>
+                <td class="text-end">{{(graph_dict.amount_received)|token_value_no_decimals(token)|safe}}</td>
             {% endif %}
-            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.receiver_txs}}</td>
-            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.receiver_accounts}}</td>
+            <td class="text-end ccd">{{graph_dict.receiver_txs}}</td>
+            <td class="text-end ccd">{{graph_dict.receiver_accounts}}</td>
         </tr>
         <tr class="sm-text">
-            <td class=" text-secondary-emphasis">Sent</td>
+            <td>Sent</td>
             {% if token == "CCD" %}
-            <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_sent*1000000)|micro_ccd_no_decimals|safe}}</td>
+            <td class="text-end">{{(graph_dict.amount_sent*1000000)|micro_ccd_no_decimals|safe}}</td>
             {% else %}
-                <td class=" text-end text-secondary-emphasis">{{(graph_dict.amount_sent)|token_value_no_decimals(token)|safe}}</td>
+                <td class="text-end">{{(graph_dict.amount_sent)|token_value_no_decimals(token)|safe}}</td>
             {% endif %}
             
-            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.sender_txs}}</td>
-            <td class=" text-end text-secondary-emphasis ccd">{{graph_dict.sender_accounts}}</td></tr>
+            <td class="text-end ccd">{{graph_dict.sender_txs}}</td>
+            <td class="text-end ccd">{{graph_dict.sender_accounts}}</td></tr>
     </tbody>    
     
 </table>
@@ -42,18 +42,18 @@
             <thead>
                 <tr class="sm-text">
                     
-                    <th class=" text-secondary-emphasis">Received from</th>
-                    <th class="text-end text-secondary-emphasis">Amount</th>
+                    <th>Received from</th>
+                    <th class="text-end">Amount</th>
                     
                 </tr>
             </thead>
             <tbody>
                 {% for k, v in graph_dict.as_receiver_dict.items()|sort(attribute='1.amount', reverse=true) %}
                 <tr class="sm-text">
-                    <td class="">
+                    <td>
                         
                         {% if v.account_id in ['<---', "--->", 'Transaction Fees', 'Rewards', 'Encrypted', 'Decrypted'] %}
-                            <span class=" text-secondary-emphasis"><i>{{v.account_id|safe}}</i></span>
+                            <span ><i>{{v.account_id|safe}}</i></span>
                         {% elif v.account_id|length < 29%}
                             {{v.account_id|instance_link_from_str(net, user, tags,app=request.app)|safe}}
                         {% else %}
@@ -61,9 +61,9 @@
                         {% endif %}
                     </td>
                     {% if token == "CCD" %}
-                        <td class=" text-end text-secondary-emphasis">{{(v.amount*1000000)|micro_ccd_no_decimals|safe}}</td>
+                        <td class="text-end">{{(v.amount*1000000)|micro_ccd_no_decimals|safe}}</td>
                     {% else %}
-                        <td class=" text-end text-secondary-emphasis">{{v.amount|token_value_no_decimals(token)|safe}}</td>
+                        <td class="text-end">{{v.amount|token_value_no_decimals(token)|safe}}</td>
                     {% endif %}
                     
                 </tr>
@@ -78,8 +78,8 @@
             <thead>
                 <tr class="sm-text">
                     
-                    <th class="  text-secondary-emphasis">Sent to</th>
-                    <th class=" text-end text-secondary-emphasis">Amount</th>
+                    <th>Sent to</th>
+                    <th class="text-end">Amount</th>
                     
                 </tr>
             </thead>
@@ -88,9 +88,9 @@
                 <tr class="sm-text">
                     
                     
-                    <td class="">
+                    <td>
                         {% if v.account_id in ['--->', "<---", 'Transaction Fees', 'Rewards', 'Encrypted', 'Decrypted'] %}
-                            <span class=" text-secondary-emphasis"><i>{{v.account_id|safe}}</i></span> 
+                            <span ><i>{{v.account_id|safe}}</i></span> 
                         {% elif v.account_id|length < 29%}
                             {{v.account_id|instance_link_from_str(net, user, tags,app=request.app)|safe}}
                         {% else %}
@@ -98,9 +98,9 @@
                         {% endif %}
                     </td>
                     {% if token == "CCD" %}
-                        <td class=" text-end text-secondary-emphasis">{{(v.amount*1000000)|micro_ccd_no_decimals|safe}}</td>
+                        <td class="text-end">{{(v.amount*1000000)|micro_ccd_no_decimals|safe}}</td>
                     {% else %}
-                        <td class=" text-end text-secondary-emphasis">{{v.amount|token_value_no_decimals(token)|safe}}</td>
+                        <td class="text-end">{{v.amount|token_value_no_decimals(token)|safe}}</td>
                     {% endif %}
                 </tr>
                 {% endfor %}

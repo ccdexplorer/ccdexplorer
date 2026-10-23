@@ -8,17 +8,17 @@
 <table class="table table-borderless">
   <thead>
     <tr>
-      <th class="text-secondary-emphasis"></th>
-      <th class="text-secondary-emphasis"></th>
-      <th class="text-secondary-emphasis"></th>
-      <th class="text-secondary-emphasis text-center" colspan="2">Missed Rounds</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th class="text-center" colspan="2">Missed Rounds</th>
     </tr>
     <tr>
-      <th class="text-secondary-emphasis">Hour in Payday</th>
-      <th class="text-secondary-emphasis">Epoch</th>
-      <th class="text-secondary-emphasis text-start">Validator/Node</th>
-      <th class="text-secondary-emphasis text-end">In Epoch</th>
-      <th class="text-secondary-emphasis text-end">In Payday</th>
+      <th>Hour in Payday</th>
+      <th>Epoch</th>
+      <th class="text-start">Validator/Node</th>
+      <th class="text-end">In Epoch</th>
+      <th class="text-end">In Payday</th>
     </tr>
   </thead>
   <tbody>
@@ -28,10 +28,10 @@
 
     {% if row_count == 0 %}
       <tr class="sm-text">
-        <td class="text-secondary-emphasis ccd">{{ v.hour_index }}</td>
-        <td class="text-secondary-emphasis ccd">{{ v.epoch }}</td>
-        <td class="text-secondary-emphasis text-muted"></td>
-        <td class="text-secondary-emphasis text-muted"></td>
+        <td class="ccd">{{ v.hour_index }}</td>
+        <td class="ccd">{{ v.epoch }}</td>
+        <td class="text-muted"></td>
+        <td class="text-muted"></td>
       </tr>
     {% else %}
       {% set shown = false %}
@@ -39,14 +39,14 @@
         {% if count.missed_epoch > 0 %}
         <tr class="sm-text">
           {% if not shown %}
-            <td class="text-secondary-emphasis ccd">{{ v.hour_index }}</td>
-            <td class="text-secondary-emphasis ccd">{{ v.epoch }}</td>
+            <td class="ccd">{{ v.hour_index }}</td>
+            <td class="ccd">{{ v.epoch }}</td>
             {% set shown = true %}
           {% else %}
             <td></td>
             <td></td>
           {% endif %}
-          <td class=" text-secondary-emphasis text-start">
+          <td class="text-start">
             {% if count.node_name %}
                 <a class="ccd" href="/{{ net }}/account/{{ validator_id }}">
                   {{ count.node_name }}
@@ -59,10 +59,10 @@
               {% endif %}
           </td>
           
-          <td class="text-secondary-emphasis text-end ccd">
+          <td class="text-end ccd">
             {{ count.missed_epoch }}
           </td>
-          <td class="text-secondary-emphasis text-end ccd">
+          <td class="text-end ccd">
             {{ count.missed_payday }}
           </td>
         </tr>

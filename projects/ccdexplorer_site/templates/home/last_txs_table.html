@@ -3,11 +3,11 @@
 <table class="table ">
   <thead>
   <tr  class="account-row sm-text">
-    <th class="text-start text-secondary-emphasis"><span style="font-family: monospace, monospace;">Hash</span></th>
-    <th class="text-end text-secondary-emphasis">Age</th>
-    <!-- <th class="text-center text-secondary-emphasis"></th> -->
-    <th class="text-start text-secondary-emphasis">Type</th>
-    <th class="text-end text-secondary-emphasis">Sender</th>
+    <th class="text-start"><span style="font-family: monospace, monospace;">Hash</span></th>
+    <th class="text-end">Age</th>
+    <!-- <th class="text-center"></th> -->
+    <th class="text-start">Type</th>
+    <th class="text-end">Sender</th>
   </tr>
 </thead>
 <tbody class="table-group-divider">
@@ -25,12 +25,12 @@
   {%endif%}
   sm-text 
   ">
-    <td class=""><a class=" " href="/{{net}}/transaction/{{row.hash}}"><span class="ccd">{{row.hash|tx_hash_link(net)|safe}}</span></a></td>
+    <td><a class=" " href="/{{net}}/transaction/{{row.hash}}"><span class="ccd">{{row.hash|tx_hash_link(net)|safe}}</span></a></td>
     
-    <td class="text-end text-secondary-emphasis">{{row.block_info.slot_time|datetime_delta_format_since}}</td>
+    <td class="text-end">{{row.block_info.slot_time|datetime_delta_format_since}}</td>
 
-    <td class="text-start ">{{row.type.contents|tx_type_translator("icon", row.account_transaction.sponsor)|safe}} <span class="text-secondary-emphasis" >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
-    <td class="text-end text-secondary-emphasis">
+    <td class="text-start">{{row.type.contents|tx_type_translator("icon", row.account_transaction.sponsor)|safe}} <span  >{{row.type.contents|tx_type_translator("display")|safe}}</span></td>
+    <td class="text-end">
       {% if row.account_transaction %}
       {{row.account_transaction.sender|account_link(net,user,tags,request.app)|safe }}
       {% else %}

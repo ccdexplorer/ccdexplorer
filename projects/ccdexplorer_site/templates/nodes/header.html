@@ -2,26 +2,26 @@
 
         <table class="table table-borderless ">
             <thead>
-                <tr class="sm-text"><th></th><th class="text-end  text-secondary-emphasis">Validator</th><th class="text-end  text-secondary-emphasis">No Validator</th><th class="text-end  text-secondary-emphasis">Total</th></tr>
+                <tr class="sm-text"><th></th><th class="text-end">Validator</th><th class="text-end">No Validator</th><th class="text-end">Total</th></tr>
             </thead>
             <tbody>
                 <tr class="sm-text ">
-                    <td class=" text-secondary-emphasis">Node</td>
-                    <td class="text-end  text-secondary-emphasis">{{len_reporting_validators}}</td>
-                    <td class="text-end  text-secondary-emphasis">{{len_non_validator_nodes}}</td>
-                    <td class="text-end  text-secondary-emphasis">{{len_reporting_validators+len_non_validator_nodes}}</td>
+                    <td>Node</td>
+                    <td class="text-end">{{len_reporting_validators}}</td>
+                    <td class="text-end">{{len_non_validator_nodes}}</td>
+                    <td class="text-end">{{len_reporting_validators+len_non_validator_nodes}}</td>
                 </tr>
                 <tr class="sm-text">
-                    <td class=" text-secondary-emphasis">Not Reporting</td>
-                    <td class="text-end text-secondary-emphasis">{{(len_validators-len_reporting_validators)}}</td>
-                    <td class="text-end text-secondary-emphasis">-</td>
-                    <td class="text-end text-secondary-emphasis">{{(len_validators-len_reporting_validators)}}</td>
+                    <td>Not Reporting</td>
+                    <td class="text-end">{{(len_validators-len_reporting_validators)}}</td>
+                    <td class="text-end">-</td>
+                    <td class="text-end">{{(len_validators-len_reporting_validators)}}</td>
                 </tr>
                 <tr class="sm-text">
-                    <td class=" text-secondary-emphasis">Total</td>
-                    <td class="text-end text-secondary-emphasis">{{len_validators}}</td>
-                    <td class="text-end text-secondary-emphasis">{{len_non_validator_nodes}}</td>
-                    <td class="text-end text-secondary-emphasis">{{(len_validators+len_non_validator_nodes)}}</td>
+                    <td>Total</td>
+                    <td class="text-end">{{len_validators}}</td>
+                    <td class="text-end">{{len_non_validator_nodes}}</td>
+                    <td class="text-end">{{(len_validators+len_non_validator_nodes)}}</td>
                 </tr>
             </tbody>
         </table>

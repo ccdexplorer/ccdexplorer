@@ -39,8 +39,8 @@
           <tbody>
             {% for tx_type in today_in.tx_types.keys() %}
                 <tr  class="sm-text">
-                    <td class="text-start text-secondary-emphasis">{{tx_type}}</td>
-                    <td class="text-end text-secondary-emphasis ccd">{{today_in.tx_types[tx_type]|round_x_decimal_with_comma(0)}}</td>
+                    <td class="text-start">{{tx_type}}</td>
+                    <td class="text-end ccd">{{today_in.tx_types[tx_type]|round_x_decimal_with_comma(0)}}</td>
                 </tr>    
             {% endfor %}
           </tbody>    
@@ -55,8 +55,8 @@
           <tbody>
             {% for contract_info in today_in.logged_events_by_contract %}
                 <tr  class="sm-text">
-                    <td class="text-start text-secondary-emphasis">{{contract_info._id|instance_link_from_str(net, tags=tags)|safe}}</td>
-                    <td class="text-end text-secondary-emphasis ccd">{{contract_info.count|round_x_decimal_with_comma(0)}}</td>
+                    <td class="text-start">{{contract_info._id|instance_link_from_str(net, tags=tags)|safe}}</td>
+                    <td class="text-end ccd">{{contract_info.count|round_x_decimal_with_comma(0)}}</td>
                 </tr>    
             {% endfor %}
           </tbody>    
@@ -76,8 +76,8 @@
           <tbody>
             {% for action in today_in.primed_suspended %}
                 <tr  class="sm-text">
-                    <td class="text-start text-secondary-emphasis">{{action.baker_id|account_link(net,user,tags,request.app)|safe }}</td>
-                    <td class="text-end text-secondary-emphasis ccd">{% if action.action == "suspended"%}Suspended{% else %}Primed for Suspension{% endif%}</td>
+                    <td class="text-start">{{action.baker_id|account_link(net,user,tags,request.app)|safe }}</td>
+                    <td class="text-end ccd">{% if action.action == "suspended"%}Suspended{% else %}Primed for Suspension{% endif%}</td>
                 </tr>    
             {% endfor %}
           </tbody>    
@@ -96,8 +96,8 @@
               <tbody>
                 {% for ia in today_in.impacted_addresses %}
                       <tr  class="sm-text">
-                          <td class="text-start text-secondary-emphasis">{{ia._id|account_link(net,user,tags,request.app)|safe }}</td>
-                          <td class="text-end text-secondary-emphasis ccd">{{ia.count|round_x_decimal_with_comma(0)}}</td>
+                          <td class="text-start">{{ia._id|account_link(net,user,tags,request.app)|safe }}</td>
+                          <td class="text-end ccd">{{ia.count|round_x_decimal_with_comma(0)}}</td>
                       </tr>    
                   {% endfor %}
               </tbody>    

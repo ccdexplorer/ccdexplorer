@@ -10,12 +10,12 @@
 <table class="sortable asc table table-borderless"> 
         <thead>
             <tr class="sm-text">
-                <th  class="text-start text-secondary-emphasis" colspan="1">Node Name</th>  
-                <th  class="text-end text-secondary-emphasis" colspan="1">Validator ID</th>
-                <th  class="text-end text-secondary-emphasis" colspan="1">Stake</th>
-                <th  class="text-end text-secondary-emphasis" colspan="1">Ping (ms)</th>
-                <th  class="text-end text-secondary-emphasis" colspan="1">Version</th>
-                <th  class="text-end text-secondary-emphasis hide-if-small" colspan="1"># Peers</th>
+                <th class="text-start" colspan="1">Node Name</th>  
+                <th class="text-end" colspan="1">Validator ID</th>
+                <th class="text-end" colspan="1">Stake</th>
+                <th class="text-end" colspan="1">Ping (ms)</th>
+                <th class="text-end" colspan="1">Version</th>
+                <th class="text-end hide-if-small" colspan="1"># Peers</th>
               
             </tr>
         <tbody >
@@ -26,15 +26,15 @@
                 {% set validator = node_info.validator %}
                 <tr class="sm-text">
                     
-                    <td class="text-secondary-emphasis text-break">{% if node %}<a href="/{{net}}/node/{{node.nodeId}}">{{node.nodeName}}</a>{% else %}<i>Not reporting</i>{% endif %}</td>
+                    <td class="text-break">{% if node %}<a href="/{{net}}/node/{{node.nodeId}}">{{node.nodeName}}</a>{% else %}<i>Not reporting</i>{% endif %}</td>
                     
-                    <td class="text-end text-secondary-emphasis ccd">{% if validator %}<a href="/{{net}}/account/{{validator.baker_id}}">{{validator.baker_id}}{% endif %}</a></td>
-                    <td class="text-end text-secondary-emphasis ccd">{% if validator %}{{validator.pool_status.current_payday_info.lottery_power|lottery_power}}%{% endif %}</td> 
+                    <td class="text-end ccd">{% if validator %}<a href="/{{net}}/account/{{validator.baker_id}}">{{validator.baker_id}}{% endif %}</a></td>
+                    <td class="text-end ccd">{% if validator %}{{validator.pool_status.current_payday_info.lottery_power|lottery_power}}%{% endif %}</td> 
                     
                     
-                    <td class="text-end text-secondary-emphasis ccd">{% if node %}{{node.averagePing|round_x_decimal_with_comma(2)}}{% endif %}</td> 
-                    <td class="text-end text-secondary-emphasis ccd">{% if node %}{{node.client}}{% endif %}</td> 
-                    <td class="text-end text-secondary-emphasis ccd hide-if-small">{% if node %}{{node.peersCount}}{% endif %}</td> 
+                    <td class="text-end ccd">{% if node %}{{node.averagePing|round_x_decimal_with_comma(2)}}{% endif %}</td> 
+                    <td class="text-end ccd">{% if node %}{{node.client}}{% endif %}</td> 
+                    <td class="text-end ccd hide-if-small">{% if node %}{{node.peersCount}}{% endif %}</td> 
                     
                 </tr>
             {% endfor %}

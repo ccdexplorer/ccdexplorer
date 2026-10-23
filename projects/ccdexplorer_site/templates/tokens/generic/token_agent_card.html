@@ -24,8 +24,8 @@
     ] %}
     {% if value %}
       <tr class="table-row-line-height sm-text">
-        <td class="text-start text-secondary-emphasis">{{ label }}</td>
-        <td class="text-end text-secondary-emphasis word-break">{{ value }}</td>
+        <td class="text-start">{{ label }}</td>
+        <td class="text-end word-break">{{ value }}</td>
       </tr>
     {% endif %}
   {% endfor %}
@@ -33,8 +33,8 @@
   {% set tools = (card.get('agent_metadata') or {}).get('tools') %}
   {% if tools %}
     <tr class="table-row-line-height sm-text">
-      <td class="text-start text-secondary-emphasis">Tools</td>
-      <td class="text-end text-secondary-emphasis word-break">{{ tools | join(', ') }}</td>
+      <td class="text-start">Tools</td>
+      <td class="text-end word-break">{{ tools | join(', ') }}</td>
     </tr>
   {% endif %}
 
@@ -43,8 +43,8 @@
   {% set skills = card.get('skills') %}
   {% if skills %}
     <tr class="table-row-line-height sm-text">
-      <td class="text-start text-secondary-emphasis">Skills</td>
-      <td class="text-end text-secondary-emphasis word-break">
+      <td class="text-start">Skills</td>
+      <td class="text-end word-break">
         {{ skills | map(attribute='name') | select | join(', ') or skills | length ~ ' defined' }}
       </td>
     </tr>
@@ -53,14 +53,14 @@
   {% set counterparties = (card.get('agent_metadata') or {}).get('counterparties') %}
   {% if counterparties %}
     <tr class="table-row-line-height sm-text">
-      <td class="text-start text-secondary-emphasis">Counterparties</td>
-      <td class="text-end text-secondary-emphasis word-break">{{ counterparties | join(', ') }}</td>
+      <td class="text-start">Counterparties</td>
+      <td class="text-end word-break">{{ counterparties | join(', ') }}</td>
     </tr>
   {% endif %}
 
   <tr class="table-row-line-height sm-text">
-    <td class="text-start text-secondary-emphasis">Agent card</td>
-    <td class="text-end text-secondary-emphasis">
+    <td class="text-start">Agent card</td>
+    <td class="text-end">
       <a href="{{ stored_token_address.metadata_url | safe_url }}"
          title="{{ stored_token_address.metadata_url }}" style="overflow-wrap:anywhere">{{ stored_token_address.metadata_url | short_url }}</a>
     </td>

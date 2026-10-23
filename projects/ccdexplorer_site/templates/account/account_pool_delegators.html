@@ -3,8 +3,8 @@
 <table class="table table-borderless">
       <thead>
         <tr class="sm-text">
-          <th class="text-secondary-emphasis " scope="col">Account</th>
-          <th class="text-secondary-emphasis  text-end" scope="col">Staked Amount</th>
+          <th scope="col">Account</th>
+          <th class="text-end" scope="col">Staked Amount</th>
 
         </tr>
       </thead>
@@ -13,13 +13,13 @@
         
         <tr class="sm-text">
           <td>{{account_id|account_link(net, user, tags, app=request.app)|safe}} (to be included in next payday)</td>
-          <td class="text-end text-secondary-emphasis ">{{value.stake | micro_ccd_no_decimals | safe}}</td>
+          <td class="text-end">{{value.stake | micro_ccd_no_decimals | safe}}</td>
         </tr>
         <hr>
 
           {% if value.pending_change.remove %}
           <span
-                  class=" text-secondary-emphasis ">Delegation to be text-secondary-emphasis removed at: </span>
+                  class=" text-secondary-emphasis ">Delegation to be removed at: </span>
           <span class="ccd ">{{value.pending_change.remove|datetime_regular_parse}}</span>
           {% endif %}
           {% if value.pending_change.reduce %}
@@ -42,22 +42,22 @@
             <br /><i>
                 {% if delegators_in_block_dict[row.account].pending_change.remove %}
                 <span
-                  class=" text-secondary-emphasis ">Delegation to be removed at: </span>
+                  >Delegation to be removed at: </span>
                 <span
-                  class="ccd text-secondary-emphasis ">{{delegators_in_block_dict[row.account].pending_change.remove|datetime_regular_parse}}</span>
+                  class="ccd">{{delegators_in_block_dict[row.account].pending_change.remove|datetime_regular_parse}}</span>
                 {% endif %}
                 {% if delegators_in_block_dict[row.account].pending_change.reduce %}
                 <span
-                  class=" text-secondary-emphasis ">Delegation stake reduced to: </span>
+                  >Delegation stake reduced to: </span>
                 {{delegators_in_block_dict[row.account].pending_change.reduce.new_stake|micro_ccd_no_decimals | safe}} at:
                 <span
-                  class="ccd text-secondary-emphasis ">{{delegators_in_block_dict[row.account].pending_change.reduce.effective_time|datetime_regular_parse}}</span>
+                  class="ccd">{{delegators_in_block_dict[row.account].pending_change.reduce.effective_time|datetime_regular_parse}}</span>
                 {% endif %}
                 {% endif %}
                 {% endif %}
               </i>
           </td>
-          <td class="text-end text-secondary-emphasis ">{{row.stake | micro_ccd_no_decimals | safe}}
+          <td class="text-end">{{row.stake | micro_ccd_no_decimals | safe}}
                 </td>
         </tr>
         {% endfor %}
