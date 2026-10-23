@@ -9,6 +9,7 @@ import ccdexplorer.dagster_recurring.src.spot_retrieval as spot_retrieval
 import ccdexplorer.dagster_recurring.src.redis_failures as redis_failures
 import ccdexplorer.dagster_recurring.src.tx_types_count_v2 as tx_types_count_v2
 import ccdexplorer.dagster_recurring.src.instance_maintenance as instance_maintenance
+import ccdexplorer.dagster_recurring.src.stable_address_info as stable_address_info
 
 # Every job in this code location materialises a single asset (market_position
 # also runs its asset check, which reads that asset and so runs after it either
@@ -27,5 +28,6 @@ defs = dg.Definitions.merge(
     redis_failures.defs,
     tx_types_count_v2.defs,
     instance_maintenance.defs,
+    stable_address_info.defs,
     dg.Definitions(executor=dg.in_process_executor),
 )
