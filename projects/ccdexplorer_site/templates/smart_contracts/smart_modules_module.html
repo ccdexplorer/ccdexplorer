@@ -12,8 +12,8 @@
             
             <td>
                 <a href="/{{net}}/module/{{ module.id }}"><span class="ccd">{{ module.id[:10] }}</span></a><br/>
-                <span class="text-secondary-emphasis">Methods: </span><span class="ccd text-secondary-emphasis">{% if module.methods %}{{module.methods|length}}{% else %} 0 {% endif %}</span>
+                <span >Methods: </span><span class="ccd">{% if module.methods %}{{module.methods|length}}{% else %} 0 {% endif %}</span>
             </td>
-            <td><br/><span class="text-secondary-emphasis">Init: {% if module.init_date %}{{module.init_date|datetime_format_day_only}}{% endif %}</span></td>
+            <td><br/><span >Init: {% if module.init_date %}{{module.init_date|datetime_format_day_only}}{% endif %}</span></td>
         </tr>
     

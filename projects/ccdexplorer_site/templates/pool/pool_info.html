@@ -29,7 +29,7 @@
         {% if pool.delegated_capital_cap > 0 %}
             <tr class="sm-text">
                 <td>Room left in pool</td>
-                <td class="text-end align-middle">{{ (pool.delegated_capital_cap - pool.delegated_capital)|micro_ccd_no_decimals|safe }} <span class=" text-end align-middle text-secondary-emphasis ccd">({{ (100*(1-(pool.delegated_capital/pool.delegated_capital_cap)))
+                <td class="text-end align-middle">{{ (pool.delegated_capital_cap - pool.delegated_capital)|micro_ccd_no_decimals|safe }} <span class="text-end align-middle ccd">({{ (100*(1-(pool.delegated_capital/pool.delegated_capital_cap)))
                     |round_x_decimal_no_comma(2) }}%)</span></td>
             </tr>
         {% endif %}

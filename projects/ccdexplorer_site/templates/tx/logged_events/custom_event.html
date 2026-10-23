@@ -2,7 +2,7 @@
     {% for k, v in result.model_dump().items() %}
     <tr class="table-row-line-height  ">
         <td >{{k.replace("_"," ")}}</td>
-        <td><span class='text-secondary-emphasis ccd text-break'>
+        <td><span class='ccd text-break'>
             {% if k == 'timestamp' %}
             {{v|int|datetime_format_normal_from_ms_timestamp}}
             {% else %}

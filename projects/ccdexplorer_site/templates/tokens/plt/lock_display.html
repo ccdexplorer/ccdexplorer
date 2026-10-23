@@ -52,7 +52,7 @@
                   <td class="text-start">Expiry</td>
                   <td class="text-end">
                       {% if lock_info.expired %}
-                          <span class="badge text-bg-secondary">Expired</span> <span class="text-secondary-emphasis">({{ lock_info.expiry|datetime_regular_parse }})</span>
+                          <span class="badge text-bg-secondary">Expired</span> <span >({{ lock_info.expiry|datetime_regular_parse }})</span>
                       {% else %}
                           {{ lock_info.expiry|datetime_regular_parse }}
                       {% endif %}

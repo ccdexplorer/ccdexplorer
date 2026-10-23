@@ -19,7 +19,7 @@
 
           {% if value.pending_change.remove %}
           <span
-                  class=" text-secondary-emphasis ">Delegation to be text-secondary-emphasis removed at: </span>
+                  class=" text-secondary-emphasis ">Delegation to be removed at: </span>
           <span class="ccd ">{{value.pending_change.remove|datetime_regular_parse}}</span>
           {% endif %}
           {% if value.pending_change.reduce %}
@@ -42,16 +42,16 @@
             <br /><i>
                 {% if delegators_in_block_dict[row.account].pending_change.remove %}
                 <span
-                  class=" text-secondary-emphasis ">Delegation to be removed at: </span>
+                  >Delegation to be removed at: </span>
                 <span
-                  class="ccd text-secondary-emphasis ">{{delegators_in_block_dict[row.account].pending_change.remove|datetime_regular_parse}}</span>
+                  class="ccd">{{delegators_in_block_dict[row.account].pending_change.remove|datetime_regular_parse}}</span>
                 {% endif %}
                 {% if delegators_in_block_dict[row.account].pending_change.reduce %}
                 <span
-                  class=" text-secondary-emphasis ">Delegation stake reduced to: </span>
+                  >Delegation stake reduced to: </span>
                 {{delegators_in_block_dict[row.account].pending_change.reduce.new_stake|micro_ccd_no_decimals | safe}} at:
                 <span
-                  class="ccd text-secondary-emphasis ">{{delegators_in_block_dict[row.account].pending_change.reduce.effective_time|datetime_regular_parse}}</span>
+                  class="ccd">{{delegators_in_block_dict[row.account].pending_change.reduce.effective_time|datetime_regular_parse}}</span>
                 {% endif %}
                 {% endif %}
                 {% endif %}

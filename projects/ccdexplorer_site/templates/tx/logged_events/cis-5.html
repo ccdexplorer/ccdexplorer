@@ -30,13 +30,13 @@
 <table class="table table-borderless">
     {% if result.nonce %}<tr class="table-row-line-height ">
         <td >Nonce</td>
-        <td><span class='text-secondary-emphasis ccd'>{{result.nonce}}</span></td></tr>{% endif %}
+        <td><span class='ccd'>{{result.nonce}}</span></td></tr>{% endif %}
     {% if result.sponsoree %}<tr class="table-row-line-height ">
         <td >Sponsoree</td>
-    <td><span class='text-secondary-emphasis'>{{result.sponsoree|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
+    <td><span >{{result.sponsoree|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
     {% if result.cis2_token_contract_address %}<tr class="table-row-line-height ">
         <td >Token</td>
-        <td><span class='text-secondary-emphasis ccd text-break'>
+        <td><span class='ccd text-break'>
             
             
                 {% if ai.token_metadata %}
@@ -48,24 +48,24 @@
             </td></tr>{% endif %}
     {% if 'ccd_amount' in result.model_fields_set %}<tr class="table-row-line-height ">
         <td >CCD Amount</td>
-        <td><span class='text-secondary-emphasis'>{{result.ccd_amount|micro_ccd_display | safe}}</span></td></tr>{% endif %}
+        <td><span >{{result.ccd_amount|micro_ccd_display | safe}}</span></td></tr>{% endif %}
     {% if 'token_amount' in result.model_fields_set %}<tr class="table-row-line-height ">
             <td >Amount</td>
-            <td><span class='text-secondary-emphasis ccd'>{{result.token_amount|token_amount_using_decimals(token_decimals)|safe}}  {% if vi %}{% if vi.token_type == "fungible" %}{{token_string|safe}}{% endif %}{% endif %}</span></td></tr>{% endif %}
+            <td><span class='ccd'>{{result.token_amount|token_amount_using_decimals(token_decimals)|safe}}  {% if vi %}{% if vi.token_type == "fungible" %}{{token_string|safe}}{% endif %}{% endif %}</span></td></tr>{% endif %}
     
     {% if result.from_public_key_ed25519 %}<tr class="table-row-line-height ">
         <td >From</td>
-        <td><span class='text-secondary-emphasis'>{{result.from_public_key_ed25519|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
+        <td><span >{{result.from_public_key_ed25519|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
     {% if result.from_address %}<tr class="table-row-line-height ">
         <td >From</td>
-        <td><span class='text-secondary-emphasis'>{{result.from_address|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
+        <td><span >{{result.from_address|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
     {% if result.to_public_key_ed25519 %}<tr class="table-row-line-height ">
         <td >To</td>
-        <td><span class='text-secondary-emphasis'>{{result.to_public_key_ed25519|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
+        <td><span >{{result.to_public_key_ed25519|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
     {% if result.to_address %}<tr class="table-row-line-height ">
         <td >To</td>
-        <td><span class='text-secondary-emphasis'>{{result.to_address|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
+        <td><span >{{result.to_address|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}
     <!-- {% if result.token_id %}<tr class="table-row-line-height ">
         <td >Token address</td>
-        <td><span class='text-secondary-emphasis'>{{tagified_token_address|safe}}</span></td></tr>{% endif %} -->
+        <td><span >{{tagified_token_address|safe}}</span></td></tr>{% endif %} -->
 </table>

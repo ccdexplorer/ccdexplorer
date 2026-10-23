@@ -15,19 +15,19 @@
           {% if vi %}
             <tr class="sm-text ">
               <td><img src="{{vi.logo_url}}"  style=" max-width: 16px;max-height: 16px;"  alt="">
-                <a href="/{{net}}/tokens/{{vi._id}}"><span class="ccd text-secondary-emphasis">{{vi._id}}</span></a>
+                <a href="/{{net}}/tokens/{{vi._id}}"><span class="ccd">{{vi._id}}</span></a>
                 <br/>
-                  <span class="ccd_decimals text-secondary-emphasis">{{token_info.token_value|round_x_decimal_with_comma(token_decimals)}} {{vi._id}}</span>
+                  <span class="ccd_decimals">{{token_info.token_value|round_x_decimal_with_comma(token_decimals)}} {{vi._id}}</span>
                 </td>
                 <!-- Second column with values -->
                 <td class="text-end">
                   {% if token_info.token_value %}
-                  <span class="ccd text-secondary-emphasis">${{token_info.token_value_USD|round_x_decimal_with_comma(0)}}
+                  <span class="ccd">${{token_info.token_value_USD|round_x_decimal_with_comma(0)}}
                   </span>
                   {% endif %}
                   <br/>
                   {% if token_info.token_value %}
-                  <span class="ccd_decimals text-secondary-emphasis">@{{ai.exchange_rate|round_x_decimal_with_comma(3)}}</span>
+                  <span class="ccd_decimals">@{{ai.exchange_rate|round_x_decimal_with_comma(3)}}</span>
                   {% endif %}
                 </td>
             </tr>
@@ -57,13 +57,13 @@
             <a href="/{{net}}/token/{{token|split_into_url_slug}}">{{ai.token_metadata.name}}</a>
             {% else %}
             <img src="{{vi.logo_url}}"  style=" max-width: 16px;max-height: 16px;"  alt="">
-              <a href="/{{net}}/token/{{token|split_into_url_slug}}"><span class="ccd text-secondary-emphasis">{{token}}</span></a>
+              <a href="/{{net}}/token/{{token|split_into_url_slug}}"><span class="ccd">{{token}}</span></a>
             
             {% endif %}
           </td>
              <!-- Second column with values -->
          <td class="text-end">
-          <span class="ccd text-secondary-emphasis">{{token_info.balance}}
+          <span class="ccd">{{token_info.balance}}
           </span>
           
         </td>
