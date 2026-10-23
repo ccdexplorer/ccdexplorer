@@ -14,8 +14,10 @@ from types import SimpleNamespace
 
 from ccdexplorer.ccdexplorer_site.app.utils import (
     account_address_is_alias,
+    account_link,
     add_account_info_to_cache,
     address_maps_from_rows,
+    from_address_to_index,
 )
 
 ADDRESS = "3Y1RLgi5pW3x96xZ7CiHUKTOrOrgnSk2tzMEXBhWhVvHDOwgkC"
@@ -238,3 +240,222 @@ async def test_the_boot_asks_the_bulk_endpoint(monkeypatch):
         f"http://api/v2/{net}/accounts/address-index-map"
         for net in ("mainnet", "testnet", "devnet")
     ]
+
+
+# --- a miss had nowhere to go --------------------------------------------
+#
+# The maps are a boot-time snapshot, so an account created since boot is not
+# in them. from_address_to_index answered that by returning the address it
+# was handed, and account_link renders a str as four characters of address --
+# so mainnet/today-in, the one page guaranteed to list the newest accounts on
+# the chain, showed addresses where indexes belong.
+#
+# The docstring on read_addresses_if_available had always called the maps "a
+# cache in front of /accounts/get-indexes". That route existed and nothing
+# ever called it; the cache had no miss path at all.
+
+
+def _resolvable_app(known: dict | None = None):
+    return SimpleNamespace(
+        api_url="http://api",
+        addresses_to_indexes={"mainnet": dict(known or {})},
+        canonical_addresses={"mainnet": {}},
+        max_index_known={"mainnet": 0},
+    )
+
+
+def test_an_unknown_address_comes_back_as_itself():
+    """The behaviour the fix exists to stop being the end of the line."""
+    app = _resolvable_app()
+
+    assert from_address_to_index(ADDRESS, "mainnet", app) == ADDRESS
+
+
+def test_an_unknown_address_renders_as_an_address_not_an_index():
+    """What production showed: a person icon and four characters."""
+    app = _resolvable_app()
+
+    rendered = account_link(ADDRESS, "mainnet", None, None, app)
+
+    assert ADDRESS[:4] in rendered
+    assert f'href="/mainnet/account/{ADDRESS}"' in rendered
+
+
+async def _resolve(monkeypatch, app, values, responder):
+    from ccdexplorer.ccdexplorer_site.app import utils
+
+    monkeypatch.setattr(utils, "post_url_from_api", responder)
+    await utils.resolve_missing_indexes(values, "mainnet", app, None)
+
+
+def _answers(mapping, calls=None):
+    async def responder(url, client, content, headers=None):
+        if calls is not None:
+            calls.append((url, content))
+        return SimpleNamespace(ok=True, return_value=mapping)
+
+    return responder
+
+
+async def test_an_unknown_address_is_resolved_and_remembered(monkeypatch):
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({ADDRESS[:29]: 104840}))
+
+    assert app.addresses_to_indexes["mainnet"][ADDRESS[:29]] == 104840
+    assert from_address_to_index(ADDRESS, "mainnet", app) == 104840
+
+
+async def test_the_index_is_then_what_renders(monkeypatch):
+    """The whole point, asserted on the markup the reader sees."""
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({ADDRESS[:29]: 104840}))
+    rendered = account_link(ADDRESS, "mainnet", None, None, app)
+
+    assert "104840" in rendered
+    assert ADDRESS[:4] not in rendered
+
+
+async def test_it_asks_the_bulk_route_with_canonical_ids(monkeypatch):
+    """get-indexes matches on _id, which is the 29-character prefix."""
+    calls = []
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS, OTHER], _answers({}, calls))
+
+    url, content = calls[0]
+    assert url.endswith("/v2/mainnet/accounts/get-indexes")
+    assert sorted(content) == sorted([ADDRESS[:29], OTHER[:29]])
+
+
+async def test_one_request_covers_a_whole_page(monkeypatch):
+    """today-in lists ~85 addresses. One round trip, not 85."""
+    calls = []
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS, OTHER], _answers({}, calls))
+
+    assert len(calls) == 1
+
+
+async def test_nothing_is_asked_when_everything_is_known(monkeypatch):
+    """The maps are still the cache; a hit must not cost a request."""
+    calls = []
+    app = _resolvable_app({ADDRESS[:29]: 5})
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({}, calls))
+
+    assert calls == []
+
+
+async def test_contract_addresses_are_not_asked_after(monkeypatch):
+    """today-in's impacted list carries `<10100,0>` alongside accounts, and
+    account_link routes those to instance_link_from_str on its own."""
+    calls = []
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, ["<10100,0>", "<10082,0>"], _answers({}, calls))
+
+    assert calls == []
+
+
+async def test_public_keys_are_not_asked_after(monkeypatch):
+    """64 characters is a cis5 public key, not an account."""
+    calls = []
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, ["a" * 64], _answers({}, calls))
+
+    assert calls == []
+
+
+async def test_resolving_raises_the_known_ceiling(monkeypatch):
+    """max_index_known feeds the search box, and a new account raises it."""
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({ADDRESS[:29]: 104840}))
+
+    assert app.max_index_known["mainnet"] == 104840
+
+
+async def test_a_404_leaves_the_map_alone(monkeypatch):
+    """get-indexes answers 404 when it matched nothing, which is its normal
+    answer for an id that is not an account."""
+    app = _resolvable_app()
+
+    async def not_found(url, client, content, headers=None):
+        return SimpleNamespace(ok=False, return_value=None)
+
+    await _resolve(monkeypatch, app, [ADDRESS], not_found)
+
+    assert app.addresses_to_indexes["mainnet"] == {}
+
+
+async def test_a_nonsense_payload_does_not_poison_the_map(monkeypatch):
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers(["not", "a", "mapping"]))
+
+    assert app.addresses_to_indexes["mainnet"] == {}
+
+
+async def test_a_non_integer_index_is_refused(monkeypatch):
+    """from_address_to_index promises an int to callers that branch on type."""
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({ADDRESS[:29]: None}))
+
+    assert app.addresses_to_indexes["mainnet"] == {}
+
+
+async def test_no_api_url_is_survivable(monkeypatch):
+    calls = []
+    app = _resolvable_app()
+    app.api_url = None
+
+    await _resolve(monkeypatch, app, [ADDRESS], _answers({}, calls))
+
+    assert calls == []
+
+
+async def test_an_empty_list_asks_nothing(monkeypatch):
+    calls = []
+    app = _resolvable_app()
+
+    await _resolve(monkeypatch, app, [], _answers({}, calls))
+    await _resolve(monkeypatch, app, None, _answers({}, calls))
+
+    assert calls == []
+
+
+# --- the top-up that should have prevented this -------------------------
+#
+# The map is kept current by one loop in the 60s refresher, over the newest
+# 50 accounts. It used to sit at the bottom of that block: below an
+# identity-providers call whose `continue` on a None answer skipped it
+# outright, and below every line that could raise into the net-wide except.
+# Three independent ways for the map to silently stop being topped up.
+
+
+def test_the_top_up_runs_before_the_identity_providers_gate():
+    import inspect
+
+    from ccdexplorer.ccdexplorer_site.app import factory
+
+    source = inspect.getsource(factory.create_app)
+    top_up = source.index("add_account_info_to_cache(account_info, app, net)")
+    gate = source.index("if api_result.return_value is None:")
+
+    assert top_up < gate, "the top-up is still behind the identity-providers continue"
+
+
+def test_one_unparseable_account_does_not_abort_the_top_up():
+    import inspect
+
+    from ccdexplorer.ccdexplorer_site.app import factory
+
+    source = inspect.getsource(factory.create_app)
+    block = source[source.index("skipped an account in the map top-up") - 400 :]
+
+    assert "continue" in block

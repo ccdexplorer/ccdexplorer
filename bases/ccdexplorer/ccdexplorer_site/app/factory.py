@@ -894,6 +894,26 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                 )
                 app.accounts_cache[net] = api_result.return_value if api_result.ok else []
 
+                # First in the cycle, and on its own. The address map is a
+                # boot-time snapshot and this is the only thing that keeps it
+                # current, but it used to sit at the bottom of this block --
+                # below an identity-providers call whose `continue` on a None
+                # answer skipped it outright, and below every line that could
+                # raise into the net-wide `except` further down. A top-up that
+                # silently stops leaves every account created since boot
+                # rendering as an address instead of an index, because
+                # from_address_to_index has no other way to learn one.
+                for account_ in app.accounts_cache[net] or ():
+                    try:
+                        account_info: CCD_AccountInfo = CCD_AccountInfo(**account_["account_info"])
+                    except Exception as error:  # noqa: BLE001
+                        # One unparseable account costs that account, not the
+                        # rest of the net's new ones behind it in the list.
+                        print(f"{net}: skipped an account in the map top-up: {error}")
+                        continue
+                    if account_info.address[:29] not in app.addresses_to_indexes[net]:
+                        add_account_info_to_cache(account_info, app, net)
+
                 identity_providers = {}
                 api_result = await get_url_from_api(
                     f"{app.api_url}/v2/{net}/misc/identity-providers",
@@ -914,12 +934,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
                     }
 
                 app.identity_providers_cache[net] = identity_providers if api_result.ok else None
-                if app.accounts_cache[net]:
-                    for account_ in app.accounts_cache[net]:
-                        account_info: CCD_AccountInfo = CCD_AccountInfo(**account_["account_info"])
-                        if account_info.address[:29] not in app.addresses_to_indexes[net]:
-                            print(f"Adding {account_info.index} to cache... FROM SCHEDULE")
-                            add_account_info_to_cache(account_info, app, net)
 
                 api_result = await get_url_from_api(
                     f"{app.api_url}/v2/{net}/plts/overview", app.httpx_client
