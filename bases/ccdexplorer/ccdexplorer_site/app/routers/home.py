@@ -147,7 +147,6 @@ async def redirect_to_mainnet(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1006,7 +1005,6 @@ async def transactions_page(
             "tx_type_translation": tx_type_translation,
             "tx_type_translation_from_python": tx_type_translation_for_js(),
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1032,7 +1030,6 @@ async def blocks_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1059,7 +1056,6 @@ async def accounts_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1139,7 +1135,6 @@ async def consensus_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1239,7 +1234,6 @@ async def consensus_visual_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 

@@ -221,7 +221,6 @@ async def business_accounts_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -794,7 +793,6 @@ async def transactions_by_type_page(
             "tx_type_translation": {
                 k: v for k, v in tx_type_translation.items() if "token_update_effect-" not in k
             },
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
             "tx_type_translation_from_python": tx_type_translation_for_js(),
         },
     )
@@ -1031,7 +1029,6 @@ async def accounts_scheduled_release(
             "user": user,
             "net": net,
             "requested_page": 1,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1130,7 +1127,6 @@ async def accounts_cooldown(
             "user": user,
             "net": net,
             "requested_page": 1,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 

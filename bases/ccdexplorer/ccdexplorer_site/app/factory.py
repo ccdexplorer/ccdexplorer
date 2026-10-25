@@ -422,9 +422,18 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
         )
 
-        app.env = environment
+        # A copy, not the module-level dict: assigning API_KEY into
+        # environment itself added this token to ccdexplorer.env.environment
+        # for every component in the process that imports it.
+        app.env = dict(environment)
         app.credential_issuers = None
-        app.env["API_KEY"] = str(uuid.uuid1())
+        # base/base.html renders this into every page and the templates
+        # append it to their ajax urls. Nothing validates it -- the routes
+        # that take it as a path parameter ignore it -- so it is a cache
+        # buster, not a credential. uuid1 published the host's MAC address
+        # and the moment of generation in the source of every page; uuid4 is
+        # random, which is all a cache buster needs.
+        app.env["API_KEY"] = str(uuid.uuid4())
         app.labeled_accounts_last_requested = init_time
         app.users_last_requested = init_time
         app.nodes_last_requested = init_time
