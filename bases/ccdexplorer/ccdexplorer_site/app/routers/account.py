@@ -35,6 +35,7 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_labeled_accounts,
     get_user_detailsv2,
 )
+from ccdexplorer.ccdexplorer_site.app import exports
 from ccdexplorer.ccdexplorer_site.app.utils import (
     account_link,
     add_account_info_to_cache,
@@ -414,14 +415,20 @@ async def get_account_rewards_download(
     )
     staking_rewards = api_result.return_value if api_result.ok else None
     if staking_rewards:
-        filename = f"/tmp/staking_rewards - {index_or_hash} - {year_month}.csv"
+        # Was "/tmp/staking_rewards - {index} - {year_month}.csv": derivable
+        # from a public account index and a month, and served to anyone by
+        # the old /tmp route. The name carries a uuid4 now and the route
+        # that serves it will not resolve outside the export directory.
+        path = exports.new_export_path(f"staking_rewards - {index_or_hash} - {year_month}")
         df = pd.json_normalize(staking_rewards)
         df["reward.transaction_fees"] = df["reward.transaction_fees"] / 1_000_000
         df["reward.baker_reward"] = df["reward.baker_reward"] / 1_000_000
         df["reward.finalization_reward"] = df["reward.finalization_reward"] / 1_000_000
         df = df.drop(columns=["reward.account"])
-        df.to_csv(filename, index=False)
-        return filename
+        df.to_csv(path, index=False)
+        # The url to fetch it by, not a path on disk -- a caller handed the
+        # old value would have fetched /tmp/<name>, which no longer exists.
+        return exports.export_url(path)
     else:
         return "NO_REWARDS"
 
@@ -565,13 +572,6 @@ async def get_account(
     cis2_token_ids = answered("cis2_token_ids", [])
     plt_ids = answered("plt_ids", [])
     token_ids = cis2_token_ids + plt_ids  # type: ignore
-
-    if pool_apy_object or account_apy_object or rewards_for_account_available:
-        rewards_filename = (
-            f"/tmp/staking_rewards - {account_id} - {dt.datetime.now().strftime('%Y-%m')}.csv"
-        )
-    else:
-        rewards_filename = None
 
     # TODO
     cns_domains_list = None  # cns_domains_registered(account_id)
@@ -751,7 +751,6 @@ async def get_account(
                 "account_link_found": account_link_found,
                 "tokens_available": tokens_available,
                 "year_month": dt.datetime.now().strftime("%Y-%m"),
-                "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
                 "alias_portion": alias_portion,
                 "account_locks_feature_visible": net == "devnet",
@@ -791,7 +790,6 @@ async def get_account(
                 "account_link_found": account_link_found,
                 "tokens_available": tokens_available,
                 "year_month": dt.datetime.now().strftime("%Y-%m"),
-                "rewards_filename": rewards_filename,
                 "tx_type_translation_from_python": tx_type_translation_for_js(),
                 "alias_portion": alias_portion,
                 "account_locks_feature_visible": net == "devnet",
