@@ -13,6 +13,7 @@ import typing
 from datetime import timedelta
 from enum import Enum
 from functools import lru_cache
+from collections.abc import Mapping
 from typing import Any, Optional
 
 import cbor2
@@ -2442,6 +2443,33 @@ async def refresh_consensus_cache(app, net: str):
                     history.appendleft({"hash": block_hash, "height": height})
     except Exception as error:
         print(f"ERROR getting consensus detailed status for {net}: {error}")
+
+
+async def gather_from_api(
+    urls: Mapping[str, str], httpx_client: httpx.AsyncClient
+) -> dict[str, "APIResponseResult"]:
+    """Several api routes at once, keyed by whatever the caller calls them.
+
+    A page that awaits its calls one after another pays the sum of their
+    round trips for no reason when they do not depend on each other. The
+    account page awaited eighteen in a row, which is what Sentry's
+    consecutive-http detector kept reporting -- 22 events in the week to
+    2026-10-24 on that route alone.
+
+    Named rather than positional because the alternative is unpacking a
+    list by index, and a url inserted in the middle then silently hands
+    every value after it to the wrong variable. gather preserves order, so
+    zipping the keys back on is safe.
+
+    No return_exceptions: get_url_from_api already answers a dead route
+    with a not-ok result instead of raising, so an exception here is a real
+    fault and should surface exactly as it does today.
+    """
+    if not urls:
+        return {}
+    names = list(urls)
+    results = await asyncio.gather(*(get_url_from_api(urls[name], httpx_client) for name in names))
+    return dict(zip(names, results))
 
 
 async def post_url_from_api(

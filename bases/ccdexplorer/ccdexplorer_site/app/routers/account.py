@@ -40,6 +40,7 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     add_account_info_to_cache,
     ccdexplorer_plotly_template,
     from_address_to_index,
+    gather_from_api,
     get_url_from_api,
     post_url_from_api,
     tx_type_translation_for_js,
@@ -513,65 +514,57 @@ async def get_account(
 
     account_link_found = account_link(account_id, net, user, tags, request.app)
 
+    # Everything below is addressed by the id account/info just gave us, and
+    # none of it depends on anything else here -- so it goes out in one wave
+    # instead of nine round trips in a row. Sentry's consecutive-http
+    # detector reported this route 22 times in the week to 2026-10-24.
+    api = request.app.api_url
     delegation_target_address = None
-    account_apy_object = None
+    first: dict[str, str] = {
+        "rewards_available": f"{api}/v2/{net}/account/{account_id}/rewards-available",
+        "tokens_available": (
+            f"{api}/v2/{net}/account/{account_id}/tokens-available"
+            f"{'/alias' if alias_portion else ''}"
+        ),
+        "ccd_balance_usd": f"{api}/v2/{net}/account/{account_id}/balance/USD",
+        "cis2_token_ids": f"{api}/v2/{net}/account/{account_id}/token-symbols-for-flow",
+        "plt_ids": f"{api}/v2/{net}/account/{account_id}/plt-symbols-for-flow",
+        "deployed": f"{api}/v2/{net}/account/{account_id}/deployed",
+    }
+    # Conditional members are simply absent from the set rather than fetched
+    # and discarded, so an ordinary account still makes six calls, not nine.
     if delegation:
         delegation_target_address = delegation.target
-        if delegation_target_address.baker:
-            api_result = await get_url_from_api(
-                f"{request.app.api_url}/v2/{net}/account/{delegation_target_address.baker}/staking-rewards-object/delegator",
-                httpx_client,
-            )
-        else:
-            # passive_delegation
-            api_result = await get_url_from_api(
-                f"{request.app.api_url}/v2/{net}/account/passive_delegation/staking-rewards-object/passive_delegation",
-                httpx_client,
-            )
-        account_apy_object = api_result.return_value if api_result.ok else None
-
-    if validator_id is not None:
-        account_is_validator = True
-
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/account/{validator_id}/pool-info",
-            httpx_client,
+        first["account_apy"] = (
+            f"{api}/v2/{net}/account/{delegation_target_address.baker}"
+            "/staking-rewards-object/delegator"
+            if delegation_target_address.baker
+            else f"{api}/v2/{net}/account/passive_delegation"
+            "/staking-rewards-object/passive_delegation"
         )
-        pool = api_result.return_value if api_result.ok else None
-
-        # api_result = await get_url_from_api(
-        #     f"{request.app.api_url}/v2/{net}/account/{account_index}/node", httpx_client
-        # )
-        # node = api_result.return_value if api_result.ok else None
-
-        # api_result = await get_url_from_api(
-        #     f"{request.app.api_url}/v2/{net}/account/{validator_id}/earliest-win-time",
-        #     httpx_client,
-        # )
-        # earliest_win_time = api_result.return_value if api_result.ok else None
-
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/account/{validator_id}/staking-rewards-object/delegator",
-            httpx_client,
+    account_is_validator = validator_id is not None
+    if account_is_validator:
+        first["pool"] = f"{api}/v2/{net}/account/{validator_id}/pool-info"
+        first["pool_apy"] = (
+            f"{api}/v2/{net}/account/{validator_id}/staking-rewards-object/delegator"
         )
-        pool_apy_object = api_result.return_value if api_result.ok else None
 
-        # api_result = await get_url_from_api(
-        #     f"{request.app.api_url}/v2/{net}/account/{account_id}/staking-rewards-object/account",
-        #     httpx_client,
-        # )
-        # account_apy_object = api_result.return_value if api_result.ok else None
+    fetched = await gather_from_api(first, httpx_client)
 
-    else:
-        account_is_validator = False
-        pool = None
-        pool_apy_object = None
+    def answered(name: str, default=None):
+        """What a route returned, or `default` if it was not asked or not ok."""
+        result = fetched.get(name)
+        return result.return_value if (result is not None and result.ok) else default
 
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/rewards-available",
-        httpx_client,
-    )
-    rewards_for_account_available = api_result.return_value if api_result.ok else None
+    account_apy_object = answered("account_apy")
+    pool = answered("pool")
+    pool_apy_object = answered("pool_apy")
+    rewards_for_account_available = answered("rewards_available")
+    tokens_available = answered("tokens_available")
+    ccd_balance_USD = answered("ccd_balance_usd", 0)
+    cis2_token_ids = answered("cis2_token_ids", [])
+    plt_ids = answered("plt_ids", [])
+    token_ids = cis2_token_ids + plt_ids  # type: ignore
 
     if pool_apy_object or account_apy_object or rewards_for_account_available:
         rewards_filename = (
@@ -580,78 +573,47 @@ async def get_account(
     else:
         rewards_filename = None
 
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/tokens-available{'/alias' if alias_portion else ''}",
-        httpx_client,
-    )
-    tokens_available = api_result.return_value if api_result.ok else None
-
-    tokens_value_USD = 0
-    if tokens_available:
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/account/{account_id}/fungible-tokens/USD",
-            httpx_client,
-        )
-        tokens_value_USD = api_result.return_value if api_result.ok else 0
-    assert isinstance(tokens_value_USD, (int, float))
-
-    plts_value_USD = 0
-    if tokens_available:
-        api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/account/{account_id}/plt/USD",
-            httpx_client,
-        )
-        plts_value_USD = api_result.return_value if api_result.ok else 0
-    assert isinstance(plts_value_USD, (int, float))
-    tokens_value_USD += plts_value_USD
-
-    ccd_balance_USD = 0
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/balance/USD",
-        httpx_client,
-    )
-    ccd_balance_USD = api_result.return_value if api_result.ok else 0
-
     # TODO
     cns_domains_list = None  # cns_domains_registered(account_id)
 
-    cis2_token_ids = []
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/token-symbols-for-flow",
-        httpx_client,
-    )
-    cis2_token_ids = api_result.return_value if api_result.ok else []
+    # The second and last wave: these are the only calls that needed an answer
+    # from the first. The token values are not worth asking for unless the
+    # account holds tokens, and block 0 only matters if `deployed` came back
+    # empty -- which is how an account created in the genesis block looks.
+    deployed = fetched["deployed"]
+    deployed_in_genesis_block = bool(deployed.ok and deployed.return_value is None)
+    second: dict[str, str] = {}
+    if tokens_available:
+        second["tokens_value_usd"] = f"{api}/v2/{net}/account/{account_id}/fungible-tokens/USD"
+        second["plts_value_usd"] = f"{api}/v2/{net}/account/{account_id}/plt/USD"
+    if deployed_in_genesis_block:
+        second["genesis_block"] = f"{api}/v2/{net}/block/0"
 
-    plt_ids = []
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/plt-symbols-for-flow",
-        httpx_client,
-    )
-    plt_ids = api_result.return_value if api_result.ok else []
-    token_ids = cis2_token_ids + plt_ids  # type: ignore
+    fetched_second = await gather_from_api(second, httpx_client)
 
-    api_result = await get_url_from_api(
-        f"{request.app.api_url}/v2/{net}/account/{account_id}/deployed",
-        httpx_client,
-    )
+    def answered_second(name: str, default=None):
+        result = fetched_second.get(name)
+        return result.return_value if (result is not None and result.ok) else default
 
-    deployed_in_genesis_block = False
+    tokens_value_USD = answered_second("tokens_value_usd", 0)
+    plts_value_USD = answered_second("plts_value_usd", 0)
+    assert isinstance(tokens_value_USD, (int, float))
+    assert isinstance(plts_value_USD, (int, float))
+    tokens_value_USD += plts_value_USD
+
     genesis_block_slot_time = None
-    if (api_result.ok) and (api_result.return_value is None):
-        # this account was created in the genesis block!
-        deployed_in_genesis_block = True
+    if deployed_in_genesis_block:
         tx_deployed = None
-        api_result = api_result = await get_url_from_api(
-            f"{request.app.api_url}/v2/{net}/block/0",
-            httpx_client,
-        )
+        genesis = fetched_second.get("genesis_block")
         genesis_block_slot_time = (
-            CCD_BlockInfo(**api_result.return_value).slot_time  # type: ignore
-            if api_result.ok
+            CCD_BlockInfo(**genesis.return_value).slot_time  # type: ignore
+            if (genesis is not None and genesis.ok)
             else dt.datetime.now().astimezone(dt.UTC)
         )
     else:
-        tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None  # type: ignore
+        tx_deployed = (
+            CCD_BlockItemSummary(**deployed.return_value) if deployed.ok else None  # type: ignore
+        )
 
     request.state.api_calls["Account Info"] = (
         f"{request.app.api_url}/docs#/Account/get_account_info"
