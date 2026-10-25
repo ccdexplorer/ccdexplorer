@@ -57,8 +57,34 @@ def _run_matches_location(run_record: dg.RunRecord, location_name: str) -> bool:
     )
 
 
+def _failed_runs_filter(window_start: datetime) -> dg.RunsFilter:
+    """The runs this summary is allowed to count: failures from the window.
+
+    `exclude_subruns` is the whole point. It compiles to `WHERE backfill_id IS
+    NULL`, and without it the summary counted failed *backfill* runs alongside
+    last night's. Those are not the same thing: j_from_genesis is a daily
+    partition per day since 2021-06-09 and nothing schedules it -- the nightly
+    work runs under `__ASSET_JOB` via AutomationCondition.eager(), so a
+    j_from_genesis run is a historical re-run by definition. Dagster files
+    those under Backfills rather than Runs, so the summary reported a failed
+    night for which the Runs page showed nothing, and the one place that
+    disagreement could be resolved was the Backfills tab nobody was pointed at.
+
+    The cost of this is accepted deliberately: a backfill that fails every
+    partition is now silent here, and the nightrunner has no Sentry to catch
+    it instead.
+    """
+    return dg.RunsFilter(
+        created_after=window_start,
+        statuses=[dg.DagsterRunStatus.FAILURE],
+        exclude_subruns=True,
+    )
+
+
 def _failed_jobs_by_location(run_records: list[dg.RunRecord]) -> dict[str, Counter[str]]:
-    failed_by_location: dict[str, Counter[str]] = {location: Counter() for location in TARGET_LOCATIONS}
+    failed_by_location: dict[str, Counter[str]] = {
+        location: Counter() for location in TARGET_LOCATIONS
+    }
     for run_record in run_records:
         for location in TARGET_LOCATIONS:
             if _run_matches_location(run_record, location):
@@ -104,12 +130,7 @@ def daily_execution_summary(
     now = datetime.now(UTC)
     window_start = now - timedelta(hours=LOOKBACK_HOURS)
 
-    failed_run_records = context.instance.get_run_records(
-        filters=dg.RunsFilter(
-            created_after=window_start,
-            statuses=[dg.DagsterRunStatus.FAILURE],
-        )
-    )
+    failed_run_records = context.instance.get_run_records(filters=_failed_runs_filter(window_start))
 
     failed_by_location = _failed_jobs_by_location(list(failed_run_records))
     message = _format_daily_summary(window_start, now, failed_by_location)
