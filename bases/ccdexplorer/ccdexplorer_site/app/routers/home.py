@@ -10,7 +10,7 @@
 # pyright: reportReturnType=false
 
 import datetime as dt
-import os
+import urllib.parse
 from enum import Enum
 
 import httpx2 as httpx
@@ -21,6 +21,7 @@ from ccdexplorer.grpc_client.CCD_Types import (
     CCD_BlockItemSummary,
     CCD_ConsensusDetailedStatus,
 )
+from ccdexplorer.ccdexplorer_site.app import exports
 from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
     MakeUp,
     MakeUpRequest,
@@ -146,7 +147,6 @@ async def redirect_to_mainnet(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -464,15 +464,28 @@ async def search_placeholder(
         return "Search for lock id"
 
 
-@router.get("/tmp/{filename}", response_class=FileResponse)
-async def tmp_files(request: Request, filename: str):
-    file_path = f"/tmp/{filename}"
+@router.get("/exports/{filename}", response_class=FileResponse)
+async def export_file(request: Request, filename: str):
+    """A generated CSV, by the unguessable name the server handed out.
 
-    # Check if the file exists
-    if not os.path.exists(file_path):
+    Replaces GET /tmp/{filename}, which served any file in the shared /tmp
+    by name -- this application's exports and every other process's
+    temporary files alike. No authentication, because these downloads are
+    for every visitor; the url is the capability instead, and
+    resolve_export refuses anything that is not an export of ours.
+    """
+    file_path = exports.resolve_export(filename)
+    if file_path is None:
         raise HTTPException(status_code=404, detail="File not found")
 
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    # Opportunistic, and here rather than on a schedule because this is the
+    # only route that is certain to run while exports exist.
+    exports.sweep_old_exports()
+
+    # quote(), because the name reaches a header and carries the prefix a
+    # caller chose -- an unescaped quote would end the quoted string.
+    safe = urllib.parse.quote(file_path.name)
+    headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{safe}"}
     return FileResponse(file_path, headers=headers, media_type="text/csv")
 
 
@@ -992,7 +1005,6 @@ async def transactions_page(
             "tx_type_translation": tx_type_translation,
             "tx_type_translation_from_python": tx_type_translation_for_js(),
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1018,7 +1030,6 @@ async def blocks_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1045,7 +1056,6 @@ async def accounts_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1125,7 +1135,6 @@ async def consensus_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 
@@ -1225,7 +1234,6 @@ async def consensus_visual_page(
             "request": request,
             "user": user,
             "net": net,
-            "API_KEY": request.app.env["CCDEXPLORER_API_KEY"],
         },
     )
 

@@ -14,7 +14,6 @@
 # import collections
 import base64
 import json
-import uuid
 import math
 from bisect import bisect_right
 import httpx2 as httpx
@@ -32,6 +31,7 @@ from ccdexplorer.schema_parser import Schema
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
+from ccdexplorer.ccdexplorer_site.app import exports
 from ccdexplorer.ccdexplorer_site.app.classes.dressingroom import (
     MakeUp,
     MakeUpRequest,
@@ -956,7 +956,12 @@ def events_to_file(instance_address: str, all_logged_events: list):
         axis=1,
         inplace=True,
     )
-    filename = f"/tmp/track_and_trace - contract {instance_address} | {dt.datetime.now():%Y-%m-%d %H-%M-%S} - {uuid.uuid4()}.csv"
+    # smart_contract.html links this straight into an href, so what comes
+    # back is the url to fetch it by, not a path on disk. The uuid4 in the
+    # name is what makes that url the capability -- see app/exports.py.
+    path = exports.new_export_path(
+        f"track_and_trace - contract {instance_address} | {dt.datetime.now():%Y-%m-%d %H-%M-%S}"
+    )
     # df_group.columns = [f"{tooltip} Ending", "Sum of Fees (CCD)"]
-    df.to_csv(filename, index=False)
-    return filename
+    df.to_csv(path, index=False)
+    return exports.export_url(path)
