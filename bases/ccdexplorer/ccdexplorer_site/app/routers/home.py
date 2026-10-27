@@ -47,6 +47,7 @@ from ccdexplorer.ccdexplorer_site.app.state import (
     get_user_detailsv2,
 )
 from ccdexplorer.ccdexplorer_site.app.utils import (
+    price_freshness,
     ccdexplorer_plotly_template,
     create_dict_for_tabulator_display,
     create_dict_for_tabulator_display_for_accounts,
@@ -215,6 +216,9 @@ async def ajax_market_cap_table(
 
     if "last_requests" not in request.state._state:
         request.state.last_requests = {}
+    # The zeroed fallback above carries no timestamp, which reads as stale --
+    # correct, because a price of 0 is not a current price.
+    freshness = price_freshness(cmc.get("last_updated"))
     html = request.app.templates.TemplateResponse(
         request,
         "home/crypto_dashboard.html",
@@ -222,6 +226,7 @@ async def ajax_market_cap_table(
             "request": request,
             "net": "mainnet",
             "theme": theme,
+            "price_freshness": freshness,
             "cmc_rank": cmc["cmc_rank"],
             "tps_h": tps_table["hour_tps"],
             "total_txs": millify(total_txs),
