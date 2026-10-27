@@ -18,6 +18,7 @@ from ccdexplorer.env import REDIS_URL, RUN_ON_NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from ccdexplorer.mongodb.core import MongoDB
+from ccdexplorer.single_instance import SingleInstanceLock
 from ccdexplorer.tooter import Tooter
 from pydantic import BaseModel
 from pymongo.asynchronous.collection import AsyncCollection
@@ -293,6 +294,32 @@ async def watch_loop(stop: Shutdown):
             await asyncio.sleep(settings.reconnect_backoff_seconds)
 
 
+# Only one block analyser per net may run. It tails a change stream and
+# publishes one Celery task per processor per block, so a second copy publishes
+# every block twice and every worker downstream repeats its work. The two
+# copies would also fight over one resume-token key in Redis.
+STANDBY_POLL_SECONDS = 15
+
+
+async def wait_for_our_turn(lock: SingleInstanceLock) -> None:
+    """Stand by until the lease is ours, rather than exiting.
+
+    Waiting makes a second deployment a warm standby: it sits here while the
+    other copy works and takes over by itself within a lease once that copy
+    stops renewing, so a host failover needs nobody to press anything.
+    """
+    announced = False
+    while not lock.acquire():
+        if not announced:
+            print(
+                f"[producer] another block analyser holds the {RUN_ON_NET} lock; "
+                f"standing by, checking every {STANDBY_POLL_SECONDS}s",
+                file=sys.stderr,
+            )
+            announced = True
+        await asyncio.sleep(STANDBY_POLL_SECONDS)
+
+
 async def main():
     stop = Shutdown()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -300,7 +327,31 @@ async def main():
             asyncio.get_running_loop().add_signal_handler(sig, stop.trigger, sig, None)
         except NotImplementedError:
             signal.signal(sig, stop.trigger)
-    await watch_loop(stop)
+
+    lock = SingleInstanceLock(
+        collection=net_db(mongodb, RUN_ON_NET)[Collections.helpers],
+        service=f"ms_block_analyser:{RUN_ON_NET}",
+    )
+    await wait_for_our_turn(lock)
+    print(f"[producer] holding the lock for {RUN_ON_NET} as {lock.holder}", file=sys.stderr)
+
+    loop = asyncio.get_running_loop()
+
+    def lease_lost() -> None:
+        # The renewer is a plain thread, and asyncio.Event.set is not
+        # thread-safe, so the shutdown has to be handed back to the loop.
+        print(
+            f"[producer] lost the {RUN_ON_NET} single-instance lease; shutting down",
+            file=sys.stderr,
+        )
+        loop.call_soon_threadsafe(stop.trigger)
+
+    lock.start_renewing(on_lost=lease_lost)
+    try:
+        await watch_loop(stop)
+    finally:
+        lock.stop_renewing()
+        lock.release()
 
 
 if __name__ == "__main__":

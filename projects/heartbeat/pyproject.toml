@@ -42,10 +42,11 @@ dependencies = [
 [tool.hatch.build.hooks.polylith-bricks]
 
 [tool.polylith.bricks]
-"../../bases/ccdexplorer/heartbeat"        = "ccdexplorer/heartbeat"
-"../../components/ccdexplorer/mongodb"     = "ccdexplorer/mongodb"
-"../../components/ccdexplorer/tooter"      = "ccdexplorer/tooter"
-"../../components/ccdexplorer/cis"         = "ccdexplorer/cis"
-"../../components/ccdexplorer/env"         = "ccdexplorer/env"
-"../../components/ccdexplorer/grpc_client" = "ccdexplorer/grpc_client"
-"../../components/ccdexplorer/domain"      = "ccdexplorer/domain"
+"../../bases/ccdexplorer/heartbeat"            = "ccdexplorer/heartbeat"
+"../../components/ccdexplorer/mongodb"         = "ccdexplorer/mongodb"
+"../../components/ccdexplorer/tooter"          = "ccdexplorer/tooter"
+"../../components/ccdexplorer/cis"             = "ccdexplorer/cis"
+"../../components/ccdexplorer/env"             = "ccdexplorer/env"
+"../../components/ccdexplorer/grpc_client"     = "ccdexplorer/grpc_client"
+"../../components/ccdexplorer/domain"          = "ccdexplorer/domain"
+"../../components/ccdexplorer/single_instance" = "ccdexplorer/single_instance"
