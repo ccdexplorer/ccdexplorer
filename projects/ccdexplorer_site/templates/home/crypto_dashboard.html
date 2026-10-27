@@ -10,7 +10,7 @@
              </div>   
             <div class="crypto-info-item ccd-price">
                 <span class="label">CCD Price</span>
-                <span class="value percentage-add">$ {{ccd_price}} {% if ccd_change > 0 %}<span class="percentage_up">{{(ccd_change)|round_x_decimal_with_comma(1)}}%</span>{% else %}<span class="percentage_down">{{(ccd_change)|round_x_decimal_with_comma(1)}}%</span>{% endif%}</span>
+                <span class="value percentage-add">$ {{ccd_price}} {% if ccd_change > 0 %}<span class="percentage_up">{{(ccd_change)|round_x_decimal_with_comma(1)}}%</span>{% else %}<span class="percentage_down">{{(ccd_change)|round_x_decimal_with_comma(1)}}%</span>{% endif%}{% if price_freshness is defined and price_freshness.is_stale %}<i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Price last updated {{price_freshness.age_text}}. The feed that refreshes it has stopped, so this is not the current price." aria-label="This price is out of date"></i>{% endif %}</span>
             </div>
             <div class="crypto-info-item accounts">
                 <span class="label">Accounts</span>

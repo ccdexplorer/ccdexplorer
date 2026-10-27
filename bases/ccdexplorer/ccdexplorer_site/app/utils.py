@@ -404,6 +404,90 @@ tx_type_translation["initial"] = TypeContents(
 UTC = dt.timezone.utc
 
 
+# The recurring job refreshes the CoinMarketCap document every ten minutes
+# (`*/10 * * * *`), so thirty is three missed runs -- late enough to mean
+# something is broken rather than a run being slow.
+PRICE_STALE_AFTER = dt.timedelta(minutes=30)
+
+
+class PriceFreshness(BaseModel):
+    """Whether the cached price is current, and how to say how old it is.
+
+    The front page reads the price from a Mongo document that dagster's
+    recurring job keeps warm. When that job stops, the page keeps rendering
+    the last number it wrote with nothing to say it is old -- which is worse
+    than showing nothing, because a stale price looks exactly like a current
+    one. On 2026-10-26 it sat eighteen hours out of date that way.
+    """
+
+    is_stale: bool
+    as_of: dt.datetime | None = None
+    age: dt.timedelta | None = None
+    age_text: str = "unknown"
+
+
+def _age_text(age: dt.timedelta) -> str:
+    """Minutes and hours, because the threshold is half an hour.
+
+    `humanize_age` is the general helper, but it works in calendar days and
+    calls anything under one "today" -- so an eighteen-hour-old price would
+    read as current, which is the whole thing being reported here.
+    """
+    minutes = int(age.total_seconds() // 60)
+    if minutes < 1:
+        return "just now"
+    if minutes < 120:
+        return f"{minutes} minute{'s' if minutes != 1 else ''} ago"
+    hours = minutes // 60
+    if hours < 48:
+        return f"{hours} hour{'s' if hours != 1 else ''} ago"
+    days = hours // 24
+    return f"{days} day{'s' if days != 1 else ''} ago"
+
+
+def price_freshness(
+    last_updated: dt.datetime | str | None,
+    now: dt.datetime | None = None,
+    stale_after: dt.timedelta = PRICE_STALE_AFTER,
+) -> PriceFreshness:
+    """Read the timestamp CoinMarketCap stamped on the cached price.
+
+    An absent or unreadable timestamp counts as stale. The number on the page
+    came from somewhere, and if we cannot say when, a reader must not be told
+    it is current -- the zeroed fallback the route builds when the api cannot
+    be reached has no timestamp at all, and a price of 0 is certainly not now.
+
+    A timestamp in the future is treated as current rather than as an error:
+    clock skew between here and CoinMarketCap is not something to warn a
+    reader about.
+    """
+    if now is None:
+        now = dt.datetime.now(UTC)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=UTC)
+
+    as_of = last_updated
+    if isinstance(as_of, str):
+        try:
+            as_of = dt.datetime.fromisoformat(as_of.replace("Z", "+00:00"))
+        except ValueError:
+            as_of = None
+    if not isinstance(as_of, dt.datetime):
+        return PriceFreshness(is_stale=True)
+
+    if as_of.tzinfo is None:
+        as_of = as_of.replace(tzinfo=UTC)
+    age = now - as_of
+    if age < dt.timedelta(0):
+        age = dt.timedelta(0)
+    return PriceFreshness(
+        is_stale=age > stale_after,
+        as_of=as_of,
+        age=age,
+        age_text=_age_text(age),
+    )
+
+
 def humanize_age(timestamp: dt.datetime, now: dt.datetime | None = None) -> str:
     """
     Turn a datetime into:
