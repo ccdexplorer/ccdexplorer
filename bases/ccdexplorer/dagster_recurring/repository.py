@@ -1,5 +1,4 @@
 import dagster as dg
-import ccdexplorer.dagster_recurring.src.dashboard_nodes as dashboard_nodes
 import ccdexplorer.dagster_recurring.src.market_position as market_position
 import ccdexplorer.dagster_recurring.src.memos as memos
 import ccdexplorer.dagster_recurring.src.top_impacted_addresses as top_impacted_addresses
@@ -19,7 +18,6 @@ import ccdexplorer.dagster_recurring.src.stable_address_info as stable_address_i
 # worker instead.
 defs = dg.Definitions.merge(
     market_position.defs,
-    dashboard_nodes.defs,
     memos.defs,
     top_impacted_addresses.defs,
     validators_missed.defs,

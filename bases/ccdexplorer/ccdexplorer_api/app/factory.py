@@ -8,7 +8,8 @@ import html as _html
 import importlib
 import json
 import time
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
 from pathlib import Path
 from typing import Callable, Optional
@@ -315,6 +316,11 @@ def use_route_names_as_operation_ids(app: FastAPI) -> None:
                 route.operation_id = route.name  # in this case, 'read_items'
 
 
+from ccdexplorer.ccdexplorer_api.app.node_cache import (
+    run_refresher as run_node_cache_refresher,
+)
+
+
 def create_app(app_settings: AppSettings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -378,10 +384,22 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.module_deployments_last_requested = {}
         app.REQUEST_LIMIT = 500  # default request limit for the API
 
+        # The dashboard_nodes cache. Here rather than in the site because the
+        # bot and heartbeat read that collection directly, so its refresh must
+        # not depend on a site process. Both api instances run this; each pass
+        # skips a net another instance has just refreshed.
+        node_cache_task = None
+        if app.mongodb is not None:
+            node_cache_task = asyncio.create_task(run_node_cache_refresher(app.mongodb))
+
         try:
             yield
         finally:
             # ---- tear down in reverse order ----
+            if node_cache_task is not None:
+                node_cache_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await node_cache_task
             await _aclose(app.tooter) if created["tooter"] else None
             await _aclose(app.grpcclient) if created["grpc"] else None
             await _aclose(app.mongodb) if created["mongo"] else None
