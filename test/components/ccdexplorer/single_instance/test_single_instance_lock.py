@@ -25,6 +25,7 @@ an outage into an outage plus a puzzle.
 
 import threading
 import time
+from types import SimpleNamespace
 
 import mongomock
 import pytest
@@ -224,3 +225,102 @@ def test_hold_yields_false_when_another_instance_has_it(collection):
 
     with _lock(collection, holder="ccd-100", clock=clock).hold() as acquired:
         assert acquired is False
+
+
+# --- the renewal thread must fail closed ---------------------------------
+#
+# Added 2026-10-28. `renew()` was called bare inside the thread, so an
+# exception killed the thread without calling `on_lost`: heartbeat:mainnet
+# indexed for six hours holding a lease that had expired, with no alert. The
+# mechanism failed open, which is the one thing a mutual-exclusion guard must
+# never do.
+#
+# These script the collection rather than the lock, so the real renew() runs:
+# the lock is a pydantic model and will not accept a patched method anyway.
+
+
+class _ScriptedCollection:
+    """update_one per call: an exception to raise, or a matched_count."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = 0
+
+    def update_one(self, _filter, _update, **_kw):
+        self.calls += 1
+        step = self.script.pop(0) if self.script else 1
+        if isinstance(step, Exception):
+            raise step
+        return SimpleNamespace(matched_count=step)
+
+
+def _renewing_lock(script, lease=0.09):
+    lock = _lock(_ScriptedCollection(script), service="renewal", lease=lease)
+    return lock, lock.collection, threading.Event()
+
+
+def test_one_failed_renewal_is_tolerated():
+    """A single slow call is not a lost lease."""
+    lock, coll, lost = _renewing_lock([RuntimeError("blip"), 1, 1])
+
+    lock.start_renewing(on_lost=lost.set)
+    time.sleep(0.25)
+    lock.stop_renewing()
+
+    assert coll.calls >= 3
+    assert not lost.is_set()
+
+
+def test_two_consecutive_failures_count_as_lost():
+    """What used to kill the thread in silence."""
+    lock, _, lost = _renewing_lock([RuntimeError("mongo down"), RuntimeError("mongo down")])
+
+    lock.start_renewing(on_lost=lost.set)
+
+    assert lost.wait(timeout=2.0), "on_lost was never called"
+    lock.stop_renewing()
+
+
+def test_a_failure_streak_resets_on_success():
+    """Alternating failures must not accumulate into a false loss."""
+    lock, _, lost = _renewing_lock(
+        [RuntimeError("a"), 1, RuntimeError("b"), 1, RuntimeError("c"), 1]
+    )
+
+    lock.start_renewing(on_lost=lost.set)
+    time.sleep(0.4)
+    lock.stop_renewing()
+
+    assert not lost.is_set()
+
+
+def test_losing_the_lease_still_calls_on_lost():
+    """The original behaviour, preserved: matched_count 0 is not ours."""
+    lock, _, lost = _renewing_lock([0])
+
+    lock.start_renewing(on_lost=lost.set)
+
+    assert lost.wait(timeout=2.0)
+    lock.stop_renewing()
+
+
+def test_an_unexpected_error_still_calls_on_lost():
+    """Any exit that is not a deliberate stop, including the unforeseen."""
+    lock, _, lost = _renewing_lock([KeyboardInterrupt("nobody predicted this")])
+
+    lock.start_renewing(on_lost=lost.set)
+
+    assert lost.wait(timeout=2.0)
+    lock.stop_renewing()
+
+
+def test_a_deliberate_stop_does_not_call_on_lost():
+    """Shutting down cleanly must not look like losing the lease."""
+    lock, _, lost = _renewing_lock([1, 1, 1])
+
+    lock.start_renewing(on_lost=lost.set)
+    time.sleep(0.15)
+    lock.stop_renewing()
+    time.sleep(0.15)
+
+    assert not lost.is_set()
