@@ -1,4 +1,17 @@
+"""Refresh the dashboard_nodes cache for one network.
+
+Extracted from dagster_recurring on 2026-10-28. It was an asset on a
+`*/1 * * * *` schedule, one run per net, which cost a Dagster run -- process
+launch, code-location load, event-log writes -- 4,320 times a day to perform
+one HTTP fetch. That work belongs in a long-lived loop; see
+bases/ccdexplorer/ccdexplorer_api/app/node_cache.py.
+
+Takes a logger rather than a Dagster execution handle, which is all it ever
+used, so it runs equally well under either.
+"""
+
 import datetime as dt
+import logging
 
 import httpx2 as httpx
 from ccdexplorer.domain.node import ConcordiumNodeFromDashboard
@@ -7,17 +20,26 @@ from pymongo import ReplaceOne
 from pymongo.collection import Collection
 
 
-def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> int:
+# Only these networks publish a node dashboard. This used to be
+# `if net == "testnet" ... else <mainnet url>`, so a devnet run fetched the
+# mainnet dashboard and wrote 132 mainnet nodes into concordium_devnet
+# (found 2026-10-28). An unknown net now raises instead.
+DASHBOARDS = {
+    "mainnet": "https://dashboard.mainnet.concordium.software/nodesSummary",
+    "testnet": "https://dashboard.testnet.concordium.com/nodesSummary",
+}
+
+
+def refresh_dashboard_nodes(logger: logging.Logger, mongodb: MongoDB, net: str) -> int:
     len_nodes = 0
+    if net not in DASHBOARDS:
+        raise ValueError(f"{net} has no node dashboard; known: {sorted(DASHBOARDS)}")
     db: dict[Collections, Collection] = net_db(mongodb, net)
     with httpx.Client() as client:
-        if net == "testnet":
-            url = "https://dashboard.testnet.concordium.com/nodesSummary"
-        else:
-            url = "https://dashboard.mainnet.concordium.software/nodesSummary"
+        url = DASHBOARDS[net]
 
         response = client.get(url)
-        context.log.info(f"{net} | Request took {response.elapsed.total_seconds()}s")
+        logger.info(f"{net} | Request took {response.elapsed.total_seconds()}s")
         if response.status_code == 200:
             t = response.json()
             queue = []
@@ -47,7 +69,7 @@ def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> 
             # strength of a bad fetch would throw away every node until the
             # next successful run.
             if not queue:
-                context.log.warning(
+                logger.warning(
                     f"{net} | dashboard returned no nodes; keeping the existing "
                     f"{db[Collections.dashboard_nodes].count_documents({})} on record"
                 )
@@ -57,7 +79,7 @@ def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> 
             reporting_ids = [op._filter["_id"] for op in queue]
             removed = db[Collections.dashboard_nodes].delete_many({"_id": {"$nin": reporting_ids}})
             if removed.deleted_count:
-                context.log.info(f"{net} | {removed.deleted_count} node(s) stopped reporting")
+                logger.info(f"{net} | {removed.deleted_count} node(s) stopped reporting")
             #
             #
             # update nodes status retrieval
@@ -71,7 +93,7 @@ def perform_update_nodes_from_dashboard(context, mongodb: MongoDB, net: str) -> 
                 upsert=True,
             )
         else:
-            context.log.error(
+            logger.error(
                 f"{net} |Failed to fetch data from {url}. Status code: {response.status_code}"
             )
             raise Exception(
