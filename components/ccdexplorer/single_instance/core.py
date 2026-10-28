@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import os
 import socket
+import logging
 import threading
 import time
 import uuid
@@ -50,6 +51,12 @@ from typing import Any
 from pydantic import BaseModel, Field, PrivateAttr
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+
+# Consecutive renewal exceptions tolerated before the lease is treated as
+# lost. Two, at renew/3, keeps the decision inside the lease window.
+log = logging.getLogger(__name__)
+
+MAX_RENEW_FAILURES = 2
 
 DOCUMENT_PREFIX = "single_instance_lock"
 
@@ -156,11 +163,45 @@ class SingleInstanceLock(BaseModel):
         interval = max(self.lease_seconds / 3.0, 0.01)
 
         def loop() -> None:
-            while not self._stop.wait(interval):
-                if not self.renew():
-                    if on_lost is not None:
-                        on_lost()
-                    return
+            # Fail closed. `renew()` used to be called bare, so an exception --
+            # Mongo unreachable, which is exactly when this matters -- escaped
+            # the thread and killed it silently: no renewal, no `on_lost`, and
+            # the service carried on writing with a lease that had lapsed.
+            # heartbeat:mainnet ran six hours that way on 2026-10-28 while its
+            # lease sat expired in the database, unprotected and unreported.
+            #
+            # A raise is tolerated once, because a single slow call is not the
+            # same as a lost lease. At renew/3 that means we give up 40s into a
+            # 60s lease -- still before it can lapse, so nobody else can have
+            # taken it while we were deciding.
+            lost = True
+            try:
+                failures = 0
+                while not self._stop.wait(interval):
+                    try:
+                        held = self.renew()
+                    except Exception as error:
+                        failures += 1
+                        log.warning(
+                            "%s: lease renewal failed (%s/%s): %s",
+                            self.service,
+                            failures,
+                            MAX_RENEW_FAILURES,
+                            error,
+                        )
+                        if failures < MAX_RENEW_FAILURES:
+                            continue
+                        held = False
+                    else:
+                        failures = 0
+                    if not held:
+                        return
+                lost = False
+            finally:
+                # Any exit that is not a deliberate stop means we can no longer
+                # claim the lease, including one we did not anticipate.
+                if lost and on_lost is not None:
+                    on_lost()
 
         self._stop.clear()
         self._renewer = threading.Thread(
