@@ -25,14 +25,14 @@ COPY projects/dagster_recurring ./projects/dagster_recurring
 # 3) Install the Dagster project as editable (important for brick discovery)
 RUN uv pip install -e ./projects/dagster_recurring
 
-# 4) Create Dagster home directory
-RUN mkdir -p $DAGSTER_HOME
+# 4) Create Dagster home directory and logs subfolder
+RUN mkdir -p $DAGSTER_HOME/logs
 
-# 5) Create non-root user first
-RUN addgroup --system app && adduser --system --ingroup app app
+# 5) Create non-root user with a fixed, safe UID/GID (e.g., 1000)
+RUN addgroup -g 1000 -S app && adduser -u 1000 -S -G app app
 
-# 6) Fix permissions (after user exists)
-RUN chown -R app:app $DAGSTER_HOME
+# 6) Force ownership using the explicit numeric IDs
+RUN chown -R 1000:1000 /opt/dagster/dagster_home
 
 # 7) Switch to user
 USER app
