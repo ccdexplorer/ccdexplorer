@@ -344,8 +344,11 @@ def _append_spot(points: list, spot_usd, spot_at, eur_usd) -> bool:
     """
     if not spot_usd or not spot_at:
         return False
+    if not (isinstance(spot_at, dt.datetime)):
+        return False
     if spot_at.tzinfo is None:
         spot_at = spot_at.replace(tzinfo=dt.timezone.utc)
+
     if points and spot_at <= points[-1]["at"]:
         return False
     points.append(
