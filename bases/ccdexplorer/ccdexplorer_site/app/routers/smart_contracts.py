@@ -309,7 +309,7 @@ async def smart_contracts_overview(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Modules Overview"] = (
-        f"{request.app.api_url}/docs#/Modules/get_overview_of_all_modules"
+        f"{request.app.api_docs_url}/docs#/Modules/get_overview_of_all_modules"
     )
     user: SiteUser | None = await get_user_detailsv2(request)
     api_result = await get_url_from_api(
@@ -620,17 +620,19 @@ async def module_module_address(
             "error": True,
             "errorMessage": f"No module on {net} found at {module_ref}.",
         }
-    request.state.api_calls["Module Info"] = f"{request.app.api_url}/docs#/Module/get_module"
+    request.state.api_calls["Module Info"] = f"{request.app.api_docs_url}/docs#/Module/get_module"
     request.state.api_calls["Deployed Tx"] = (
-        f"{request.app.api_url}/docs#/Module/get_module_deployment_tx"
+        f"{request.app.api_docs_url}/docs#/Module/get_module_deployment_tx"
     )
     request.state.api_calls["Module Schema"] = (
-        f"{request.app.api_url}/docs#/Module/get_module_schema"
+        f"{request.app.api_docs_url}/docs#/Module/get_module_schema"
     )
     request.state.api_calls["Module Instances"] = (
-        f"{request.app.api_url}/docs#/Module/get_module_instances"
+        f"{request.app.api_docs_url}/docs#/Module/get_module_instances"
     )
-    request.state.api_calls["Module Usage"] = f"{request.app.api_url}/docs#/Module/get_module_usage"
+    request.state.api_calls["Module Usage"] = (
+        f"{request.app.api_docs_url}/docs#/Module/get_module_usage"
+    )
     return request.app.templates.TemplateResponse(
         request,
         "smart_contracts/smart_module.html",
@@ -833,37 +835,37 @@ async def smart_contract_page(
         tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None
 
         request.state.api_calls["Instance Info"] = (
-            f"{request.app.api_url}/docs#/Contract/get_contract_information"
+            f"{request.app.api_docs_url}/docs#/Contract/get_contract_information"
         )
         request.state.api_calls["Verified Information"] = (
-            f"{request.app.api_url}/docs#/Contract/get_instance_tag_information"
+            f"{request.app.api_docs_url}/docs#/Contract/get_instance_tag_information"
         )
         request.state.api_calls["Tokens Available"] = (
-            f"{request.app.api_url}/docs#/Contract/get_contract_tokens_available"
+            f"{request.app.api_docs_url}/docs#/Contract/get_contract_tokens_available"
         )
         request.state.api_calls["Deployed Tx"] = (
-            f"{request.app.api_url}/docs#/Contract/get_contract_deployment_tx"
+            f"{request.app.api_docs_url}/docs#/Contract/get_contract_deployment_tx"
         )
         request.state.api_calls["Instance Transactions"] = (
-            f"{request.app.api_url}/docs#/Account/get_account_txs"
+            f"{request.app.api_docs_url}/docs#/Account/get_account_txs"
         )
         request.state.api_calls["Token Information"] = (
-            f"{request.app.api_url}/docs#/Contract/get_token_information"
+            f"{request.app.api_docs_url}/docs#/Contract/get_token_information"
         )
         request.state.api_calls["Schema from Source"] = (
-            f"{request.app.api_url}/docs#/Contract/get_schema_from_source"
+            f"{request.app.api_docs_url}/docs#/Contract/get_schema_from_source"
         )
         request.state.api_calls["Supports CIS Standard"] = (
-            f"{request.app.api_url}/docs#/Contract/get_instance_CIS_support"
+            f"{request.app.api_docs_url}/docs#/Contract/get_instance_CIS_support"
         )
         request.state.api_calls["Supports CIS Standards"] = (
-            f"{request.app.api_url}/docs#/Contract/get_instance_CIS_support_multiple"
+            f"{request.app.api_docs_url}/docs#/Contract/get_instance_CIS_support_multiple"
         )
         request.state.api_calls["TNT IDs"] = (
-            f"{request.app.api_url}/docs#/Contract/get_instance_tnt_ids"
+            f"{request.app.api_docs_url}/docs#/Contract/get_instance_tnt_ids"
         )
         request.state.api_calls["TNT Logged Events"] = (
-            f"{request.app.api_url}/docs#/Contract/get_instance_tnt_logged_events"
+            f"{request.app.api_docs_url}/docs#/Contract/get_instance_tnt_logged_events"
         )
         if contract:
             error = None

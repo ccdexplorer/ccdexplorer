@@ -57,10 +57,10 @@ async def nodes(
 
     request.state.api_calls = {}
     request.state.api_calls["Nodes and Validators"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_nodes_and_validators"
+        f"{request.app.api_docs_url}/docs#/Accounts/get_nodes_and_validators"
     )
     request.state.api_calls["Last Payday Info"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_last_payday_info"
+        f"{request.app.api_docs_url}/docs#/Accounts/get_last_payday_info"
     )
     return request.app.templates.TemplateResponse(
         request,

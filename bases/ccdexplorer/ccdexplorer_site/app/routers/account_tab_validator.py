@@ -329,7 +329,7 @@ async def get_account_earliest(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Earliest Win Time"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_earliest_win_time"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_earliest_win_time"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/earliest-win-time",
@@ -366,7 +366,7 @@ async def get_account_aliases_in_use(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Aliases in Use"] = (
-        f"{request.app.api_url}/docs#/Account/get_aliases_in_use_for_account"
+        f"{request.app.api_docs_url}/docs#/Account/get_aliases_in_use_for_account"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{account_address}/aliases-in-use",
@@ -397,7 +397,7 @@ async def get_validator_pool_apy_rewards(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Validator/Account Staking Rewards"] = (
-        f"{request.app.api_url}/docs#/Account/get_staking_rewards_object"
+        f"{request.app.api_docs_url}/docs#/Account/get_staking_rewards_object"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{validator_id}/staking-rewards-object",
@@ -425,7 +425,7 @@ async def get_account_payday_stats(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Current Payday Stats"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_current_payday_stats"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_current_payday_stats"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/current-payday-stats",

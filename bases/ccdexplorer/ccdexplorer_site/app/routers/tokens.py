@@ -146,13 +146,13 @@ async def slash_tokens(
         non_fungible_tokens_verified = api_result.return_value if api_result.ok else None
     request.state.api_calls = {}
     request.state.api_calls["Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Tokens/get_fungible_tokens_verified"
+        f"{request.app.api_docs_url}/docs#/Tokens/get_fungible_tokens_verified"
     )
     request.state.api_calls["Non-Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Tokens/get_non_fungible_tokens_verified"
+        f"{request.app.api_docs_url}/docs#/Tokens/get_non_fungible_tokens_verified"
     )
     request.state.api_calls["Protocol-Level Tokens"] = (
-        f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
+        f"{request.app.api_docs_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
     )
     return request.app.templates.TemplateResponse(
         request,
@@ -304,13 +304,13 @@ async def show_token_address(
     tx_deployed = CCD_BlockItemSummary(**api_result.return_value) if api_result.ok else None
     request.state.api_calls = {}
     request.state.api_calls["Token Info"] = (
-        f"{request.app.api_url}/docs#/Token/get_info_for_token_address"
+        f"{request.app.api_docs_url}/docs#/Token/get_info_for_token_address"
     )
     request.state.api_calls["Token Mint Tx"] = (
-        f"{request.app.api_url}/docs#/Transaction/get_transaction"
+        f"{request.app.api_docs_url}/docs#/Transaction/get_transaction"
     )
     request.state.api_calls["CIS-2 Compliance"] = (
-        f"{request.app.api_url}/docs#/Token/get_token_cis_2_compliance"
+        f"{request.app.api_docs_url}/docs#/Token/get_token_cis_2_compliance"
     )
     # An agent registry is not a list anyone maintains: it is any contract that
     # reports supporting CIS-8004. ms_instances resolves that once per instance
@@ -581,7 +581,7 @@ async def show_plt_lock(
     lock_info = api_result.return_value if api_result.ok else None
     request.state.api_calls = {}
     request.state.api_calls["Lock Info"] = (
-        f"{request.app.api_url}/docs#/Protocol-Level%20Token/get_lock_detail"
+        f"{request.app.api_docs_url}/docs#/Protocol-Level%20Token/get_lock_detail"
     )
 
     if not lock_info:
@@ -805,7 +805,7 @@ async def show_plt(
     plt_info = CCD_TokenInfo(**plt_info) if plt_info else None
     request.state.api_calls = {}
     request.state.api_calls["PLT Info"] = (
-        f"{request.app.api_url}/docs#/Protocol-Level%20Token/get_plt_token_info"
+        f"{request.app.api_docs_url}/docs#/Protocol-Level%20Token/get_plt_token_info"
     )
 
     template_dict = {
@@ -863,19 +863,19 @@ async def tokens_tag_token_id(
 ):
     request.state.api_calls = {}
     request.state.api_calls["PLT Token IDs"] = (
-        f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens_from_node"
+        f"{request.app.api_docs_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens_from_node"
     )
     request.state.api_calls["Token Info"] = (
-        f"{request.app.api_url}/docs#/Token/get_info_for_token_address"
+        f"{request.app.api_docs_url}/docs#/Token/get_info_for_token_address"
     )
     request.state.api_calls["Token Tag Info"] = (
-        f"{request.app.api_url}/docs#/Token/get_info_for_token_tag"
+        f"{request.app.api_docs_url}/docs#/Token/get_info_for_token_tag"
     )
     request.state.api_calls["Token by Tag and ID"] = (
-        f"{request.app.api_url}/docs#/Token/get_token_based_on_token_id"
+        f"{request.app.api_docs_url}/docs#/Token/get_token_based_on_token_id"
     )
     request.state.api_calls["Token by Tag"] = (
-        f"{request.app.api_url}/docs#/Token/get_token_based_on_token_id_for_token_tag"
+        f"{request.app.api_docs_url}/docs#/Token/get_token_based_on_token_id_for_token_tag"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/plt/list-token-ids",

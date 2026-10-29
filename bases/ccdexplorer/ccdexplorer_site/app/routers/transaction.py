@@ -77,7 +77,7 @@ async def get_transaction(
     )
     tx_with_makeup = classified_tx.dct
     request.state.api_calls["Transaction Info"] = (
-        f"{request.app.api_url}/docs#/Transaction/get_transaction"
+        f"{request.app.api_docs_url}/docs#/Transaction/get_transaction"
     )
     return request.app.templates.TemplateResponse(
         request,

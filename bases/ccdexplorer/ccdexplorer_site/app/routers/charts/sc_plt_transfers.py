@@ -79,7 +79,7 @@ async def _plt_transfers_page(
     if net == "mainnet":
         request.state.api_calls = {}
         request.state.api_calls["Protocol-Level Tokens"] = (
-            f"{request.app.api_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
+            f"{request.app.api_docs_url}/docs#/Protocol-Level%20Tokens/get_all_plt_tokens"
         )
         chain_start = dt.date(2025, 9, 22).strftime("%Y-%m-%d")
         api_result = await get_url_from_api(

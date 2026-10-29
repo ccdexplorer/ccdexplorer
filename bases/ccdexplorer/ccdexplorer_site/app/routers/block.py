@@ -84,24 +84,26 @@ async def request_block(
             },
         )
     request.state.api_calls["Block Info"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_at_height_from_grpc"
+        f"{request.app.api_docs_url}/docs#/Block/get_block_at_height_from_grpc"
     )
     request.state.api_calls["Chain Parameters"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_chain_parameters"
+        f"{request.app.api_docs_url}/docs#/Block/get_block_chain_parameters"
     )
     request.state.api_calls["Special Events"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_special_events"
+        f"{request.app.api_docs_url}/docs#/Block/get_block_special_events"
     )
-    request.state.api_calls["Transactions"] = f"{request.app.api_url}/docs#/Block/get_block_txs"
+    request.state.api_calls["Transactions"] = (
+        f"{request.app.api_docs_url}/docs#/Block/get_block_txs"
+    )
     request.state.api_calls["Payday Yes/No"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_payday_true_false"
+        f"{request.app.api_docs_url}/docs#/Block/get_block_payday_true_false"
     )
     if payday_info["is_payday"]:
         request.state.api_calls["Payday Pool Rewards"] = (
-            f"{request.app.api_url}/docs#/Block/get_block_payday_pool_rewards"
+            f"{request.app.api_docs_url}/docs#/Block/get_block_payday_pool_rewards"
         )
         request.state.api_calls["Payday Account Rewards"] = (
-            f"{request.app.api_url}/docs#/Block/get_block_payday_account_rewards"
+            f"{request.app.api_docs_url}/docs#/Block/get_block_payday_account_rewards"
         )
 
     return request.app.templates.TemplateResponse(

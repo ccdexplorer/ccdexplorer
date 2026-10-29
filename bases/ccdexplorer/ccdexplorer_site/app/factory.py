@@ -6,6 +6,8 @@ import hashlib
 import gc
 import uuid
 from collections import deque
+from collections.abc import Mapping
+from typing import Any
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -388,6 +390,33 @@ class AppSettings(BaseModel):
     api_url: str | None = None
 
 
+def resolve_api_urls(app_settings: AppSettings, env: Mapping[str, Any]) -> tuple[str, str]:
+    """Where the site fetches from, and the api it shows a visitor. In that order.
+
+    One env var was doing both jobs, so every call a page made went out to
+    api.ccdexplorer.io and came back -- a public DNS lookup, a TLS handshake and
+    a trip through the proxy, for two containers on the same host. The same
+    request measured 28ms over the tunnel against 105ms over the public name,
+    and the two responses were byte-identical.
+
+    They have to stay separate because the second one is clicked. base.html
+    renders request.state.api_calls into every page's footer, and a link to
+    http://10.0.0.1:10101/docs is dead for everyone but me. Only the docs
+    links use the second url; every other use of api_url in this base is a
+    server-side fetch, and test_api_url_is_internal_and_public holds that line.
+
+    app_settings.api_url overrides both, which is how the tests point the whole
+    app at one stand-in.
+    """
+    if app_settings.api_url:
+        return app_settings.api_url, app_settings.api_url
+    public = env["API_URL"]
+    # API_URL_INTERNAL is absent for every process that has no reason to care,
+    # and ccdexplorer.env already answers API_URL for it. The `or` is here for
+    # a caller passing a plain dict that does not.
+    return env.get("API_URL_INTERNAL") or public, public
+
+
 def allow_head_on_images(app) -> None:
     """Let a crawler HEAD an og:image instead of being told 405.
 
@@ -410,12 +439,11 @@ def allow_head_on_images(app) -> None:
 def create_app(app_settings: AppSettings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.api_url = app_settings.api_url or environment["API_URL"]
+        app.api_url, app.api_docs_url = resolve_api_urls(app_settings, environment)
         app.app_settings = app_settings
 
         init_time = dt.datetime.now().astimezone(dt.timezone.utc) - timedelta(seconds=10)
 
-        app.api_url = environment["API_URL"]
         app.httpx_client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
             limits=httpx.Limits(max_keepalive_connections=50, keepalive_expiry=90.0),
