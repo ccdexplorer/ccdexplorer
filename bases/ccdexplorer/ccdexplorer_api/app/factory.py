@@ -607,6 +607,17 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         data = generate_latest(registry)
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
+    # The api had no health route at all: /health answered 404, so a
+    # blue/green flip had nothing to ask. Registered above the routers to
+    # keep it out of reach of any future path-parameter route.
+    #
+    # Deliberately touches nothing: no Mongo, no api, no app state. A health
+    # route that calls a dependency reports that dependency's health, and a
+    # blue/green flip then waits on the wrong thing.
+    @app.get("/health", include_in_schema=False)
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
     # # V2
     app.include_router(account_v2.router)
     app.include_router(accounts_v2.router)
