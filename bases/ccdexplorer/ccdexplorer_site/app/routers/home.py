@@ -1372,7 +1372,3 @@ async def partners_acn(
         },
     )
 
-
-@router.get("/health")
-async def health():
-    return {"status": "ok"}

@@ -651,6 +651,19 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         data = generate_latest(registry)
         return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
+    # Registered here, above include_router, because home.router's
+    # `/{net}` matches any single segment -- so a /health defined inside it
+    # is unreachable. It answered 302 -> /mainnet from the day it was
+    # written, and the container healthcheck passed only because urllib
+    # follows redirects and rendered the homepage instead.
+    #
+    # Deliberately touches nothing: no Mongo, no api, no app state. A health
+    # route that calls a dependency reports that dependency's health, and a
+    # blue/green flip then waits on the wrong thing.
+    @app.get("/health", include_in_schema=False)
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
     # ── .well-known ──────────────────────────────────────────────────────
     @app.get("/.well-known/security.txt", include_in_schema=False)
     def security_txt() -> Response:
