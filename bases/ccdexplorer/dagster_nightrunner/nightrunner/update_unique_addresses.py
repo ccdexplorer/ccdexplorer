@@ -103,19 +103,18 @@ def perform_data_for_unique_addresses(
     return {"message": dct}
 
 
-def calculate_unique_address_stats(
-    context,
-    analysis: AnalysisType,
-    d_date,
-    height_for_first_block,
-    height_for_last_block,
-    mongodb: MongoDB,
-    grouping=Grouping.daily,
-    complete: bool = True,
-) -> dict:
-    _id = f"{d_date}-{analysis.value}"
-    context.log.info(_id)
-    pipeline = [
+def unique_address_pipeline(height_for_first_block: int, height_for_last_block: int) -> list[dict]:
+    """Unique impacted addresses in a block range, counted per category.
+
+    Every field this reads -- block_height, effect_type,
+    impacted_address_canonical -- sits in one compound index, and nothing
+    downstream wants the document's own _id, so dropping it in the $project
+    lets the whole thing be answered from index keys. Without that the $ne and
+    the $strLenCP force a fetch of every matched document: 1,417,361 of them
+    on 2026-10-30, to return two numbers, and the ten and a half seconds that
+    took cost ccd-100 its primary.
+    """
+    return [
         {
             "$match": {
                 "block_height": {
@@ -127,6 +126,7 @@ def calculate_unique_address_stats(
         },
         {
             "$project": {
+                "_id": 0,
                 "address_length": {"$strLenCP": "$impacted_address_canonical"},
                 "impacted_address_canonical": 1,
             }
@@ -170,6 +170,21 @@ def calculate_unique_address_stats(
             }
         },
     ]
+
+
+def calculate_unique_address_stats(
+    context,
+    analysis: AnalysisType,
+    d_date,
+    height_for_first_block,
+    height_for_last_block,
+    mongodb: MongoDB,
+    grouping=Grouping.daily,
+    complete: bool = True,
+) -> dict:
+    _id = f"{d_date}-{analysis.value}"
+    context.log.info(_id)
+    pipeline = unique_address_pipeline(height_for_first_block, height_for_last_block)
     result = mongodb.mainnet[Collections.impacted_addresses].aggregate(pipeline)
     ll = list(result)
 

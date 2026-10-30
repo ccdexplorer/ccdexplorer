@@ -139,6 +139,18 @@ def find_new_instances_from_project_modules(mongodb: MongoDB):
 
 
 def get_start_end_block_from_date(mongodb: MongoDB, date: str) -> tuple[int, int]:
+    """First and last block height covering `date`.
+
+    blocks_per_day only gets a row once a day is complete, so today never has
+    one -- and neither does any period end, because week_end and month_end
+    always sit ahead of the date being processed. Every weekly and monthly run
+    takes the branch below.
+
+    The end height used to be 1_000_000_000 there, which is not a bound: the
+    $match it feeds runs to the head of the chain and about twenty times past
+    it. Reading the real head costs one lookup, served by the descending
+    height index on blocks.
+    """
     result = mongodb.mainnet[Collections.blocks_per_day].find_one({"date": date})
     if result:
         return result["height_for_first_block"], result["height_for_last_block"]
@@ -148,13 +160,17 @@ def get_start_end_block_from_date(mongodb: MongoDB, date: str) -> tuple[int, int
         # find yesterday's date and find the last block there
         yesterday_date = f"{(parser.parse(date) - timedelta(days=1)):%Y-%m-%d}"
         result = mongodb.mainnet[Collections.blocks_per_day].find_one({"date": yesterday_date})
-        end_height = 1_000_000_000
         if not result:
             # if we cannot find yesterday's date, we are requesting a further date
             start_height = 0
         else:
             # we have found yesterday, so we can set the start height
             start_height = result["height_for_last_block"] + 1
+
+        # A dropped devnet has no blocks at all; nothing can match the old
+        # sentinel there either, so it stays as the fallback.
+        head = mongodb.mainnet[Collections.blocks].find_one({}, sort=[("height", -1)])
+        end_height = head["height"] if head else 1_000_000_000
 
         return start_height, end_height
 
