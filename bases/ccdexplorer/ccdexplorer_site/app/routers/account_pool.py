@@ -151,7 +151,7 @@ async def get_account_payday_stats(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Current Payday Stats"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_current_payday_stats"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_current_payday_stats"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{index}/current-payday-stats",
@@ -259,7 +259,7 @@ async def get_account_pool_delegators(
     user: SiteUser | None = await get_user_detailsv2(request)
     request.state.api_calls = {}
     request.state.api_calls["Pool Delegators"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_pool_delegators"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_pool_delegators"
     )
     skip = (page - 1) * size
     api_result = await get_url_from_api(

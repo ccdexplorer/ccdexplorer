@@ -44,6 +44,12 @@ MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
 API_NET = os.environ.get("API_NET", "mainnet")
 API_URL = os.environ.get("API_URL")
+# Where a process fetches the api from, as opposed to the api a visitor is
+# shown. On ccd-100 the site reaches the api over the WireGuard address
+# instead of its own public hostname, which saves a TLS handshake and a
+# round trip out to the internet and back for every call a page makes.
+# Unset, it is API_URL, so nothing changes for anything that does not set it.
+API_URL_INTERNAL = os.environ.get("API_URL_INTERNAL") or API_URL
 LOGIN_SECRET = os.environ.get("LOGIN_SECRET")
 API_KEY_HEADER = "x-ccdexplorer-key"
 API_CODEX_KEY = os.environ.get("API_CODEX_KEY")
@@ -137,6 +143,7 @@ environment = {
     "API_ACCOUNT_MAINNET": API_ACCOUNT_MAINNET,
     "API_NET": API_NET,
     "API_URL": API_URL,
+    "API_URL_INTERNAL": API_URL_INTERNAL,
     "SENTRY_ENVIRONMENT": SENTRY_ENVIRONMENT,
     "REDIS_URL": REDIS_URL,
     "SENTRY_DSN": SENTRY_DSN,

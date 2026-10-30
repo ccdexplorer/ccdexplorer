@@ -616,96 +616,96 @@ async def get_account(
         )
 
     request.state.api_calls["Account Info"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_info"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_info"
     )
     request.state.api_calls["Identity Providers"] = (
-        f"{request.app.api_url}/docs#/Misc/get_identity_providers"
+        f"{request.app.api_docs_url}/docs#/Misc/get_identity_providers"
     )
     request.state.api_calls["Account Transactions"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_txs"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_txs"
     )
     request.state.api_calls["Rewards Available"] = (
-        f"{request.app.api_url}/docs#/Account/get_bool_account_rewards_available"
+        f"{request.app.api_docs_url}/docs#/Account/get_bool_account_rewards_available"
     )
     request.state.api_calls["APY Data"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_apy_data_v2"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_apy_data_v2"
     )
     request.state.api_calls["Tokens Available"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_tokens_available"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_tokens_available"
     )
     request.state.api_calls["Smart Wallet Details"] = (
-        f"{request.app.api_url}/docs#/Smart%20Wallet/get_smart_wallet_details_from_public_key"
+        f"{request.app.api_docs_url}/docs#/Smart%20Wallet/get_smart_wallet_details_from_public_key"
     )
     request.state.api_calls["CCD Balance in USD"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_balance_in_USD"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_balance_in_USD"
     )
     request.state.api_calls["Fungible Tokens Value in USD"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_fungible_tokens_value_in_USD"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_fungible_tokens_value_in_USD"
     )
     request.state.api_calls["PLT Value in USD"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_plt_tokens_value_in_USD"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_plt_tokens_value_in_USD"
     )
     request.state.api_calls["Token Symbols for Flow"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_token_symbols_for_flow"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_token_symbols_for_flow"
     )
     request.state.api_calls["PLT Symbols for Flow"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_plt_symbols_for_flow"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_plt_symbols_for_flow"
     )
     request.state.api_calls["Verified Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_fungible_tokens_verified"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_fungible_tokens_verified"
     )
     request.state.api_calls["Verified Non-Fungible Tokens"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_non_fungible_tokens_verified"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_non_fungible_tokens_verified"
     )
     request.state.api_calls["Unverified Tokens"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_tokens_unverified"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_tokens_unverified"
     )
     request.state.api_calls["Aliases in Use"] = (
-        f"{request.app.api_url}/docs#/Account/get_aliases_in_use_for_account"
+        f"{request.app.api_docs_url}/docs#/Account/get_aliases_in_use_for_account"
     )
     request.state.api_calls["Deployed Tx"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_deployment_tx"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_deployment_tx"
     )
     request.state.api_calls["Transactions for Flow"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_transactions_for_flow_graph"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_transactions_for_flow_graph"
     )
     request.state.api_calls["Rewards for Flow"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_rewards_for_flow_graph"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_rewards_for_flow_graph"
     )
     request.state.api_calls["Pool Info"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_pool_info"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_pool_info"
     )
     request.state.api_calls["Node"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_validator_node"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_validator_node"
     )
     request.state.api_calls["Earliest Win Time"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_earliest_win_time"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_earliest_win_time"
     )
     request.state.api_calls["Current Payday Stats"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_current_payday_stats"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_current_payday_stats"
     )
     request.state.api_calls["Validator/Account Staking Rewards"] = (
-        f"{request.app.api_url}/docs#/Account/get_staking_rewards_object"
+        f"{request.app.api_docs_url}/docs#/Account/get_staking_rewards_object"
     )
 
     request.state.api_calls["Pool Delegators"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_pool_delegators"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_pool_delegators"
     )
     request.state.api_calls["Validator Tally"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_tally"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_tally"
     )
     request.state.api_calls["Validator Transactions"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_validator_txs"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_validator_txs"
     )
 
     request.state.api_calls["Staking Rewards"] = (
-        f"{request.app.api_url}/docs#/Account/get_staking_rewards_bucketed"
+        f"{request.app.api_docs_url}/docs#/Account/get_staking_rewards_bucketed"
     )
     request.state.api_calls["Validator Performance"] = (
-        f"{request.app.api_url}/docs#/Account/get_validator_performance"
+        f"{request.app.api_docs_url}/docs#/Account/get_validator_performance"
     )
     request.state.api_calls["Block Info"] = (
-        f"{request.app.api_url}/docs#/Block/get_block_at_height_from_grpc"
+        f"{request.app.api_docs_url}/docs#/Block/get_block_at_height_from_grpc"
     )
     # TODO
     exchange_rates = {"CCD": {"rate": 1}}
@@ -1429,7 +1429,7 @@ async def get_account_tx_sent_latest_first(
 ):
     request.state.api_calls = {}
     request.state.api_calls["Sent Transactions"] = (
-        f"{request.app.api_url}/docs#/Account/get_account_txs_sent_latest_first"
+        f"{request.app.api_docs_url}/docs#/Account/get_account_txs_sent_latest_first"
     )
     api_result = await get_url_from_api(
         f"{request.app.api_url}/v2/{net}/account/{account_address}/transactions/sent/latest_first",

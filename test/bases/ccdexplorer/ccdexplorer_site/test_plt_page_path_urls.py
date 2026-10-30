@@ -34,6 +34,8 @@ def _request():
         app=SimpleNamespace(
             templates=templates,
             api_url="http://api",
+            # The fetch url and the url shown in the footer are separate now.
+            api_docs_url="http://public-api",
             httpx_client=None,
             env={},
         ),

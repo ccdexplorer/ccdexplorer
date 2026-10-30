@@ -41,16 +41,16 @@ async def staking(
     account_apy_object = api_result.return_value if api_result.ok else {}
 
     request.state.api_calls = {}
-    request.state.api_calls["Paydays"] = f"{request.app.api_url}/docs#/Accounts/get_paydays"
-    request.state.api_calls["Pools"] = f"{request.app.api_url}/docs#/Accounts/get_payday_pools"
+    request.state.api_calls["Paydays"] = f"{request.app.api_docs_url}/docs#/Accounts/get_paydays"
+    request.state.api_calls["Pools"] = f"{request.app.api_docs_url}/docs#/Accounts/get_payday_pools"
     request.state.api_calls["Passive Delegation Info"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_payday_passive_info"
+        f"{request.app.api_docs_url}/docs#/Accounts/get_payday_passive_info"
     )
     request.state.api_calls["Passive Delegators"] = (
-        f"{request.app.api_url}/docs#/Accounts/get_payday_passive_delegators"
+        f"{request.app.api_docs_url}/docs#/Accounts/get_payday_passive_delegators"
     )
     request.state.api_calls["Passive Delegation Rewards"] = (
-        f"{request.app.api_url}/docs#/Account/get_staking_rewards_object"
+        f"{request.app.api_docs_url}/docs#/Account/get_staking_rewards_object"
     )
     if net == "mainnet":
         all_pools: dict = request.app.staking_pools_cache
