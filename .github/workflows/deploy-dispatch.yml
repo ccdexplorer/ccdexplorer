@@ -1,0 +1,52 @@
+# Tell the deploy repo that a build landed on main.
+#
+# This repository is public, so it does no deploying itself and holds no
+# infrastructure credentials: a self-hosted runner here could be reached by a
+# fork's pull request. All it does is name a service and a sha. The private
+# deploy repo decides what that means and does the work, on a runner inside
+# the tunnel.
+name: Dispatch deploy
+
+on:
+  workflow_run:
+    workflows: ["Build & Push Projects"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  dispatch:
+    # A failed or cancelled build has nothing worth deploying.
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch each service that was actually built
+        env:
+          TOKEN: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+          TARGET: ${{ secrets.DEPLOY_DISPATCH_REPO }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          TAG="${SHA::7}"
+          sent=0
+          for service in site api; do
+            image="ccdexplorer/pl-ccdexplorer_${service}"
+            # The build is path-filtered, so most commits build neither of
+            # these. Asking the registry whether the tag exists is the honest
+            # question -- it needs no coupling to the build's matrix, and it
+            # cannot say yes for an image that was not pushed.
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              "https://hub.docker.com/v2/repositories/${image}/tags/${TAG}")
+            if [ "$code" != "200" ]; then
+              echo "no ${image}:${TAG} (HTTP ${code}); skipping ${service}"
+              continue
+            fi
+            echo "dispatching ${service} at ${TAG}"
+            curl -sS -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${TARGET}/dispatches" \
+              -d "{\"event_type\":\"deploy\",\"client_payload\":{\"service\":\"${service}\",\"tag\":\"${TAG}\"}}"
+            sent=$((sent + 1))
+          done
+          echo "dispatched ${sent} service(s) for ${TAG}"
