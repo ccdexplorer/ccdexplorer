@@ -49,7 +49,15 @@ def _resolve_caller_name(caller_name: str | None) -> str:
         del frame
 
 
-def _client_kwargs(nearest: bool, caller_name: str) -> dict:
+#: How long a majority-acknowledged write waits before reporting a timeout.
+#: Generous, because the replica set spans the WireGuard tunnel and a slow
+#: secondary should not fail a write that is about to be acknowledged.
+DURABLE_WRITE_TIMEOUT_MS = 30_000
+
+
+def _client_kwargs(
+    nearest: bool, caller_name: str, durable_writes: bool = False
+) -> dict:
     """Shared connection options for MongoDB()/MongoMotor().
 
     `appname` is what makes a connection attributable server-side: it shows up
@@ -58,6 +66,17 @@ def _client_kwargs(nearest: bool, caller_name: str) -> dict:
     only used for local error messages and never reached the driver.
 
     `maxPoolSize` bounds each client's pool -- see MONGO_MAX_POOL_SIZE.
+
+    `durable_writes` asks for `w="majority"` on every write this client makes,
+    rather than the default `w=1` acknowledgement from the primary alone. A
+    w=1 write is acknowledged before any secondary has it, so an election
+    discards it: on 2026-10-30 ccd-100 stopped answering replication
+    heartbeats, lost the primary, and rolled back eleven seconds of writes
+    that had all been reported successful. Opt-in rather than the default
+    because majority costs a round trip to a secondary on every write, which
+    the per-block ingest path does thousands of times and cannot afford --
+    and which it does not need, since it recomputes from the chain. Jobs
+    whose output is computed once and never revisited do need it.
     """
     kwargs: dict = {
         "appname": f"ccdexplorer:{caller_name}",
@@ -66,6 +85,13 @@ def _client_kwargs(nearest: bool, caller_name: str) -> dict:
     read_pref = _resolve_read_preference(nearest)
     if read_pref is not None:
         kwargs["read_preference"] = read_pref
+    if durable_writes:
+        # wtimeoutms bounds the wait, and a write that times out is NOT rolled
+        # back -- it may still commit afterwards. That ambiguity is acceptable
+        # only where the caller can safely redo the write, which is why this
+        # is documented on the parameter rather than hidden here.
+        kwargs["w"] = "majority"
+        kwargs["wtimeoutms"] = DURABLE_WRITE_TIMEOUT_MS
     return kwargs
 
 
@@ -249,11 +275,22 @@ class MongoDB:
         tooter: Tooter | None,
         nearest: bool = False,
         caller_name: str | None = None,
+        durable_writes: bool = False,
     ):
+        """`durable_writes=True` makes every write here wait for a majority of
+        the replica set, so an election cannot discard it. Use it where losing
+        an acknowledged write loses data for good -- a statistic computed once
+        for a date and never revisited -- and where redoing a write is safe,
+        because a majority write that times out leaves an ambiguous outcome.
+        See _client_kwargs for the incident this exists for.
+        """
         self.tooter = tooter
         self.caller_name = _resolve_caller_name(caller_name)
         try:
-            con = MongoClient(MONGO_URI, **_client_kwargs(nearest, self.caller_name))
+            con = MongoClient(
+                MONGO_URI,
+                **_client_kwargs(nearest, self.caller_name, durable_writes),
+            )
             self.connection: MongoClient = con
 
             self.mainnet_db = con["concordium_mainnet"]
