@@ -24,8 +24,16 @@ import ccdexplorer.dagster_nightrunner.src._jobs as _jobs
 import ccdexplorer.dagster_nightrunner.src.realized_prices as realized_prices
 import ccdexplorer.dagster_nightrunner.src.agent_registry_statistics as agent_registry
 import ccdexplorer.dagster_nightrunner.src.cooldowns as cooldowns
+import ccdexplorer.dagster_nightrunner.src._sentry as _sentry
+
+# Here rather than inside the sensor: a run worker is a separate process that
+# imports this module and inherits no Sentry client, so arming it at import is
+# what covers both the code server and every run. A test run gets a client with
+# no transport -- see ccdexplorer.env.sentry_dsn.
+_sentry.init_sentry()
 
 defs = dg.Definitions.merge(
+    dg.Definitions(sensors=[_sentry.report_failures_to_sentry]),
     accounts_repo.defs,
     account_graph_data.defs,
     tx_types.defs,

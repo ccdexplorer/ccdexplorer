@@ -32,8 +32,27 @@ def shared_mongodb() -> MongoDB:
     of a run worker, and one for the long-lived code server where schedules
     evaluate. Lazy rather than at import, so importing the definitions opens
     nothing.
+
+    durable_writes: every statistic here is computed once for a date and then
+    read forever -- nothing recomputes it, so a write that is acknowledged and
+    then discarded by an election is a permanently wrong number with no
+    symptom. That is not hypothetical: on 2026-10-30 the monthly
+    unique-addresses run examined 1.4 million documents, mongod stopped
+    answering replication heartbeats, ccd-100 lost the primary, and eleven
+    seconds of acknowledged writes went away. Majority acknowledgement costs a
+    round trip per write, which a nightly batch job can easily afford.
+
+    The writes are idempotent `ReplaceOne(..., upsert=True)` keyed on a
+    deterministic `_id`, which is what makes the timeout safe to retry: a
+    majority write that times out may or may not have committed, and the only
+    sound response is to do it again.
     """
-    return MongoDB(Tooter(), nearest=True, caller_name="dagster_nightrunner")
+    return MongoDB(
+        Tooter(),
+        nearest=True,
+        caller_name="dagster_nightrunner",
+        durable_writes=True,
+    )
 
 
 class MongoDBResource(dg.ConfigurableResource):
