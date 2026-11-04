@@ -72,7 +72,7 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2 import (
     transaction_v2,
     transactions_v2,
 )
-from ccdexplorer.env import REDIS_URL, environment, sentry_dsn
+from ccdexplorer.env import BUILD_TAG, REDIS_URL, environment, sentry_dsn
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.tooter import Tooter
 
@@ -617,6 +617,18 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     @app.get("/health", include_in_schema=False)
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    # What build is actually answering. /health cannot close this gap: both
+    # blue/green colours answer it 200, which is what blue/green means, so it
+    # proves a container is alive and nothing about which image it is.
+    #
+    # BUILD_TAG is baked into the image at docker build time, so this is the
+    # container's own account of itself rather than a repeat of what the
+    # deployer set. That is what lets the deploy gate assert that the thing it
+    # health-checked is the thing it built.
+    @app.get("/version", include_in_schema=False)
+    def version() -> dict[str, str]:
+        return {"build": BUILD_TAG}
 
     # # V2
     app.include_router(account_v2.router)

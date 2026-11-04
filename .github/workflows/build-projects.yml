@@ -152,6 +152,11 @@ jobs:
           fi
 
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+          # Same value the image is tagged with, as a step output so the build
+          # can bake it in. It has to be the same string the deploy pipeline
+          # asks the registry for and pins into the compose, or the gate that
+          # compares them fails on a build that is in fact correct.
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "Using tags: $TAGS"
 
       - name: Sanity check project Dockerfile
@@ -167,6 +172,13 @@ jobs:
           file: projects/${{ matrix.project }}/Dockerfile
           push: true
           platforms: linux/amd64
+          # So a running container can be asked which build it is. Only the
+          # site and the api declare this ARG -- they are the two with a
+          # /version route and a deploy gate that checks it -- and docker only
+          # warns about an unconsumed build-arg, so passing it to every project
+          # costs nothing and keeps this step uniform.
+          build-args: |
+            BUILD_TAG=${{ steps.tags.outputs.short_sha }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

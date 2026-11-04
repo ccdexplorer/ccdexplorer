@@ -46,5 +46,14 @@ ENV HOME=/home/app \
 USER app
 
 WORKDIR /app/projects/ccdexplorer_site
+# Last, and deliberately so: an ARG that changes on every commit invalidates
+# every layer built after it, so declaring this near the top would defeat the
+# build cache on each push. Nothing below it is expensive.
+#
+# Baked in here rather than set in the compose file because the blue/green
+# deploy gate asks a running container which build it is, and an answer the
+# deployer supplied would only repeat what the deployer already believed.
+ARG BUILD_TAG=unknown
+ENV BUILD_TAG=${BUILD_TAG}
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "80", "--no-access-log"]

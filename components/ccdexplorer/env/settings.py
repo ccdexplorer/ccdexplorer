@@ -9,6 +9,12 @@ load_dotenv()
 LIVE_PORT = os.environ.get("LIVE_PORT", "")
 BRANCH = os.environ.get("BRANCH", "dev")
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "prod")
+# The short sha this image was built from, baked in at docker build time by
+# build-projects.yml -- not set at deploy time, which is the whole point. The
+# blue/green pipeline needs to ask a running container which build it is, and
+# an answer the deployer supplied would only repeat what the deployer already
+# believed. "unknown" means the image was built outside that workflow.
+BUILD_TAG = os.environ.get("BUILD_TAG", "unknown")
 NOTIFIER_API_TOKEN = os.environ.get("NOTIFIER_API_TOKEN")
 SITE_URL = os.environ.get("SITE_URL")
 API_TOKEN = os.environ.get("API_TOKEN", "api_token")
@@ -150,4 +156,5 @@ environment = {
     "TX_REQUEST_LIMIT_DISPLAY": TX_REQUEST_LIMIT_DISPLAY,
     "NET": "mainnet",
     "ENVIRONMENT": ENVIRONMENT,
+    "BUILD_TAG": BUILD_TAG,
 }
