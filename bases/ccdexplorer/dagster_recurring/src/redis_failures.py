@@ -34,13 +34,20 @@ def redis_failures(
 job = dg.define_asset_job(f"j_{asset_name}", selection=[redis_failures])
 
 
+# Every tick fans out one run per net, so this schedule alone cost 864 runs a
+# day at */5 -- and with j_top_impacted_addresses it made up most of the 2,430
+# daily runs behind a 958MB instance database (event_logs 661MB) that
+# dagster_pg_backup dumps hourly to R2. The upper bound on this interval is
+# get_failures_last_x_blocks' 1,000-block window: at mainnet's block time that
+# is roughly half an hour of chain, so a failure has to be noticed well inside
+# it. */15 keeps a wide margin; */30 would not.
 @dg.schedule(
     job=job,
-    cron_schedule="*/5 * * * *",
+    cron_schedule="*/15 * * * *",
     name=f"s_{asset_name}",
 )
 def schedule(context):
-    """Schedule that runs all partitions every 5 minutes"""
+    """Schedule that runs all partitions every 15 minutes"""
     # Get all partition keys and create a run request for each
     run_records = context.instance.get_run_records(
         dg.RunsFilter(

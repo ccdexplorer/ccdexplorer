@@ -26,9 +26,14 @@ def top_impacted_addresses(
 job = dg.define_asset_job(f"j_{asset_name}", selection=[top_impacted_addresses])
 
 
+# Same reason as s_redis_failures: one run per net per tick, 864 a day at */5.
+# Nothing is skipped by running less often -- update_top_impacted_addresses
+# works from its own marker in `helpers` up to the heartbeat block, so a longer
+# interval only means each run aggregates more blocks. The cost is that the top
+# list behind the tx lists can be up to 15 minutes stale instead of 5.
 @dg.schedule(
     job=job,
-    cron_schedule="*/5 * * * *",
+    cron_schedule="*/15 * * * *",
     name=f"s_{asset_name}",
 )
 def schedule(context):
