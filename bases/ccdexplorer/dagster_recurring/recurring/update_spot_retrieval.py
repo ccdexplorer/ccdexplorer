@@ -1,7 +1,7 @@
 import datetime as dt
-import time
 from collections.abc import Sequence
 from datetime import timezone
+from time import sleep
 
 import dateutil
 import httpx2 as httpx
@@ -229,7 +229,7 @@ def perform_spot_retrieval_update(
                 # CoinAPI, which can price a token that has no CoinGecko id.
                 # These are one request each, so they stay paced.
                 if coinapi_calls:
-                    time.sleep(PACING_SECONDS)
+                    sleep(PACING_SECONDS)
                 coinapi_calls += 1
                 result = fetch_rate_from_coinapi(context, token, client)
 

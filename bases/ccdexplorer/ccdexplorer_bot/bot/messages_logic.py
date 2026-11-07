@@ -38,9 +38,14 @@ console = Console()
 
 
 class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Utils):
-    # TODO make lines the same
-    line_top = "___________________________________"
-    line_bottom = "\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e\u203e"
+    # Both rules are built from one width, which is the whole point: they were
+    # written out by hand as 35 underscores against 55 overlines, so every
+    # notification closed 20 characters wider than it opened. The longest line
+    # they have to span is the footer's own
+    # "Notification type: Validator - Payday pool reward", at 49.
+    line_width = 55
+    line_top = "_" * line_width
+    line_bottom = "\u203e" * line_width
 
     def token_amount_using_decimals(self, value: int, decimals: int = None):
         if not decimals:
@@ -154,17 +159,23 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
                 if impacted_address.address_type == AddressType.receiver:
                     address_type = "Receiver"
                 footer_impacted_addresses += f"{address_type}: <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.index}{tab}'>{impacted_address.label}</a><br/>"
-        footer = f"""
-{self.line_top}<br/>
-{footer_time}
-{footer_block}
-{footer_tx}
-{footer_impacted_addresses}
-{footer_notification_limit}
-{footer_event_type}
-{self.line_bottom}<br/>
-"""
-        return footer
+        # Joined rather than interpolated into one multi-line f-string. Each
+        # of these is conditional -- a payday event has no transaction and no
+        # notification limit -- and an empty one still left its own newline
+        # behind, so the footer carried a blank line wherever a field happened
+        # not to apply. That is a separate fault from the double breaks
+        # for_telegram() normalises: there is no <br/> involved to collapse.
+        footer_lines = [
+            f"{self.line_top}<br/>",
+            footer_time,
+            footer_block,
+            footer_tx,
+            footer_impacted_addresses,
+            footer_notification_limit,
+            footer_event_type,
+            f"{self.line_bottom}<br/>",
+        ]
+        return "\n" + "\n".join(line for line in footer_lines if line) + "\n"
 
     def footer_email(
         self,

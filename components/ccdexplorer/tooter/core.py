@@ -1,5 +1,7 @@
 from enum import Enum
 
+import re
+
 import aiohttp
 import requests
 
@@ -13,6 +15,32 @@ from ccdexplorer.env import (
     MAILTO_USER,
     NOTIFIER_API_TOKEN,
 )
+
+
+
+def for_telegram(body: str) -> str:
+    """One line break per intended break, for Telegram only.
+
+    The message definitions are HTML and break lines with `<br/>`, but they are
+    also readable multi-line f-strings, so many bodies carry real newlines too.
+    Apprise used to collapse the whitespace around a `<br>`; since 2.1.0 it does
+    not, so `...(Tx fees)<br/>` followed by `"\nDistribution..."` became two
+    newlines where it had been one -- blank lines right through every
+    notification (2026-10-29).
+
+    Rather than rewrite ~270 break sites across six files, every break is
+    normalised here, where all three Telegram paths meet: tags become newlines,
+    and a run of them collapses to at most one blank line. Email keeps its tags,
+    because real HTML mail needs them.
+    """
+    # A tag that ends a line swallows the source newline after it: the author
+    # wrote one break, the newline is just how the f-string was laid out.
+    # Consecutive tags keep their count, so `<br/><br/>` is still a blank line.
+    body = re.sub(r"[ \t]*<br\s*/?>[ \t]*\n?", "\n", body, flags=re.IGNORECASE)
+    body = re.sub(r"[ \t]+\n", "\n", body)
+    # Never more than one blank line, whatever the source did.
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    return body.strip()
 
 
 class TooterType(Enum):
@@ -83,8 +111,8 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
 
         payload = {
             "urls": f"tgram://{API_TO_USE}/{chat_id}",
-            "title": f"{title}<br/>",
-            "body": body,
+            "title": for_telegram(f"{title}<br/>"),
+            "body": for_telegram(body),
             "format": "html",
         }
         _ = requests.post(self.url, json=payload)
@@ -101,8 +129,8 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
         chat_id = ADMIN_CHAT_ID if channel == TooterChannel.NOTIFIER else chat_id
         payload = {
             "urls": f"tgram://{API_TO_USE}/{chat_id}",
-            "title": f"{title}<br/>",
-            "body": body,
+            "title": for_telegram(f"{title}<br/>"),
+            "body": for_telegram(body),
             "format": "html",
         }
         async with aiohttp.ClientSession(self.plain_url) as session:
@@ -135,8 +163,8 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
 
         payload = {
             "urls": f"tgram://{API_TO_USE}/{chat_id}",
-            "title": title,
-            "body": body,
+            "title": for_telegram(title),
+            "body": for_telegram(body),
             "format": "html",
         }
         _ = requests.post(self.url, json=payload)
