@@ -124,7 +124,14 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
         notifier_type: TooterType,
         title: str,
         chat_id: str | int | None = None,
-    ):
+    ) -> int:
+        """Post one notification, and report what apprise said about it.
+
+        The status is returned rather than only printed because `424` is not
+        noise -- it is Telegram saying this recipient has blocked the bot, and
+        the caller is the only one in a position to remember that. Printing it
+        and returning None is what let four blocked chats be sent to for weeks.
+        """
         API_TO_USE = self.BOT_API_TOKEN if channel == TooterChannel.BOT else self.NOTIFIER_API_TOKEN
         chat_id = ADMIN_CHAT_ID if channel == TooterChannel.NOTIFIER else chat_id
         payload = {
@@ -139,8 +146,7 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
                     print(
                         f"Error sending notification to {chat_id}. Status code= {response.status}."
                     )
-                else:
-                    pass
+                return response.status
 
     def send(
         self,

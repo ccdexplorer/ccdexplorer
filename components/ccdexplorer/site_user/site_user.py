@@ -150,3 +150,9 @@ class SiteUser(BaseModel):
     verification_token: Optional[str] = None  # uuid, added until email is verified
     verification_token_expires: Optional[dt.datetime] = None  # when the verification token lapses
     email_verified: Optional[bool] = None  # True once the email link is confirmed
+    # Telegram refuses delivery with 424 once the recipient has blocked the bot,
+    # and says nothing when they unblock it. Both fields are absent for every
+    # user whose messages arrive; see ccdexplorer_bot/telegram_delivery.py for
+    # who writes them and what the count has to reach.
+    telegram_consecutive_failures: Optional[int] = None
+    telegram_blocked_since: Optional[dt.datetime] = None  # set when the count tripped

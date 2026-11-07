@@ -389,7 +389,17 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
         notification_services_to_send: dict[NotificationServices, bool],
         message_response: MessageResponse,
     ):
-        if notification_services_to_send[NotificationServices.telegram] and user.telegram_chat_id:
+        # A chat that has blocked the bot is skipped here rather than further
+        # down the pipeline, so a blocked user costs no celery task, no apprise
+        # request and no log line -- which is the whole point. ms_bot_sender set
+        # this after TELEGRAM_FAILURE_LIMIT consecutive 424s; the flag is read
+        # from the users collection, which this process re-reads every 10s, so
+        # it takes effect within one refresh of being set or cleared.
+        if (
+            notification_services_to_send[NotificationServices.telegram]
+            and user.telegram_chat_id
+            and not user.telegram_blocked_since
+        ):
             await self.publish_to_celery(
                 service=NotificationServices.telegram,
                 user=user,

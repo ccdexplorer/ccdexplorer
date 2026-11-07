@@ -16,6 +16,7 @@ from ccdexplorer.mongodb import (
 )
 from telegram.ext import ContextTypes
 from rich.console import Console
+from ..telegram_delivery import users_collection_name
 from .telegram_logic import Mixin as _telegram_logic
 from .messages_logic import Mixin as _messages_logic
 from .blocks_logic import Mixin as _blocks_logic
@@ -30,8 +31,6 @@ from ccdexplorer.domain.mongo import (
 from redis.asyncio import Redis
 
 console = Console()
-
-import sys
 
 
 class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
@@ -61,13 +60,14 @@ class Bot(_telegram_logic, _messages_logic, _blocks_logic, _nodes_logic):
         )
 
     def users_collection(self):
-        """The users collection in use (dev under pytest, prod otherwise)."""
-        name = (
-            CollectionsUtilities.users_v2_dev
-            if "pytest" in sys.modules
-            else CollectionsUtilities.users_v2_prod
-        )
-        return self.connections.mongodb.utilities[name]
+        """The users collection in use (dev under pytest, prod otherwise).
+
+        The choice is made in telegram_delivery because ms_bot_sender has to
+        make the same one -- it marks blocked chats in this collection, and if
+        the two processes disagreed about which it is, the bot would read a
+        flag the sender never wrote.
+        """
+        return self.connections.mongodb.utilities_db[users_collection_name()]
 
     def read_users_from_collection(self):
         result = self.users_collection().find({})
