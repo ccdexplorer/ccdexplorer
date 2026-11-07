@@ -70,9 +70,18 @@ def sleeps(monkeypatch):
     Patching the sleep rather than the constant keeps PACING_SECONDS readable in
     tests, so its value can be asserted -- it is rate-limit protection, and it
     has been lowered by accident before.
+
+    The name in this module, never `time.sleep` itself. `update_spot_retrieval.time`
+    was the time module, so this autouse fixture used to neuter sleeping for the
+    whole process while any test in this file ran. Anything polling elsewhere in
+    the worker then stopped waiting and spun: on 2026-11-07 this list came back
+    holding 175,053 entries of 0.5 instead of [10, 10], and the spin took a
+    sibling test out on the 150s pytest timeout. Whether that bites depends on
+    how xdist happens to split the suite, so it stayed hidden until two test
+    files were added elsewhere.
     """
     recorded: list[float] = []
-    monkeypatch.setattr(update_spot_retrieval.time, "sleep", recorded.append)
+    monkeypatch.setattr(update_spot_retrieval, "sleep", recorded.append)
     return recorded
 
 
