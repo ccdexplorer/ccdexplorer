@@ -1,7 +1,9 @@
 from enum import Enum
 
+import datetime as dt
 import re
 import time
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aiohttp
 import requests
@@ -9,6 +11,9 @@ import requests
 from ccdexplorer.env import (
     ADMIN_CHAT_ID,
     API_TOKEN,
+    BARK_QUIET_END,
+    BARK_QUIET_START,
+    BARK_QUIET_TZ,
     BARK_URL,
     BRANCH,
     ENVIRONMENT,
@@ -19,13 +24,86 @@ from ccdexplorer.env import (
 )
 
 
-
 # How long one condition stays quiet on Bark after it has rung. Watchtower
 # re-checks every 60 seconds, so without this a fault that lasts an hour is
 # sixty critical alerts, each ringing for thirty seconds -- which is how a
 # pager gets muted and then ignored. Telegram is unaffected and keeps the
 # full minute-by-minute record.
 CRITICAL_COOLDOWN_SECONDS = 30 * 60
+
+
+def _now() -> dt.datetime:
+    """Wall clock, aware. Deliberately separate from `time.monotonic()`.
+
+    The cooldown measures elapsed time and must not move when the clock is
+    set; the quiet window asks what time it is where the phone is. Two
+    different questions, so two different clocks.
+    """
+    return dt.datetime.now(dt.UTC)
+
+
+class QuietHours:
+    """A wall-clock window in which Bark stays silent.
+
+    A critical alert is built to defeat Do Not Disturb -- that is the entire
+    reason it exists -- so the phone cannot silence it and this is the only
+    place a night window can be honoured. Telegram is left alone: it obeys
+    silent mode already, so it cannot wake anyone, and it is the record of
+    what the estate did overnight.
+
+    The zone is explicit rather than read from the host. Almost none of these
+    containers set TZ, so they run on UTC -- an hour behind Amsterdam in
+    winter and two in summer -- and a naive `datetime.now()` would hold
+    00:00-07:00 local in January and 01:00-08:00 in July. ZoneInfo also keeps
+    the window from drifting when the clocks change.
+    """
+
+    def __init__(self, start: dt.time, end: dt.time, tz: ZoneInfo) -> None:
+        self.start = start
+        self.end = end
+        self.tz = tz
+
+    @classmethod
+    def parse(cls, start: str, end: str, tz: str) -> "QuietHours | None":
+        """A window from three env strings, or None if there is not one.
+
+        Fails open, and says so. A typo in BARK_QUIET_START must not turn
+        paging off: silence is indistinguishable from a healthy estate, so
+        that failure would stay invisible for exactly as long as it mattered.
+        """
+        if not (start or "").strip() or not (end or "").strip():
+            return None
+        try:
+            return cls(_clock(start), _clock(end), ZoneInfo(tz.strip()))
+        except (ValueError, ZoneInfoNotFoundError, KeyError) as exc:
+            print(f"Bark: ignoring quiet hours {start!r}-{end!r} {tz!r}: {exc}")
+            return None
+
+    def covers(self, moment: dt.datetime) -> bool:
+        """Whether `moment` -- in any zone -- falls inside the window.
+
+        Half-open, so "23:00-06:00" reads as it sounds: asleep at 23:00,
+        awake at 06:00. A start equal to its end is an empty window rather
+        than an all-day mute; guessing the other way would silence paging
+        completely and invisibly.
+        """
+        local = moment.astimezone(self.tz).time()
+        if self.start <= self.end:
+            return self.start <= local < self.end
+        return local >= self.start or local < self.end
+
+    def __str__(self) -> str:
+        return f"{self.start:%H:%M}-{self.end:%H:%M} {self.tz.key}"
+
+
+def _clock(text: str) -> dt.time:
+    """ "23:00", or the "23" anyone types first."""
+    parts = text.strip().split(":")
+    if not 1 <= len(parts) <= 2:
+        raise ValueError(f"not a time of day: {text!r}")
+    hour = int(parts[0])
+    minute = int(parts[1]) if len(parts) == 2 else 0
+    return dt.time(hour, minute)
 
 
 def for_telegram(body: str) -> str:
@@ -82,6 +160,9 @@ class Tooter:
         self.url = "https://tooter.ccdexplorer.io/notify/"
         self.plain_url = "https://tooter.ccdexplorer.io"
         self.bark_url = BARK_URL
+        #: Hours in which Bark stays silent; see QuietHours. None means page
+        #: at any hour, which is how this behaved before the window existed.
+        self.bark_quiet = QuietHours.parse(BARK_QUIET_START, BARK_QUIET_END, BARK_QUIET_TZ)
         # Per-condition cooldown clock, keyed by the caller's `key`. Process
         # local and in memory on purpose; see bark()'s docstring.
         self._bark_last_sent: dict[str, float] = {}
@@ -258,8 +339,19 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
         It is held in memory, so a restart re-pages. That is the right way
         round: a watchtower that just came up should re-assert what it finds
         rather than stay quiet about it.
+
+        Between BARK_QUIET_START and BARK_QUIET_END nothing is sent at all --
+        see QuietHours. This is the only place that window can be honoured,
+        because a critical alert exists specifically to override the phone's
+        own silence. Telegram still goes out, so nothing is lost from the log.
         """
         if not self.bark_url:
+            return
+        # Suppressed, not swallowed: the cooldown clock is left untouched, so
+        # a fault that lasted the night rings at the end of the window rather
+        # than starting the morning inside a half-hour cooldown for an alert
+        # that was never delivered. Telegram has gone out either way.
+        if self.bark_quiet is not None and self.bark_quiet.covers(_now()):
             return
         now = time.monotonic()
         last = self._bark_last_sent.get(key or message)
