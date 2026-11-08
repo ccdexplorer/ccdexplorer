@@ -3,6 +3,7 @@ from .settings import (
     LIVE_PORT,
     ADMIN_CHAT_ID,
     API_TOKEN,
+    BARK_URL,
     CHART_BOT_TOKEN,
     SITE_URL,
     BRANCH,
@@ -46,6 +47,7 @@ from .settings import (
 __all__ = [
     "LIVE_PORT",
     "ADMIN_CHAT_ID",
+    "BARK_URL",
     "API_TOKEN",
     "CHART_BOT_TOKEN",
     "SITE_URL",

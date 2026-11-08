@@ -30,11 +30,26 @@ def _core():
 
 
 class FakeTooter:
+    """Records both severities separately.
+
+    `messages` stays every message, whichever way it went, so the assertions
+    written before alert() existed still mean what they meant. `paged` is only
+    what went to Bark as well -- the split is the point of the change, and a
+    test that cannot see it cannot pin it.
+    """
+
     def __init__(self):
         self.messages = []
+        self.paged = []
+        self.keys = []
 
     def relay(self, *, channel, title, chat_id, body, notifier_type, **kw):
         self.messages.append(body)
+
+    def critical(self, message, key=None, chat_id=None):
+        self.messages.append(message)
+        self.paged.append(message)
+        self.keys.append(key)
 
 
 class FakeCollection:
@@ -292,3 +307,161 @@ async def test_a_lagging_secondary_is_reported():
     await wt.check_mongo()
 
     assert any("is 30 mins behind primary" in m for m in tooter.messages)
+
+
+# --- which conditions page, and which only inform -------------------------
+#
+# Every alert used to leave through one inform() as REQUESTS_ERROR, so
+# "ReplicaSet has no PRIMARY" and "Primary: ccd-100" were indistinguishable.
+# These pin the split: `paged` is what also rings the phone via Bark.
+# Getting it wrong in either direction is bad -- a missed outage, or a pager
+# that cries wolf until it is muted.
+
+
+async def test_no_primary_pages():
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={"members": [_member("a", 2, "SECONDARY"), _member("b", 2, "SECONDARY")]},
+            hello={"primary": None},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert any("no PRIMARY" in m for m in tooter.paged)
+    assert "watchtower:no-primary" in tooter.keys
+
+
+async def test_a_member_in_a_bad_state_pages():
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={
+                "members": [
+                    _member("a"),
+                    _member("b", 2, "SECONDARY"),
+                    _member("c", 8, "DOWN"),
+                ]
+            },
+            hello={"primary": "a"},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert any("has state DOWN" in m for m in tooter.paged)
+
+
+async def test_a_slow_ping_does_not_page():
+    """The one I would most regret paging on: PING_MS is a single fixed
+    threshold for a 1.4ms datacenter member and a 20ms member behind a
+    consumer line, and pingMs is an EWMA that has decayed by the time anyone
+    looks. It stays an inform.
+    """
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={
+                "members": [
+                    _member("a"),
+                    _member("b", 2, "SECONDARY", ping=431),
+                    _member("c", 2, "SECONDARY"),
+                ]
+            },
+            hello={"primary": "a"},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert any("431 ms" in m for m in tooter.messages)
+    assert tooter.paged == []
+
+
+async def test_a_failed_check_pages_rather_than_passing_silently():
+    """If the check itself cannot run we are blind, which is worse than any
+    single finding it could have reported."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(core, tooter=tooter, mongodb=FakeMongo(status={"bad": "shape"}))
+
+    await wt.check_mongo()
+
+    assert any("check_mongo:" in m for m in tooter.paged)
+
+
+async def test_a_stalled_heartbeat_pages_per_net():
+    """Nothing else in the estate watches indexer liveness -- live-everything
+    has no heartbeat or last_processed_block check at all."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            mainnet=[_marker("heartbeat_last_processed_block", 50)],
+            testnet=[_marker("heartbeat_last_processed_block", 100)],
+        ),
+    )
+
+    await wt.check_heartbeat_running()
+
+    assert any("mainnet: Heartbeat lagging 50" in m for m in tooter.paged)
+    assert "watchtower:heartbeat-lagging:mainnet" in tooter.keys
+
+
+async def test_a_lagging_bot_does_not_page():
+    """Notifications arrive late; nothing is down. It stays an inform."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            mainnet=[
+                _marker("heartbeat_last_processed_block", 200),
+                _marker("bot_last_processed_block", 150),
+            ]
+        ),
+    )
+
+    await wt.check_bot()
+
+    assert tooter.messages == ["Watchtower: Bot lagging 50 blocks."]
+    assert tooter.paged == []
+
+
+async def test_every_paged_alert_carries_a_stable_key():
+    """Replication lag and member state both name the member, because the
+    message text carries a number or state that changes between checks."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={
+                "members": [
+                    _member("a"),
+                    _member("b", 2, "SECONDARY", optime=NOW - dt.timedelta(minutes=30)),
+                    _member("c", 2, "SECONDARY"),
+                ]
+            },
+            hello={"primary": "a"},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert "watchtower:member-lag:b" in tooter.keys
+    assert all(k and k.startswith("watchtower:") for k in tooter.keys)

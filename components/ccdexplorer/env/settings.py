@@ -46,6 +46,17 @@ MONGO_READ_PREFERENCE = os.environ.get("MONGO_READ_PREFERENCE")
 # serial workers that never need anywhere near 100 concurrent sockets.
 MONGO_MAX_POOL_SIZE = int(os.environ.get("MONGO_MAX_POOL_SIZE", "20"))
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
+# An apprise `bark://` url for iOS push, used only by Tooter.critical() -- the
+# alerts that mean something is down, not the ones that mean something is
+# worth reading. It carries a device key, so it is a secret and lives in the
+# environment like every other token here.
+#
+# Unset is the normal case: most of the ~20 deployables that embed tooter have
+# no business paging anyone, and an unset value makes critical() behave exactly
+# like the telegram-only alert it replaced. Only the services that watch the
+# estate need it. Format, whole thing in one variable because apprise parses
+# it: bark://<host>/<device-key> (barks:// for https).
+BARK_URL = os.environ.get("BARK_URL", "")
 MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
 API_NET = os.environ.get("API_NET", "mainnet")
