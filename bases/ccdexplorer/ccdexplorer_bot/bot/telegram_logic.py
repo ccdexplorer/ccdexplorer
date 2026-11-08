@@ -11,6 +11,7 @@
 from ccdexplorer.tooter import TooterChannel, TooterType
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
 from pymongo import ReplaceOne
+from ..telegram_delivery import clear_telegram_block
 from .messages_logic import Mixin as messages_logic
 
 from ccdexplorer.site_user import (
@@ -58,6 +59,16 @@ class Mixin:
         if user:
             existing_user = user
             console.log("Existing user.")
+
+            # Talking to the bot is the only signal there is that someone
+            # unblocked it, and without acting on it a block would be
+            # permanent: a blocked chat is never sent to, so it can never earn
+            # the 200 that clears the count.
+            if existing_user.telegram_blocked_since or existing_user.telegram_consecutive_failures:
+                try:
+                    clear_telegram_block(self.users_collection(), telegram_user.id)
+                except Exception as e:
+                    console.log(f"Could not clear telegram block for {telegram_user.id}: {e}")
 
             mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='{SITE_URL}/token/{existing_user.token}'>link</a> to login on CCDExplorer."
             # console.log(f"{message.from_user.id} | {mess}")

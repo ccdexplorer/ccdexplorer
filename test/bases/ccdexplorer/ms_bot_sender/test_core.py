@@ -104,3 +104,76 @@ def test_send_message_email_path():
 
         mock_mail.assert_awaited_once()
         mock_tg.assert_not_awaited()
+
+
+# --- remembering who blocked the bot --------------------------------------
+#
+# A 424 from apprise is Telegram refusing delivery because the recipient
+# blocked the bot. This worker is the only part of the estate that sees it, so
+# it is the only part that can stop the next message being built. See
+# ccdexplorer_bot/telegram_delivery.py for the threshold and the queries.
+
+
+@pytest.mark.asyncio
+async def test_a_424_is_counted_against_the_chat():
+    msg = MessageResponse(
+        title_telegram="T", message_telegram="B", title_email="", message_email=""
+    )
+
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "record_telegram_success") as success,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=424)
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=msg)
+
+        failure.assert_called_once()
+        assert failure.call_args.args[1] == 777
+        success.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_delivery_clears_the_count():
+    msg = MessageResponse(
+        title_telegram="T", message_telegram="B", title_email="", message_email=""
+    )
+
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "record_telegram_success") as success,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=200)
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=msg)
+
+        success.assert_called_once()
+        failure.assert_not_called()
+
+
+def test_other_statuses_unsubscribe_nobody():
+    """apprise's own bad minute is not the recipient's fault, so a 500 must
+    log and leave the count exactly where it was."""
+    with (
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "record_telegram_success") as success,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        for status in (500, 502, 401, 0):
+            bot_sender.record_delivery(status, 777)
+
+        failure.assert_not_called()
+        success.assert_not_called()
+
+
+def test_a_failed_write_does_not_raise_into_the_task():
+    """The message is already sent or already refused by this point. Celery
+    retrying the task over a bookkeeping failure would re-send it."""
+    with (
+        patch.object(bot_sender, "users_collection", side_effect=RuntimeError("no mongo")),
+    ):
+        bot_sender.record_delivery(424, 777)  # must not raise
