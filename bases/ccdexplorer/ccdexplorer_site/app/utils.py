@@ -16,6 +16,7 @@ from functools import lru_cache
 from collections.abc import Mapping
 from typing import Any, Optional
 
+import cachetools
 import cbor2
 import dateutil
 import dateutil.parser
@@ -2228,6 +2229,72 @@ async def process_event_for_makeup(req: ProcessEventRequest):
             )
 
 
+# The transaction page renders every logged event in a transaction, and each
+# one used to ask the api for its token's metadata with no cache at all --
+# one sequential round trip per event. Measured on production 2026-11-08:
+# ~81.5s for a single page load against an api averaging 37ms, i.e. roughly
+# 2,200 calls in series. The events in one transaction overwhelmingly concern
+# the same few tokens, so the answer is reused instead.
+#
+# 60s matches the sibling caches in factory.py, and is a ceiling rather than a
+# preference: this endpoint returns a holder count alongside the immutable
+# metadata, so entries have to expire. maxsize bounds a key space that is
+# unbounded for an explorer -- see the same reasoning in factory.py.
+TOKEN_INFO_CACHE_TTL_SECONDS = 60
+TOKEN_INFO_CACHE_MAXSIZE = 2_000
+_TOKEN_INFO_CACHE_MISS = object()
+
+
+def token_info_cache_for(app, net: str) -> cachetools.TTLCache:
+    """The per-net token-info cache, created on first use.
+
+    Self-installing rather than read from the app: forgetting to declare it
+    would silently restore one api call per event, which is the whole defect.
+    Creating buckets on demand also means an unfamiliar net serves a page
+    instead of raising KeyError, which indexing a fixed dict by net does.
+    """
+    cache = getattr(app, "token_address_info_cache", None)
+    if cache is None:
+        cache = {}
+        app.token_address_info_cache = cache
+    bucket = cache.get(net)
+    if bucket is None:
+        bucket = cachetools.TTLCache(
+            maxsize=TOKEN_INFO_CACHE_MAXSIZE, ttl=TOKEN_INFO_CACHE_TTL_SECONDS
+        )
+        cache[net] = bucket
+    return bucket
+
+
+async def token_info_for_token_id(
+    req: ProcessEventRequest, contract_address: CCD_ContractAddress, token_id: str
+):
+    """Token metadata for one token address, fetched at most once per ttl.
+
+    A failed lookup is cached too. Without that, a token the api cannot
+    answer for costs a round trip on every event -- and a failing call can be
+    slower than a good one, up to the client's 30s read timeout. The cost of
+    caching it is that a transient api fault shows no metadata for up to the
+    ttl, which is bounded; the cost of not caching it is unbounded.
+    """
+    bucket = token_info_cache_for(req.app, req.net)
+    # The api looks this endpoint up by exactly this key, so it is the one
+    # that cannot collide: contract address plus token id.
+    key = f"<{contract_address.index},{contract_address.subindex}>-{token_id}"
+    cached = bucket.get(key, _TOKEN_INFO_CACHE_MISS)
+    if cached is not _TOKEN_INFO_CACHE_MISS:
+        return cached
+
+    api_result = await get_url_from_api(
+        f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
+        req.httpx_client,
+    )
+    token_address_as_class = api_result.return_value if api_result.ok else None
+    bucket[key] = token_address_as_class
+
+    return token_address_as_class
+
+
 async def get_token_info_from_collection(
     req: ProcessEventRequest, contract_address: CCD_ContractAddress
 ):
@@ -2244,25 +2311,14 @@ async def get_token_info_from_collection(
         return None
 
     token_id = "_" if raw_token_id == "" else raw_token_id
-    api_result = await get_url_from_api(
-        f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
-        req.httpx_client,
-    )
-    token_address_as_class = api_result.return_value if api_result.ok else None
 
-    return token_address_as_class
+    return await token_info_for_token_id(req, contract_address, token_id)
 
 
 async def get_s7_token_info_from_collection(
     req: ProcessEventRequest, contract_address: CCD_ContractAddress, token_id: str
 ):
-    api_result = await get_url_from_api(
-        f"{req.app.api_url}/v2/{req.net}/token/{contract_address.index}/{contract_address.subindex}/{token_id}/info",
-        req.httpx_client,
-    )
-    token_address_as_class = api_result.return_value if api_result.ok else None
-
-    return token_address_as_class
+    return await token_info_for_token_id(req, contract_address, token_id)
 
 
 def address_link(value, net, user, tags, app):
