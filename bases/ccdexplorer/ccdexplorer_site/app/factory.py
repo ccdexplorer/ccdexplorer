@@ -493,6 +493,12 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         app.schema_cache = _net_ttl_caches()
         app.token_information_cache = _net_ttl_caches()
         app.cns_domain_cache = _net_ttl_caches()
+        # Per-token metadata, keyed by token address -- distinct from
+        # token_information_cache above, which is per *contract*. Declared
+        # here to sit with its siblings, but utils.token_info_cache_for
+        # creates it on demand too, so the transaction page cannot quietly
+        # go back to one api call per logged event if this line is lost.
+        app.token_address_info_cache = _net_ttl_caches()
         app.blocks_cache = {"mainnet": [], "testnet": [], "devnet": []}
         app.last_finalized_block = {"mainnet": 0, "testnet": 0, "devnet": 0}
 
