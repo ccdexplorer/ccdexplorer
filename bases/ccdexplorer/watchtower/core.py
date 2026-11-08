@@ -64,13 +64,33 @@ class WatchTower:
         self.watched_nets = tuple(watched_nets)
 
     def inform(self, message: str) -> None:
-        """One alert. `relay` replaces the old `send`, which no longer exists."""
+        """One alert, to be read when convenient. Telegram only.
+
+        Everything used to come through here, which is why TooterType could
+        not be used as a severity: "ReplicaSet has no PRIMARY" and
+        "Primary: ccd-100" went out identically, both as REQUESTS_ERROR. The
+        ones that mean something is down now go to `alert` instead.
+        """
         self.tooter.relay(
             channel=TooterChannel.NOTIFIER,
             title="",
             chat_id=self.admin_chat_id,
             body=f"Watchtower: {message}",
             notifier_type=TooterType.REQUESTS_ERROR,
+        )
+
+    def alert(self, message: str, key: str) -> None:
+        """One alert that means something is down. Telegram, and a page.
+
+        Same Telegram message as `inform`, plus an iOS critical alert that
+        ignores Do Not Disturb. `key` names the condition rather than the
+        wording, because this runs every CHECK_INTERVAL and most of these
+        messages carry a number that moves -- see Tooter.critical.
+        """
+        self.tooter.critical(
+            f"Watchtower: {message}",
+            key=f"watchtower:{key}",
+            chat_id=self.admin_chat_id,
         )
 
     def _helpers(self, net: NET) -> dict:
@@ -82,13 +102,19 @@ class WatchTower:
             helpers = self._helpers(net)
             recorded = helpers.get("heartbeat_last_processed_block", {}).get("height")
             if recorded is None:
-                self.inform(f"{net.value}: no heartbeat_last_processed_block recorded.")
+                self.alert(
+                    f"{net.value}: no heartbeat_last_processed_block recorded.",
+                    key=f"heartbeat-missing:{net.value}",
+                )
                 continue
 
             tip = self.grpcclient.get_block_info("last_final", net).height
             behind = tip - recorded
             if behind >= LAG_BLOCKS:
-                self.inform(f"{net.value}: Heartbeat lagging {behind} blocks.")
+                self.alert(
+                    f"{net.value}: Heartbeat lagging {behind} blocks.",
+                    key=f"heartbeat-lagging:{net.value}",
+                )
 
     async def check_bot(self) -> None:
         helpers = self._helpers(NET.MAINNET)
@@ -106,34 +132,32 @@ class WatchTower:
         try:
             status = self.mongodb.connection.admin.command("replSetGetStatus")
             hello = self.mongodb.connection.admin.command("hello")
-            output = ReplicaSetOutput(
-                members=[ReplicaSetMember(**x) for x in status["members"]]
-            )
+            output = ReplicaSetOutput(members=[ReplicaSetMember(**x) for x in status["members"]])
 
             # No primary is the case this check exists for, and the original
             # read `next(m for m ... == "PRIMARY")` outside its try, so an
             # election crashed it instead of reporting.
-            primary = next(
-                (m for m in output.members if m.stateStr == "PRIMARY"), None
-            )
+            primary = next((m for m in output.members if m.stateStr == "PRIMARY"), None)
             if primary is None:
-                self.inform("ReplicaSet has no PRIMARY.")
+                self.alert("ReplicaSet has no PRIMARY.", key="no-primary")
 
             if len(output.members) < 3:
                 online = " ".join(m.name for m in output.members)
-                self.inform(
-                    f"There are only {len(output.members)} replicaset members online! Online: {online}"
+                self.alert(
+                    f"There are only {len(output.members)} replicaset members online! Online: {online}",
+                    key="members-missing",
                 )
                 self.inform(f"Primary: {hello.get('primary')}")
                 return
 
             for member in output.members:
                 if member.pingMs and member.pingMs > PING_MS:
-                    self.inform(
-                        f"Member {member.name} has ping of {member.pingMs} ms to primary."
-                    )
+                    self.inform(f"Member {member.name} has ping of {member.pingMs} ms to primary.")
                 if member.state not in (1, 2):
-                    self.inform(f"Member {member.name} has state {member.stateStr}.")
+                    self.alert(
+                        f"Member {member.name} has state {member.stateStr}.",
+                        key=f"member-state:{member.name}",
+                    )
                 if (
                     member.stateStr == "SECONDARY"
                     and primary is not None
@@ -142,8 +166,9 @@ class WatchTower:
                 ):
                     lag = (primary.optimeDate - member.optimeDate).total_seconds()
                     if lag > SECONDARY_LAG_SECONDS:
-                        self.inform(
-                            f"Member {member.name} is {lag / 60:.0f} mins behind primary."
+                        self.alert(
+                            f"Member {member.name} is {lag / 60:.0f} mins behind primary.",
+                            key=f"member-lag:{member.name}",
                         )
         except Exception as e:
-            self.inform(f"check_mongo: {e}")
+            self.alert(f"check_mongo: {e}", key="check-mongo-failed")
