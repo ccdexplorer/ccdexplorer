@@ -24,7 +24,9 @@ from ccdexplorer.ccdexplorer_bot.telegram_delivery import (
     clear_telegram_block,
     record_telegram_failure,
     record_telegram_success,
+    telegram_failures_so_far,
     users_collection_name,
+    worth_retrying,
 )
 from ccdexplorer.site_user import SiteUser
 
@@ -254,3 +256,59 @@ async def test_failures_below_the_limit_do_not_gate(gate):
     user = SiteUser(token="t", telegram_chat_id=CHAT, telegram_consecutive_failures=24)
 
     assert await gate(user) == ["telegram"]
+
+
+# --- was this chat working until now? --------------------------------------
+#
+# A 424 is Telegram refusing delivery, and it says nothing about why. "The
+# recipient blocked the bot" and "not this message, not right now" arrive as
+# the same number. On 2026-11-09 a payday pool reward to a working chat was
+# refused 240 ms after that chat's payday account reward was accepted, and the
+# message was lost: nothing resends a 424.
+#
+# The distinguishing fact is already on the user document. A chat with no
+# consecutive failures was delivering as of its last send, so a refusal is
+# worth one more try; a chat already collecting them is most likely blocked
+# and must not cost a second send every time.
+
+
+def test_a_chat_that_has_never_failed_reports_nothing(users):
+    assert telegram_failures_so_far(users, CHAT) == 0
+
+
+def test_a_chat_that_has_failed_reports_how_often(users):
+    record_telegram_failure(users, CHAT)
+    record_telegram_failure(users, CHAT)
+
+    assert telegram_failures_so_far(users, CHAT) == 2
+
+
+def test_a_chat_we_have_never_seen_reports_nothing(users):
+    """`async_relay` is given a chat id, not a user, so the id may belong to
+    no document at all -- as `...-backup`'s mangled id does."""
+    assert telegram_failures_so_far(users, 404404404) == 0
+
+
+def test_a_delivery_resets_what_is_reported(users):
+    record_telegram_failure(users, CHAT)
+    record_telegram_success(users, CHAT)
+
+    assert telegram_failures_so_far(users, CHAT) == 0
+
+
+def test_one_chat_failing_does_not_speak_for_another(users):
+    for _ in range(3):
+        record_telegram_failure(users, CHAT)
+
+    assert telegram_failures_so_far(users, OTHER_CHAT) == 0
+
+
+def test_a_working_chat_is_worth_another_try():
+    assert worth_retrying(0) is True
+
+
+def test_a_chat_already_failing_is_not_retried():
+    """Twenty-five retries on top of twenty-five sends is the traffic this
+    whole module exists to stop."""
+    assert worth_retrying(1) is False
+    assert worth_retrying(TELEGRAM_FAILURE_LIMIT - 1) is False
