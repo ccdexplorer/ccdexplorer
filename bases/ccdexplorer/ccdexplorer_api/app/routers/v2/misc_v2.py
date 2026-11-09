@@ -377,6 +377,61 @@ def _thin(points: list, limit: int) -> list:
     return thinned
 
 
+#: How long the daily branch serves its last Mongo read. The series it feeds
+#: changes once a day -- the nightrunner writes a day only after it is over --
+#: while the charts above a week are rendered on every page view. On
+#: production 2026-11-09 that query took 4.0-5.3s inside each of 40 requests,
+#: all of it in a single Mongo `getMore`, which on a few hundred small
+#: documents is the server still scanning for matches.
+#:
+#: Short on purpose: it holds only the daily points, and the caller still
+#: appends the live spot price and the newest on-chain rate after this
+#: returns, so the end of the chart stays current whatever this is set to.
+CCD_PRICE_DAILY_CACHE_SECONDS = 60
+
+#: The window is clamped to CCD_PRICE_MAX_HOURS, so one document per day puts
+#: a known ceiling on the read. `to_list(length=None)` had none.
+CCD_PRICE_MAX_DAILY_DOCS = CCD_PRICE_MAX_HOURS // 24 + 2
+
+_ccd_price_daily_cache: dict[str, tuple[float, list[dict]]] = {}
+
+
+async def _daily_points(db, start: str) -> list[dict]:
+    """The chain's daily CCD/EUR rate from ``start``, cached briefly.
+
+    Returns a fresh list every time. The caller appends the current spot to
+    what it gets back and then thins it, so handing out the cached list itself
+    would add a point to it on every render until the chart was all spot.
+    """
+    cached = _ccd_price_daily_cache.get(start)
+    now = time.time()
+    if cached and now - cached[0] < CCD_PRICE_DAILY_CACHE_SECONDS:
+        return list(cached[1])
+
+    cursor = db[Collections.statistics].find(
+        {"type": "statistics_microccd", "date": {"$gte": start}},
+        {"date": 1, "GTU_numerator": 1, "GTU_denominator": 1},
+    )
+    points: list[dict] = []
+    for doc in await cursor.to_list(length=CCD_PRICE_MAX_DAILY_DOCS):
+        eur = _eur_per_ccd(
+            {"numerator": doc.get("GTU_numerator"), "denominator": doc.get("GTU_denominator")}
+        )
+        if eur is None:
+            continue
+        points.append(
+            {
+                "at": dt.datetime.strptime(doc["date"], "%Y-%m-%d").replace(tzinfo=dt.timezone.utc),
+                "eur": eur,
+            }
+        )
+    # Mongo returns natural order without a sort; a chart drawn from that
+    # would zigzag.
+    points.sort(key=lambda point: point["at"])
+    _ccd_price_daily_cache[start] = (now, points)
+    return list(points)
+
+
 @router.get("/{net}/misc/ccd-price/last/{hours}", response_class=JSONResponse)
 async def get_ccd_price_series(
     request: Request,
@@ -448,25 +503,7 @@ async def get_ccd_price_series(
     else:
         source = "chain-daily"
         start = cutoff.strftime("%Y-%m-%d")
-        cursor = db_to_use[Collections.statistics].find(
-            {"type": "statistics_microccd", "date": {"$gte": start}},
-            {"date": 1, "GTU_numerator": 1, "GTU_denominator": 1},
-        )
-        for doc in await cursor.to_list(length=None):
-            eur = _eur_per_ccd(
-                {"numerator": doc.get("GTU_numerator"), "denominator": doc.get("GTU_denominator")}
-            )
-            if eur is None:
-                continue
-            points.append(
-                {
-                    "at": dt.datetime.strptime(doc["date"], "%Y-%m-%d").replace(
-                        tzinfo=dt.timezone.utc
-                    ),
-                    "eur": eur,
-                }
-            )
-        points.sort(key=lambda point: point["at"])
+        points = await _daily_points(db_to_use, start)
 
         # The nightrunner only writes a day once it is over, so the daily
         # series stops at yesterday. Left alone, a 90-day chart would end a
