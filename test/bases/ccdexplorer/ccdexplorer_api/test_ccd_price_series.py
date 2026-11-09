@@ -14,9 +14,11 @@ would still look plausible on a chart.
 """
 
 import datetime as dt
+import time
 
 import pytest
 
+from ccdexplorer.ccdexplorer_api.app.routers.v2 import misc_v2
 from ccdexplorer.ccdexplorer_api.app.routers.v2.misc_v2 import (
     CCD_PRICE_INTRADAY_MAX_HOURS,
     CCD_PRICE_MAX_HOURS,
@@ -183,3 +185,185 @@ def test_the_spot_still_lands_on_an_empty_series():
     points = []
     assert _append_spot(points, 0.0035, dt.datetime.now(UTC), 1.1426) is True
     assert len(points) == 1
+
+
+# --- the daily branch is cached ------------------------------------------
+#
+# Above a week the series comes from the chain's daily rate in `statistics`,
+# filtered on `{"type": ..., "date": {"$gte": start}}` and read with
+# `to_list(length=None)`. On production 2026-11-09 that made 40 of 196
+# requests take over a second -- about 130s of the endpoint's 135s total --
+# and Sentry's spans put 4.0-5.3s of each inside a single Mongo `getMore`.
+# A getMore that slow on a few hundred small documents is the server still
+# looking for matches, i.e. a scan.
+#
+# Two of the three price charts take this branch: 90 days and a year. Only
+# the 24-hour one is on the indexed intraday path.
+#
+# The index is the real fix and has to be made on the database, which is
+# where this estate keeps index definitions. These pin what can be fixed in
+# code: the query runs once per window per ttl instead of once per render,
+# and the read is bounded rather than unbounded.
+
+
+class FakeCursor:
+    def __init__(self, docs, recorder):
+        self.docs = docs
+        self.recorder = recorder
+
+    async def to_list(self, length=None):
+        self.recorder["lengths"].append(length)
+        return list(self.docs)
+
+
+class FakeCollection:
+    def __init__(self, docs, recorder):
+        self.docs = docs
+        self.recorder = recorder
+
+    def find(self, query, projection=None):
+        self.recorder["queries"].append(query)
+        self.recorder["projections"].append(projection)
+        return FakeCursor(self.docs, self.recorder)
+
+
+class FakeDB:
+    """Only __getitem__, which is all the helper uses."""
+
+    def __init__(self, docs):
+        self.recorder = {"queries": [], "projections": [], "lengths": []}
+        self.collection = FakeCollection(docs, self.recorder)
+
+    def __getitem__(self, _name):
+        return self.collection
+
+    @property
+    def calls(self):
+        return len(self.recorder["queries"])
+
+
+def _doc(date, numerator="2777778", denominator="1"):
+    return {"date": date, "GTU_numerator": numerator, "GTU_denominator": denominator}
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """Module-level state, so it leaks between tests if left alone."""
+    misc_v2._ccd_price_daily_cache.clear()
+    yield
+    misc_v2._ccd_price_daily_cache.clear()
+
+
+async def test_the_same_window_queries_mongo_once():
+    """The whole point. Every render of the year chart used to repeat the
+    scan."""
+    db = FakeDB([_doc("2026-01-01"), _doc("2026-01-02")])
+
+    for _ in range(5):
+        await misc_v2._daily_points(db, "2026-01-01")
+
+    assert db.calls == 1
+
+
+async def test_two_windows_are_cached_separately():
+    """The 90-day and year charts ask for different start dates, and one
+    must not be served the other's points."""
+    db = FakeDB([_doc("2026-01-01")])
+
+    await misc_v2._daily_points(db, "2026-01-01")
+    await misc_v2._daily_points(db, "2025-11-09")
+
+    assert db.calls == 2
+
+
+async def test_the_points_are_what_the_documents_say():
+    db = FakeDB([_doc("2026-01-02"), _doc("2026-01-01")])
+
+    points = await misc_v2._daily_points(db, "2026-01-01")
+
+    assert [p["at"].strftime("%Y-%m-%d") for p in points] == ["2026-01-01", "2026-01-02"]
+    assert points[0]["eur"] == pytest.approx(0.36, rel=1e-4)
+
+
+async def test_the_points_come_back_in_date_order():
+    """Mongo returns natural order without a sort; a chart drawn from that
+    would zigzag."""
+    db = FakeDB([_doc("2026-03-01"), _doc("2026-01-01"), _doc("2026-02-01")])
+
+    points = await misc_v2._daily_points(db, "2026-01-01")
+
+    assert points == sorted(points, key=lambda p: p["at"])
+
+
+async def test_a_document_that_cannot_be_a_price_is_skipped():
+    """Preserved behaviour: a zero numerator would divide by zero."""
+    db = FakeDB([_doc("2026-01-01"), _doc("2026-01-02", numerator="0")])
+
+    points = await misc_v2._daily_points(db, "2026-01-01")
+
+    assert len(points) == 1
+
+
+async def test_the_caller_cannot_mutate_the_cache():
+    """The handler appends the current spot to this list and then thins it.
+    Handing out the cached list itself would grow it by one point on every
+    render until the chart was all spot."""
+    db = FakeDB([_doc("2026-01-01")])
+
+    first = await misc_v2._daily_points(db, "2026-01-01")
+    first.append({"at": "injected", "eur": 1})
+    second = await misc_v2._daily_points(db, "2026-01-01")
+
+    assert len(second) == 1
+    assert db.calls == 1
+
+
+async def test_an_expired_entry_is_requeried(monkeypatch):
+    """A cache, not a freeze: the nightrunner writes yesterday overnight."""
+    db = FakeDB([_doc("2026-01-01")])
+    monkeypatch.setattr(misc_v2, "CCD_PRICE_DAILY_CACHE_SECONDS", 0.05)
+
+    await misc_v2._daily_points(db, "2026-01-01")
+    time.sleep(0.1)
+    await misc_v2._daily_points(db, "2026-01-01")
+
+    assert db.calls == 2
+
+
+async def test_the_read_is_bounded():
+    """`to_list(length=None)` is unbounded. The window cannot exceed
+    CCD_PRICE_MAX_HOURS, so the document count has a known ceiling and
+    asking for more than that can only be a surprise."""
+    db = FakeDB([_doc("2026-01-01")])
+
+    await misc_v2._daily_points(db, "2026-01-01")
+
+    (length,) = db.recorder["lengths"]
+    assert length is not None
+    assert length >= CCD_PRICE_MAX_HOURS // 24
+
+
+async def test_the_projection_is_kept():
+    """Three fields out of a statistics document, not the whole thing."""
+    db = FakeDB([_doc("2026-01-01")])
+
+    await misc_v2._daily_points(db, "2026-01-01")
+
+    (projection,) = db.recorder["projections"]
+    assert set(projection) == {"date", "GTU_numerator", "GTU_denominator"}
+
+
+async def test_the_query_still_filters_on_type_and_start():
+    """What the index will have to cover."""
+    db = FakeDB([_doc("2026-01-01")])
+
+    await misc_v2._daily_points(db, "2026-02-03")
+
+    (query,) = db.recorder["queries"]
+    assert query == {"type": "statistics_microccd", "date": {"$gte": "2026-02-03"}}
+
+
+def test_the_cache_ttl_is_short():
+    """The series ends on the current spot price in the caller, so this only
+    holds the daily points -- but a long ttl would still delay a new day."""
+    assert 0 < misc_v2.CCD_PRICE_DAILY_CACHE_SECONDS <= 300
