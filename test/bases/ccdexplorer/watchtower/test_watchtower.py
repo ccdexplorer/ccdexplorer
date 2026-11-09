@@ -402,22 +402,21 @@ async def test_a_failed_check_pages_rather_than_passing_silently():
 
 async def test_a_stalled_heartbeat_pages_per_net():
     """Nothing else in the estate watches indexer liveness -- live-everything
-    has no heartbeat or last_processed_block check at all."""
+    has no heartbeat or last_processed_block check at all.
+
+    Keyed per net, because mainnet and testnet are separate indexers and one
+    being dead must not sit out the other's cooldown. Lagging no longer pages
+    (see below); a marker that was never written still does.
+    """
     core = _core()
     tooter = FakeTooter()
-    wt = _wt(
-        core,
-        tooter=tooter,
-        mongodb=FakeMongo(
-            mainnet=[_marker("heartbeat_last_processed_block", 50)],
-            testnet=[_marker("heartbeat_last_processed_block", 100)],
-        ),
-    )
+    wt = _wt(core, tooter=tooter, mongodb=FakeMongo(mainnet=[], testnet=[]))
 
     await wt.check_heartbeat_running()
 
-    assert any("mainnet: Heartbeat lagging 50" in m for m in tooter.paged)
-    assert "watchtower:heartbeat-lagging:mainnet" in tooter.keys
+    assert any("mainnet: no heartbeat_last_processed_block" in m for m in tooter.paged)
+    assert "watchtower:heartbeat-missing:mainnet" in tooter.keys
+    assert "watchtower:heartbeat-missing:testnet" in tooter.keys
 
 
 async def test_a_lagging_bot_does_not_page():
@@ -442,8 +441,9 @@ async def test_a_lagging_bot_does_not_page():
 
 
 async def test_every_paged_alert_carries_a_stable_key():
-    """Replication lag and member state both name the member, because the
-    message text carries a number or state that changes between checks."""
+    """Member state names the member, because the message carries a state
+    that changes between checks -- keyed on the text it would ring for every
+    transition, and two sick members would share one cooldown."""
     core = _core()
     tooter = FakeTooter()
     wt = _wt(
@@ -453,7 +453,7 @@ async def test_every_paged_alert_carries_a_stable_key():
             status={
                 "members": [
                     _member("a"),
-                    _member("b", 2, "SECONDARY", optime=NOW - dt.timedelta(minutes=30)),
+                    _member("b", 8, "(not reachable/healthy)"),
                     _member("c", 2, "SECONDARY"),
                 ]
             },
@@ -463,5 +463,97 @@ async def test_every_paged_alert_carries_a_stable_key():
 
     await wt.check_mongo()
 
-    assert "watchtower:member-lag:b" in tooter.keys
+    assert "watchtower:member-state:b" in tooter.keys
     assert all(k and k.startswith("watchtower:") for k in tooter.keys)
+
+
+# --- lag is not an outage -------------------------------------------------
+#
+# `alert()` documents itself as "one alert that means something is down", but
+# two lag conditions used it. Falling behind is the service working and not
+# keeping up, which is a thing to read about rather than a reason to defeat
+# Do Not Disturb -- the same line live-everything now draws with _outage().
+# Both still inform, so the Telegram record is unchanged.
+
+
+async def test_a_lagging_heartbeat_does_not_page():
+    """The indexer is running and behind. Nothing is unavailable."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            mainnet=[_marker("heartbeat_last_processed_block", 50)],
+            testnet=[_marker("heartbeat_last_processed_block", 100)],
+        ),
+    )
+
+    await wt.check_heartbeat_running()
+
+    assert any("mainnet: Heartbeat lagging 50" in m for m in tooter.messages)
+    assert tooter.paged == []
+
+
+async def test_a_missing_heartbeat_marker_still_pages():
+    """No marker at all is the indexer never having run, which is down."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(core, tooter=tooter, mongodb=FakeMongo(mainnet=[], testnet=[]))
+
+    await wt.check_heartbeat_running()
+
+    assert any("no heartbeat_last_processed_block" in m for m in tooter.paged)
+
+
+async def test_a_lagging_secondary_does_not_page():
+    """Replication lag on a healthy SECONDARY. The set still has a primary
+    and still serves reads and writes."""
+    core = _core()
+    tooter = FakeTooter()
+    behind = NOW - dt.timedelta(minutes=30)
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={
+                "members": [
+                    _member("a", optime=NOW),
+                    _member("b", 2, "SECONDARY", optime=behind),
+                    _member("c", 2, "SECONDARY", optime=NOW),
+                ]
+            },
+            hello={"primary": "a"},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert any("is 30 mins behind primary" in m for m in tooter.messages)
+    assert tooter.paged == []
+
+
+async def test_the_outages_still_page():
+    """The other side of the line, in one place: a set with no primary and a
+    member in a bad state. Both mean something is not serving."""
+    core = _core()
+    tooter = FakeTooter()
+    wt = _wt(
+        core,
+        tooter=tooter,
+        mongodb=FakeMongo(
+            status={
+                "members": [
+                    _member("a", 2, "SECONDARY"),
+                    _member("b", 2, "SECONDARY"),
+                    _member("c", 8, "(not reachable/healthy)"),
+                ]
+            },
+            hello={"primary": None},
+        ),
+    )
+
+    await wt.check_mongo()
+
+    assert any("no PRIMARY" in m for m in tooter.paged)
+    assert any("has state (not reachable/healthy)" in m for m in tooter.paged)

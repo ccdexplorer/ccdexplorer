@@ -82,6 +82,11 @@ class WatchTower:
     def alert(self, message: str, key: str) -> None:
         """One alert that means something is down. Telegram, and a page.
 
+        Reserved for unavailability, not degradation. Heartbeat lag and
+        replication lag used to come through here; both are the estate
+        working and not keeping up, and a page that fires for those is a
+        page that gets muted. They inform instead.
+
         Same Telegram message as `inform`, plus an iOS critical alert that
         ignores Do Not Disturb. `key` names the condition rather than the
         wording, because this runs every CHECK_INTERVAL and most of these
@@ -111,10 +116,11 @@ class WatchTower:
             tip = self.grpcclient.get_block_info("last_final", net).height
             behind = tip - recorded
             if behind >= LAG_BLOCKS:
-                self.alert(
-                    f"{net.value}: Heartbeat lagging {behind} blocks.",
-                    key=f"heartbeat-lagging:{net.value}",
-                )
+                # Behind, not stopped: the indexer is running and catching
+                # up, so this is a thing to read rather than a reason to
+                # override Do Not Disturb. A marker missing entirely is a
+                # different matter and still pages, above.
+                self.inform(f"{net.value}: Heartbeat lagging {behind} blocks.")
 
     async def check_bot(self) -> None:
         helpers = self._helpers(NET.MAINNET)
@@ -166,9 +172,10 @@ class WatchTower:
                 ):
                     lag = (primary.optimeDate - member.optimeDate).total_seconds()
                     if lag > SECONDARY_LAG_SECONDS:
-                        self.alert(
-                            f"Member {member.name} is {lag / 60:.0f} mins behind primary.",
-                            key=f"member-lag:{member.name}",
-                        )
+                        # A healthy SECONDARY that is behind. The set has a
+                        # primary and is serving reads and writes, so nothing
+                        # is down -- a member in a bad *state* is caught
+                        # above and does page.
+                        self.inform(f"Member {member.name} is {lag / 60:.0f} mins behind primary.")
         except Exception as e:
             self.alert(f"check_mongo: {e}", key="check-mongo-failed")
