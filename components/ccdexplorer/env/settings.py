@@ -57,6 +57,17 @@ ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 # estate need it. Format, whole thing in one variable because apprise parses
 # it: bark://<host>/<device-key> (barks:// for https).
 BARK_URL = os.environ.get("BARK_URL", "")
+# A nightly window in which Bark stays silent. A critical alert is built to
+# defeat Do Not Disturb, so the phone cannot silence it and the window has to
+# be honoured in Tooter.bark(). Telegram is unaffected: it obeys silent mode
+# already and is the record of what the estate did overnight.
+#
+# The zone is explicit rather than taken from the host, because almost none of
+# these containers set TZ and so run on UTC -- an hour behind Amsterdam in
+# winter and two in summer. Blank either end to page at any hour.
+BARK_QUIET_START = os.environ.get("BARK_QUIET_START", "23:00")
+BARK_QUIET_END = os.environ.get("BARK_QUIET_END", "06:00")
+BARK_QUIET_TZ = os.environ.get("BARK_QUIET_TZ", "Europe/Amsterdam")
 MAILTO_LINK = os.environ.get("MAILTO_LINK")
 MAILTO_USER = os.environ.get("MAILTO_USER")
 API_NET = os.environ.get("API_NET", "mainnet")
