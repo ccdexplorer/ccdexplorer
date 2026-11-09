@@ -131,6 +131,48 @@ def for_telegram(body: str) -> str:
     return body.strip()
 
 
+#: Apprise renders its own captured notification log into the response body,
+#: at whatever level was asked for -- and that log is the only place the
+#: provider's reason for refusing appears. Pinned here rather than left to the
+#: server's `APPRISE_LOG_LEVEL`, which is unset on ours and so defaults to
+#: WARNING; a quieter default set later would silently cost every diagnosis.
+APPRISE_HEADERS = {"X-Apprise-Log-Level": "WARNING"}
+
+#: How much of apprise's response body goes into the log. Its errors are one
+#: line; anything longer is an HTML page from something in front of it, and a
+#: container log is not the place for that.
+APPRISE_DETAIL_LIMIT = 400
+
+
+async def _apprise_detail(response, token: str) -> str:
+    """Why apprise refused this notification, fit to be logged.
+
+    The status alone cannot tell a transient refusal from a blocked recipient:
+    both are `424`. On 2026-11-09 one of two payday notifications to a working
+    chat was refused 240 ms after the other was accepted, and the reason was
+    unrecoverable -- the body was discarded here and apprise-api keeps no
+    application log of its own.
+
+    Never raises. Reading the body is a second network read, and the caller
+    acts on the status, so a body we could not read must not cost it.
+
+    The token is scrubbed because apprise echoes the `tgram://` url it was
+    handed, which carries it. Logging the body verbatim would publish the bot
+    token to every container log and to whatever ships them.
+    """
+    try:
+        body = (await response.text()).strip()
+    except Exception as exc:  # noqa: BLE001 - logged, never raised
+        return f"(body unreadable: {exc!r})"
+    if not body:
+        return "(no body)"
+    if token:
+        body = body.replace(token, "<token>")
+    if len(body) > APPRISE_DETAIL_LIMIT:
+        body = body[:APPRISE_DETAIL_LIMIT] + "..."
+    return body
+
+
 class TooterType(Enum):
     INFO = "info"
     GRAPHQL_ERROR = "graphql error"
@@ -241,10 +283,12 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
             "format": "html",
         }
         async with aiohttp.ClientSession(self.plain_url) as session:
-            async with session.post("/notify", json=payload) as response:
+            async with session.post("/notify", json=payload, headers=APPRISE_HEADERS) as response:
                 if response.status != 200:
+                    detail = await _apprise_detail(response, API_TO_USE)
                     print(
-                        f"Error sending notification to {chat_id}. Status code= {response.status}."
+                        f"Error sending notification to {chat_id}. "
+                        f"Status code= {response.status}. {detail}"
                     )
                 return response.status
 

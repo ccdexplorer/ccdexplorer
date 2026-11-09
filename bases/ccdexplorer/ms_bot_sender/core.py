@@ -10,7 +10,9 @@ from ccdexplorer.ccdexplorer_bot.telegram_delivery import (
     TELEGRAM_BLOCKED_STATUS,
     record_telegram_failure,
     record_telegram_success,
+    telegram_failures_so_far,
     users_collection_name,
+    worth_retrying,
 )
 from ccdexplorer.celery_app import app as celery_app
 from ccdexplorer.mongodb import MongoDB
@@ -28,6 +30,12 @@ warnings.simplefilter("ignore", CPendingDeprecationWarning)
 tooter = Tooter()
 
 _mongodb: MongoDB | None = None
+
+# How long to wait before resending a refused notification. Telegram's own
+# per-chat pacing is about a second, and the two payday notifications that
+# exposed this were 240 ms apart, so a retry that follows immediately would be
+# asking the same question under the same conditions.
+TELEGRAM_RETRY_DELAY_S = 2.0
 
 
 def users_collection():
@@ -67,11 +75,43 @@ def record_delivery(status: int, telegram_chat_id: int) -> None:
         print(f"Could not record telegram delivery status {status} for {telegram_chat_id}: {e}")
 
 
+def retry_allowed(telegram_chat_id: int) -> bool:
+    """Whether this chat's refused message is worth sending once more.
+
+    Consulted only after a non-200, so the read costs nothing on the path
+    almost every notification takes.
+
+    A collection we cannot reach answers no. Without the counter there is no
+    telling a working chat from a blocked one, and guessing yes resends to
+    every blocked chat at once -- while guessing no loses exactly what was
+    going to be lost anyway.
+    """
+    try:
+        return worth_retrying(telegram_failures_so_far(users_collection(), telegram_chat_id))
+    except Exception as e:
+        print(f"Could not read telegram failure count for {telegram_chat_id}: {e}")
+        return False
+
+
 async def send_to_telegram(
     self,
     telegram_chat_id: int,
     message_response: MessageResponse,
 ):
+    """Post one notification, and give a refused one a second chance.
+
+    apprise answers a refusal with a status, not an exception, so the celery
+    task around this ends in SUCCESS and `autoretry_for` never fires: before
+    this, a refused message was simply gone. On 2026-11-09 the 09:00 payday
+    sent two notifications to chat `913126895`; the first was accepted and the
+    second refused 240 ms later, and only one arrived.
+
+    One retry, for a chat that was delivering as of its last send, after a
+    pause -- back-to-back is how the message was refused in the first place.
+    Only the verdict of the last attempt is recorded, so a chat that answers
+    424 then 200 ends the message with a clean sheet and one that answers 424
+    twice is one strike down, not two.
+    """
     status = await tooter.async_relay(
         channel=TooterChannel.BOT,
         title=message_response.title_telegram,
@@ -79,6 +119,15 @@ async def send_to_telegram(
         body=message_response.message_telegram,
         notifier_type=TooterType.INFO,
     )
+    if status != 200 and retry_allowed(telegram_chat_id):
+        await asyncio.sleep(TELEGRAM_RETRY_DELAY_S)
+        status = await tooter.async_relay(
+            channel=TooterChannel.BOT,
+            title=message_response.title_telegram,
+            chat_id=telegram_chat_id,
+            body=message_response.message_telegram,
+            notifier_type=TooterType.INFO,
+        )
     record_delivery(status, telegram_chat_id)
 
 

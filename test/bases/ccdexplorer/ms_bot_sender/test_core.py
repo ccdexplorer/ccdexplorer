@@ -16,9 +16,16 @@ async def test_send_to_telegram():
         message_email="",
     )
 
-    # Patch the module-level Tooter instance
-    with patch.object(bot_sender, "tooter") as mock_tooter:
-        mock_tooter.async_relay = AsyncMock()
+    # Patch the module-level Tooter instance. The relay has to answer 200:
+    # anything else is a refusal, and send_to_telegram then consults the users
+    # collection to decide whether to resend -- which, left unpatched, reached
+    # the live database from this test.
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender, "record_telegram_success"),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=200)
 
         await bot_sender.send_to_telegram(
             self=None,
@@ -177,3 +184,176 @@ def test_a_failed_write_does_not_raise_into_the_task():
         patch.object(bot_sender, "users_collection", side_effect=RuntimeError("no mongo")),
     ):
         bot_sender.record_delivery(424, 777)  # must not raise
+
+
+# --- a refused message gets one more chance -------------------------------
+#
+# A 424 is returned, not raised, so the celery task ends in SUCCESS and
+# `autoretry_for` -- grpc.RpcError, ConnectionError, TimeoutError -- never sees
+# it. Nothing resent a refused message. On 2026-11-09 that lost a payday pool
+# reward: apprise took the same chat's payday account reward with a 200 at
+# 09:00:47.472 and refused the next one with a 424 at 09:00:47.710.
+#
+# One retry, and only for a chat that was delivering as of its last send. See
+# worth_retrying in ccdexplorer_bot/telegram_delivery.py for why not more.
+
+
+def _msg():
+    return MessageResponse(
+        title_telegram="T", message_telegram="B", title_email="", message_email=""
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_refused_message_is_sent_once_more():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=True),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "record_telegram_success") as success,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender.asyncio, "sleep", AsyncMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(side_effect=[424, 200])
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        assert mock_tooter.async_relay.await_count == 2
+        success.assert_called_once()
+        failure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_transient_refusal_leaves_no_mark():
+    """The whole point of the retry: a 424 between two deliveries to the same
+    chat is a dropped message, not someone blocking the bot, and it must not
+    push that chat a step closer to being switched off."""
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=True),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender.asyncio, "sleep", AsyncMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(side_effect=[424, 200])
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        failure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_chat_that_refuses_twice_is_counted_once():
+    """Two sends, one verdict. Counting both would halve the twenty-five
+    strikes a chat is meant to get."""
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=True),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender.asyncio, "sleep", AsyncMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(side_effect=[424, 424])
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        assert mock_tooter.async_relay.await_count == 2
+        failure.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_a_chat_already_failing_is_not_sent_twice():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=False),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=424)
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        assert mock_tooter.async_relay.await_count == 1
+        failure.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_a_delivered_message_is_not_sent_twice():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed") as allowed,
+        patch.object(bot_sender, "record_telegram_success"),
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=200)
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        assert mock_tooter.async_relay.await_count == 1
+        allowed.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_the_retry_waits_first():
+    """Back-to-back is how the message was refused in the first place. The
+    module's own sleep is patched, not the clock, so this stays a test of what
+    send_to_telegram does rather than of asyncio."""
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=True),
+        patch.object(bot_sender, "record_telegram_success"),
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender.asyncio, "sleep", AsyncMock()) as slept,
+    ):
+        mock_tooter.async_relay = AsyncMock(side_effect=[500, 200])
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        slept.assert_awaited_once_with(bot_sender.TELEGRAM_RETRY_DELAY_S)
+        assert bot_sender.TELEGRAM_RETRY_DELAY_S > 0
+
+
+@pytest.mark.asyncio
+async def test_the_retry_sends_the_same_message():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=True),
+        patch.object(bot_sender, "record_telegram_failure"),
+        patch.object(bot_sender, "users_collection", MagicMock()),
+        patch.object(bot_sender.asyncio, "sleep", AsyncMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(side_effect=[424, 424])
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        first, second = mock_tooter.async_relay.await_args_list
+        assert first == second
+        assert first.kwargs["chat_id"] == 777
+        assert first.kwargs["body"] == "B"
+
+
+def test_a_counter_we_cannot_read_does_not_resend():
+    """If the collection is unreachable we cannot tell a blocked chat from a
+    working one, and guessing wrong resends to every blocked chat. The send
+    already happened either way."""
+    with patch.object(bot_sender, "users_collection", side_effect=RuntimeError("no mongo")):
+        assert bot_sender.retry_allowed(777) is False
+
+
+def test_a_working_chat_is_worth_a_retry():
+    users = MagicMock()
+    users.return_value.find_one.return_value = {"telegram_chat_id": 777}
+
+    with patch.object(bot_sender, "users_collection", users):
+        assert bot_sender.retry_allowed(777) is True
+
+
+def test_a_chat_with_failures_behind_it_is_not():
+    users = MagicMock()
+    users.return_value.find_one.return_value = {
+        "telegram_chat_id": 777,
+        "telegram_consecutive_failures": 4,
+    }
+
+    with patch.object(bot_sender, "users_collection", users):
+        assert bot_sender.retry_allowed(777) is False

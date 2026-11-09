@@ -55,6 +55,37 @@ def users_collection_name() -> str:
     )
 
 
+def telegram_failures_so_far(users: Collection, telegram_chat_id: int) -> int:
+    """How many consecutive refusals this chat has already collected.
+
+    Read only on the rare non-200 path, to tell a chat that was working until
+    this moment from one that has been refusing for a while. A chat id that
+    matches no document -- `async_relay` is handed an id, not a user, and one
+    of ours carries a mangled one -- counts as nothing collected.
+    """
+    doc = users.find_one(
+        {"telegram_chat_id": telegram_chat_id},
+        {"telegram_consecutive_failures": 1},
+    )
+    return int((doc or {}).get("telegram_consecutive_failures") or 0)
+
+
+def worth_retrying(failures_so_far: int) -> bool:
+    """Whether a refused send to this chat should be tried once more.
+
+    Only when the chat was delivering as of its last send. A 424 does not say
+    why Telegram refused, so the one message that follows a success gets the
+    benefit of the doubt: on 2026-11-09 a payday pool reward was refused 240 ms
+    after the same chat's payday account reward was accepted, and it was simply
+    lost.
+
+    A chat that is already counting failures does not get a retry. It is most
+    likely blocked, and doubling the traffic to twenty-five blocked chats is
+    the cost this module was written to avoid.
+    """
+    return failures_so_far == 0
+
+
 def record_telegram_failure(
     users: Collection,
     telegram_chat_id: int,
