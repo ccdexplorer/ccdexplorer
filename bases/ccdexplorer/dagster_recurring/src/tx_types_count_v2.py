@@ -2,7 +2,7 @@ import dagster as dg
 import datetime as dt
 from typing import cast
 from ..recurring.update_tx_types_count_v2 import update_tx_types_count_hourly
-from ._partitions import partitions_def_hourly_net
+from ._partitions import net_partition, partitions_def_hourly_net
 from ._resources import MongoDBResource, mongodb_resource_instance
 from dagster import MultiPartitionKey
 from datetime import datetime, timedelta, timezone
@@ -68,7 +68,13 @@ def schedule(context: dg.ScheduleEvaluationContext):
     hour_start = t_utc.replace(minute=0, second=0, microsecond=0) - dt.timedelta(hours=1)
     datetime_key = hour_start.strftime("%Y-%m-%d-%H")
 
-    for net in ["mainnet", "testnet"]:
+    # Every net the partition definition carries, which is how the other
+    # recurring assets do it. Hardcoding two of them here left
+    # concordium_devnet.tx_types_count unwritten, and that collection is the
+    # only source of the counts on /{net}/transactions-by-type -- both the
+    # dropdown labels and the api's total_for_type -- so every devnet type
+    # read zero while its transactions were indexed all along.
+    for net in net_partition.get_partition_keys():
         yield dg.RunRequest(
             run_key=f"{hour_start.isoformat()}|{net}",
             partition_key=f"{datetime_key}|{net}",
