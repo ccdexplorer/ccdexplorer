@@ -115,8 +115,26 @@ def _accounts_level_and_growth(frame):
     return out
 
 
-#: Seconds in a day: TPS is the day's transaction count spread over it.
+#: Seconds in a day. A rate is the bucket's count over the seconds the bucket
+#: actually covers, which is this times the days in it.
 SECONDS_PER_DAY = 86_400
+
+
+def days_behind(frame) -> pd.Series:
+    """How many days of data each row holds, as a divisor.
+
+    The grouping pipeline counts them into _days. A row without one is a day:
+    an API that predates ?grouping= answers with raw daily documents and
+    carries no such field (see rows_are_grouped), and absent is not zero.
+
+    An empty bucket is zero days and zero of everything else -- $fill writes
+    both -- and 0/0 is NaN, drawn as a hole in the line. One stands in, so the
+    row keeps the zero it had.
+    """
+    if "_days" not in frame.columns:
+        return pd.Series(1, index=frame.index)
+    days = frame["_days"].fillna(1)
+    return days.where(days > 0, 1)
 
 
 def _activity_and_tps(frame):
@@ -124,8 +142,15 @@ def _activity_and_tps(frame):
     if "network_activity" in frame.columns:
         out["activity"] = frame["network_activity"]
     if "account_transaction" in frame.columns:
+        # Over the seconds in the bucket, not in a day. account_transaction is
+        # Agg.SUM, so a weekly row holds seven days of transactions and a
+        # monthly row thirty -- divided by one day's seconds, the same chain
+        # read 0.6 TPS daily, 4.2 weekly and about 15 monthly. Dividing by the
+        # days as well is the mean of their daily rates, which is what the
+        # series' Agg.MEAN has always told the settings panel to say.
+        #
         # One source failing costs one line, not the whole chart.
-        out["tps"] = frame["account_transaction"] / SECONDS_PER_DAY
+        out["tps"] = frame["account_transaction"] / (days_behind(frame) * SECONDS_PER_DAY)
     return out
 
 
