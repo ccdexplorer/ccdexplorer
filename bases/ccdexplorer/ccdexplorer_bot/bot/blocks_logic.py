@@ -521,6 +521,14 @@ class Mixin(Utils):
                 contract = logged_event.event_info.contract
                 tx_hash = logged_event.tx_info.tx_hash
 
+                # Set per event, not left over from the last one. A token the
+                # tokens microservice has not written down yet -- which is
+                # every token in the block it was minted in -- used to leave
+                # this unassigned, and reading it below raised
+                # UnboundLocalError, losing every notification for the block.
+                # Worse, once an earlier event had assigned it, a later
+                # nameless token silently inherited that name.
+                token_name = None
                 stored_token_address = self.connections.mongodb.mainnet[
                     Collections.tokens_token_addresses
                 ].find_one({"_id": token_address})
@@ -529,6 +537,8 @@ class Mixin(Utils):
                     if stored_token_address.token_metadata:
                         token_name = stored_token_address.token_metadata.name
                     else:
+                        # indexed, but its metadata has not been read yet --
+                        # distinct from not being indexed at all
                         token_name = "Not yet available..."
                 else:
                     console.log(f"{token_address=} not found in Mongo collection yet.")
