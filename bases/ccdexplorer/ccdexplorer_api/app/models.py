@@ -22,6 +22,14 @@ class APIPlans(Enum):
     unrestricted = "Unrestricted"
 
 
+#: The plans an account may choose for itself: the ones the page draws a card
+#: for. `unrestricted` and `ccdexplorer.io` are rate limit groups as well, and
+#: are given out by hand.
+SELECTABLE_PLANS = frozenset(
+    plan.value.lower() for plan in (APIPlans.free, APIPlans.standard, APIPlans.pro)
+)
+
+
 plans: dict[APIPlans, APIPlansDetail] = {}
 plans.update(
     {

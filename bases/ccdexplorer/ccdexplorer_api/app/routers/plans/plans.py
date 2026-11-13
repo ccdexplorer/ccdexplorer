@@ -1,14 +1,35 @@
-from fastapi import APIRouter, Request
+from urllib.parse import parse_qs
+
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pymongo import ReplaceOne, DeleteOne
 from ccdexplorer.mongodb import (
     CollectionsUtilities,
 )
-from ccdexplorer.ccdexplorer_api.app.models import User
+from ccdexplorer.ccdexplorer_api.app.models import SELECTABLE_PLANS, User
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_user_details
 import datetime as dt
 
 router = APIRouter(include_in_schema=False)
+
+
+def chosen_plan(body: bytes) -> str:
+    """The plan a form body asks for, if it is one an account may choose.
+
+    No body is the free plan, as it always was. Anything else has to carry a
+    `plan` field naming one of the plans on offer; the name is what the rate
+    limiter groups a key by, so it is never stored as sent.
+    """
+    if not body:
+        return "free"
+    try:
+        fields = parse_qs(body.decode("utf-8"), keep_blank_values=True)
+    except UnicodeDecodeError:
+        fields = {}
+    plan = fields.get("plan", [""])[0]
+    if plan not in SELECTABLE_PLANS:
+        raise HTTPException(status_code=400, detail="Unknown plan.")
+    return plan
 
 
 @router.post(
@@ -23,10 +44,7 @@ async def plans_set_plan(
         response.headers["HX-Redirect"] = "/auth/login"
         return response
 
-    plan = "free"
-    body = await request.body()
-    if body:
-        plan = body.decode("utf-8").split("=")[1]
+    plan = chosen_plan(await request.body())
 
     user: User | None = get_user_details(request)
     if user:
