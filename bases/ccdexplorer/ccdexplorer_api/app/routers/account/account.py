@@ -265,10 +265,19 @@ async def account_delete_key(
     key: str,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
 ):
+    user: User | None = get_user_details(request)
+    if not user:
+        response = RedirectResponse(url="/auth/login", status_code=303)
+        return response
+    # The owner is part of the match. A key is a string that gets pasted into
+    # scripts and support requests, so knowing one is not owning it -- and
+    # this route used to ask for nothing else, not even a login. A key that
+    # belongs to someone else matches nothing, and gets the same answer as
+    # one that does not exist.
     await request.app.motormongo.utilities_db["api_api_keys"].bulk_write(
         [
             DeleteOne(
-                {"_id": key},
+                {"_id": key, "api_account_id": user.api_account_id},
             )
         ]
     )
