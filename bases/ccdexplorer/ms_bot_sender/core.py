@@ -10,6 +10,7 @@ from ccdexplorer.ccdexplorer_bot.telegram_delivery import (
     TELEGRAM_BLOCKED_STATUS,
     record_telegram_failure,
     record_telegram_success,
+    refusal_is_a_block,
     telegram_failures_so_far,
     users_collection_name,
     worth_retrying,
@@ -68,7 +69,10 @@ def record_delivery(status: int, telegram_chat_id: int) -> None:
     """
     try:
         if status == TELEGRAM_BLOCKED_STATUS:
-            record_telegram_failure(users_collection(), telegram_chat_id)
+            # Only when Telegram says the recipient is gone. The reason comes
+            # with the status; a refusal without one counts for nothing.
+            if refusal_is_a_block(getattr(status, "detail", "")):
+                record_telegram_failure(users_collection(), telegram_chat_id)
         elif status == 200:
             record_telegram_success(users_collection(), telegram_chat_id)
     except Exception as e:

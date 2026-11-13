@@ -17,7 +17,7 @@ from ccdexplorer.site_user import (
 from rich.console import Console
 
 from ..notification_classes import *
-from .utils import Utils as Utils
+from .utils import Utils as Utils, esc
 
 console = Console()
 
@@ -46,7 +46,7 @@ class MessageContract(Utils):
             if contract_with_info
             else contract_address.label
         )
-        message = f'On smart contract <a href="https://ccdexplorer.io/mainnet/instance/{contract_address.address.contract.index}/{contract_address.address.contract.subindex}">{module_name}</a> the method "{receive_name}" was called.<br/><br/>'
+        message = f'On smart contract <a href="https://ccdexplorer.io/mainnet/instance/{contract_address.address.contract.index}/{contract_address.address.contract.subindex}">{esc(module_name)}</a> the method "{esc(receive_name)}" was called.<br/><br/>'
 
         message += f"""
 

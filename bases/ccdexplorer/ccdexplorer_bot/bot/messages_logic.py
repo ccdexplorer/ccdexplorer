@@ -32,7 +32,7 @@ from .messages_logic_account import ProcessAccount as ProcessAccount
 from .messages_logic_contract import ProcessContract as ProcessContract
 from .messages_logic_other import ProcessOther as ProcessOther
 from .messages_logic_validator import ProcessValidator as ProcessValidator
-from .utils import Utils as Utils
+from .utils import Utils as Utils, esc
 
 console = Console()
 
@@ -144,7 +144,7 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
         footer_impacted_addresses = ""
         for impacted_address in notification_event.impacted_addresses:
             if impacted_address.address.contract:
-                footer_impacted_addresses += f"Contract: <a href='https://ccdexplorer.io/mainnet/instance/{impacted_address.address.contract.index}/{impacted_address.address.contract.subindex}'>{impacted_address.label}</a><br/>"
+                footer_impacted_addresses += f"Contract: <a href='https://ccdexplorer.io/mainnet/instance/{impacted_address.address.contract.index}/{impacted_address.address.contract.subindex}'>{esc(impacted_address.label)}</a><br/>"
             else:
                 address_type = "Account"
                 tab = ""
@@ -158,7 +158,7 @@ class Mixin(ProcessContract, ProcessAccount, ProcessValidator, ProcessOther, Uti
                     address_type = "Sender"
                 if impacted_address.address_type == AddressType.receiver:
                     address_type = "Receiver"
-                footer_impacted_addresses += f"{address_type}: <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.index}{tab}'>{impacted_address.label}</a><br/>"
+                footer_impacted_addresses += f"{address_type}: <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.index}{tab}'>{esc(impacted_address.label)}</a><br/>"
         # Joined rather than interpolated into one multi-line f-string. Each
         # of these is conditional -- a payday event has no transaction and no
         # notification limit -- and an empty one still left its own newline

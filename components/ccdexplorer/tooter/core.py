@@ -106,6 +106,23 @@ def _clock(text: str) -> dt.time:
     return dt.time(hour, minute)
 
 
+class RelayStatus(int):
+    """The status apprise answered with, and what it said when it refused.
+
+    Still the number every caller compares against. The reason rides along
+    because the status cannot tell a recipient who blocked the bot from a
+    send that failed for any other cause -- both are `424` -- and only the
+    caller is in a position to act on the difference.
+    """
+
+    detail: str
+
+    def __new__(cls, status: int, detail: str = "") -> "RelayStatus":
+        self = super().__new__(cls, status)
+        self.detail = detail
+        return self
+
+
 def for_telegram(body: str) -> str:
     """One line break per intended break, for Telegram only.
 
@@ -290,7 +307,8 @@ Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>accoun
                         f"Error sending notification to {chat_id}. "
                         f"Status code= {response.status}. {detail}"
                     )
-                return response.status
+                    return RelayStatus(response.status, detail)
+                return RelayStatus(response.status)
 
     def send(
         self,

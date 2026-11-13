@@ -16,7 +16,7 @@ from ccdexplorer.site_user import (
 from rich.console import Console
 
 from ..notification_classes import *
-from .utils import Utils as Utils
+from .utils import Utils as Utils, esc
 
 console = Console()
 
@@ -36,9 +36,9 @@ class MessageValidator(Utils):
             notification_event.impacted_addresses, AddressType.validator
         )
         if validator:
-            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{delegator.label}</a> performed the following delegation action(s) on validator <a href="https://ccdexplorer.io/mainnet/account/{validator.address.account.id}">{validator.label}</a>:<br/><br/>'
+            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{esc(delegator.label)}</a> performed the following delegation action(s) on validator <a href="https://ccdexplorer.io/mainnet/account/{validator.address.account.id}">{esc(validator.label)}</a>:<br/><br/>'
         else:
-            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{delegator.label}</a> performed the following delegation action(s):<br/><br/>'
+            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{esc(delegator.label)}</a> performed the following delegation action(s):<br/><br/>'
 
         if isinstance(event_type, EventTypeValidator):
             previous_block_info = (
@@ -180,7 +180,7 @@ Status: <code>{status}</code><br/>
             if event.baker_set_metadata_url:
                 message_to_send += f"""
 <i>Set MetaDataURL</i><br/>
-URL: <a href='{event.baker_set_metadata_url.url}'>{event.baker_set_metadata_url.url}</a><br/>
+URL: <a href='{esc(event.baker_set_metadata_url.url)}'>{esc(event.baker_set_metadata_url.url)}</a><br/>
  <br/>
 """
             previous_string = " <br/>"
@@ -231,7 +231,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         return MessageResponse(
             **{
                 # "delegator_index": delegator_index,
-                "title_telegram": f"Validator {validator.label} Configured",
+                "title_telegram": f"Validator {esc(validator.label)} Configured",
                 "title_email": f"CCDExplorer Notification - Validator {validator.label} Configured",
                 "message_telegram": message_to_send,
                 "message_email": message_to_send,
@@ -250,7 +250,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         )
         telegram_message = f"""
 
-Validator <code>{validator.label}</code> produced the <a href="https://ccdexplorer.io/mainnet/block/{notification_event.block_hash}">block</a> ({tally} / {expectation:,.0f}) at height: <code>{notification_event.block_height:,.0f}</code>.
+Validator <code>{esc(validator.label)}</code> produced the <a href="https://ccdexplorer.io/mainnet/block/{notification_event.block_hash}">block</a> ({tally} / {expectation:,.0f}) at height: <code>{notification_event.block_height:,.0f}</code>.
  
 Earliest possible next block production in {self.verbose_timedelta(notification_event.event_type.validator.earliest_win_time - dt.datetime.now().astimezone(dt.timezone.utc))}.<br/>
 """
@@ -277,7 +277,7 @@ Earliest possible next block production in {self.verbose_timedelta(notification_
         )
         telegram_message = f"""
 
-Validator <code>{validator.label}</code> seems to be running behind <code>{notification_event.event_type.validator.validator_running_behind:,.0f} </code> blocks.<br/>
+Validator <code>{esc(validator.label)}</code> seems to be running behind <code>{notification_event.event_type.validator.validator_running_behind:,.0f} </code> blocks.<br/>
 
 """
 
@@ -303,7 +303,7 @@ Validator <code>{validator.label}</code> seems to be running behind <code>{notif
         )
         telegram_message = f"""
 
-Validator <code>{validator.label}</code> is primed for suspension.<br/>
+Validator <code>{esc(validator.label)}</code> is primed for suspension.<br/>
 
 """
 
@@ -329,7 +329,7 @@ Validator <code>{validator.label}</code> is primed for suspension.<br/>
         )
         telegram_message = f"""
 
-Validator <code>{validator.label}</code> is suspended.<br/>
+Validator <code>{esc(validator.label)}</code> is suspended.<br/>
 
 """
 
@@ -354,7 +354,7 @@ Validator <code>{validator.label}</code> is suspended.<br/>
         validator: ImpactedAddress = self.return_specific_address_type(
             notification_event.impacted_addresses, AddressType.validator
         )
-        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> missed rounds now at <code>{notification_event.event_type.validator.validator_missed_rounds['current_missed_rounds']}</code>.<br/>"
+        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> missed rounds now at <code>{notification_event.event_type.validator.validator_missed_rounds['current_missed_rounds']}</code>.<br/>"
 
         message += f"""
 
@@ -453,7 +453,7 @@ Validator <code>{validator.label}</code> is suspended.<br/>
         ending = "" if pool_info.current_payday_info.blocks_baked == 1 else "s"
 
         message = (
-            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code> (<code>{pool_info.current_payday_info.blocks_baked}</code> block{ending})\n\nReward payout of <code>{(total_amount / 1_000_000):,.6f} CCD</code> for validator <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{impacted_address.label}</a>: <br/><br/>"
+            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code> (<code>{pool_info.current_payday_info.blocks_baked}</code> block{ending})\n\nReward payout of <code>{(total_amount / 1_000_000):,.6f} CCD</code> for validator <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{esc(impacted_address.label)}</a>: <br/><br/>"
             + pool_message
         )
         message += f"""
@@ -461,7 +461,7 @@ Validator <code>{validator.label}</code> is suspended.<br/>
 {self.footer(notification_event)}
 """
         message_email = (
-            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code> (<code>{pool_info.current_payday_info.blocks_baked}</code> block{ending})<br/>Reward payout of <code>{(total_amount / 1_000_000):,.6f} CCD</code> for validator <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{impacted_address.label}</a>: <br/><br/>"
+            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code> (<code>{pool_info.current_payday_info.blocks_baked}</code> block{ending})<br/>Reward payout of <code>{(total_amount / 1_000_000):,.6f} CCD</code> for validator <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{esc(impacted_address.label)}</a>: <br/><br/>"
             + html_table
         )
         message_email += f"""

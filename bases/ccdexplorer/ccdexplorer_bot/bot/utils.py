@@ -8,6 +8,8 @@
 # pyright: reportOptionalOperand=false
 # pyright: reportOptionalIterable=false
 
+import html
+
 from rich import print
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import *  # type: ignore
@@ -21,6 +23,18 @@ from ccdexplorer.site_user import (
     NotificationServices,
     SiteUser,
 )
+
+
+def esc(value) -> str:
+    """`value` as text for a notification body, which is HTML.
+
+    Telegram and a mail client both parse the body, so anything a message did
+    not write itself -- a token name, a method name, a label -- is escaped
+    where it is placed. Unescaped, a `<` in a token name is at best a message
+    Telegram refuses and at worst a link the notification appears to vouch
+    for.
+    """
+    return "" if value is None else html.escape(str(value), quote=True)
 
 
 class Utils:
