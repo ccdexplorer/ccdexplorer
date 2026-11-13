@@ -68,23 +68,70 @@ async def slash_token(
     request: Request,
     token: str,
 ):
-    """Telegram deep-link login (``?start={token}``): ``token`` here is the
-    account's stable identity token, not a session token."""
-    user: SiteUser = await get_user_detailsv2(request, token)
-    if not isinstance(user, SiteUser):
-        user = SiteUser(**user)
-    if user:
-        response = RedirectResponse(url="/settings/user/overview", status_code=303)
-        session_response = await post_url_from_api(
-            f"{request.app.api_url}/site-auth/{user.token}/sessions",
-            request.app.httpx_client,
-            {"user_agent": request.headers.get("user-agent")},
+    """The login link the bot sends. ``token`` is a one-time code.
+
+    It used to be the account's identity token, looked up here directly --
+    which made every copy of the url a permanent way in. The api now spends
+    the code and names the account; an old link, or the same link a second
+    time, is refused there like any other unknown code.
+    """
+    redeemed = await post_url_from_api(
+        f"{request.app.api_url}/site-auth/login-codes/redeem",
+        request.app.httpx_client,
+        {"code": token},
+    )
+    if not redeemed.ok:
+        return request.app.templates.TemplateResponse(
+            request,
+            "auth/login.html",
+            {
+                "env": request.app.env,
+                "request": request,
+                "net": "mainnet",
+                "error": (
+                    "That login link has expired or was already used. "
+                    "Send /login to the bot for a new one, or log in below."
+                ),
+            },
         )
-        if session_response.ok:
-            set_access_token_cookie(
-                request, response, session_response.return_value["session_token"]
-            )
-        return response
+    response = RedirectResponse(url="/settings/user/overview", status_code=303)
+    session_response = await post_url_from_api(
+        f"{request.app.api_url}/site-auth/{redeemed.return_value['token']}/sessions",
+        request.app.httpx_client,
+        {"user_agent": request.headers.get("user-agent")},
+    )
+    if session_response.ok:
+        set_access_token_cookie(request, response, session_response.return_value["session_token"])
+    return response
+
+
+PRODUCTION_SITE = "https://ccdexplorer.io"
+PRODUCTION_BOT = "concordium_explorer_bot"
+DEV_BOT = "ce_dev_bot"
+
+
+@router.get("/settings/user/connect-telegram")
+async def connect_telegram(request: Request):
+    """Send the browser to the bot with a one-time linking code.
+
+    The settings page used to link straight to ``t.me/<bot>?start=<account
+    token>``, which printed the token into the page. The code is minted here,
+    on the click, so it is not in any page and is minutes old when it is used.
+    """
+    user: SiteUser | None = await get_user_detailsv2(request)
+    if not user:
+        return RedirectResponse(url="/auth/login", status_code=303)
+    minted = await post_url_from_api(
+        f"{request.app.api_url}/site-auth/{user.token}/telegram-link-code",
+        request.app.httpx_client,
+        None,
+    )
+    if not minted.ok:
+        return RedirectResponse(url="/settings/user/overview", status_code=303)
+    bot = PRODUCTION_BOT if request.app.env.get("SITE_URL") == PRODUCTION_SITE else DEV_BOT
+    return RedirectResponse(
+        url=f"https://telegram.me/{bot}?start={minted.return_value['code']}", status_code=303
+    )
 
 
 @router.get("/settings/user/logout")

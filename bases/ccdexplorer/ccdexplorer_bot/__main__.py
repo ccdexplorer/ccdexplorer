@@ -7,10 +7,8 @@ from ccdexplorer.mongodb import MongoDB, MongoMotor
 from .bot import Bot, Connections
 from ccdexplorer.env import *  # type: ignore
 
-from telegram.ext import (
-    CommandHandler,
-    ApplicationBuilder,
-)
+from .commands import command_handlers
+from telegram.ext import ApplicationBuilder
 from ccdexplorer.env import API_TOKEN
 
 # bump
@@ -44,10 +42,7 @@ if __name__ == "__main__":
     bot.do_missed_rounds_read()
 
     application = ApplicationBuilder().token(API_TOKEN).build()
-    application.add_handler(CommandHandler("login", bot.user_login))
-    application.add_handler(CommandHandler("start", bot.user_login))
-    application.add_handler(CommandHandler("wintime", bot.user_win_time))
-    application.add_handler(CommandHandler("me", bot.user_me))
+    application.add_handlers(command_handlers(bot))
     application.bot_data = {"net": "mainnet"}
 
     job_queue = application.job_queue

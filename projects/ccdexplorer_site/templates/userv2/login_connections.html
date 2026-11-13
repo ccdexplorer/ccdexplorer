@@ -32,11 +32,7 @@
 <b>Telegram</b>
 {% if not user.telegram_chat_id %}
   <p class="sm-text">Connect Telegram to receive notifications in chat.</p>
-  {% if env.SITE_URL != 'https://ccdexplorer.io' %}
-    <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/ce_dev_bot?start={{ user.token }}">Connect Telegram</a>
-  {% else %}
-    <a class="btn btn-link ms-0 ps-0" href="https://telegram.me/concordium_explorer_bot?start={{ user.token }}">Connect Telegram</a>
-  {% endif %}
+  <a class="btn btn-link ms-0 ps-0" href="/settings/user/connect-telegram">Connect Telegram</a>
 {% else %}
   <p class="sm-text">Telegram is connected.</p>
 {% endif %}

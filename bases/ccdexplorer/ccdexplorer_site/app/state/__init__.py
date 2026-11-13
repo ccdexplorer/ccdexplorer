@@ -180,23 +180,10 @@ def get_and_save_user_from_collection(req: Request):
         req.app.users_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
 
 
-async def get_user_detailsv2(req: Request, token: str | None = None):
-    if token:
-        # Explicit account-token lookup (e.g. the Telegram deep-link
-        # /token/{token} route) -- unrelated to the session cookie, this
-        # resolves the SiteUser directly by its stable identity token.
-        try:
-            response = await req.app.httpx_client.get(f"{req.app.api_url}/v2/site_user/{token}")
-            response.raise_for_status()
-            user = response.json()
-        except httpx.HTTPError:
-            user = None
-        if user and type(user) is not SiteUser:
-            user = SiteUser(**user)
-        return user
-
-    # No explicit token: use the session resolved once per request (from the
-    # `access-token` cookie) by SiteSessionMiddleware.
+async def get_user_detailsv2(req: Request):
+    # The session resolved once per request (from the `access-token` cookie)
+    # by SiteSessionMiddleware. There is deliberately no way to ask for a
+    # user by account token: that lookup is what made the token a password.
     return getattr(req.state, "user", None)
 
 

@@ -55,9 +55,7 @@ def _resolve_caller_name(caller_name: str | None) -> str:
 DURABLE_WRITE_TIMEOUT_MS = 30_000
 
 
-def _client_kwargs(
-    nearest: bool, caller_name: str, durable_writes: bool = False
-) -> dict:
+def _client_kwargs(nearest: bool, caller_name: str, durable_writes: bool = False) -> dict:
     """Shared connection options for MongoDB()/MongoMotor().
 
     `appname` is what makes a connection attributable server-side: it shows up
@@ -254,6 +252,7 @@ class CollectionsUtilities(Enum):
     users_v2_dev = "users_v2_dev"
     user_sessions = "user_sessions"
     login_audit_log = "login_audit_log"
+    login_codes = "login_codes"
     message_log = "message_log"
     preferences_explanations = "preferences_explanations"
     release_notes = "release_notes"

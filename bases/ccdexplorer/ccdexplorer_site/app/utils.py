@@ -90,7 +90,7 @@ def set_access_token_cookie(request: Request, response: Response, token: str) ->
 
     ``HttpOnly`` keeps it out of JavaScript (so XSS can't steal the session),
     ``Secure`` restricts it to https in production, and ``SameSite=Lax`` still
-    allows the top-level Telegram ``/token/{token}`` login navigation while
+    allows the top-level ``/token/{code}`` navigation from the bot's link while
     blocking cross-site subrequests (CSRF).
     """
     response.set_cookie(

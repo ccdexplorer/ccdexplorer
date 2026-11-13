@@ -4,7 +4,7 @@
 
 These are thin wrappers: every action is delegated to the API ``/site-auth/*``
 endpoints (the site has no DB/email of its own). On success we set the existing
-``access-token`` cookie, exactly like the Telegram ``/token/{token}`` login.
+``access-token`` cookie, exactly like the bot's ``/token/{code}`` login link.
 """
 
 from fastapi import APIRouter, Form, Request, Response
