@@ -15,6 +15,7 @@ from ccdexplorer.mongodb import (
     MongoMotor,
     CollectionsUtilities,
 )
+from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_internal_api_auth
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from fastapi.encoders import jsonable_encoder
@@ -22,7 +23,15 @@ import httpx2 as httpx
 import datetime as dt
 from ccdexplorer.site_user import SiteUser
 
-router = APIRouter(tags=["Site User"], prefix="/v2", include_in_schema=False)
+# Under /v2 the rate limiter already turns away a request with no registered
+# key, but a customer's key is a registered key. These routes read and write
+# site users by their token, so they are for the site's key only.
+router = APIRouter(
+    tags=["Site User"],
+    prefix="/v2",
+    include_in_schema=False,
+    dependencies=[Depends(require_internal_api_auth)],
+)
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 apply_docstring_router_wrappers(router)
 

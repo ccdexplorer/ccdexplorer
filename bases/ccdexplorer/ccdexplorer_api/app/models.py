@@ -84,7 +84,13 @@ for plan, detail in plans.items():
         }
 
 
-rate_limit_rules.append(Rule(group="ccdexplorer.io"))
+#: The group the project's own keys are in: the site's, and nothing a customer
+#: can hold. It has no limits, and it is the one group let in to the routes
+#: the site manages its users through (ratelimiting.require_internal_api_auth).
+#: It is not an APIPlans member on purpose -- a plan is something an account
+#: can choose.
+INTERNAL_API_GROUP = "ccdexplorer.io"
+rate_limit_rules.append(Rule(group=INTERNAL_API_GROUP))
 
 
 class APIPayment(BaseModel):
