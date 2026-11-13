@@ -20,7 +20,7 @@
     </tr>{% endif %}
     {% if "agent_uri" in result.model_fields_set %}<tr class=" ">
         <td >Agent URI</td>
-        <td><span class='text-break'><a href='{{result.agent_uri}}'>{{result.agent_uri|shorten_address( address=True)}}</span></td></tr>{% endif %}
+        <td><span class='text-break'><a href='{{result.agent_uri|safe_url}}'>{{result.agent_uri|shorten_address( address=True)}}</span></td></tr>{% endif %}
     {% if "external_reference" in result.model_fields_set and result.external_reference is not none %}<tr class=" ">
         <td >Metadata Url</td>
         <td><span class='text-break'>{{result.external_reference}}</span></td></tr>{% endif %}

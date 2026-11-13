@@ -213,15 +213,15 @@ class MakeUp:
                     display_value = token_amount_using_decimals_rounded(
                         int(self.additional_info["amount"]), decimals, 0
                     )
-                    type_additional_info = f'{display_value} <span class="ccd">{self.additional_info["token_id"]}</span>'
+                    type_additional_info = f'{display_value} <span class="ccd">{h(self.additional_info["token_id"])}</span>'
 
                 elif "token_id" in self.additional_info:
                     if not plt_page:
-                        type_additional_info = f'<a href="/{self.net}/tokens/{self.additional_info["token_id"]}"><span class="ccd">{self.additional_info["token_id"]}</span></a>'
+                        type_additional_info = f'<a href="/{self.net}/tokens/{h(self.additional_info["token_id"])}"><span class="ccd">{h(self.additional_info["token_id"])}</span></a>'
 
                 # type_additional_info = '<a href="/{{net}}/module/{{row.additional_info["value"]}}" class="module_ref" title="{{row.additional_info["value"]}}"><span style="font-family: monospace, monospace;">{{row.additional_info["value"][:4]|safe}}</span></a>'
             elif self.additional_info.get("contents") == "create_plt":
-                type_additional_info = f'<a href="/{self.net}/tokens/{self.additional_info["token_id"]}"><span class="ccd">{self.additional_info["token_id"]}</span></a>'
+                type_additional_info = f'<a href="/{self.net}/tokens/{h(self.additional_info["token_id"])}"><span class="ccd">{h(self.additional_info["token_id"])}</span></a>'
         sender = "Chain"
         if self.transaction.account_transaction:
             sender = account_link(
@@ -575,7 +575,7 @@ class MakeUp:
 
                         new_event = EventType(
                             f"Contract Initialized {instance_link_v2(effects.contract_initialized.address, self.user, self.tags, self.net)}",
-                            f'Initializer: {effects.contract_initialized.init_name}<br>Module: <a class="ccd"href="/{self.net}/module/{effects.contract_initialized.origin_ref}">{effects.contract_initialized.origin_ref[:10]}</a>',
+                            f'Initializer: {h(effects.contract_initialized.init_name)}<br>Module: <a class="ccd"href="/{self.net}/module/{effects.contract_initialized.origin_ref}">{effects.contract_initialized.origin_ref[:10]}</a>',
                             None,
                             logged_events,
                         )
@@ -709,9 +709,14 @@ class MakeUp:
                                 else:
                                     parameter_or_token = f"Parameter: {shorten_address(effect.updated.parameter) if not parameter_json else print_schema_dict(parameter_json, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}"
 
+                                # Both halves are named by whoever deployed the
+                                # module, and a name takes punctuation.
+                                contract_name, _, entrypoint = (
+                                    effect.updated.receive_name.partition(".")
+                                )
                                 new_event = EventType(
                                     f"Updated contract with address {instance_link_v2(effect.updated.address, self.user, self.tags, self.net)}",
-                                    f"Contract: {effect.updated.receive_name.split('.')[0]}<br>Function: {effect.updated.receive_name.split('.')[1]}{amount_str}",
+                                    f"Contract: {h(contract_name)}<br>Function: {h(entrypoint)}{amount_str}",
                                     parameter_or_token,
                                     logged_events,
                                 )
@@ -806,6 +811,9 @@ class MakeUp:
                         else None
                     )
                     dct.update({"start_1": effects.account_transfer.amount, "memo": memo})
+                    # dct feeds the CSV export and keeps the memo as it is; the
+                    # page prints with |safe and gets it escaped.
+                    memo = memo_for_display(effects.account_transfer.memo)
                     self.to_account = effects.account_transfer.receiver
                     self.from_account = t.account_transaction.sender
 
@@ -939,11 +947,7 @@ class MakeUp:
                             ),
                         }
                     )
-                    memo = (
-                        f"Memo: {decode_memo(effects.transferred_with_schedule.memo)}"
-                        if effects.transferred_with_schedule.memo
-                        else None
-                    )
+                    memo = memo_for_display(effects.transferred_with_schedule.memo)
                     self.to_account = effects.transferred_with_schedule.receiver
                     dct.update({"to_account": self.to_account})
 
@@ -1030,12 +1034,9 @@ class MakeUp:
                             )
 
                         elif event.baker_set_metadata_url:
-                            escaped_metadata_url = markupsafe.escape(
-                                event.baker_set_metadata_url.url
-                            )
                             new_event = EventType(
                                 f"Validator Set MetaDataURL for validator: {event.baker_set_metadata_url.baker_id}",
-                                f"metadataURL: <a href='{escaped_metadata_url}'>{escaped_metadata_url}</a>",
+                                f"metadataURL: {link_or_text(event.baker_set_metadata_url.url)}",
                                 None,
                             )
 
@@ -1308,12 +1309,12 @@ class MakeUp:
                 protocol_update_message = markupsafe.escape(
                     t.update.payload.protocol_update.message_
                 )
-                protocol_update_url = markupsafe.escape(
-                    t.update.payload.protocol_update.specification_url
+                protocol_update_link = link_or_text(
+                    t.update.payload.protocol_update.specification_url, "Specification URL"
                 )
                 new_event = EventType(
                     "Protocol Update",
-                    f"Effective Time: {eff}<br>{protocol_update_message}<br>More info at the <a href='{protocol_update_url}'>Specification URL</a>.",
+                    f"Effective Time: {eff}<br>{protocol_update_message}<br>More info at the {protocol_update_link}.",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1371,10 +1372,10 @@ class MakeUp:
                 idp_description = t.update.payload.add_identity_provider_update.description
                 idp_name = markupsafe.escape(idp_description.name)
                 idp_desc = markupsafe.escape(idp_description.description)
-                idp_url = markupsafe.escape(idp_description.url)
+                idp_link = link_or_text(idp_description.url)
                 new_event = EventType(
                     "Add Identity Provider",
-                    f"Effective Time: {eff}<br>Name: {idp_name}<br>Description: {idp_desc}<br/>More info at: <a href='{idp_url}'>{idp_url}</a>",
+                    f"Effective Time: {eff}<br>Name: {idp_name}<br>Description: {idp_desc}<br/>More info at: {idp_link}",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1391,10 +1392,10 @@ class MakeUp:
                 ar_description = t.update.payload.add_anonymity_revoker_update.description
                 ar_name = markupsafe.escape(ar_description.name)
                 ar_desc = markupsafe.escape(ar_description.description)
-                ar_url = markupsafe.escape(ar_description.url)
+                ar_link = link_or_text(ar_description.url)
                 new_event = EventType(
                     "Add Anonymity Revoker",
-                    f"Effective Time: {eff}<br>Name: {ar_name}<br>Description: {ar_desc}<br/>More info at: <a href='{ar_url}'>{ar_url}</a>",
+                    f"Effective Time: {eff}<br>Name: {ar_name}<br>Description: {ar_desc}<br/>More info at: {ar_link}",
                     None,
                 )
                 self.events_list.append(new_event)
@@ -1429,7 +1430,9 @@ class MakeUp:
                         EventType(
                             self._payload_title_for_display(payload_name),
                             f"Effective Time: {eff}",
-                            payload_value,
+                            # A mapping is printed as JSON by the template;
+                            # anything else is printed with |safe.
+                            payload_value if isinstance(payload_value, dict) else h(payload_value),
                         )
                     )
 
@@ -1571,7 +1574,7 @@ class MakeUp:
                 for k, v in event_json.items():
                     logged_events.append(
                         EventType(
-                            f"Schema Parsed for {k}",
+                            f"Schema Parsed for {h(k)}",
                             print_schema_dict(v, net, user, tags, app),
                             None,
                         )
@@ -1662,11 +1665,7 @@ class MakeUp:
             plt_display = plt_token_id if not display_name else markupsafe.escape(display_name)
             plt_string = f'PLT: <a href="/{self.net}/tokens/{plt_token_id}"><span class="ccd">{plt_display}</span></a>'
             if event.transfer_event:
-                memo = (
-                    f"Memo: {decode_memo(event.transfer_event.memo)}"
-                    if event.transfer_event.memo
-                    else None
-                )
+                memo = memo_for_display(event.transfer_event.memo)
                 self.additional_info["amount"] = int(event.transfer_event.amount.value)
                 new_event = EventType(
                     f"Transferred {token_amount_using_decimals_rounded(int(event.transfer_event.amount.value), decimals)} from {account_link(event.transfer_event.from_.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)} to {account_link(event.transfer_event.to.account, self.net, user=self.user, tags=self.tags, app=self.makeup_request.app)}",
@@ -1692,7 +1691,7 @@ class MakeUp:
 
             elif event.module_event is not None:
                 new_event = EventType(
-                    f"Module event:  {event.module_event.type}",
+                    f"Module event:  {h(event.module_event.type)}",
                     plt_string,
                     None,
                 )
@@ -1757,11 +1756,7 @@ class MakeUp:
             }
 
             if event.transfer_event:
-                memo = (
-                    f"Memo: {decode_memo(event.transfer_event.memo)}"
-                    if event.transfer_event.memo
-                    else None
-                )
+                memo = memo_for_display(event.transfer_event.memo)
                 self.additional_info["amount"] = int(event.transfer_event.amount.value)
                 amount_str = token_amount_using_decimals_rounded(
                     int(event.transfer_event.amount.value), decimals
@@ -1817,7 +1812,7 @@ class MakeUp:
 
             elif event.module_event is not None:
                 new_event = EventType(
-                    f"Module event:  {event.module_event.type}",
+                    f"Module event:  {h(event.module_event.type)}",
                     plt_string,
                     None,
                 )

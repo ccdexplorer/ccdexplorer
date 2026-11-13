@@ -59,6 +59,6 @@
     </tr>{% endif %}
     {% if result.metadata %}<tr class="table-row-line-height ">
         <td >Metadata Url</td>
-        <td><span ><a href='{{result.metadata.url}}'>{{result.metadata.url[8:15]}}...{{result.metadata.url[-6:]}}</a></span></td>
+        <td><span ><a href='{{result.metadata.url|safe_url}}'>{{result.metadata.url[8:15]}}...{{result.metadata.url[-6:]}}</a></span></td>
     </tr>{% endif %}
 </table>

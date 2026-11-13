@@ -1633,15 +1633,33 @@ def account_link(
         if is_alias and isinstance(index_if_found, int):
             alias_portion = f"{index_if_found}/alias/{value[29:]}"
     # check if this is a contract address
+    key_like = False
+    short = ""
     if isinstance(value, str):
         if "<" in value:
-            return instance_link_from_str(value, net, user, tags)
+            try:
+                return instance_link_from_str(value, net, user, tags)
+            except ValueError:
+                # "<" is how a contract address starts, and also how markup
+                # does. This is reached with values out of a contract's own
+                # schema, so one that does not parse is shown as the text it
+                # is rather than raised into a 500 for the whole page.
+                return h(value)
 
         value = from_address_to_index(value, net, app)
 
+    if isinstance(value, str):
+        # Still a string: an address the map has not heard of, or a key, or
+        # nothing of the kind. It goes into an href and a label below, so it
+        # is escaped once here. The label is cut from the raw value first --
+        # cutting the escaped one could end in the middle of an entity.
+        key_like = len(value) == 64
+        short = h(value[:6] if key_like and net != "testnet" else value[:4])
+        value = h(value)
+
     if net == "testnet":
         if isinstance(value, str):
-            tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i>{value[:4]}'
+            tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i>{short}'
         else:
             tag_label = (
                 f'<i class="bi bi-person-bounding-box pe-1"></i><span class="ccd">{value}</span>'
@@ -1653,10 +1671,10 @@ def account_link(
         tag_found, tag_label = account_label_on_index(value, user, tags, net, app)
     if not tag_found:
         if isinstance(value, str):
-            if len(value) == 64:
-                tag_label = f'<i style="color:#F6DB9A;" class="bi bi-filetype-key pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value[:6]}</span>'
+            if key_like:
+                tag_label = f'<i style="color:#F6DB9A;" class="bi bi-filetype-key pe-1"></i><span style="font-family: monospace, monospace;" class="small">{short}</span>'
             else:
-                tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{value[:4]}</span>'
+                tag_label = f'<i class="bi bi-person-bounding-box pe-1"></i><span style="font-family: monospace, monospace;" class="small">{short}</span>'
         else:
             tag_label = (
                 f'<i class="bi bi-person-bounding-box pe-1"></i><span class="ccd">{value}</span>'
@@ -1745,22 +1763,23 @@ class EventType:
         return f"{self.event}, {self.update}, {self.emit}"
 
 
-def shorten_address(value, address=None):
-    if value:
-        if isinstance(value, int):
-            return f"<div class='ccd'>{value}</div>"
-        if isinstance(value, str):
-            if len(value) < 17:
-                return f"<div class='ccd'>{value}</div>"
+def shorten_address(value, address=None) -> markupsafe.Markup:
+    """A value in the site's monospace wrapper, or shortened to its two ends.
 
-            else:
-                if address:
-                    return f"{value[:8]}...{value[-8:]}"
-                else:
-                    ss = f'<br/><div class="ccd">{value}</div>'
-                    return ss
-    else:
-        return "<div class='ccd'>No metadata url found</div>"
+    What it wraps is a contract parameter, a metadata url, registered data --
+    all of it written by whoever sent the transaction -- and most callers print
+    the result with |safe. So the value is escaped here, and the result is
+    Markup: the callers that use |safe get the wrapper intact, and the ones
+    that do not are no longer escaped a second time by the template.
+    """
+    if not value:
+        return markupsafe.Markup("<div class='ccd'>No metadata url found</div>")
+    text = str(value)
+    if isinstance(value, int) or len(text) < 17:
+        return markupsafe.Markup(f"<div class='ccd'>{escape(text)}</div>")
+    if address:
+        return escape(f"{text[:8]}...{text[-8:]}")
+    return markupsafe.Markup(f'<br/><div class="ccd">{escape(text)}</div>')
 
 
 def json_safe(value):
@@ -1850,47 +1869,64 @@ def decode_memo(hex: str):
     return raw
 
 
+def memo_for_display(memo_hex: str | None) -> str | None:
+    """The memo line as the transaction page prints it, or None without one.
+
+    A memo is free bytes from whoever sent the transfer, and the page prints
+    this line with |safe. Only this line is escaped: the same memo is kept
+    unescaped for the CSV export, where an entity would be corruption.
+    """
+    if not memo_hex:
+        return None
+    return f"Memo: {_as_text(decode_memo(memo_hex))}"
+
+
+def _as_text(value) -> str:
+    """Anything, as escaped text. None prints as it always did, as "None"."""
+    return str(escape(str(value)))
+
+
+def link_or_text(url, label=None) -> str:
+    """A link when the url is one we would link to, and its text when not.
+
+    Escaping keeps a url inside its attribute; it does nothing about
+    href="javascript:...", which needs no quote to do its damage. safe_url
+    decides whether there is a link at all.
+    """
+    text = _as_text(url) if label is None else label
+    href = safe_url(url) if isinstance(url, str) else ""
+    return f"<a href='{h(href)}'>{text}</a>" if href else text
+
+
+#: What a hostile or merely unexpected shape raises on its way through the
+#: branches below: a missing key, an empty list, a string where a mapping was
+#: expected, an index that is no number.
+_NOT_THE_EXPECTED_SHAPE = (KeyError, IndexError, TypeError, ValueError)
+
+
 def parse_account_or_contract(key, value, net, user, tags, app):
+    """One line of a schema-parsed parameter or event, as markup.
+
+    The schema is embedded in the module by whoever deployed it, so both the
+    key and the value are theirs to choose. Everything that is not markup
+    built here is escaped, and a value that does not have the shape its branch
+    expects is printed as text instead of raised.
+    """
+    key = _as_text(key)
     out = ""
-    if isinstance(value, dict):
-        sec_key = list(value.keys())[0]
-        if sec_key == "Account":
-            account_id = value[sec_key][0]
-            account_ = account_link(
-                account_id,
-                net,
-                user=user,
-                tags=tags,
-                app=app,
-            )
-            out = f"{key}: {account_}<br/>"
-
-        elif sec_key == "Contract":
-            contract_id = value[sec_key][0]
-            contract = CCD_ContractAddress.from_index(contract_id["index"], contract_id["subindex"])
-            contract_ = instance_link_v2(contract, net)
-            out = f"{key}: {contract_}<br/>"
-
-        elif list(value.keys()) == ["index", "subindex"]:
-            contract = CCD_ContractAddress.from_index(value["index"], value["subindex"])
-            contract_ = instance_link_v2(contract, net)
-            out = f"{key}: {contract_}<br/>"
-
-        elif sec_key == "metadata_url":
-            if "url" in value[sec_key]:
-                out = f"{key}: <a href='{value[sec_key]['url']}'>{value[sec_key]['url']}</a><br/>"
-
-        elif "url" in list(value.keys()):
-            out = f"{key}: <a href='{value['url']}'>{value['url']}</a><br/>"
-        else:
-            out = f"{key}: {value}<br/>"
+    if isinstance(value, dict) and value:
+        try:
+            out = _structured_schema_value(key, value, net, user, tags, app)
+        except _NOT_THE_EXPECTED_SHAPE:
+            out = ""
 
     if isinstance(value, str):
         if len(value) < 29:
-            out = f"{key}: {value}<br/>"
+            out = f"{key}: {_as_text(value)}<br/>"
         elif key == "tokens":
-            out += f"{key}: <span class='text-break'>{value[:8]}</span><br/>"
-        else:
+            out += f"{key}: <span class='text-break'>{_as_text(value[:8])}</span><br/>"
+        elif value.isalnum():
+            # Long and nothing but letters and digits: an address or a key.
             account_ = account_link(
                 value,
                 net,
@@ -1901,14 +1937,55 @@ def parse_account_or_contract(key, value, net, user, tags, app):
             out += f"{key}: {account_}<br/>"
 
     if out == "":
-        out = f"{key}: {value}<br/>"
+        out = f"{key}: {_as_text(value)}<br/>"
     return out
 
 
+def _structured_schema_value(key, value: dict, net, user, tags, app) -> str:
+    """The shapes of mapping a schema commonly yields. `key` is escaped."""
+    sec_key = next(iter(value))
+    if sec_key == "Account":
+        account_id = value[sec_key][0]
+        if not (isinstance(account_id, int) or str(account_id).isalnum()):
+            return ""
+        account_ = account_link(
+            account_id,
+            net,
+            user=user,
+            tags=tags,
+            app=app,
+        )
+        return f"{key}: {account_}<br/>"
+
+    if sec_key == "Contract":
+        contract_id = value[sec_key][0]
+        contract = CCD_ContractAddress.from_index(contract_id["index"], contract_id["subindex"])
+        contract_ = instance_link_v2(contract, net)
+        return f"{key}: {contract_}<br/>"
+
+    if list(value.keys()) == ["index", "subindex"]:
+        contract = CCD_ContractAddress.from_index(value["index"], value["subindex"])
+        contract_ = instance_link_v2(contract, net)
+        return f"{key}: {contract_}<br/>"
+
+    if sec_key == "metadata_url":
+        if "url" in value[sec_key]:
+            return f"{key}: {link_or_text(value[sec_key]['url'])}<br/>"
+        return ""
+
+    if "url" in value:
+        return f"{key}: {link_or_text(value['url'])}<br/>"
+    return ""
+
+
 def print_schema_dict(schema_dict, net, user, tags, app):
-    if not isinstance(schema_dict, dict):
-        if isinstance(schema_dict, list):
-            schema_dict = schema_dict[0]
+    """A schema-parsed parameter or event as the transaction page prints it.
+
+    The result is printed with |safe, so nothing reaches it unescaped except
+    the markup written out below.
+    """
+    if isinstance(schema_dict, list) and schema_dict:
+        schema_dict = schema_dict[0]
     if isinstance(schema_dict, dict):
         out = '<div class="text-secondary-emphasis parameter  ps-4 pe-2">'
         for key, value in schema_dict.items():
@@ -1928,25 +2005,25 @@ def print_schema_dict(schema_dict, net, user, tags, app):
                 out += parse_account_or_contract(key, value, net, user, tags, app)
             elif key == "amount":
                 if value != "":
-                    out += f"{key}: <span class='ccd'>{value}</span><br/>"
+                    out += f"{key}: <span class='ccd'>{_as_text(value)}</span><br/>"
             elif key == "data":
                 if value != "":
                     out += f"{key}: {shorten_address(value)}"
             elif key == "url":
                 if value != "":
-                    out += f"{key}: <a href='{value}'>{shorten_address(value)}</a>"
+                    out += f"{key}: {link_or_text(value, shorten_address(value))}"
             elif key == "tokens":
                 if value != "":
-                    out += f"{key}: <a href='/{net}/token'>{value}</a>"
+                    out += f"{key}: <a href='/{net}/token'>{_as_text(value)}</a>"
             else:
                 if value != "":
-                    out += f"{key}: {value}<br/>"
+                    out += f"{_as_text(key)}: {_as_text(value)}<br/>"
 
         out += "</div>"
     else:
-        out = out = (
+        out = (
             '<div class="text-secondary-emphasis parameter  ps-4 pe-2">'
-            + str(schema_dict)
+            + _as_text(schema_dict)
             + "</div>"
         )
     return out
