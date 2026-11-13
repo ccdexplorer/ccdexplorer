@@ -8,7 +8,7 @@ from ccdexplorer.ccdexplorer_api.app.security import hash_password, manager, ver
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_user_details
 from ccdexplorer.env import API_NET, API_URL, environment
 from ccdexplorer.mongodb import MongoMotor
-from ccdexplorer.tooter import Tooter
+from ccdexplorer.tooter import Tooter, is_acceptable_email_address
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -259,6 +259,15 @@ async def register(
     """
     Registers a new user
     """
+    if not is_acceptable_email_address(form_data.username):
+        # Before anything is looked up or stored: the forgot-password mail
+        # goes to whatever address the account was created with.
+        context = {
+            "request": request,
+            "env": environment,
+            "errors": ["please enter a valid email address."],
+        }
+        return request.app.state.templates.TemplateResponse(request, "auth/register.html", context)
     user = await get_user_by_email(form_data.username, db)
     next_alias_id, alias_account_id = await get_next_alias_id_and_account_id(db)
     if user is None:

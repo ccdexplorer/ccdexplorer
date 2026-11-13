@@ -3,6 +3,7 @@ from enum import Enum
 import datetime as dt
 import re
 import time
+from urllib.parse import quote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aiohttp
@@ -192,6 +193,45 @@ class TooterChannel(Enum):
     SMART = "smart"
 
 
+#: What an address has to look like before it is put in a mail url.
+#:
+#: Narrower than the RFC on purpose. Mail leaves through apprise, which takes
+#: the server, the login and the recipient in one url and reads the recipient
+#: a second time once the url is decoded -- splitting it on commas and spaces,
+#: and taking a quote as the end of a display name. So `o'brien@example.com`
+#: is delivered to brien@example.com, which is somebody else's mailbox. An
+#: address this pattern turns away gets an error its owner can read; one that
+#: apprise misreads gets silence, or a stranger's inbox.
+#:
+#: Letters, digits and `. _ -` before the @, with at most one `+tag`; a
+#: hostname with a dot after it. One tag because apprise takes one: a second
+#: `+` makes it drop the recipient without a word, and an address accepted
+#: here and discarded there is a mail that never arrives.
+_EMAIL_NAME = r"[A-Za-z0-9_][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_-]+)*"
+_EMAIL_ADDRESS = re.compile(
+    rf"{_EMAIL_NAME}(?:\+{_EMAIL_NAME})?"
+    r"@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+"
+    r"[A-Za-z](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])"
+)
+#: The longest address a mail server will take (RFC 5321).
+EMAIL_ADDRESS_MAX_LENGTH = 254
+
+
+def is_acceptable_email_address(value: object) -> bool:
+    """Whether `value` is an address mail can safely be sent to.
+
+    fullmatch, not match with a `$`: that anchor is satisfied just before a
+    trailing newline, and a newline is one of the characters this is here to
+    keep out. Anything that is not a string is not an address either -- the
+    stored value comes from Mongo and is whatever was once written there.
+    """
+    return (
+        isinstance(value, str)
+        and len(value) <= EMAIL_ADDRESS_MAX_LENGTH
+        and _EMAIL_ADDRESS.fullmatch(value) is not None
+    )
+
+
 class Tooter:
     def __init__(self) -> None:
         self.environment = ENVIRONMENT
@@ -212,30 +252,50 @@ class Tooter:
         self.email_part_2 = f"""&user={MAILTO_USER}&pass={FASTMAIL_TOKEN}&from=CCDExplorer Bot<bot@ccdexplorer.io>"""
         # self.email_part_2_api = f"""&user={MAILTO_USER}&pass={FASTMAIL_TOKEN}&from=CCDExplorer API Bot<bot@ccdexplorer.io>"""
 
-    def email(self, title: str, body: str, email_address: str, value=None, error=None):
+    def _mail_url(self, email_address: object) -> str | None:
+        """The apprise url for one recipient, or None if there is no safe one.
+
+        The address is percent-encoded so that it stays a value. It used to be
+        pasted in as it came, and the url carries the mail server and its
+        login: an address ending in `&smtp=<host>` sent that login to a server
+        of the sender's choosing, and one ending in `,<scheme>://<host>` added
+        a second destination of any kind apprise knows.
+
+        Encoding alone is not enough, because apprise decodes the value and
+        then splits it again; see _EMAIL_ADDRESS. Both, so that neither has to
+        be right about everything.
+        """
+        if not is_acceptable_email_address(email_address):
+            return None
+        return f"{self.email_part_1}{quote(str(email_address), safe='')}{self.email_part_2}"
+
+    def _send_mail(self, title: str, body: str, email_address: object) -> bool:
+        """Post one mail. False means it was refused and nothing was sent.
+
+        Refused rather than raised: this runs for addresses stored long ago as
+        well as ones typed a moment ago, and a notification that cannot be
+        delivered should cost that one notification, not the task around it.
+        The address is deliberately not logged.
+        """
+        urls = self._mail_url(email_address)
+        if urls is None:
+            return False
+        payload = {"urls": urls, "title": title, "body": body, "format": "html"}
+        _ = requests.post(self.url, json=payload)
+        return True
+
+    def email(self, title: str, body: str, email_address: str, value=None, error=None) -> bool:
         """Send email"""
         body_signature = """
 Please visit your <a href='https://ccdexplorer.io/settings/user/overview'>account</a> to adjust notification settings.
 
         """
-        payload = {
-            "urls": f"{self.email_part_1}{email_address}{self.email_part_2}",
-            "title": title,
-            "body": body + body_signature,
-            "format": "html",
-        }
-        _ = requests.post(self.url, json=payload)
+        return self._send_mail(title, body + body_signature, email_address)
 
-    def email_api(self, title: str, body: str, email_address: str, value=None, error=None):
+    def email_api(self, title: str, body: str, email_address: str, value=None, error=None) -> bool:
         body_signature = """
         """
-        payload = {
-            "urls": f"{self.email_part_1}{email_address}{self.email_part_2}",
-            "title": title,
-            "body": body + body_signature,
-            "format": "html",
-        }
-        _ = requests.post(self.url, json=payload)
+        return self._send_mail(title, body + body_signature, email_address)
 
     def relay(
         self,
