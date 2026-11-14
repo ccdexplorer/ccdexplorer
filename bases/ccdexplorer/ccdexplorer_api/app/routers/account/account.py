@@ -10,7 +10,7 @@ from ccdexplorer.mongodb import (
 )
 import datetime as dt
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockItemSummary
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pymongo import ReplaceOne, DeleteOne
 import dateutil
@@ -22,6 +22,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_user_details,
     get_api_keys,
 )
+from ccdexplorer.ccdexplorer_api.app.models import SELECTABLE_PLANS
 
 router = APIRouter(include_in_schema=False)
 
@@ -236,6 +237,12 @@ async def account_new_key(
     # api keys for paid plans are initially
     else:
         api_key_end_date = user.plan_end_date
+
+    # The key's rate limit group is the plan's name, so the plan is checked
+    # here as well as where it is chosen: an account may hold one stored
+    # before that check existed.
+    if user.plan not in SELECTABLE_PLANS:
+        raise HTTPException(status_code=400, detail="Choose a plan first.")
 
     key_id = str(uuid4())
     key_to_add = APIKey(
