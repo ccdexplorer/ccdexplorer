@@ -558,13 +558,14 @@ async def test_resolve_session_unknown_token_fails():
 
 
 @pytest.mark.asyncio
-async def test_resolve_session_migrates_legacy_account_token_cookie():
-    """Pre-session-layer cookies held the raw SiteUser.token directly; the
-    resolver treats that as an implicit login instead of forcing a logout."""
-    mongo = FakeMongo(FakeCollection([_user_doc()]), FakeCollection([]))
+async def test_resolve_session_refuses_an_account_token_cookie():
+    """Pre-session-layer cookies held the raw SiteUser.token directly, and
+    the resolver went on taking one as a login. See test_login_codes.py."""
+    sessions = FakeCollection([])
+    mongo = FakeMongo(FakeCollection([_user_doc()]), sessions)
     result = await site_auth.resolve_session("tok", mongo)
-    assert result["ok"] is True
-    assert result["session_token"] != "tok"  # cookie gets upgraded to a real session
+    assert result == {"ok": False, "reason": "invalid"}
+    assert sessions.docs == []
 
 
 @pytest.mark.asyncio

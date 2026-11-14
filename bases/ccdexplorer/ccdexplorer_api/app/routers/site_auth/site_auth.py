@@ -29,6 +29,14 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
 )
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from ccdexplorer.env import environment
+from ccdexplorer.site_user.login_codes import (
+    LoginCodePurpose,
+    code_document,
+    expired_filter,
+    is_live,
+    new_code,
+    redeem_filter,
+)
 from ccdexplorer.mongodb import CollectionsUtilities, MongoMotor
 from ccdexplorer.site_user import SiteUser
 
@@ -178,6 +186,10 @@ class ResolveSessionRequest(BaseModel):
 
 class RevokeOtherSessionsRequest(BaseModel):
     keep_session_id: Optional[str] = None
+
+
+class RedeemLoginCodeRequest(BaseModel):
+    code: str
 
 
 class CreateSessionRequest(BaseModel):
@@ -446,14 +458,11 @@ async def resolve_session(session_token: str, mongomotor: MongoMotor) -> dict:
         # converge on the current token instead of forcing a re-login.
         return await _resolved(doc["user_token"], doc["_id"], doc["token"], mongomotor)
 
-    # Migration fallback: an old-style cookie holding a raw SiteUser.token
-    # directly (pre-dates the session layer). Treat it as an implicit login
-    # instead of forcing a mass logout on deploy.
-    user = await get_site_user_by_field("token", session_token, mongomotor)
-    if user is not None:
-        session = await create_session(user.token, mongomotor)
-        return await _resolved(user.token, session["_id"], session["token"], mongomotor)
-
+    # Nothing else is a session. A cookie holding a raw SiteUser.token was
+    # once accepted here as a login, to carry browsers across the move to
+    # sessions; every session from then has since outlived its absolute
+    # lifetime, and all that was left was the account token working as a
+    # password that could never be changed.
     return {"ok": False, "reason": "invalid"}
 
 
@@ -877,6 +886,56 @@ async def revoke_other_sessions_endpoint(
     await revoke_other_sessions(token, body.keep_session_id, "logout_others", mongomotor)
     await _append_audit_entry(token, "logout_others", mongomotor)
     return {"ok": True}
+
+
+# --------------------------------------------------------------------------- #
+# One-time codes: what a link holds instead of the account token
+# --------------------------------------------------------------------------- #
+@router.post("/login-codes/redeem", response_class=JSONResponse)
+async def redeem_login_code(
+    body: RedeemLoginCodeRequest,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Spend a login code from the bot and return the account it was issued for.
+
+    The site calls this for ``/token/<code>`` and then starts a session. The
+    code is deleted by being asked about, whatever the answer, and a refusal
+    does not say which of unknown, used, lapsed or wrong-purpose it was.
+    """
+    issued = await mongomotor.utilities[CollectionsUtilities.login_codes].find_one_and_delete(
+        redeem_filter(body.code, LoginCodePurpose.LOGIN)
+    )
+    user = (
+        await get_site_user_by_field("token", issued["user_token"], mongomotor)
+        if is_live(issued)
+        else None
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="Invalid or expired login link.")
+    await _append_audit_entry(user.token, "login_success", mongomotor)
+    return {"token": user.token}
+
+
+@router.post("/{token}/telegram-link-code", response_class=JSONResponse)
+async def issue_telegram_link_code(
+    token: str,
+    mongomotor: MongoMotor = Depends(get_mongo_motor),
+    api_key: str = Security(API_KEY_HEADER),
+) -> dict:
+    """Mint the code the settings page's "Connect Telegram" link carries.
+
+    The bot spends it to attach a chat to this account. The deep link used to
+    carry the account token itself, printed into the page.
+    """
+    user = await get_site_user_by_field("token", token, mongomotor)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    codes = mongomotor.utilities[CollectionsUtilities.login_codes]
+    await codes.delete_many(expired_filter())
+    code = new_code()
+    await codes.insert_one(code_document(code, user.token, LoginCodePurpose.LINK))
+    return {"code": code}
 
 
 @router.get("/{token}/audit-log", response_class=JSONResponse)

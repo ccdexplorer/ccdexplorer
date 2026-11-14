@@ -22,12 +22,20 @@ from ccdexplorer.site_user import (
     ValidatorNotificationPreferences,
     OtherNotificationPreferences,
 )
+from ccdexplorer.site_user.login_codes import (
+    LoginCodePurpose,
+    code_document,
+    expired_filter,
+    is_live,
+    new_code,
+    redeem_filter,
+)
 import uuid
 from ccdexplorer.env import *  # type: ignore
 from ccdexplorer.mongodb import (
     CollectionsUtilities,
 )
-from telegram import Update
+from telegram import LinkPreviewOptions, Update
 from telegram.ext import ContextTypes
 from rich.console import Console
 from rich import print
@@ -38,15 +46,42 @@ console = Console()
 # Base URL for site login links (localhost in dev, ccdexplorer.io in prod).
 SITE_URL = environment["SITE_URL"]
 
+# Telegram builds a link preview by fetching the url. A login link works once,
+# so the fetch would spend it before the person it was sent to clicked it.
+NO_PREVIEW = LinkPreviewOptions(is_disabled=True)
+
+LINK_LIFETIME_NOTE = "The link works once and expires in 10 minutes."
+
 
 class Mixin:
+    def login_codes_collection(self):
+        return self.connections.mongodb.utilities[CollectionsUtilities.login_codes]
+
+    def login_link(self, user_token: str) -> str:
+        """A link that logs one browser in to the account, once.
+
+        It holds a code, not the account token: the token never changes, so a
+        link made from it stayed a way in for as long as the message existed.
+        """
+        code = new_code()
+        codes = self.login_codes_collection()
+        codes.delete_many(expired_filter())
+        codes.insert_one(code_document(code, user_token, LoginCodePurpose.LOGIN))
+        return f"{SITE_URL}/token/{code}"
+
     async def user_login(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Either send login for existing user, or create an account and send login for new user.
 
-        A deep link (``t.me/<bot>?start=<token>``) delivers an account token in
-        ``context.args``; when present, and this chat isn't already a user, we link
+        A deep link (``t.me/<bot>?start=<code>``) delivers a one-time linking code
+        in ``context.args``; when present, and this chat isn't already a user, we link
         Telegram to that existing (email-first) account instead of creating a new one.
         """
+        # The handlers are registered for private chats only (see commands.py).
+        # Checked again here because what this sends is a way in to an account,
+        # and a group is everyone in it.
+        if getattr(update.effective_chat, "type", None) != "private":
+            return
+
         telegram_user = update.effective_user
         user: SiteUser | None = self.users.get(str(telegram_user.id))
 
@@ -70,9 +105,8 @@ class Mixin:
                 except Exception as e:
                     console.log(f"Could not clear telegram block for {telegram_user.id}: {e}")
 
-            mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='{SITE_URL}/token/{existing_user.token}'>link</a> to login on CCDExplorer."
-            # console.log(f"{message.from_user.id} | {mess}")
-            await update.message.reply_html(mess)
+            mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='{self.login_link(existing_user.token)}'>link</a> to login on CCDExplorer. {LINK_LIFETIME_NOTE}"
+            await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
 
         else:
             console.log("New user.")
@@ -108,19 +142,30 @@ class Mixin:
                 )
             except Exception as e:
                 print(e)
-            mess = f"Hey <b>{new_user.first_name}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='{SITE_URL}/token/{new_user.token}'>link</a> to login on CCDExplorer with your new account."
             try:
-                await update.message.reply_html(mess)
+                mess = f"Hey <b>{new_user.first_name}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='{self.login_link(new_user.token)}'>link</a> to login on CCDExplorer with your new account. {LINK_LIFETIME_NOTE}"
+                await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
             except Exception as e:
                 console.log(f"Exception sending message to newly created user: {e}")
 
-    async def link_telegram_to_account(self, update: Update, token: str, telegram_user) -> bool:
-        """Link this Telegram chat to an existing account identified by ``token``.
+    async def link_telegram_to_account(self, update: Update, code: str, telegram_user) -> bool:
+        """Link this Telegram chat to the account a linking ``code`` was issued for.
+
+        The settings page asks the api for the code and sends the browser to
+        ``t.me/<bot>?start=<code>``. It is spent here whether or not the link
+        goes through, so a code read off someone's screen is worth one try.
 
         Returns True if the deep link was handled (linked, already-linked, or
         invalid) so the caller skips creating a brand-new account.
         """
-        result = self.users_collection().find_one({"token": token})
+        issued = self.login_codes_collection().find_one_and_delete(
+            redeem_filter(code, LoginCodePurpose.LINK)
+        )
+        result = (
+            self.users_collection().find_one({"token": issued["user_token"]})
+            if is_live(issued)
+            else None
+        )
         if not result:
             try:
                 await update.message.reply_html(
@@ -135,10 +180,10 @@ class Mixin:
             # Already linked. If it's this same chat, just resend the login link;
             # otherwise refuse to merge two accounts.
             if str(account.telegram_chat_id) == str(telegram_user.id):
-                mess = f"Your Telegram is already connected. Use this <a href='{SITE_URL}/token/{account.token}'>link</a> to login on CCDExplorer."
+                mess = f"Your Telegram is already connected. Use this <a href='{self.login_link(account.token)}'>link</a> to login on CCDExplorer. {LINK_LIFETIME_NOTE}"
             else:
                 mess = "This account is already connected to a different Telegram user."
-            await update.message.reply_html(mess)
+            await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
             return True
 
         account.telegram_chat_id = telegram_user.id
@@ -173,8 +218,8 @@ class Mixin:
         except Exception as e:
             console.log(f"Exception sending notification for linked account: {e}")
 
-        mess = f"Hey <b>{account.first_name}</b>! I've connected this Telegram to your CCDExplorer account. You'll now receive notifications here. Use this <a href='{SITE_URL}/token/{account.token}'>link</a> to login on the site."
-        await update.message.reply_html(mess)
+        mess = f"Hey <b>{account.first_name}</b>! I've connected this Telegram to your CCDExplorer account. You'll now receive notifications here. Use this <a href='{self.login_link(account.token)}'>link</a> to login on the site. {LINK_LIFETIME_NOTE}"
+        await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
         return True
 
     async def user_win_time(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
