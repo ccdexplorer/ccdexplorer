@@ -7,10 +7,10 @@
         <td><span class='text-break ccd'>{{result.credential_id}}</span></td></tr>{% endif %}
     {% if "schema_ref" in result.model_fields_set %}<tr class=" ">
         <td >Schema Ref</td>
-        <td><span class='text-break'><a href='{{result.schema_ref.url}}'>{{result.schema_ref.url|shorten_address( address=True)}}</span></td></tr>{% endif %}
+        <td><span class='text-break'><a href='{{result.schema_ref.url|safe_url}}'>{{result.schema_ref.url|shorten_address( address=True)}}</span></td></tr>{% endif %}
     {% if "metadata" in result.model_fields_set %}<tr class=" ">
         <td >Metadata Url</td>
-        <td><span class='text-break'><a href='{{result.metadata.url}}'>{{result.metadata.url|shorten_address( address=True)}}</span></td></tr>{% endif %}
+        <td><span class='text-break'><a href='{{result.metadata.url|safe_url}}'>{{result.metadata.url|shorten_address( address=True)}}</span></td></tr>{% endif %}
     {% if "revoker" in result.model_fields_set %}<tr class=" ">
         <td >Revoker</td>
         <td><span >{{result.revoker|account_link(net, user, tags, app=request.app)|safe}}</span></td></tr>{% endif %}

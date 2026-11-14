@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from httpx2 import Request
 from starlette.requests import Request as HTTPRequest
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
 
 _prometheus_client = importlib.import_module("prometheus_client")
@@ -238,6 +239,56 @@ def _classify_client(request: HTTPRequest) -> tuple[str, str]:
     if not any(h in request.headers for h in _BROWSER_ONLY_HEADERS):
         return "browser", "likely"
     return "browser", "none"
+
+
+#: Sent on every response. Each is one no page here can be broken by, which
+#: is the bar for sending it everywhere without a per-route exception:
+#:
+#: * nosniff -- a response is the type it says it is, never a script because
+#:   it happens to look like one.
+#: * the referrer policy is the browsers' own default, stated so that it does
+#:   not depend on which browser is asking.
+#: * frame-ancestors: no other origin gets to draw this site inside itself
+#:   and put its own buttons over ours. Nothing embeds the site.
+#: * object-src and base-uri: no plugin content, and no <base> to repoint
+#:   every relative link on a page. The templates use neither.
+#:
+#: There is no script-src, on purpose. The templates carry over a hundred
+#: inline scripts and a couple of dozen inline handlers, so the only policy
+#: that would not break them has to allow inline script -- and that allows
+#: exactly what such a policy exists to stop. It wants nonces first.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+}
+
+
+class SecurityHeadersMiddleware:
+    """Adds SECURITY_HEADERS to every http response.
+
+    Plain ASGI rather than BaseHTTPMiddleware: it only touches the first
+    message of a response, and has no reason to sit between a streamed body
+    and its client. A header a route set itself is left as the route set it.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in SECURITY_HEADERS.items():
+                    if name not in headers:
+                        headers[name] = value
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 class SiteSessionMiddleware(BaseHTTPMiddleware):
@@ -714,6 +765,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Last, so outermost: what another middleware answers on its own account
+    # still leaves through this one.
+    app.add_middleware(SecurityHeadersMiddleware)
 
     app.include_router(home.router)
     app.include_router(transaction.router)
