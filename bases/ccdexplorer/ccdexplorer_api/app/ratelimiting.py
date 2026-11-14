@@ -4,6 +4,7 @@ import sentry_sdk
 from typing import Mapping, Tuple
 
 from ccdexplorer.env import API_KEY_HEADER
+from ccdexplorer.ccdexplorer_api.app.models import INTERNAL_API_GROUP
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from ratelimit.auths import EmptyInformation
@@ -100,3 +101,22 @@ async def require_api_auth(request: Request) -> Tuple[str, str]:
         return await resolve_api_auth(request.scope)
     except EmptyInformation as exc:
         raise HTTPException(status_code=401, detail="Unauthorized access.") from exc
+
+
+async def require_internal_api_auth(request: Request) -> Tuple[str, str]:
+    """A registered key that is also one of the project's own.
+
+    require_api_auth answers "is this a key we issued", and every customer's
+    key is, the free ones included. The routes the site logs people in
+    through need the narrower question, because a key anyone can register
+    for was enough to call them directly: try passwords against every site
+    user, send verification and reset mail from the project's address, and
+    read, change or delete an account given its token.
+
+    403 rather than 401 for a key from another group: the caller is known,
+    and is not allowed. The detail does not say which group would have been.
+    """
+    api_account_id, group_name = await require_api_auth(request)
+    if group_name != INTERNAL_API_GROUP:
+        raise HTTPException(status_code=403, detail="Forbidden.")
+    return api_account_id, group_name

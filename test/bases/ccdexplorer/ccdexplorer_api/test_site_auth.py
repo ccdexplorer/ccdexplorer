@@ -177,9 +177,13 @@ def make_request(redis=None, tooter=None, headers=None, client_host="198.51.100.
 # Authentication: a valid API key is required (finding #3, part A)
 # --------------------------------------------------------------------------- #
 def test_site_auth_router_enforces_valid_api_key():
-    """The router carries the validating dependency, not just presence checks."""
+    """The router carries the validating dependency, not just presence checks.
+
+    The narrower one: a registered key was not enough of a question to ask,
+    see test_internal_routes_auth.py.
+    """
     dep_names = [d.dependency.__name__ for d in site_auth.router.dependencies]
-    assert "require_api_auth" in dep_names
+    assert "require_internal_api_auth" in dep_names
 
 
 def _scope_for(api_key: str, keys: dict):

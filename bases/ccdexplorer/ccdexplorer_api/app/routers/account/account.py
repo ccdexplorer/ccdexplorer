@@ -16,7 +16,14 @@ from pymongo import ReplaceOne, DeleteOne
 import dateutil
 from ccdexplorer.env import environment, API_NET, API_URL
 
-from ccdexplorer.ccdexplorer_api.app.models import APIKey, User, APIPayment, APIPlans, plans
+from ccdexplorer.ccdexplorer_api.app.models import (
+    INTERNAL_API_GROUP,
+    APIKey,
+    APIPayment,
+    APIPlans,
+    User,
+    plans,
+)
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_motor,
     get_user_details,
@@ -231,6 +238,12 @@ async def account_new_key(
     if not user:
         response = RedirectResponse(url="/auth/login", status_code=303)
         return response
+    # A key takes its group from its owner's plan, and the plan is whatever
+    # the owner last posted to /plans/set. The project's own group opens the
+    # routes the site manages users through, so no key is made in it here;
+    # those keys are written to the collection by hand.
+    if user.plan == INTERNAL_API_GROUP:
+        raise HTTPException(status_code=403, detail="This plan cannot hold API keys.")
     # api keys for the free plan are always active, set to 365 days (but of course rate limited)
     if user.plan == "free":
         api_key_end_date = dt.datetime.now().astimezone(dt.UTC) + dt.timedelta(days=365)

@@ -21,7 +21,7 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 from pymongo import ReplaceOne
 
-from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_api_auth
+from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_internal_api_auth
 from ccdexplorer.ccdexplorer_api.app.security import hash_password, verify_password
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_motor,
@@ -40,15 +40,16 @@ from ccdexplorer.site_user.login_codes import (
 from ccdexplorer.mongodb import CollectionsUtilities, MongoMotor
 from ccdexplorer.site_user import SiteUser
 
-# ``require_api_auth`` validates the key against the registered API keys and 401s
-# otherwise. The per-endpoint ``Security(API_KEY_HEADER)`` below only checks that
-# the header is *present*, so this router-level dependency is what actually
-# authenticates these server-to-server auth endpoints.
+# ``require_internal_api_auth`` lets in the site's own key and no other: 401
+# for a key that is not registered, 403 for a customer's. The per-endpoint
+# ``Security(API_KEY_HEADER)`` below only checks that the header is *present*,
+# so this router-level dependency is what actually authenticates these
+# server-to-server auth endpoints.
 router = APIRouter(
     prefix="/site-auth",
     tags=["Site Auth"],
     include_in_schema=False,
-    dependencies=[Depends(require_api_auth)],
+    dependencies=[Depends(require_internal_api_auth)],
 )
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
 
