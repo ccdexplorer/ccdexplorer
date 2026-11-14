@@ -39,6 +39,7 @@ from ccdexplorer.site_user.login_codes import (
 )
 from ccdexplorer.mongodb import CollectionsUtilities, MongoMotor
 from ccdexplorer.site_user import SiteUser
+from ccdexplorer.tooter import is_acceptable_email_address
 
 # ``require_internal_api_auth`` lets in the site's own key and no other: 401
 # for a key that is not registered, 403 for a customer's. The per-endpoint
@@ -563,6 +564,18 @@ def _audit_public(doc: dict) -> dict:
     }
 
 
+def require_email_address(email: str) -> None:
+    """Turn away anything the mailer would not send to, before it is stored.
+
+    The mailer makes the same check and refuses quietly, which is right for a
+    notification and wrong here: the account would exist, the page would say
+    to look for a verification mail, and none would come. A 422 with a
+    sentence, because the site shows `detail` to the visitor as it stands.
+    """
+    if not is_acceptable_email_address(email):
+        raise HTTPException(status_code=422, detail="Please enter a valid email address.")
+
+
 def send_verification_email(request: Request, user: SiteUser) -> None:
     """Email the user a link to confirm ownership of their email address."""
     request.app.tooter.email_api(
@@ -585,6 +598,8 @@ async def register(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """Create a new email/password SiteUser and send a verification email."""
+    # Before the throttle, so that what is counted is always an address.
+    require_email_address(body.email)
     # Throttle to prevent verification-email bombing / registration spam.
     caller = _client_ip(request)
     if await _too_many_attempts(request, "register", body.email, EMAIL_MAX_PER_WINDOW) or (
@@ -730,6 +745,7 @@ async def set_email(
 
     Used by the settings page so that every email address ends up verified.
     """
+    require_email_address(body.email)
     user = await get_site_user_by_field("token", token, mongomotor)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -786,6 +802,8 @@ async def set_password(
 
     If a new email is supplied, it is stored and a verification email is sent.
     """
+    if body.email:
+        require_email_address(body.email)
     user = await get_site_user_by_field("token", token, mongomotor)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")

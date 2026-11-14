@@ -907,3 +907,128 @@ def test_the_per_caller_limits_are_looser_than_the_per_target_ones():
     """They bound a sweep across accounts; the email keys bound one account."""
     assert site_auth.LOGIN_MAX_ATTEMPTS_PER_IP > site_auth.LOGIN_MAX_ATTEMPTS
     assert site_auth.EMAIL_MAX_PER_IP > site_auth.EMAIL_MAX_PER_WINDOW
+
+
+# --------------------------------------------------------------------------- #
+# An email address is checked before it is stored
+#
+# The three routes that accept a new address took any string, stored it, and
+# mailed a verification link to it. The mailer now refuses an address it
+# cannot send to safely, but refusing there is silent: the account exists, the
+# page says "check your inbox", and nothing ever arrives. So the same check
+# runs here first, where there is someone to tell.
+# --------------------------------------------------------------------------- #
+class RecordingCollection(FakeCollection):
+    """A collection that remembers whether anything was written to it."""
+
+    def __init__(self, docs=None):
+        super().__init__(docs)
+        self.writes = []
+
+    async def bulk_write(self, operations):
+        self.writes.append(operations)
+
+
+NOT_AN_ADDRESS = [
+    "a@example.com&smtp=evil.example",
+    "a@example.com,json://evil.example/x",
+    "a@example.com&bcc=other@evil.example",
+    "a@example.com other@evil.example",
+    "nobody",
+    "",
+]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("email", NOT_AN_ADDRESS)
+async def test_register_refuses_what_is_not_an_address(email):
+    tooter = FakeTooter()
+    users = RecordingCollection([])
+
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.register(
+            request=make_request(tooter=tooter),
+            body=site_auth.RegisterRequest(email=email, password="whatever"),
+            mongomotor=FakeMongo(users),
+        )
+
+    assert exc.value.status_code == 422
+    # The site shows `detail` to the visitor as it comes, so it has to be a
+    # sentence and not pydantic's list of error dicts.
+    assert isinstance(exc.value.detail, str)
+    assert users.writes == []
+    assert tooter.emails == []
+
+
+@pytest.mark.asyncio
+async def test_register_still_takes_an_ordinary_address(monkeypatch):
+    monkeypatch.setattr(site_auth, "SITE_URL", "https://ccdexplorer.io")
+    tooter = FakeTooter()
+    users = RecordingCollection([])
+
+    result = await site_auth.register(
+        request=make_request(tooter=tooter),
+        body=site_auth.RegisterRequest(email="user+ccd@example.com", password="whatever"),
+        mongomotor=FakeMongo(users),
+    )
+
+    assert result == {"ok": True, "needs_verification": True}
+    assert len(users.writes) == 1
+    assert tooter.emails[0]["email_address"] == "user+ccd@example.com"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("email", NOT_AN_ADDRESS)
+async def test_set_email_refuses_what_is_not_an_address(email):
+    tooter = FakeTooter()
+    users = RecordingCollection([{"token": "tok", "email_address": "old@example.com"}])
+
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_email(
+            request=make_request(tooter=tooter),
+            token="tok",
+            body=site_auth.SetEmailRequest(email=email),
+            mongomotor=FakeMongo(users),
+        )
+
+    assert exc.value.status_code == 422
+    assert isinstance(exc.value.detail, str)
+    assert users.writes == []
+    assert tooter.emails == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("email", [e for e in NOT_AN_ADDRESS if e])
+async def test_set_password_refuses_a_new_address_that_is_not_one(email):
+    """An empty email here means "keep the one I have", so it is not in the
+    list; anything else that is given has to be an address."""
+    tooter = FakeTooter()
+    users = RecordingCollection([{"token": "tok", "email_address": "old@example.com"}])
+
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_password(
+            request=make_request(tooter=tooter),
+            token="tok",
+            body=site_auth.SetPasswordRequest(password="whatever", email=email),
+            mongomotor=FakeMongo(users),
+        )
+
+    assert exc.value.status_code == 422
+    assert users.writes == []
+    assert tooter.emails == []
+
+
+@pytest.mark.asyncio
+async def test_set_password_without_an_email_is_untouched_by_the_check():
+    users = RecordingCollection(
+        [{"token": "tok", "email_address": "old@example.com", "email_verified": True}]
+    )
+
+    result = await site_auth.set_password(
+        request=make_request(),
+        token="tok",
+        body=site_auth.SetPasswordRequest(password="whatever"),
+        mongomotor=FakeMongo(users),
+    )
+
+    assert result == {"ok": True, "needs_verification": False}
