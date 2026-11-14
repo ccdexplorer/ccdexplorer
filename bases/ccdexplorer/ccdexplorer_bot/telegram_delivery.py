@@ -40,6 +40,26 @@ TELEGRAM_FAILURE_LIMIT = 25
 # must not unsubscribe anybody.
 TELEGRAM_BLOCKED_STATUS = 424
 
+# What Telegram says, through apprise, when the recipient is gone. A 424 is
+# apprise failing to deliver for any reason at all -- it could not reach
+# Telegram, the message was too long or would not parse -- and none of those
+# is the recipient's doing. Over ten days to 2026-11-13 they were 62 of 135.
+# Counting them lets whatever can make a send fail switch a subscription off.
+TELEGRAM_BLOCK_REASONS = (
+    "bot was blocked by the user",
+    "user is deactivated",
+)
+
+
+def refusal_is_a_block(detail: str | None) -> bool:
+    """Whether apprise's reason for a refusal says the recipient is gone.
+
+    No reason is no: a body that could not be read says nothing about the
+    chat, and a missed strike costs one more wasted send where a wrong one
+    works toward silencing somebody.
+    """
+    return bool(detail) and any(reason in detail for reason in TELEGRAM_BLOCK_REASONS)
+
 
 def users_collection_name() -> str:
     """The users collection in use (dev under pytest, prod otherwise).

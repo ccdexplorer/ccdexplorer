@@ -18,7 +18,7 @@ from ccdexplorer.site_user import (
 from rich.console import Console
 
 from ..notification_classes import *
-from .utils import Utils as Utils
+from .utils import Utils as Utils, esc
 
 console = Console()
 
@@ -40,9 +40,9 @@ class MessageAccount(Utils):
             notification_event.impacted_addresses, AddressType.validator
         )
         if validator:
-            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{delegator.label}</a> performed the following delegation action(s) on validator <a href="https://ccdexplorer.io/mainnet/account/{validator.address.account.id}">{validator.label}</a>:<br/><br/>'
+            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{esc(delegator.label)}</a> performed the following delegation action(s) on validator <a href="https://ccdexplorer.io/mainnet/account/{validator.address.account.id}">{esc(validator.label)}</a>:<br/><br/>'
         else:
-            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{delegator.label}</a> performed the following delegation action(s):<br/><br/>'
+            message = f'Delegator <a href="https://ccdexplorer.io/mainnet/account/{delegator.address.account.id}">{esc(delegator.label)}</a> performed the following delegation action(s):<br/><br/>'
 
         if isinstance(event_type, EventTypeValidator):
             previous_block_info = (
@@ -114,7 +114,7 @@ class MessageAccount(Utils):
         )
         message = f"""
              
-Module: <a href="/mainnet/module/{event_type.module_deployed}">{event_type.module_deployed}</a><br/>
+Module: <a href="/mainnet/module/{esc(event_type.module_deployed)}">{esc(event_type.module_deployed)}</a><br/>
 
 """
         message += f"""
@@ -143,8 +143,8 @@ Module: <a href="/mainnet/module/{event_type.module_deployed}">{event_type.modul
         message_telegram = f"""
               
 Contract: <code>{event_type.contract_initialized.address.index}</code><br/>
-Initializer: {event_type.contract_initialized.init_name}<br/>
-Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{event_type.contract_initialized.origin_ref[:10]}</a><br/>
+Initializer: {esc(event_type.contract_initialized.init_name)}<br/>
+Module: <a href="/mainnet/module/{esc(event_type.contract_initialized.origin_ref)}">{esc(event_type.contract_initialized.origin_ref[:10])}</a><br/>
 """
         message_telegram += f"""
 
@@ -168,7 +168,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         e = notification_event.event_type.account
         notification_event = self.add_labels_to_notitication_event(user, notification_event)
         message_telegram = f"""
-Data registered: <code>{e.data_registered}</code>
+Data registered: <code>{esc(e.data_registered)}</code>
 {self.footer(notification_event)}
 
 
@@ -190,7 +190,7 @@ Data registered: <code>{e.data_registered}</code>
         notification_event = self.add_labels_to_notitication_event(user, notification_event)
         impacted_address = notification_event.impacted_addresses[0]
         amount = notification_event.event_type.account.account_transfer.amount / 1_000_000
-        message_telegram = f"Account <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{impacted_address.label}</a> was affected by a transfer <a href='https://ccdexplorer.io/mainnet/transaction/{notification_event.tx_hash}'>transaction</a> with amount: {amount:,.0f} CCD.<br/>"
+        message_telegram = f"Account <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{esc(impacted_address.label)}</a> was affected by a transfer <a href='https://ccdexplorer.io/mainnet/transaction/{notification_event.tx_hash}'>transaction</a> with amount: {amount:,.0f} CCD.<br/>"
         message_telegram += f"""
 
 {self.footer(notification_event)}
@@ -232,17 +232,17 @@ Data registered: <code>{e.data_registered}</code>
                 amount = self.token_amount_using_decimals(result.token_amount, decimals)
 
             amount_string = (
-                f"Amount: <code>{amount}</code> {contract_info.id}"
+                f"Amount: <code>{amount}</code> {esc(contract_info.id)}"
                 if contract_info.token_type == "fungible"
                 else ""
             )
-            token_name_string = f"Name: {token_name}" if token_name else ""
+            token_name_string = f"Name: {esc(token_name)}" if token_name else ""
             token_string = f"""
-Token: {contract_info.display_name}<br/>
+Token: {esc(contract_info.display_name)}<br/>
 {amount_string}<br/>
 {token_name_string}<br/>
 """
-        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected by a CIS token <code>{event_type}</code> event:<br/>
+        message_telegram = f"""Account {esc(notification_event.impacted_addresses[0].label)} was affected by a CIS token <code>{event_type}</code> event:<br/>
 {token_string}<br/>
 """
         message_telegram += f"""
@@ -308,7 +308,7 @@ Token: {contract_info.display_name}<br/>
         ###
         return MessageResponse(
             **{
-                "title_telegram": f"Scheduled Account Transfer for {impacted_address.label}",
+                "title_telegram": f"Scheduled Account Transfer for {esc(impacted_address.label)}",
                 "title_email": f"CCDExplorer Notification - Scheduled Account Transfer for {impacted_address.label}",
                 "message_telegram": message_telegram,
                 "message_email": html_release_table,
@@ -334,7 +334,7 @@ Token: {contract_info.display_name}<br/>
             + event_type.payday_account_reward.finalization_reward / 1_000_000
         )
         message = (
-            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code>\n\nReward payout of <code>{total_amount:,.6f} CCD</code> for account <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{impacted_address.label}</a>: \n\n"
+            f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code>\n\nReward payout of <code>{total_amount:,.6f} CCD</code> for account <a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{esc(impacted_address.label)}</a>: \n\n"
             + account_message
         )
         message += f"""
@@ -378,7 +378,7 @@ Token: {contract_info.display_name}<br/>
         html_message = (
             f"Payday: <code>{notification_event.block_slot_time:%Y-%m-%d}</code><br/>"
             f"Reward payout of <code>{total_amount:,.6f} CCD</code> for account "
-            f"<a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{impacted_address.label}</a>: \n\n"
+            f"<a href='https://ccdexplorer.io/mainnet/account/{impacted_address.address.account.id}'>{esc(impacted_address.label)}</a>: \n\n"
             + html_account_table
         )
 
@@ -464,7 +464,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         return MessageResponse(
             **{
                 # "delegator_index": delegator_index,
-                "title_telegram": f"Validator {validator.label} (delegation target) Set Commission Rates",
+                "title_telegram": f"Validator {esc(validator.label)} (delegation target) Set Commission Rates",
                 "title_email": f"CCDExplorer Notification - Validator {validator.label} (delegation target) Set Commission Rates",
                 "message_telegram": message_to_send,
                 "message_email": message_to_send,
@@ -480,7 +480,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         )
         telegram_message = f"""
 
-    Validator <code>{validator.label}</code> is primed for suspension.<br/>
+    Validator <code>{esc(validator.label)}</code> is primed for suspension.<br/>
 
     """
 
@@ -506,7 +506,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         )
         telegram_message = f"""
 
-Validator <code>{validator.label}</code> is suspended.<br/>
+Validator <code>{esc(validator.label)}</code> is suspended.<br/>
 
 """
 
@@ -551,9 +551,9 @@ Validator <code>{validator.label}</code> is suspended.<br/>
             )
             formatted_amount = f"{amount:,.{token_event.transfer_event.amount.decimals}f}"
 
-        amount_string = f"Amount: <code>{formatted_amount}</code> {token_event.token_id}"
+        amount_string = f"Amount: <code>{formatted_amount}</code> {esc(token_event.token_id)}"
 
-        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected in a PLT transaction<br/><br/>Token: <a href='https://ccdexplorer.io/mainnet/tokens/{token_event.token_id}'>{token_event.token_id}</a><br/>Event: <code>{event_type}</code><br/>
+        message_telegram = f"""Account {esc(notification_event.impacted_addresses[0].label)} was affected in a PLT transaction<br/><br/>Token: <a href='https://ccdexplorer.io/mainnet/tokens/{esc(token_event.token_id)}'>{esc(token_event.token_id)}</a><br/>Event: <code>{event_type}</code><br/>
 {amount_string}<br/>
 """
         message_telegram += f"""
@@ -577,7 +577,7 @@ Validator <code>{validator.label}</code> is suspended.<br/>
         assert lock_create_event is not None
         lock_id = lock_create_event.lock_id.to_str()
 
-        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> being created.<br/>
+        message_telegram = f"""Account {esc(notification_event.impacted_addresses[0].label)} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{esc(lock_id)}'>lock</a> being created.<br/>
 """
         message_telegram += f"""
 
@@ -600,7 +600,7 @@ Validator <code>{validator.label}</code> is suspended.<br/>
         assert lock_destroy_event is not None
         lock_id = lock_destroy_event.lock_id.to_str()
 
-        message_telegram = f"""Account {notification_event.impacted_addresses[0].label} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> being destroyed/cancelled.<br/>
+        message_telegram = f"""Account {esc(notification_event.impacted_addresses[0].label)} was affected by a PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{esc(lock_id)}'>lock</a> being destroyed/cancelled.<br/>
 """
         message_telegram += f"""
 

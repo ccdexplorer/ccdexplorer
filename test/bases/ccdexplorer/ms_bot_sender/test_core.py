@@ -4,6 +4,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # Import the module under test
 import ccdexplorer.ms_bot_sender.core as bot_sender
 from ccdexplorer.ccdexplorer_bot.notification_classes import MessageResponse
+from ccdexplorer.tooter.core import RelayStatus
+
+
+def _refused(reason: str) -> RelayStatus:
+    """A 424 as `async_relay` returns it, with apprise's reason attached."""
+    return RelayStatus(
+        424,
+        '{"error":"One or more notifications could not be sent",'
+        f'"details":[["WARNING","2026-11-13 14:46:30,817","{reason}"]]}}',
+    )
+
+
+def _blocked() -> RelayStatus:
+    return _refused(
+        "Failed to send Telegram notification to 777: "
+        "Forbidden: bot was blocked by the user, error=403."
+    )
 
 
 @pytest.mark.asyncio
@@ -122,7 +139,7 @@ def test_send_message_email_path():
 
 
 @pytest.mark.asyncio
-async def test_a_424_is_counted_against_the_chat():
+async def test_a_block_is_counted_against_the_chat():
     msg = MessageResponse(
         title_telegram="T", message_telegram="B", title_email="", message_email=""
     )
@@ -133,7 +150,7 @@ async def test_a_424_is_counted_against_the_chat():
         patch.object(bot_sender, "record_telegram_success") as success,
         patch.object(bot_sender, "users_collection", MagicMock()),
     ):
-        mock_tooter.async_relay = AsyncMock(return_value=424)
+        mock_tooter.async_relay = AsyncMock(return_value=_blocked())
 
         await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=msg)
 
@@ -253,7 +270,7 @@ async def test_a_chat_that_refuses_twice_is_counted_once():
         patch.object(bot_sender, "users_collection", MagicMock()),
         patch.object(bot_sender.asyncio, "sleep", AsyncMock()),
     ):
-        mock_tooter.async_relay = AsyncMock(side_effect=[424, 424])
+        mock_tooter.async_relay = AsyncMock(side_effect=[_blocked(), _blocked()])
 
         await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
 
@@ -269,7 +286,7 @@ async def test_a_chat_already_failing_is_not_sent_twice():
         patch.object(bot_sender, "record_telegram_failure") as failure,
         patch.object(bot_sender, "users_collection", MagicMock()),
     ):
-        mock_tooter.async_relay = AsyncMock(return_value=424)
+        mock_tooter.async_relay = AsyncMock(return_value=_blocked())
 
         await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
 
@@ -357,3 +374,70 @@ def test_a_chat_with_failures_behind_it_is_not():
 
     with patch.object(bot_sender, "users_collection", users):
         assert bot_sender.retry_allowed(777) is False
+
+
+# --- only a recipient who is gone is a strike -----------------------------
+#
+# A 424 is apprise failing to deliver, whatever the cause. Counting every one
+# let an outage, or a message Telegram would not parse, work toward switching
+# a subscription off.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "reason",
+    [
+        "A connection error occurred sending Telegram:777 notification.",
+        "Failed to send Telegram notification to 777: Bad Request: can't parse entities, error=400.",
+        "Failed to send Telegram notification to 777: Bad Request: message is too long, error=400.",
+    ],
+)
+async def test_a_refusal_that_is_not_the_recipient_is_no_strike(reason):
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=False),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "record_telegram_success") as success,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=_refused(reason))
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        failure.assert_not_called()
+        success.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_424_with_no_reason_is_no_strike():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=False),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(return_value=424)
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        failure.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_deactivated_recipient_is_a_strike():
+    with (
+        patch.object(bot_sender, "tooter") as mock_tooter,
+        patch.object(bot_sender, "retry_allowed", return_value=False),
+        patch.object(bot_sender, "record_telegram_failure") as failure,
+        patch.object(bot_sender, "users_collection", MagicMock()),
+    ):
+        mock_tooter.async_relay = AsyncMock(
+            return_value=_refused(
+                "Failed to send Telegram notification to 777: "
+                "Forbidden: user is deactivated, error=403."
+            )
+        )
+
+        await bot_sender.send_to_telegram(self=None, telegram_chat_id=777, message_response=_msg())
+
+        failure.assert_called_once()

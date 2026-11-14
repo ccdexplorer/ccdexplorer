@@ -15,7 +15,7 @@ from ccdexplorer.site_user import (
 from rich.console import Console
 
 from ..notification_classes import *
-from .utils import Utils as Utils
+from .utils import Utils as Utils, esc
 
 console = Console()
 
@@ -26,8 +26,8 @@ class MessageOther(Utils):
     ) -> MessageResponse:
         event_type = notification_event.event_type.other
         message_telegram = f"""
-<i>{event_type.protocol_update.message_}</i>
-Further info <a href='{event_type.protocol_update.specification_url}'>here</a>.
+<i>{esc(event_type.protocol_update.message_)}</i>
+Further info <a href='{esc(event_type.protocol_update.specification_url)}'>here</a>.
 """
         message_telegram += f"""
 
@@ -40,10 +40,10 @@ Further info <a href='{event_type.protocol_update.specification_url}'>here</a>.
                 "message_telegram": message_telegram,
                 "message_email": f"""In the block at height {notification_event.block_height:,.0f} a protocol update was issued with the following message:
 
-            {event_type.protocol_update.message_} 
+            {esc(event_type.protocol_update.message_)} 
 
             Further info can be found at the following URL: 
-            {event_type.protocol_update.specification_url}.
+            {esc(event_type.protocol_update.specification_url)}.
                             """,
             }
         )
@@ -53,9 +53,9 @@ Further info <a href='{event_type.protocol_update.specification_url}'>here</a>.
     ) -> MessageResponse:
         e = notification_event.event_type.other
         message_telegram = f"""
-Name: {e.add_anonymity_revoker_update.description.name}<br/>
-URL: <a href='{e.add_anonymity_revoker_update.description.url}'>{e.add_anonymity_revoker_update.description.url}</a><br/>
-Description: {e.add_anonymity_revoker_update.description.description}<br/>
+Name: {esc(e.add_anonymity_revoker_update.description.name)}<br/>
+URL: <a href='{esc(e.add_anonymity_revoker_update.description.url)}'>{esc(e.add_anonymity_revoker_update.description.url)}</a><br/>
+Description: {esc(e.add_anonymity_revoker_update.description.description)}<br/>
 """
         message_telegram += f"""
 
@@ -75,9 +75,9 @@ Description: {e.add_anonymity_revoker_update.description.description}<br/>
     ) -> MessageResponse:
         e = notification_event.event_type.other
         message_telegram = f"""
-Name: {e.add_identity_provider_update.description.name}<br/>
-URL: <a href='{e.add_identity_provider_update.description.url}'>{e.add_identity_provider_update.description.url}</a><br/>
-Description: {e.add_identity_provider_update.description.description}<br/>
+Name: {esc(e.add_identity_provider_update.description.name)}<br/>
+URL: <a href='{esc(e.add_identity_provider_update.description.url)}'>{esc(e.add_identity_provider_update.description.url)}</a><br/>
+Description: {esc(e.add_identity_provider_update.description.description)}<br/>
 """
         message_telegram += f"""
 
@@ -151,7 +151,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         return MessageResponse(
             **{
                 # "delegator_index": delegator_index,
-                "title_telegram": f"Validator {validator.label} Set Commission Rates",
+                "title_telegram": f"Validator {esc(validator.label)} Set Commission Rates",
                 "title_email": f"CCDExplorer Notification - Validator {validator.label} Set Commission Rates",
                 "message_telegram": message_to_send,
                 "message_email": message_to_send,
@@ -169,9 +169,9 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         message = ""
 
         if lowered_stake_object.baker_removed:
-            message = f"Validator Account <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> removed its validator and unstaked <code>{(lowered_stake_object.unstaked_amount) / 1_000_000:,.0f} CCD</code>.<br/>"
+            message = f"Validator Account <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> removed its validator and unstaked <code>{(lowered_stake_object.unstaked_amount) / 1_000_000:,.0f} CCD</code>.<br/>"
         else:
-            message = f"Validator Account <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> decreased its stake with <code>{(lowered_stake_object.unstaked_amount) / 1_000_000:,.0f} CCD ({(100 * lowered_stake_object.percentage_unstaked):,.2f}%)</code> to <code>{(lowered_stake_object.new_stake / 1_000_000):,.0f} CCD</code>.<br/>"
+            message = f"Validator Account <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> decreased its stake with <code>{(lowered_stake_object.unstaked_amount) / 1_000_000:,.0f} CCD ({(100 * lowered_stake_object.percentage_unstaked):,.2f}%)</code> to <code>{(lowered_stake_object.new_stake / 1_000_000):,.0f} CCD</code>.<br/>"
 
         message += f"""
 
@@ -201,7 +201,7 @@ Finalization Reward Commission: <code>{event.baker_set_finalization_reward_commi
         )
         message = f"""
              
-Module: <a href="/mainnet/module/{event_type.module_deployed}">{event_type.module_deployed}</a><br/>
+Module: <a href="/mainnet/module/{esc(event_type.module_deployed)}">{esc(event_type.module_deployed)}</a><br/>
 
 """
         message += f"""
@@ -229,8 +229,8 @@ Module: <a href="/mainnet/module/{event_type.module_deployed}">{event_type.modul
         message_telegram = f"""
               
 Contract: <code>{event_type.contract_initialized.address.index}</code><br/>
-Initializer: {event_type.contract_initialized.init_name}<br/>
-Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{event_type.contract_initialized.origin_ref[:10]}</a><br/>
+Initializer: {esc(event_type.contract_initialized.init_name)}<br/>
+Module: <a href="/mainnet/module/{esc(event_type.contract_initialized.origin_ref)}">{esc(event_type.contract_initialized.origin_ref[:10])}</a><br/>
 """
         message_telegram += f"""
 
@@ -365,7 +365,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         self, notification_event: NotificationEvent, user: SiteUser
     ) -> MessageResponse:
         notification_event = self.add_labels_to_notitication_event(user, notification_event)
-        message_telegram = f"The CCD domain <code>{notification_event.event_type.other.domain_name_minted}</code> was minted."
+        message_telegram = f"The CCD domain <code>{esc(notification_event.event_type.other.domain_name_minted)}</code> was minted."
         message_telegram += f"""
 
 {self.footer(notification_event)}
@@ -385,7 +385,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         notification_event = self.add_labels_to_notitication_event(user, notification_event)
         message_telegram = "A new Concordium account is created. <br/>"
         message_telegram += (
-            f"Address: <code>{notification_event.event_type.other.account_created}</code><br/>"
+            f"Address: <code>{esc(notification_event.event_type.other.account_created)}</code><br/>"
         )
         message_telegram += f"""
 
@@ -408,7 +408,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         validator: ImpactedAddress = self.return_specific_address_type(
             notification_event.impacted_addresses, AddressType.validator
         )
-        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> is primed for suspension.<br/>"
+        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> is primed for suspension.<br/>"
 
         message += f"""
 
@@ -431,7 +431,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         validator: ImpactedAddress = self.return_specific_address_type(
             notification_event.impacted_addresses, AddressType.validator
         )
-        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> is suspended.<br/>"
+        message = f"Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> is suspended.<br/>"
 
         message += f"""
 
@@ -454,7 +454,7 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         validator: ImpactedAddress = self.return_specific_address_type(
             notification_event.impacted_addresses, AddressType.validator
         )
-        message = f"Concordium Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{validator.label}</a> has just upgraded its node to version {notification_event.event_type.other.validator_node_version_upgrade}.<br/>"
+        message = f"Concordium Validator <a href='https://ccdexplorer.io/mainnet/account/{validator.address.account.id}'>{esc(validator.label)}</a> has just upgraded its node to version {esc(notification_event.event_type.other.validator_node_version_upgrade)}.<br/>"
 
         message += f"""
 
@@ -478,8 +478,8 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
 
         message = f"""
         A new Protocol-Level Token (PLT) was created.<br/><br/>
-        Name: {notification_event.event_type.other.token_creation.initialization_parameters.name}<br/>
-        Symbol: {notification_event.event_type.other.token_creation.token_id}<br/>
+        Name: {esc(notification_event.event_type.other.token_creation.initialization_parameters.name)}<br/>
+        Symbol: {esc(notification_event.event_type.other.token_creation.token_id)}<br/>
         """  # type: ignore
 
         message += f"""
@@ -503,8 +503,8 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         lock_id = lock_create_event.lock_id.to_str()
 
         message = f"""
-        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> was created.<br/><br/>
-        Lock id: {lock_id}<br/>
+        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{esc(lock_id)}'>lock</a> was created.<br/><br/>
+        Lock id: {esc(lock_id)}<br/>
         """
 
         message += f"""
@@ -528,8 +528,8 @@ Module: <a href="/mainnet/module/{event_type.contract_initialized.origin_ref}">{
         lock_id = lock_destroy_event.lock_id.to_str()
 
         message = f"""
-        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{lock_id}'>lock</a> was destroyed/cancelled.<br/><br/>
-        Lock id: {lock_id}<br/>
+        A PLT <a href='https://ccdexplorer.io/mainnet/tokens/plt/lock/{esc(lock_id)}'>lock</a> was destroyed/cancelled.<br/><br/>
+        Lock id: {esc(lock_id)}<br/>
         """
 
         message += f"""
