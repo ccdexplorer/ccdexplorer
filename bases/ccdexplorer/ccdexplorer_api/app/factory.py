@@ -71,6 +71,7 @@ from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.tooter import Tooter
 
 from .models import rate_limit_rules
+from .security_headers import SecurityHeadersMiddleware
 
 r = Redis.from_url(REDIS_URL, decode_responses=False)  # type: ignore
 # ratelimit
@@ -428,6 +429,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     )
     app.add_middleware(BearerTokenApiKeyMiddleware)
     Instrumentator().instrument(app)
+    # Last, so outermost: a 401 or a 429 another middleware answers on its own
+    # account still leaves through this one.
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # @app.middleware("http")
     # async def log_cors_origin(request, call_next):
