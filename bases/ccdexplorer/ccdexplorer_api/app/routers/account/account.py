@@ -1,5 +1,6 @@
 from uuid import uuid4
 import math
+from ccdexplorer.ccdexplorer_api.app.security import require_htmx
 from ccdexplorer.ccdexplorer_api.app.utils import await_await, get_plts_that_track_eur
 import httpx2 as httpx
 from ccdexplorer.mongodb import (
@@ -229,7 +230,7 @@ async def account_home_refresh(
     return response
 
 
-@router.post("/account/new-key")
+@router.post("/account/new-key", dependencies=[Depends(require_htmx)])
 async def account_new_key(
     request: Request,
     mongomotor: MongoMotor = Depends(get_mongo_motor),
@@ -279,7 +280,7 @@ async def account_new_key(
     return response
 
 
-@router.delete("/account/key/{key}")
+@router.delete("/account/key/{key}", dependencies=[Depends(require_htmx)])
 async def account_delete_key(
     request: Request,
     key: str,

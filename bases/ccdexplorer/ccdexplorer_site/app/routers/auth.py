@@ -229,12 +229,15 @@ async def set_password_post(
     request: Request,
     password: str = Form(...),
     email: str = Form(None),
+    current_password: str = Form(None),
 ):
     user = await get_user_detailsv2(request)
     if not user:
         return RedirectResponse(url="/auth/login", status_code=303)
 
     payload = {"password": password, "session_id": request.state.session_id}
+    if current_password:
+        payload["current_password"] = current_password
     if email:
         payload["email"] = email
     api_response = await post_url_from_api(

@@ -15,7 +15,12 @@ from ccdexplorer.ccdexplorer_api.app.routers.site_auth.site_auth import (
     _reset_attempts,
     _too_many_attempts,
 )
-from ccdexplorer.ccdexplorer_api.app.security import hash_password, manager, verify_password
+from ccdexplorer.ccdexplorer_api.app.security import (
+    hash_password,
+    manager,
+    set_session_cookie,
+    verify_password,
+)
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_user_details
 from ccdexplorer.env import API_NET, API_URL, environment
 from ccdexplorer.mongodb import MongoMotor
@@ -172,7 +177,7 @@ async def login(
 
     await _reset_attempts(request, "api-login-email", email)
     response = RedirectResponse(url="/account", status_code=303)
-    manager.set_cookie(response, user.token)
+    set_session_cookie(response, user.token)
     return response
 
 
@@ -297,6 +302,8 @@ async def set_new_password_after_forgot(
     if user:
         assert password is not None
         user.password = hash_password(password)
+        # A new password retires every cookie made with the old token.
+        user.token = str(uuid4())
         user.reset_password_token = None
         user.reset_password_token_expires = None
         await db.utilities_db["api_users"].bulk_write(
@@ -386,7 +393,7 @@ async def register(
             ]
         )
         response = RedirectResponse(url="/account", status_code=303)
-        manager.set_cookie(response, user.token)
+        set_session_cookie(response, user.token)
         return response
 
     else:
@@ -399,8 +406,41 @@ async def register(
 
 
 @router.get("/logout")
-async def logout(request: Request, response: Response):
-    response = RedirectResponse(url="/", status_code=302)
-    response.delete_cookie("api.ccdexplorer.io")
+async def logout_get():
+    """Nothing happens on a GET.
+
+    A link, an image tag or a redirect on another site is a GET, and signing
+    someone out is not something they should be able to trigger.
+    """
+    return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    response: Response,
+    db: MongoMotor = Depends(get_mongo_motor),
+):
+    """End the session -- on the server too.
+
+    The cookie holds the account's token, so deleting it only forgets it on
+    this browser; anyone who copied it could still use it. Retiring the token
+    makes a copy worth nothing, which does sign out the account's other
+    browsers as well.
+    """
+    user = get_user_details(request)
+    if user:
+        user.token = str(uuid4())
+        await db.utilities_db["api_users"].bulk_write(
+            [
+                ReplaceOne(
+                    {"_id": user.api_account_id},
+                    user.model_dump(exclude_none=True),
+                    upsert=True,
+                )
+            ]
+        )
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie("api.ccdexplorer.io", path="/")
     request.app.user = None
     return response

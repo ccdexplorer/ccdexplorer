@@ -11,6 +11,7 @@ and sets the ``access-token`` cookie with the returned ``token``.
 # pyright: reportOptionalSubscript=false
 # pyright: reportAttributeAccessIssue=false
 import datetime as dt
+import html
 import json
 from typing import Optional
 from uuid import uuid4
@@ -176,10 +177,13 @@ class SetPasswordRequest(BaseModel):
     password: str
     email: Optional[str] = None
     session_id: Optional[str] = None
+    # Required once the account has a password; see _require_current_password.
+    current_password: Optional[str] = None
 
 
 class SetEmailRequest(BaseModel):
     email: str
+    current_password: Optional[str] = None
 
 
 class ResolveSessionRequest(BaseModel):
@@ -733,6 +737,42 @@ async def reset_password(
     return {"token": user.token}
 
 
+async def _require_current_password(
+    request: Request, user: SiteUser, supplied: Optional[str]
+) -> None:
+    """Whoever changes a credential has to know the one it replaces.
+
+    A session proves a browser was signed in once, not that the person at it
+    knows the password: a stolen cookie, or one script on the site's origin,
+    could otherwise swap the password and the address and keep the account.
+
+    An account with no password -- a Telegram-first one adding its first --
+    has nothing to ask for, and passes. Wrong guesses count against the
+    account, so this is not a way to test passwords without the login limit.
+    """
+    if not user.password:
+        return
+    key = str(user.token)
+    if await _too_many_attempts(request, "reauth", key, LOGIN_MAX_ATTEMPTS):
+        raise HTTPException(status_code=429, detail="Too many attempts. Try again later.")
+    if not supplied or not verify_password(supplied, user.password):
+        await _record_attempt(request, "reauth", key, LOGIN_WINDOW_SECONDS)
+        raise HTTPException(status_code=403, detail="Current password is incorrect.")
+    await _reset_attempts(request, "reauth", key)
+
+
+def _tell_the_owner(
+    request: Request, address: Optional[str], verified: bool, title: str, body: str
+) -> None:
+    """A notice to an address the owner has proved, if there is one.
+
+    Takes the address rather than the user, because the call being reported
+    may be about to replace it -- and the one to tell is the one before.
+    """
+    if address and verified:
+        request.app.tooter.email_api(title=title, body=body, email_address=address)
+
+
 @router.post("/{token}/set-email", response_class=JSONResponse)
 async def set_email(
     request: Request,
@@ -754,10 +794,22 @@ async def set_email(
     if body.email == user.email_address and user.email_verified:
         return {"ok": True, "needs_verification": False}
 
+    await _require_current_password(request, user, body.current_password)
+
     other = await get_site_user_by_field("email_address", body.email, mongomotor)
     if other is not None and other.token != user.token:
         raise HTTPException(status_code=409, detail="Email address already in use.")
 
+    # Told before the address is replaced: afterwards there is nobody left to
+    # tell who did not do it.
+    _tell_the_owner(
+        request,
+        user.email_address,
+        user.email_verified,
+        "CCDExplorer.io - Email address changed",
+        f"The email address on your account on {SITE_URL} is being changed to "
+        f"<b>{html.escape(body.email)}</b>. If this wasn't you, reset your password at once.",
+    )
     user.email_address = body.email
     user.email_verified = False
     _issue_verification_token(user)
@@ -808,6 +860,10 @@ async def set_password(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
+    await _require_current_password(request, user, body.current_password)
+    replacing = bool(user.password)
+    address_on_file, was_verified = user.email_address, user.email_verified
+
     if body.email and (body.email != user.email_address):
         other = await get_site_user_by_field("email_address", body.email, mongomotor)
         if other is not None:
@@ -828,6 +884,15 @@ async def set_password(
     if needs_verification:
         _issue_verification_token(user)
 
+    if replacing:
+        _tell_the_owner(
+            request,
+            address_on_file,
+            was_verified,
+            "CCDExplorer.io - Password changed",
+            f"The password on your account on {SITE_URL} was just changed. "
+            "If this wasn't you, reset your password at once.",
+        )
     await save_user(user, mongomotor)
 
     # Setting/changing a password from the settings page is done from a

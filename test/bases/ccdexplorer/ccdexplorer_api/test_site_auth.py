@@ -1032,3 +1032,155 @@ async def test_set_password_without_an_email_is_untouched_by_the_check():
     )
 
     assert result == {"ok": True, "needs_verification": False}
+
+
+# --------------------------------------------------------------------------- #
+# Changing a credential needs the current password
+# --------------------------------------------------------------------------- #
+# set-password and set-email took the account token and nothing else. A hijacked
+# session, or one script running on the site's origin, could replace the
+# password and the address in two calls and own the account for good. An account
+# that has a password now has to say it. One that has none -- the Telegram-first
+# account adding its first -- has nothing to say, and is unchanged.
+
+PASSWORD = "correct-horse"
+
+
+def _with_password(**extra):
+    doc = {
+        "token": "tok",
+        "email_address": "old@example.com",
+        "email_verified": True,
+        "password": hash_password(PASSWORD),
+    }
+    doc.update(extra)
+    return RecordingCollection([doc])
+
+
+@pytest.mark.asyncio
+async def test_a_password_cannot_be_replaced_without_the_old_one():
+    users = _with_password()
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_password(
+            request=make_request(),
+            token="tok",
+            body=site_auth.SetPasswordRequest(password="attackers"),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 403
+    assert users.writes == []
+
+
+@pytest.mark.asyncio
+async def test_a_password_cannot_be_replaced_with_a_wrong_one():
+    users = _with_password()
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_password(
+            request=make_request(),
+            token="tok",
+            body=site_auth.SetPasswordRequest(password="attackers", current_password="guess"),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 403
+    assert users.writes == []
+
+
+@pytest.mark.asyncio
+async def test_a_password_is_replaced_when_the_old_one_is_given():
+    users = _with_password()
+    result = await site_auth.set_password(
+        request=make_request(),
+        token="tok",
+        body=site_auth.SetPasswordRequest(password="a-new-one", current_password=PASSWORD),
+        mongomotor=FakeMongo(users),
+    )
+    assert result["ok"] is True
+    assert len(users.writes) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_owner_hears_that_the_password_changed():
+    tooter = FakeTooter()
+    await site_auth.set_password(
+        request=make_request(tooter=tooter),
+        token="tok",
+        body=site_auth.SetPasswordRequest(password="a-new-one", current_password=PASSWORD),
+        mongomotor=FakeMongo(_with_password()),
+    )
+    assert [e["email_address"] for e in tooter.emails] == ["old@example.com"]
+
+
+@pytest.mark.asyncio
+async def test_the_first_password_of_a_telegram_account_needs_no_old_one():
+    users = RecordingCollection(
+        [{"token": "tok", "email_address": "old@example.com", "email_verified": True}]
+    )
+    result = await site_auth.set_password(
+        request=make_request(),
+        token="tok",
+        body=site_auth.SetPasswordRequest(password="first-one"),
+        mongomotor=FakeMongo(users),
+    )
+    assert result["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_the_address_cannot_be_changed_without_the_password():
+    users = _with_password()
+    tooter = FakeTooter()
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_email(
+            request=make_request(tooter=tooter),
+            token="tok",
+            body=site_auth.SetEmailRequest(email="attacker@example.org"),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 403
+    assert users.writes == []
+    assert tooter.emails == []
+
+
+@pytest.mark.asyncio
+async def test_the_address_changes_when_the_password_is_given_and_the_old_one_is_told():
+    users = _with_password()
+    tooter = FakeTooter()
+    result = await site_auth.set_email(
+        request=make_request(tooter=tooter),
+        token="tok",
+        body=site_auth.SetEmailRequest(email="new@example.org", current_password=PASSWORD),
+        mongomotor=FakeMongo(users),
+    )
+    assert result == {"ok": True, "needs_verification": True}
+    recipients = [e["email_address"] for e in tooter.emails]
+    assert "old@example.com" in recipients  # the notice
+    assert "new@example.org" in recipients  # the verification link
+
+
+@pytest.mark.asyncio
+async def test_an_account_without_a_password_may_still_add_an_email():
+    users = RecordingCollection([{"token": "tok"}])
+    result = await site_auth.set_email(
+        request=make_request(),
+        token="tok",
+        body=site_auth.SetEmailRequest(email="new@example.org"),
+        mongomotor=FakeMongo(users),
+    )
+    assert result["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_guessing_the_current_password_is_throttled():
+    users = _with_password()
+    redis = FakeRedis()
+    statuses = []
+    for _ in range(site_auth.LOGIN_MAX_ATTEMPTS + 2):
+        with pytest.raises(HTTPException) as exc:
+            await site_auth.set_email(
+                request=make_request(redis=redis),
+                token="tok",
+                body=site_auth.SetEmailRequest(email="x@example.org", current_password="guess"),
+                mongomotor=FakeMongo(users),
+            )
+        statuses.append(exc.value.status_code)
+    assert statuses[-1] == 429
+    assert set(statuses[: site_auth.LOGIN_MAX_ATTEMPTS]) == {403}

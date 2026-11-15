@@ -18,4 +18,16 @@
 
     <!-- <div> -->
     </div>
+    {% if user.password %}
+    {# Changing where reset links go is changing who owns the account. #}
+    <div class="row">
+        <div class="col">
+             Current password
+        </div>
+        <div class="col-6 me-3">
+            <input class=" form-control form-control-sm  input-sm mb-1 text-center "
+            type="password" name="current_password" autocomplete="current-password" required>
+        </div>
+    </div>
+    {% endif %}
 </div>
