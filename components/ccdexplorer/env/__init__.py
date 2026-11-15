@@ -1,5 +1,8 @@
 from .settings import (
+    scrub_sentry_event,
+    scrub_url,
     sentry_dsn,
+    sentry_traces_sample_rate,
     LIVE_PORT,
     ADMIN_CHAT_ID,
     API_TOKEN,
@@ -94,4 +97,7 @@ __all__ = [
     "REPO_DIR",
     "ON_SERVER",
     "sentry_dsn",
+    "scrub_sentry_event",
+    "scrub_url",
+    "sentry_traces_sample_rate",
 ]

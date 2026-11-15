@@ -11,7 +11,6 @@ api's forms to the same numbers.
 
 import datetime as dt
 from types import SimpleNamespace
-from urllib.parse import urlencode
 
 from ccdexplorer.ccdexplorer_api.app.models import User
 from ccdexplorer.ccdexplorer_api.app.routers.auth import auth
@@ -65,7 +64,13 @@ class _Collection:
         return _Result(hits)
 
     def aggregate(self, pipeline):
-        return _Result([{"alias": "3alias", "alias_id": 0}])
+        return _Result([])
+
+    async def find_one_and_update(self, query, update):
+        return {"alias": "3alias", "alias_id": query["alias_id"]}
+
+    async def find_one(self, query):
+        return {"alias": "3alias"}
 
     async def bulk_write(self, operations):
         self.writes.append(operations)
@@ -215,17 +220,13 @@ async def test_a_broken_redis_does_not_lock_everyone_out():
 # --- forgot password ------------------------------------------------------
 
 
-def _forgot_body(email):
-    return urlencode({"email": email}).encode()
-
-
 async def test_the_reset_mail_stops_after_the_limit():
     db = _Db([_user()])
     tooter = _Tooter()
     redis = FakeRedis()
     for _ in range(site_auth.EMAIL_MAX_PER_WINDOW + 3):
-        req = _request(body=_forgot_body("a@example.org"), redis=redis, tooter=tooter)
-        await auth.forgot_password_action(req, None, db)
+        req = _request(redis=redis, tooter=tooter)
+        await auth.forgot_password_action(req, None, db, username="a@example.org")
     assert len(tooter.sent) == site_auth.EMAIL_MAX_PER_WINDOW
 
 
@@ -234,11 +235,11 @@ async def test_a_throttled_reset_looks_the_same_as_an_unthrottled_one():
     db = _Db([_user()])
     redis = FakeRedis()
     first = await auth.forgot_password_action(
-        _request(body=_forgot_body("a@example.org"), redis=redis), None, db
+        _request(redis=redis), None, db, username="a@example.org"
     )
     for _ in range(site_auth.EMAIL_MAX_PER_WINDOW):
         last = await auth.forgot_password_action(
-            _request(body=_forgot_body("a@example.org"), redis=redis), None, db
+            _request(redis=redis), None, db, username="a@example.org"
         )
     assert first.template == last.template
     assert first.status_code == last.status_code == 200
@@ -249,8 +250,8 @@ async def test_one_address_cannot_mail_many_accounts():
     tooter = _Tooter()
     redis = FakeRedis()
     for i in range(site_auth.EMAIL_MAX_PER_IP + 5):
-        req = _request(body=_forgot_body(f"u{i}@example.org"), redis=redis, tooter=tooter)
-        await auth.forgot_password_action(req, None, db)
+        req = _request(redis=redis, tooter=tooter)
+        await auth.forgot_password_action(req, None, db, username=f"u{i}@example.org")
     assert len(tooter.sent) == site_auth.EMAIL_MAX_PER_IP
 
 
@@ -259,8 +260,8 @@ async def test_one_address_cannot_mail_many_accounts():
 
 async def test_a_fresh_reset_token_is_issued_with_an_expiry():
     db = _Db([_user()])
-    req = _request(body=_forgot_body("a@example.org"))
-    await auth.forgot_password_action(req, None, db)
+    req = _request()
+    await auth.forgot_password_action(req, None, db, username="a@example.org")
     replacement = db.users.writes[-1][0]._doc
     assert replacement["reset_password_token"]
     expires = replacement["reset_password_token_expires"]

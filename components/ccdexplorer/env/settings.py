@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import ast
 from dotenv import load_dotenv
@@ -180,3 +181,116 @@ environment = {
     "ENVIRONMENT": ENVIRONMENT,
     "BUILD_TAG": BUILD_TAG,
 }
+
+
+# --- What Sentry is told about a request ----------------------------------- #
+# Identity tokens, reset and verification tokens, login codes and API keys all
+# travel in url paths in this codebase, so a trace carried them to a third
+# party for as long as it was kept -- and sampling was 100%.
+
+#: A fraction of requests is plenty to see what is slow; the rest only costs.
+DEFAULT_TRACES_SAMPLE_RATE = 0.1
+
+
+def sentry_traces_sample_rate() -> float:
+    """Share of requests to trace: SENTRY_TRACES_SAMPLE_RATE, else a tenth.
+
+    A value that is not a number between 0 and 1 falls back to the default
+    rather than stopping the process from starting over a monitoring setting.
+    """
+    raw = os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "")
+    try:
+        rate = float(raw)
+    except ValueError:
+        return DEFAULT_TRACES_SAMPLE_RATE
+    return rate if 0.0 <= rate <= 1.0 else DEFAULT_TRACES_SAMPLE_RATE
+
+
+_MASK = "***"
+_UUID = re.compile(r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+#: Auth routes whose next path segment is a secret, whatever shape it has.
+_SECRET_SEGMENT = re.compile(
+    r"(/(?:verify-email|verify|reset-password|reset-password-action)/)[^/?#\s]+"
+)
+_SECRET_QUERY_KEYS = {
+    "token",
+    "code",
+    "key",
+    "api_key",
+    "apikey",
+    "access_token",
+    "password",
+    "secret",
+}
+_URL = re.compile(r"https?://[^\s\"'<>]+")
+
+
+def _mask_query(query: str) -> str:
+    parts = []
+    for pair in query.split("&"):
+        name, sep, value = pair.partition("=")
+        parts.append(f"{name}={_MASK}" if sep and name.lower() in _SECRET_QUERY_KEYS else pair)
+    return "&".join(parts)
+
+
+def scrub_url(url: str) -> str:
+    """`url` with every secret it carries replaced.
+
+    A uuid anywhere in the path (identity tokens and API keys are uuids), the
+    segment after the auth routes that carry a token or code, the code after
+    a leading /token/, and the value of any secret-named query parameter.
+    Account addresses and ordinary parameters are left as they are, so
+    traces still group and read.
+    """
+    base, qmark, query = url.partition("?")
+    query, hmark, fragment = query.partition("#") if qmark else ("", "", "")
+    if not qmark:
+        base, hmark, fragment = base.partition("#")
+    base = _UUID.sub(_MASK, base)
+    base = _SECRET_SEGMENT.sub(lambda m: m.group(1) + _MASK, base)
+    scheme_end = base.find("://")
+    path_start = base.find("/", scheme_end + 3) if scheme_end != -1 else 0
+    if base[path_start:].startswith("/token/"):
+        head = base[: path_start + len("/token/")]
+        rest = base[path_start + len("/token/") :]
+        base = head + _MASK + rest[len(rest.split("/", 1)[0]) :]
+    out = base
+    if qmark:
+        out += "?" + _mask_query(_UUID.sub(_MASK, query))
+    if hmark:
+        out += "#" + fragment
+    return out
+
+
+def _scrub_text(text: str) -> str:
+    return _URL.sub(lambda m: scrub_url(m.group(0)), text)
+
+
+def _scrub_any(node):
+    if isinstance(node, str):
+        return _scrub_text(node)
+    if isinstance(node, dict):
+        return {k: _scrub_any(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_scrub_any(v) for v in node]
+    return node
+
+
+def scrub_sentry_event(event, hint):
+    """before_send / before_send_transaction: secrets out of urls, everywhere.
+
+    Walks the places a url ends up -- the request, every span, breadcrumbs and
+    the trace context -- rather than naming fields, so a span attribute added
+    by a later SDK version is covered too.
+    """
+    request = event.get("request")
+    if isinstance(request, dict):
+        scrubbed = _scrub_any(request)
+        query = scrubbed.get("query_string")
+        if isinstance(query, str):
+            scrubbed["query_string"] = _mask_query(_UUID.sub(_MASK, query))
+        event["request"] = scrubbed
+    for part in ("spans", "breadcrumbs", "contexts", "extra", "tags"):
+        if part in event:
+            event[part] = _scrub_any(event[part])
+    return event

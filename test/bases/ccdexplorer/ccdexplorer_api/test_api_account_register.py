@@ -35,7 +35,13 @@ class _Collection:
         return _Result([])
 
     def aggregate(self, pipeline):
-        return _Result(self.docs)
+        return _Result([])
+
+    async def find_one_and_update(self, query, update):
+        return {"alias": "3alias", "alias_id": query["alias_id"]}
+
+    async def find_one(self, query):
+        return {"alias": "3alias"}
 
     async def bulk_write(self, operations):
         self.writes.append(operations)

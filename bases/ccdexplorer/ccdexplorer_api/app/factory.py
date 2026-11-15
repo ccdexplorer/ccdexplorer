@@ -66,7 +66,14 @@ from ccdexplorer.ccdexplorer_api.app.routers.v2 import (
     transaction_v2,
     transactions_v2,
 )
-from ccdexplorer.env import BUILD_TAG, REDIS_URL, environment, sentry_dsn
+from ccdexplorer.env import (
+    BUILD_TAG,
+    REDIS_URL,
+    environment,
+    scrub_sentry_event,
+    sentry_dsn,
+    sentry_traces_sample_rate,
+)
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.tooter import Tooter
 
@@ -92,8 +99,12 @@ from ccdexplorer.env import API_KEY_HEADER
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
         dsn=sentry_dsn(environment["SENTRY_DSN"]),
-        traces_sample_rate=1.0,
-        _experiments={"continuous_profiling_auto_start": True},
+        # A fraction, not every request; and no continuous profiling, which
+        # sent a stack profile of the whole process for as long as it ran.
+        traces_sample_rate=sentry_traces_sample_rate(),
+        # Tokens and keys travel in url paths here; none of them leave.
+        before_send=scrub_sentry_event,
+        before_send_transaction=scrub_sentry_event,
     )
 
 

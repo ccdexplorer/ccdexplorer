@@ -6,7 +6,7 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import failure, apply_docstring_router_wrappers
 from ccdexplorer.grpc_client.CCD_Types import CCD_BlockInfo
 from ccdexplorer.mongodb import (
     Collections,
@@ -69,10 +69,7 @@ async def get_last_blocks(
     if result is not None:
         return result
     else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving last {limit} blocks on {net}, {error_message}.",
-        )
+        raise failure(500, f"Error retrieving last {limit} blocks on {net}.", error_message)
 
 
 @router.get(
@@ -122,10 +119,7 @@ async def get_paginated_blocks(
 
     except Exception as e:
         # log e if you like, then:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving blocks: {e}",
-        )
+        raise failure(500, "Error retrieving blocks.", e)
 
     return {
         "total_rows": total_docs,
@@ -187,7 +181,4 @@ async def get_last_blocks_newer_than(
     if not error:
         return result or []
     else:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving blocks on {net} newer than {since} with error: {error}.",
-        )
+        raise failure(500, f"Error retrieving blocks on {net} newer than {since}.", error)

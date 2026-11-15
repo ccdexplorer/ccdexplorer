@@ -6,7 +6,11 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
+    await_await,
+    apply_docstring_router_wrappers,
+)
 import datetime as dt
 import grpc
 from ccdexplorer.mongodb import Collections, MongoMotor, net_db
@@ -199,9 +203,8 @@ async def get_paginated_token_current_holders(
         }
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve current holders for PLT token {token_id} on {net}. {error}",
+        raise failure(
+            404, f"Can't retrieve current holders for PLT token {token_id} on {net}.", error
         )
 
 
@@ -282,10 +285,7 @@ async def get_paginated_locks(
         }
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve locks on {net}. {error}",
-        )
+        raise failure(404, f"Can't retrieve locks on {net}.", error)
 
 
 @router.get(
@@ -355,10 +355,7 @@ async def get_paginated_token_locks(
         }
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve locks for PLT token {token_id} on {net}. {error}",
-        )
+        raise failure(404, f"Can't retrieve locks for PLT token {token_id} on {net}.", error)
 
 
 @router.get(
@@ -554,10 +551,7 @@ async def get_paginated_lock_transactions(
         }
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve transactions for lock {lock_id_str} on {net}. {error}",
-        )
+        raise failure(404, f"Can't retrieve transactions for lock {lock_id_str} on {net}.", error)
 
 
 @router.get(

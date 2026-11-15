@@ -12,6 +12,7 @@ import asyncio
 from typing import Any, AsyncIterator
 
 from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
     SEARCH_LIMIT,
     SEARCH_MAX_TIME_MS,
     apply_docstring_router_wrappers,
@@ -148,10 +149,7 @@ async def get_last_accounts_newer_than(
         return list(rr) or []
 
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving accounts on {net} newer than {since_index}. {error}",
-        )
+        raise failure(500, f"Error retrieving accounts on {net} newer than {since_index}.", error)
 
 
 @router.get("/{net}/accounts/info/count", response_class=JSONResponse)
@@ -200,10 +198,7 @@ async def get_accounts_count_estimate(
     if result:
         return int(result[0]["account_index"]) + 1
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving accounts count on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving accounts count on {net}.", error_message)
 
 
 @router.post("/{net}/accounts/get-indexes", response_class=JSONResponse)
@@ -255,10 +250,7 @@ async def get_account_indexes(
     if result:
         return {x["_id"]: x["account_index"] for x in result}
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving accounts list on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving accounts list on {net}.", error_message)
 
 
 #: How many accounts go out per chunk. Large enough that the per-chunk
@@ -456,10 +448,7 @@ async def get_account_addresses(
     if result:
         return {x["account_index"]: x["_id"] for x in result}
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving accounts list on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving accounts list on {net}.", error_message)
 
 
 @router.get("/{net}/accounts/current-payday/info", response_class=JSONResponse)
@@ -503,10 +492,7 @@ async def get_current_payday_info(
     if result:
         return result
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving current payday info, {error_message}.",
-        )
+        raise failure(404, "Error retrieving current payday info.", error_message)
 
 
 @router.get("/{net}/accounts/last-payday-block/info", response_class=JSONResponse)
@@ -628,10 +614,7 @@ async def get_last_accounts(
     if accounts:
         return accounts
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving last {count} accounts on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving last {count} accounts on {net}.", error_message)
 
 
 @router.get(
@@ -1603,10 +1586,7 @@ async def get_paginated_accounts(
             "accounts": rr,
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving accounts: {e}",
-        )
+        raise failure(500, "Error retrieving accounts.", e)
 
 
 @router.get(

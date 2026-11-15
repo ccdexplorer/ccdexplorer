@@ -1,6 +1,7 @@
 import asyncio
 import datetime as dt
 import inspect
+import logging
 import re
 from collections import defaultdict
 from enum import Enum
@@ -110,6 +111,21 @@ async def await_await(
     else:
         collection = Collections(collection.value)
     return await (await db[collection].aggregate(pipeline, **kwargs)).to_list(length=length)
+
+
+logger = logging.getLogger(__name__)
+
+
+def failure(status_code: int, message: str, error: object = None) -> HTTPException:
+    """An HTTPException that says what failed and keeps why to itself.
+
+    An exception's own text can name a Mongo host, a collection, a query
+    fragment or a file path, and the caller has no use for any of it. It is
+    logged here instead, where whoever runs the api can read it.
+    """
+    if error is not None:
+        logger.error("%s -- %r", message, error)
+    return HTTPException(status_code=status_code, detail=message)
 
 
 #: A search box takes a name or an address, never a pattern. Nothing a person

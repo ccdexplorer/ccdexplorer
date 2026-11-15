@@ -8,6 +8,7 @@
 # pyright: reportArgumentType=false
 
 from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
     SEARCH_LIMIT,
     SEARCH_MAX_TIME_MS,
     apply_docstring_router_wrappers,
@@ -167,10 +168,7 @@ async def get_paginated_contracts(
             instance["module_info"] = module_info
     except Exception as e:
         # log e if you like, then:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving blocks: {e}",
-        )
+        raise failure(500, "Error retrieving blocks.", e)
 
     return {
         "total_rows": total_docs,

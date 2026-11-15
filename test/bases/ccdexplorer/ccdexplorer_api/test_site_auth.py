@@ -49,11 +49,15 @@ class FakeRedis:
         return 1
 
 
-def _matches(doc: dict, query: dict) -> bool:
+def _matches(doc: dict, query: dict, ignore_case: bool = False) -> bool:
     for key, cond in query.items():
         value = doc.get(key)
         if isinstance(cond, dict) and "$ne" in cond:
             if value == cond["$ne"]:
+                return False
+        elif ignore_case and isinstance(value, str) and isinstance(cond, str):
+            # What a strength-2 collation does: letters compare without case.
+            if value.casefold() != cond.casefold():
                 return False
         elif value != cond:
             return False
@@ -87,9 +91,9 @@ class FakeCollection:
     def __init__(self, docs=None):
         self.docs = list(docs or [])
 
-    async def find_one(self, query, projection=None):
+    async def find_one(self, query, projection=None, collation=None):
         for doc in self.docs:
-            if _matches(doc, query):
+            if _matches(doc, query, ignore_case=collation is not None):
                 return dict(doc)
         return None
 
@@ -339,7 +343,7 @@ async def test_reset_password_accepts_unexpired_token():
         )
     )
     result = await site_auth.reset_password(
-        body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-pw"),
+        body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-password-1"),
         mongomotor=mongo,
     )
     assert result == {"token": "tok"}
@@ -352,7 +356,9 @@ async def test_reset_password_rejects_expired_token():
     )
     with pytest.raises(HTTPException) as exc:
         await site_auth.reset_password(
-            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-pw"),
+            body=site_auth.ResetPasswordRequest(
+                reset_password_token="rt", password="new-password-1"
+            ),
             mongomotor=mongo,
         )
     assert exc.value.status_code == 404
@@ -364,7 +370,9 @@ async def test_reset_password_rejects_token_without_expiry():
     mongo = FakeMongo(FakeCollection([_user_doc(reset_password_token="rt")]))
     with pytest.raises(HTTPException) as exc:
         await site_auth.reset_password(
-            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="x"),
+            body=site_auth.ResetPasswordRequest(
+                reset_password_token="rt", password="x-long-enough-1"
+            ),
             mongomotor=mongo,
         )
     assert exc.value.status_code == 404
@@ -1184,3 +1192,158 @@ async def test_guessing_the_current_password_is_throttled():
         statuses.append(exc.value.status_code)
     assert statuses[-1] == 429
     assert set(statuses[: site_auth.LOGIN_MAX_ATTEMPTS]) == {403}
+
+
+# --------------------------------------------------------------------------- #
+# Addresses are one address whatever their case; passwords have a floor
+# --------------------------------------------------------------------------- #
+GOOD_PASSWORD = "a long enough one"
+
+
+@pytest.mark.asyncio
+async def test_registering_stores_the_address_lowercased_and_trimmed():
+    tooter = FakeTooter()
+    users = RecordingCollection([])
+    await site_auth.register(
+        request=make_request(tooter=tooter),
+        body=site_auth.RegisterRequest(email="  Alice@Example.ORG ", password=GOOD_PASSWORD),
+        mongomotor=FakeMongo(users),
+    )
+    assert tooter.emails[0]["email_address"] == "alice@example.org"
+
+
+@pytest.mark.asyncio
+async def test_a_case_variant_of_a_registered_address_is_a_duplicate():
+    users = RecordingCollection([{"token": "t", "email_address": "alice@example.org"}])
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.register(
+            request=make_request(),
+            body=site_auth.RegisterRequest(email="ALICE@example.org", password=GOOD_PASSWORD),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_an_account_stored_with_capitals_is_still_found_by_any_case():
+    """Accounts from before addresses were lowercased have to keep working."""
+    users = FakeCollection(
+        [
+            {
+                "token": "tok",
+                "email_address": "Alice@Example.org",
+                "email_verified": True,
+                "password": hash_password(GOOD_PASSWORD),
+            }
+        ]
+    )
+    for typed in ("alice@example.org", "ALICE@EXAMPLE.ORG", "Alice@Example.org"):
+        result = await site_auth.login(
+            request=make_request(),
+            body=site_auth.LoginRequest(email=typed, password=GOOD_PASSWORD),
+            mongomotor=FakeMongo(users),
+        )
+        assert result == {"token": "tok"}, typed
+
+
+@pytest.mark.asyncio
+async def test_changing_a_letters_case_does_not_reset_the_login_throttle():
+    users = FakeCollection([])
+    redis = FakeRedis()
+    last = None
+    for variant in ("a@example.org", "A@example.org", "a@EXAMPLE.org", "A@Example.ORG"):
+        for _ in range(site_auth.LOGIN_MAX_ATTEMPTS // 4 + 1):
+            try:
+                await site_auth.login(
+                    request=make_request(redis=redis, client_host=None),
+                    body=site_auth.LoginRequest(email=variant, password="x"),
+                    mongomotor=FakeMongo(users),
+                )
+            except HTTPException as exc:
+                last = exc.status_code
+    assert last == 429
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("password", ["", "short", "1234567"])
+async def test_register_refuses_a_password_that_is_too_short(password):
+    users = RecordingCollection([])
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.register(
+            request=make_request(),
+            body=site_auth.RegisterRequest(email="new@example.org", password=password),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 422
+    assert "at least" in exc.value.detail
+    assert users.writes == []
+
+
+@pytest.mark.asyncio
+async def test_register_refuses_a_password_bcrypt_would_cut_short():
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.register(
+            request=make_request(),
+            body=site_auth.RegisterRequest(email="new@example.org", password="x" * 73),
+            mongomotor=FakeMongo(RecordingCollection([])),
+        )
+    assert exc.value.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_the_longest_acceptable_password_is_accepted():
+    result = await site_auth.register(
+        request=make_request(),
+        body=site_auth.RegisterRequest(email="new@example.org", password="x" * 72),
+        mongomotor=FakeMongo(RecordingCollection([])),
+    )
+    assert result["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_a_reset_to_a_short_password_leaves_the_token_unused():
+    users = RecordingCollection(
+        [_user_doc(reset_password_token="rt", reset_password_token_expires=_future())]
+    )
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.reset_password(
+            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="short"),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 422
+    assert users.writes == []
+
+
+@pytest.mark.asyncio
+async def test_set_password_refuses_a_short_one():
+    users = RecordingCollection([{"token": "tok", "email_address": "old@example.org"}])
+    with pytest.raises(HTTPException) as exc:
+        await site_auth.set_password(
+            request=make_request(),
+            token="tok",
+            body=site_auth.SetPasswordRequest(password="short"),
+            mongomotor=FakeMongo(users),
+        )
+    assert exc.value.status_code == 422
+    assert users.writes == []
+
+
+@pytest.mark.asyncio
+async def test_login_is_not_held_to_the_policy():
+    """An account from before the rule must still be able to log in."""
+    users = FakeCollection(
+        [
+            {
+                "token": "tok",
+                "email_address": "old@example.org",
+                "email_verified": True,
+                "password": hash_password("abc"),
+            }
+        ]
+    )
+    result = await site_auth.login(
+        request=make_request(),
+        body=site_auth.LoginRequest(email="old@example.org", password="abc"),
+        mongomotor=FakeMongo(users),
+    )
+    assert result == {"token": "tok"}
