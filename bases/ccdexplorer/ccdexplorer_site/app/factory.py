@@ -17,12 +17,14 @@ import importlib
 import kaleido
 import urllib3
 from cachetools import TTLCache
+from ccdexplorer.ccdexplorer_site.app.node_files import NodeModulesFiles
+from ccdexplorer.ccdexplorer_site.app.path_guard import guard_path_params
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountInfo,
     CCD_IpInfo,
 )
-from fastapi import FastAPI, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -653,6 +655,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     app = FastAPI(
         lifespan=lifespan,
+        # Before any handler: `net` is a network, and no parameter is a dot-segment.
+        dependencies=[Depends(guard_path_params)],
         # No API docs on the site. This is a server-rendered app, not an API:
         # the documented API is a separate service, and the docs people are
         # meant to read are at docs.ccdexplorer.io.
@@ -709,7 +713,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             return Response(status_code=404)
         return FileResponse(lottie_file, media_type="text/html")
 
-    app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
+    app.mount(
+        "/node", NodeModulesFiles(directory=app_settings.node_modules_dir), name="node_modules"
+    )
     app.mount("/addresses", StaticFiles(directory=app_settings.addresses_dir), name="addresses")
 
     app.state.templates = Jinja2Templates(directory=app_settings.templates_dir)

@@ -7,6 +7,8 @@ endpoints (the site has no DB/email of its own). On success we set the existing
 ``access-token`` cookie, exactly like the bot's ``/token/{code}`` login link.
 """
 
+import html
+
 from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -218,7 +220,9 @@ async def resend_verification(request: Request):
     error = "Couldn't send the verification email. Please try again."
     if isinstance(api_response.return_value, dict):
         error = api_response.return_value.get("detail", error)
-    return f'<span class="sm-text text-danger">{error}</span>'
+    # `detail` is the api's own words, or a list of validation errors: text
+    # either way, and never markup.
+    return f'<span class="sm-text text-danger">{html.escape(str(error))}</span>'
 
 
 # --------------------------------------------------------------------------- #
