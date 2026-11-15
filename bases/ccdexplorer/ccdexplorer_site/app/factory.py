@@ -261,6 +261,9 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy": "object-src 'none'; base-uri 'self'; frame-ancestors 'self'",
+    # A year, no includeSubDomains or preload: those promise on behalf of
+    # hostnames this app does not own. Browsers ignore it over plain http.
+    "Strict-Transport-Security": "max-age=31536000",
 }
 
 
@@ -289,6 +292,34 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+#: Origins that may read this site's responses from a browser. The api origin
+#: is here because it hosts pages of its own, and those are the weaker ones
+#: (see the api's account routes), so a flaw there must not be able to speak
+#: as a signed-in site visitor. Hence no credentials: another origin can read
+#: what is public, and cannot carry the session cookie along with it.
+CORS_ORIGINS = [
+    "http://127.0.0.1:7000",
+    "https://127.0.0.1:7000",
+    "https://api.ccdexplorer.io",
+    "https://dev-api.ccdexplorer.io",
+]
+
+
+def add_cors(app) -> None:
+    """The one place the site's CORS policy is registered.
+
+    It used to be registered twice, with credentials and every method and
+    header allowed, and the two copies could drift apart unseen.
+    """
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "HEAD", "OPTIONS"],
+        allow_headers=["*"],
+    )
 
 
 class SiteSessionMiddleware(BaseHTTPMiddleware):
@@ -683,19 +714,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     # given, without every dashboard template having to pass it in.
     app.state.templates.env.globals["spec_for_plot"] = spec_for_plot
 
-    origins = [
-        "http://127.0.0.1:7000",
-        "https://127.0.0.1:7000",
-        "https://api.ccdexplorer.io",
-        "https://dev-api.ccdexplorer.io",
-    ]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
 
     Instrumentator().instrument(app)
 
@@ -758,13 +776,7 @@ def create_app(app_settings: AppSettings) -> FastAPI:
         # browsers/password managers deep-link straight to account settings.
         return RedirectResponse(url="/settings/user/overview#account-security", status_code=302)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    add_cors(app)
     # Last, so outermost: what another middleware answers on its own account
     # still leaves through this one.
     app.add_middleware(SecurityHeadersMiddleware)
