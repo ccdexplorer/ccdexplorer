@@ -127,6 +127,9 @@ class User(BaseModel):
     email: str
     password: str  # hashed
     reset_password_token: Optional[str] = None  # gets added if user clicks reset password
+    # A token without one is not honoured: it predates expiries, and a link
+    # that works forever is a password sitting in somebody's mailbox.
+    reset_password_token_expires: Optional[dt.datetime] = None
     plan: Optional[str] = None
     payments: Optional[dict[str, APIPayment]] = None
     # this field is generated from the payments array

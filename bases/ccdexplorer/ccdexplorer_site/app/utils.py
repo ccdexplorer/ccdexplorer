@@ -9,6 +9,7 @@ import io
 import json
 import math
 import re
+import ipaddress
 import typing
 from datetime import timedelta
 from enum import Enum
@@ -3460,6 +3461,20 @@ def short_url(url: str | None, tail: int = 24) -> str:
     return f"{host}{middle}{last}"
 
 
+#: Addresses a hop between us and the visitor has. Spelled out rather than
+#: `is_private`, which also covers the documentation ranges and says nothing
+#: about which of them are ours.
+_OWN_HOPS = [
+    ipaddress.ip_network(n)
+    for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16")
+    + ("::1/128", "fc00::/7", "fe80::/10")
+]
+
+
+def _is_our_own_hop(address) -> bool:
+    return any(address.version == n.version and address in n for n in _OWN_HOPS)
+
+
 def client_ip(request) -> str:
     """The end user's address, from the proxy header or the peer.
 
@@ -3468,10 +3483,25 @@ def client_ip(request) -> str:
     imports the routers at module level, so the router's import of factory ran
     against a half-built module and failed on startup.
     """
+    peer = request.client.host if request.client else ""
     forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else ""
+    if not forwarded:
+        return peer
+    # Read from the right: the entry nearest us was written by a proxy we run,
+    # and everything further left is whatever the client chose to send. Hops
+    # of our own (private, loopback) are skipped to reach the first public
+    # address, which is the visitor. Each entry has to be an address: this
+    # becomes a Redis key and a header on a call to the api.
+    entries = []
+    for part in forwarded.split(","):
+        try:
+            entries.append(ipaddress.ip_address(part.strip()))
+        except ValueError:
+            return peer
+    for address in reversed(entries):
+        if not _is_our_own_hop(address):
+            return str(address)
+    return str(entries[-1])
 
 
 def h(value) -> str:

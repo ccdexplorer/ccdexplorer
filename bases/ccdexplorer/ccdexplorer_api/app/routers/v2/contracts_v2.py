@@ -6,9 +6,14 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-import re
 
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    SEARCH_LIMIT,
+    SEARCH_MAX_TIME_MS,
+    apply_docstring_router_wrappers,
+    await_await,
+    search_pattern,
+)
 from ccdexplorer.mongodb import Collections, MongoMotor, net_db
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
@@ -50,7 +55,7 @@ async def search_contracts(
         HTTPException: If the network is unsupported.
     """
     search_str = str(value)
-    regex = re.compile(search_str, re.IGNORECASE)
+    regex = search_pattern(search_str)
     db_to_use = net_db(mongomotor, net)
 
     pipeline = [
@@ -61,9 +66,12 @@ async def search_contracts(
                     {"v1.name": {"$regex": regex}},
                 ]
             }
-        }
+        },
+        {"$limit": SEARCH_LIMIT},
     ]
-    result = await await_await(db_to_use, Collections.instances, pipeline)
+    result = await await_await(
+        db_to_use, Collections.instances, pipeline, maxTimeMS=SEARCH_MAX_TIME_MS
+    )
     return result
 
 

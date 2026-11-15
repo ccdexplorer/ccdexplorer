@@ -1,12 +1,14 @@
 import asyncio
 import datetime as dt
 import inspect
+import re
 from collections import defaultdict
 from enum import Enum
 from typing import Any, Optional
 from pymongo.asynchronous.collection import AsyncCollection
 from ccdexplorer.mongodb.core import Collections, CollectionsUtilities
 import httpx2 as httpx
+from fastapi import HTTPException
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_RejectReason,
     CCD_UpdatePayload,
@@ -108,6 +110,28 @@ async def await_await(
     else:
         collection = Collections(collection.value)
     return await (await db[collection].aggregate(pipeline, **kwargs)).to_list(length=length)
+
+
+#: A search box takes a name or an address, never a pattern. Nothing a person
+#: looks for here is longer than an account address (50 characters).
+SEARCH_MAX_LENGTH = 64
+#: A search that has not answered in this long is not going to be useful, and
+#: Mongo should stop spending CPU on it.
+SEARCH_MAX_TIME_MS = 5_000
+SEARCH_LIMIT = 100
+
+
+def search_pattern(value: str, *, lower: bool = False) -> "re.Pattern[str]":
+    """The caller's text as a case-insensitive *literal* match.
+
+    The search routes used to compile what they were sent, so an invalid
+    pattern was a 500 and a pathological one ran unanchored over a whole
+    collection. Escaping makes every character mean itself.
+    """
+    text = str(value)
+    if len(text) > SEARCH_MAX_LENGTH:
+        raise HTTPException(status_code=422, detail="Search text is too long.")
+    return re.compile(re.escape(text.lower() if lower else text), re.IGNORECASE)
 
 
 async def get_url_from_api(url: str, httpx_client: httpx.AsyncClient):
