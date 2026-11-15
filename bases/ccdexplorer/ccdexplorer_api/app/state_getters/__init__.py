@@ -33,23 +33,40 @@ def site_users_collection_name() -> CollectionsUtilities:
     )
 
 
+def mask_key(key: object) -> str:
+    """An API key as a reader can recognise it but not use it."""
+    text = str(key)
+    return f"{text[:8]}…" if len(text) > 8 else "…"
+
+
 def get_dict_diff(old_dict: dict, new_dict: dict) -> str:
+    """What changed between two key sets, safe to send to a chat.
+
+    The keys of these dicts are API keys, and the notification goes to
+    Telegram, where it stays. So they appear as a recognisable prefix, and a
+    changed entry says which fields changed rather than printing the
+    documents -- which carry the key again as their _id.
+    """
     added = set(new_dict.keys()) - set(old_dict.keys())
     removed = set(old_dict.keys()) - set(new_dict.keys())
     changed = {
-        k: (old_dict[k], new_dict[k])
+        k: sorted(
+            f
+            for f in set(old_dict[k]) | set(new_dict[k])
+            if old_dict[k].get(f) != new_dict[k].get(f)
+        )
         for k in set(old_dict.keys()) & set(new_dict.keys())
         if old_dict[k] != new_dict[k]
     }
 
     diff_parts = []
     if added:
-        diff_parts.append(f"Added keys: {', '.join(added)}")
+        diff_parts.append(f"Added keys: {', '.join(sorted(mask_key(k) for k in added))}")
     if removed:
-        diff_parts.append(f"Removed keys: {', '.join(removed)}")
+        diff_parts.append(f"Removed keys: {', '.join(sorted(mask_key(k) for k in removed))}")
     if changed:
-        changes = [f"{k}: {old} → {new}" for k, (old, new) in changed.items()]
-        diff_parts.append(f"Changed values: {', '.join(changes)}")
+        changes = [f"{mask_key(k)}: {', '.join(fields)}" for k, fields in changed.items()]
+        diff_parts.append(f"Changed: {'; '.join(changes)}")
 
     return "\n".join(diff_parts) if diff_parts else "No differences"
 
