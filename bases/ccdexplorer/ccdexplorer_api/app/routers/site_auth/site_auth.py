@@ -19,8 +19,9 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security.api_key import APIKeyHeader
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from pymongo import ReplaceOne
+from pymongo.collation import Collation
 
 from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_internal_api_auth
 from ccdexplorer.ccdexplorer_api.app.security import hash_password, verify_password
@@ -154,17 +155,36 @@ async def _reset_attempts(request: Request, bucket: str, key: str) -> None:
         pass
 
 
-class RegisterRequest(BaseModel):
+def _normalised(value: str) -> str:
+    """An address as it is stored and looked up: no padding, no case.
+
+    Case-distinct copies of one address were possible, which made two
+    accounts of one mailbox and let the per-address throttles be stepped
+    around by changing a letter's case.
+    """
+    return value.strip().lower()
+
+
+class _Email(BaseModel):
+    """Request bodies whose `email` is normalised the moment it arrives."""
+
+    @field_validator("email", check_fields=False, mode="before")
+    @classmethod
+    def _tidy(cls, value):
+        return _normalised(value) if isinstance(value, str) else value
+
+
+class RegisterRequest(_Email):
     email: str
     password: str
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(_Email):
     email: str
     password: str
 
 
-class ForgotPasswordRequest(BaseModel):
+class ForgotPasswordRequest(_Email):
     email: str
 
 
@@ -173,7 +193,7 @@ class ResetPasswordRequest(BaseModel):
     password: str
 
 
-class SetPasswordRequest(BaseModel):
+class SetPasswordRequest(_Email):
     password: str
     email: Optional[str] = None
     session_id: Optional[str] = None
@@ -181,7 +201,7 @@ class SetPasswordRequest(BaseModel):
     current_password: Optional[str] = None
 
 
-class SetEmailRequest(BaseModel):
+class SetEmailRequest(_Email):
     email: str
     current_password: Optional[str] = None
 
@@ -246,6 +266,22 @@ async def get_site_user_by_field(field: str, value, mongomotor: MongoMotor) -> O
     if result:
         return SiteUser(**result)
     return None
+
+
+#: Matching an address ignoring case, without a regex built from user input.
+EMAIL_COLLATION = Collation(locale="en", strength=2)
+
+
+async def get_site_user_by_email(email: str, mongomotor: MongoMotor) -> Optional[SiteUser]:
+    """The account holding this address, however its letters were cased.
+
+    Accounts stored before addresses were lowercased may hold any case, and
+    must go on being found by whichever one their owner types.
+    """
+    result = await mongomotor.utilities[site_users_collection_name()].find_one(
+        {"email_address": email}, collation=EMAIL_COLLATION
+    )
+    return SiteUser(**result) if result else None
 
 
 async def save_user(user: SiteUser, mongomotor: MongoMotor) -> None:
@@ -580,6 +616,31 @@ def require_email_address(email: str) -> None:
         raise HTTPException(status_code=422, detail="Please enter a valid email address.")
 
 
+PASSWORD_MIN_LENGTH = 8
+#: bcrypt reads 72 bytes and ignores the rest, so a longer password would be
+#: accepted and then quietly only partly checked.
+PASSWORD_MAX_BYTES = 72
+
+
+def require_acceptable_password(password: str) -> None:
+    """A password worth storing: not trivially short, not silently truncated.
+
+    Asked of every new password and never of a login, so an account that
+    predates the rule is not locked out by it. A 422 with a sentence, as with
+    the address check: the site shows `detail` as it stands.
+    """
+    if len(password) < PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Please choose a password of at least {PASSWORD_MIN_LENGTH} characters.",
+        )
+    if len(password.encode("utf-8")) > PASSWORD_MAX_BYTES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Please choose a password of at most {PASSWORD_MAX_BYTES} bytes.",
+        )
+
+
 def send_verification_email(request: Request, user: SiteUser) -> None:
     """Email the user a link to confirm ownership of their email address."""
     request.app.tooter.email_api(
@@ -604,6 +665,7 @@ async def register(
     """Create a new email/password SiteUser and send a verification email."""
     # Before the throttle, so that what is counted is always an address.
     require_email_address(body.email)
+    require_acceptable_password(body.password)
     # Throttle to prevent verification-email bombing / registration spam.
     caller = _client_ip(request)
     if await _too_many_attempts(request, "register", body.email, EMAIL_MAX_PER_WINDOW) or (
@@ -612,7 +674,7 @@ async def register(
         raise HTTPException(status_code=429, detail="Too many attempts. Please try again later.")
     await _record_attempt(request, "register", body.email, EMAIL_WINDOW_SECONDS)
     await _record_attempt(request, "register-ip", caller, EMAIL_WINDOW_SECONDS)
-    existing = await get_site_user_by_field("email_address", body.email, mongomotor)
+    existing = await get_site_user_by_email(body.email, mongomotor)
     if existing:
         raise HTTPException(status_code=409, detail="Email address already registered.")
 
@@ -645,7 +707,7 @@ async def login(
             status_code=429,
             detail="Too many login attempts. Please wait a few minutes and try again.",
         )
-    user = await get_site_user_by_field("email_address", body.email, mongomotor)
+    user = await get_site_user_by_email(body.email, mongomotor)
     if (user is None) or (not user.password) or (not verify_password(body.password, user.password)):
         await _record_attempt(request, "login", body.email, LOGIN_WINDOW_SECONDS)
         # Counted per caller as well, and deliberately not cleared on success:
@@ -696,7 +758,7 @@ async def forgot_password(
         return {"ok": True}
     await _record_attempt(request, "forgot", body.email, EMAIL_WINDOW_SECONDS)
     await _record_attempt(request, "forgot-ip", caller, EMAIL_WINDOW_SECONDS)
-    user = await get_site_user_by_field("email_address", body.email, mongomotor)
+    user = await get_site_user_by_email(body.email, mongomotor)
     if user is not None:
         _issue_reset_token(user)
         await save_user(user, mongomotor)
@@ -721,6 +783,7 @@ async def reset_password(
     api_key: str = Security(API_KEY_HEADER),
 ) -> dict:
     """Set a new password from a reset token and return the token to log the user in."""
+    require_acceptable_password(body.password)
     user = await get_site_user_by_field(
         "reset_password_token", body.reset_password_token, mongomotor
     )
@@ -796,7 +859,7 @@ async def set_email(
 
     await _require_current_password(request, user, body.current_password)
 
-    other = await get_site_user_by_field("email_address", body.email, mongomotor)
+    other = await get_site_user_by_email(body.email, mongomotor)
     if other is not None and other.token != user.token:
         raise HTTPException(status_code=409, detail="Email address already in use.")
 
@@ -856,6 +919,7 @@ async def set_password(
     """
     if body.email:
         require_email_address(body.email)
+    require_acceptable_password(body.password)
     user = await get_site_user_by_field("token", token, mongomotor)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -865,7 +929,7 @@ async def set_password(
     address_on_file, was_verified = user.email_address, user.email_verified
 
     if body.email and (body.email != user.email_address):
-        other = await get_site_user_by_field("email_address", body.email, mongomotor)
+        other = await get_site_user_by_email(body.email, mongomotor)
         if other is not None:
             raise HTTPException(status_code=409, detail="Email address already in use.")
         user.email_address = body.email
