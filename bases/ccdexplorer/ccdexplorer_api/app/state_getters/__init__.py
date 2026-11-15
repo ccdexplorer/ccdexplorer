@@ -75,27 +75,22 @@ async def get_httpx_client(req: Request):
     return req.app.httpx_client
 
 
-def get_and_save_user_from_collection(req: Request):
-    result = req.app.mongodb.utilities_db["api_users"].find({})
-    req.app.users_from_collection = {x["token"]: User(**x) for x in list(result)}
-    req.app.users_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
-
-
 def get_user_details(req: Request, token: str | None = None) -> User | None:
-    get_and_save_user_from_collection(req=req)
+    """The api account behind the login cookie (or an explicit token).
+
+    One document is read, by token. It used to load every api user, on every
+    page view, and pick one out of the resulting dict.
+    """
     if not token:
         token = req.cookies.get("api.ccdexplorer.io")
+    if not token:
+        return None
 
     try:
-        users_from_collection = req.app.users_from_collection
-        user = users_from_collection.get(token)
-        if user:
-            if type(user) is not User:
-                user = User(**user)
+        doc = req.app.mongodb.utilities_db["api_users"].find_one({"token": token})
     except AttributeError:
-        user = None
-
-    return user
+        return None
+    return User(**doc) if doc else None
 
 
 async def get_mongo_db(req: Request):
@@ -249,50 +244,50 @@ def get_exchange_rates_historical(
     return exchange_rates_historical
 
 
+#: How long a per-net lookup is reused. Short, because both are read on pages
+#: where a stale answer would show.
+PER_NET_CACHE_SECONDS = 60
+
+
+def _net_of(req: Request) -> str:
+    """The network a request is about; routes without one are mainnet's."""
+    return req.path_params.get("net", "mainnet")
+
+
+def _cached_per_net(req: Request, name: str, load):
+    """One cached value per network.
+
+    These were one value for the whole app, so a testnet request within a
+    minute of a mainnet one was answered with mainnet's data.
+    """
+    net = _net_of(req)
+    cache = req.app.__dict__.setdefault("_per_net_cache", {})
+    stamp, value = cache.get((name, net), (None, None))
+    now = dt.datetime.now().astimezone(dt.timezone.utc)
+    if stamp is not None and value and (now - stamp).total_seconds() < PER_NET_CACHE_SECONDS:
+        return value
+    value = load(net_db(req.app.mongodb, net))
+    cache[(name, net)] = (now, value)
+    return value
+
+
 def get_blocks_per_day(
     req: Request,
 ):
-    if (
-        (
-            dt.datetime.now().astimezone(dt.timezone.utc) - req.app.blocks_per_day_last_requested
-        ).total_seconds()
-        < 60
-    ) and (req.app.blocks_per_day):
-        pass
-
-    else:
-        if "net" in req.path_params:
-            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
-        else:
-            db_to_use = req.app.mongodb.mainnet
-
-        result = {
-            x["_id"]: MongoTypeBlockPerDay(**x)
-            for x in db_to_use[Collections.blocks_per_day].find({})
-        }
-        req.app.blocks_per_day = result
-        req.app.blocks_per_day_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
-
-    return req.app.blocks_per_day
+    return _cached_per_net(
+        req,
+        "blocks_per_day",
+        lambda db: {
+            x["_id"]: MongoTypeBlockPerDay(**x) for x in db[Collections.blocks_per_day].find({})
+        },
+    )
 
 
 def get_memos(
     req: Request,
 ):
-    if (
-        (
-            dt.datetime.now().astimezone(dt.timezone.utc) - req.app.memos_last_requested
-        ).total_seconds()
-        < 60
-    ) and (req.app.memos):
-        set_memos: dict[str, list] = req.app.memos
-        # print("memo_transfers from cache.")
-    else:
-        if "net" in req.path_params:
-            db_to_use = net_db(req.app.mongodb, req.path_params["net"])
-        set_memos = {
-            x["_id"]: x["tx_hashes"] for x in db_to_use[Collections.memos_to_hashes].find({})
-        }
-        req.app.memos_last_requested = dt.datetime.now().astimezone(dt.timezone.utc)
-        req.app.memos = set_memos
-    return set_memos
+    return _cached_per_net(
+        req,
+        "memos",
+        lambda db: {x["_id"]: x["tx_hashes"] for x in db[Collections.memos_to_hashes].find({})},
+    )
