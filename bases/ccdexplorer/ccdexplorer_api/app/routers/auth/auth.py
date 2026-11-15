@@ -4,6 +4,17 @@ from uuid import uuid4
 
 
 from ccdexplorer.ccdexplorer_api.app.models import User
+from ccdexplorer.ccdexplorer_api.app.routers.site_auth.site_auth import (
+    EMAIL_MAX_PER_IP,
+    EMAIL_MAX_PER_WINDOW,
+    EMAIL_WINDOW_SECONDS,
+    LOGIN_MAX_ATTEMPTS,
+    LOGIN_MAX_ATTEMPTS_PER_IP,
+    LOGIN_WINDOW_SECONDS,
+    _record_attempt,
+    _reset_attempts,
+    _too_many_attempts,
+)
 from ccdexplorer.ccdexplorer_api.app.security import hash_password, manager, verify_password
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_user_details
 from ccdexplorer.env import API_NET, API_URL, environment
@@ -13,6 +24,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pymongo import ReplaceOne
+import ipaddress
 
 tooter = Tooter()
 motormongo = MongoMotor(tooter, caller_name="api_auth")
@@ -49,15 +61,70 @@ async def get_user_by_reset_password_token(reset_password_token: str, session) -
     result = (
         await db["api_users"].find({"reset_password_token": reset_password_token}).to_list(length=1)
     )
-    if result:
-        return User(**result[0])
-    else:
+    if not result:
         return None
+    user = User(**result[0])
+    # No expiry on record means it was issued before there were any.
+    expires = user.reset_password_token_expires
+    if expires is None or expires.astimezone(dt.UTC) <= dt.datetime.now(dt.UTC):
+        return None
+    return user
 
 
 @manager.user_loader(session=get_session)
 async def get_user(name: str, session):
     return await get_user_by_email(name, session)
+
+
+#: How long a reset link works. Long enough to find the email, short enough
+#: that an old mailbox is not a standing way into the account.
+RESET_TOKEN_LIFETIME = dt.timedelta(hours=1)
+
+
+#: Addresses a hop between us and the visitor has. Spelled out rather than
+#: `is_private`, which also covers the documentation ranges and says nothing
+#: about which of them are ours.
+_OWN_HOPS = [
+    ipaddress.ip_network(n)
+    for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16")
+    + ("::1/128", "fc00::/7", "fe80::/10")
+]
+
+
+def _is_our_own_hop(address) -> bool:
+    return any(address.version == n.version and address in n for n in _OWN_HOPS)
+
+
+def caller_ip(request: Request) -> str:
+    """Who is asking: the address the proxy in front of us wrote.
+
+    The api is reached by browsers directly, through one proxy, so read
+    X-Forwarded-For from the right: entries further left are the client's to
+    choose. Hops of our own (private addresses) are skipped; anything that is
+    not an address falls back to the peer, since this becomes a throttle key.
+    """
+    peer = request.client.host if request.client else ""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if not forwarded:
+        return peer
+    entries = []
+    for part in forwarded.split(","):
+        try:
+            entries.append(ipaddress.ip_address(part.strip()))
+        except ValueError:
+            return peer
+    for address in reversed(entries):
+        if not _is_our_own_hop(address):
+            return str(address)
+    return str(entries[-1])
+
+
+TOO_MANY = "Too many attempts. Please try again later."
+
+
+def _refused(request: Request, template: str, extra: dict | None = None):
+    context = {"request": request, "env": environment, "errors": [TOO_MANY], **(extra or {})}
+    return request.app.state.templates.TemplateResponse(request, template, context, status_code=429)
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -86,18 +153,24 @@ async def login(
     """
     Logs in the user provided by form_data.username and form_data.password
     """
-    user = await get_user_by_email(form_data.username, db)
-    error = None
-    if user is None:
+    ip = caller_ip(request)
+    email = form_data.username
+    if await _too_many_attempts(
+        request, "api-login-email", email, LOGIN_MAX_ATTEMPTS
+    ) or await _too_many_attempts(request, "api-login-ip", ip, LOGIN_MAX_ATTEMPTS_PER_IP):
+        return _refused(request, "auth/login.html")
+
+    user = await get_user_by_email(email, db)
+    if user is None or not verify_password(form_data.password, user.password):
+        # The same answer either way, and both count: an unknown address is
+        # exactly what someone working through a list is trying.
+        await _record_attempt(request, "api-login-email", email, LOGIN_WINDOW_SECONDS)
+        await _record_attempt(request, "api-login-ip", ip, LOGIN_WINDOW_SECONDS)
         error = "Can't find user and/or password is wrong. "
         context = {"request": request, "env": environment, "errors": [error]}
         return request.app.state.templates.TemplateResponse(request, "auth/login.html", context)  # type: ignore
 
-    if not verify_password(form_data.password, user.password):
-        error = "Can't find user and/or password is wrong. "
-        context = {"request": request, "env": environment, "errors": [error]}
-        return request.app.state.templates.TemplateResponse(request, "auth/login.html", context)  # type: ignore
-
+    await _reset_attempts(request, "api-login-email", email)
     response = RedirectResponse(url="/account", status_code=303)
     manager.set_cookie(response, user.token)
     return response
@@ -117,7 +190,9 @@ async def forgot_password(
         "request": request,
         "env": environment,
     }
-    return request.app.state.templates.TemplateResponse(request, "auth/forgot_password.html", context)
+    return request.app.state.templates.TemplateResponse(
+        request, "auth/forgot_password.html", context
+    )
 
 
 @router.get("/reset-password-action/{reset_password_token}")
@@ -140,7 +215,9 @@ async def reset_password_action(
         "env": environment,
         "reset_password_token": reset_password_token,
     }
-    return request.app.state.templates.TemplateResponse(request, "auth/reset_password.html", context)
+    return request.app.state.templates.TemplateResponse(
+        request, "auth/reset_password.html", context
+    )
 
 
 @router.post("/reset-password")
@@ -157,10 +234,21 @@ async def forgot_password_action(
     body = await request.body()
     if body:
         username = body.decode("utf-8").split("=")[1].replace("%40", "@")
+
+    # Counted whether or not the address has an account, and answered the same
+    # either way, so the limit cannot be used to tell which ones do.
+    ip = caller_ip(request)
+    limited = await _too_many_attempts(
+        request, "api-reset-email", username or "", EMAIL_MAX_PER_WINDOW
+    ) or await _too_many_attempts(request, "api-reset-ip", ip, EMAIL_MAX_PER_IP)
+    await _record_attempt(request, "api-reset-email", username or "", EMAIL_WINDOW_SECONDS)
+    await _record_attempt(request, "api-reset-ip", ip, EMAIL_WINDOW_SECONDS)
+    if username and not limited:
         user = await get_user_by_email(username, db)
 
     if user:
         user.reset_password_token = str(uuid4())
+        user.reset_password_token_expires = dt.datetime.now(dt.UTC) + RESET_TOKEN_LIFETIME
         await db.utilities_db["api_users"].bulk_write(
             [
                 ReplaceOne(
@@ -181,7 +269,9 @@ async def forgot_password_action(
         "request": request,
         "env": environment,
     }
-    return request.app.state.templates.TemplateResponse(request, "auth/forgot_password_action.html", context)
+    return request.app.state.templates.TemplateResponse(
+        request, "auth/forgot_password_action.html", context
+    )
 
 
 @router.post("/set-password")
@@ -208,6 +298,7 @@ async def set_new_password_after_forgot(
         assert password is not None
         user.password = hash_password(password)
         user.reset_password_token = None
+        user.reset_password_token_expires = None
         await db.utilities_db["api_users"].bulk_write(
             [
                 ReplaceOne(
@@ -268,6 +359,10 @@ async def register(
             "errors": ["please enter a valid email address."],
         }
         return request.app.state.templates.TemplateResponse(request, "auth/register.html", context)
+    ip = caller_ip(request)
+    if await _too_many_attempts(request, "api-register-ip", ip, EMAIL_MAX_PER_IP):
+        return _refused(request, "auth/register.html")
+    await _record_attempt(request, "api-register-ip", ip, EMAIL_WINDOW_SECONDS)
     user = await get_user_by_email(form_data.username, db)
     next_alias_id, alias_account_id = await get_next_alias_id_and_account_id(db)
     if user is None:

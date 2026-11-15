@@ -8,10 +8,15 @@
 # pyright: reportArgumentType=false
 from markdown_it.rules_core import block
 import datetime as dt
-import re
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_grpcclient, get_mongo_motor
-from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers, await_await
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    SEARCH_LIMIT,
+    SEARCH_MAX_TIME_MS,
+    apply_docstring_router_wrappers,
+    await_await,
+    search_pattern,
+)
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.mongodb import Collections, MongoMotor, net_db
@@ -167,7 +172,7 @@ async def search_modules(
         HTTPException: If the network is unsupported.
     """
     search_str = str(value)
-    regex = re.compile(search_str, re.IGNORECASE)
+    regex = search_pattern(search_str)
     db_to_use = net_db(mongomotor, net)
 
     pipeline = [
@@ -179,8 +184,11 @@ async def search_modules(
                 ]
             }
         },
+        {"$limit": SEARCH_LIMIT},
     ]
-    result = await await_await(db_to_use, Collections.modules, pipeline, 10)
+    result = await await_await(
+        db_to_use, Collections.modules, pipeline, 10, maxTimeMS=SEARCH_MAX_TIME_MS
+    )
     return result
 
 

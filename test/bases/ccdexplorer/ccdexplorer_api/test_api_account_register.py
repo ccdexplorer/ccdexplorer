@@ -65,7 +65,11 @@ class _Templates:
 
 
 def _request(templates):
-    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(templates=templates)))
+    return SimpleNamespace(
+        headers={},
+        client=SimpleNamespace(host="203.0.113.7"),
+        app=SimpleNamespace(state=SimpleNamespace(templates=templates)),
+    )
 
 
 @pytest.mark.asyncio

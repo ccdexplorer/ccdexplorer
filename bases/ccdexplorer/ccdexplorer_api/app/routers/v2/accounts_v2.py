@@ -8,11 +8,16 @@
 # pyright: reportArgumentType=false
 
 import json
-import re
 import asyncio
 from typing import Any, AsyncIterator
 
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    SEARCH_LIMIT,
+    SEARCH_MAX_TIME_MS,
+    apply_docstring_router_wrappers,
+    await_await,
+    search_pattern,
+)
 import httpx2 as httpx
 from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_blocks_per_day,
@@ -379,9 +384,8 @@ async def search_accounts(
         HTTPException: If the network is unsupported.
     """
     search_str = str(value)
-    regex = re.compile(search_str, re.IGNORECASE)
-    search_str_canonical = str(value)[:29]
-    regex_canonical = re.compile(search_str_canonical, re.IGNORECASE)
+    regex = search_pattern(search_str)
+    regex_canonical = search_pattern(search_str[:29])
     db_to_use = net_db(mongomotor, net)
 
     pipeline = [
@@ -395,8 +399,11 @@ async def search_accounts(
                 ]
             }
         },
+        {"$limit": SEARCH_LIMIT},
     ]
-    result = await await_await(db_to_use, Collections.stable_address_info, pipeline)
+    result = await await_await(
+        db_to_use, Collections.stable_address_info, pipeline, maxTimeMS=SEARCH_MAX_TIME_MS
+    )
     return result
 
 

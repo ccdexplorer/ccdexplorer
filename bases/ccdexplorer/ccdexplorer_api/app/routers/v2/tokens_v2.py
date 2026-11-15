@@ -6,7 +6,13 @@
 # pyright: reportAssignmentType=false
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    SEARCH_LIMIT,
+    SEARCH_MAX_TIME_MS,
+    apply_docstring_router_wrappers,
+    await_await,
+    search_pattern,
+)
 from fastapi import APIRouter, Request, Depends, HTTPException, Security
 from ccdexplorer.env import API_KEY_HEADER as API_KEY_HEADER_NAME
 from fastapi.security.api_key import APIKeyHeader
@@ -25,7 +31,6 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
 import math
 from typing import Optional
 from pydantic import BaseModel
-import re
 
 router = APIRouter(tags=["Tokens"], prefix="/v2")
 API_KEY_HEADER = APIKeyHeader(name=API_KEY_HEADER_NAME)
@@ -240,8 +245,8 @@ async def search_tokens(
     Raises:
         HTTPException: If the network is unsupported.
     """
-    search_str = str(value).lower()
-    regex = re.compile(search_str)
+    search_str = str(value)
+    regex = search_pattern(search_str, lower=True)
 
     db_to_use = net_db(mongomotor, net)
 
@@ -249,6 +254,9 @@ async def search_tokens(
         {"$match": {"$or": [{"hidden": False}, {"hidden": {"$exists": False}}]}},
         {"$addFields": {"display_name_lc": {"$toLower": "$display_name"}}},
         {"$match": {"display_name_lc": {"$regex": regex}}},
+        {"$limit": SEARCH_LIMIT},
     ]
-    result = await await_await(db_to_use, Collections.tokens_tags, pipeline)
+    result = await await_await(
+        db_to_use, Collections.tokens_tags, pipeline, maxTimeMS=SEARCH_MAX_TIME_MS
+    )
     return result
