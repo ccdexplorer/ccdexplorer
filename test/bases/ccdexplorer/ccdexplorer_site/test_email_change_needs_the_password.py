@@ -80,3 +80,29 @@ async def test_the_apis_refusal_is_shown_and_escaped(monkeypatch):
     out = await _save(monkeypatch, {"email_address": "new@example.org"}, spy)
     assert "Current password is incorrect." in out
     assert "&lt;b&gt;" in out
+
+
+# --- other text that reaches a page ---------------------------------------
+
+
+def test_a_contract_name_from_the_chain_is_text_in_the_picker():
+    out = usersv2.contract_search_result_html("<1,0>", "<img src=x onerror=alert(1)>")
+    assert "<img" not in out
+    assert "&lt;img" in out
+    assert "&lt;1,0&gt;" in out  # the id's own angle brackets are text too
+
+
+async def test_the_resend_error_is_text_not_markup(monkeypatch):
+    from ccdexplorer.ccdexplorer_site.app.routers import auth
+
+    async def fake_user(request):
+        return SimpleNamespace(token="tok")
+
+    async def fake_post(url, client, payload):
+        return SimpleNamespace(ok=False, return_value={"detail": "<script>x</script>"})
+
+    monkeypatch.setattr(auth, "get_user_detailsv2", fake_user)
+    monkeypatch.setattr(auth, "post_url_from_api", fake_post)
+    request = SimpleNamespace(app=SimpleNamespace(api_url="http://api", httpx_client=None))
+    out = await auth.resend_verification(request)
+    assert "<script>" not in out

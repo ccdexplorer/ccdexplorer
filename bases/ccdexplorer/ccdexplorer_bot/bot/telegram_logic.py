@@ -30,6 +30,8 @@ from ccdexplorer.site_user.login_codes import (
     new_code,
     redeem_filter,
 )
+import asyncio
+import html
 import uuid
 from ccdexplorer.env import *  # type: ignore
 from ccdexplorer.mongodb import (
@@ -105,7 +107,7 @@ class Mixin:
                 except Exception as e:
                     console.log(f"Could not clear telegram block for {telegram_user.id}: {e}")
 
-            mess = f"Hey <b>{existing_user.first_name}</b>! Use this <a href='{self.login_link(existing_user.token)}'>link</a> to login on CCDExplorer. {LINK_LIFETIME_NOTE}"
+            mess = f"Hey <b>{html.escape(existing_user.first_name or '')}</b>! Use this <a href='{self.login_link(existing_user.token)}'>link</a> to login on CCDExplorer. {LINK_LIFETIME_NOTE}"
             await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
 
         else:
@@ -131,7 +133,7 @@ class Mixin:
 
             try:
                 self.connections: Connections
-                self.connections.mongodb.utilities[CollectionsUtilities.users_v2_prod].bulk_write(
+                self.users_collection().bulk_write(
                     [
                         ReplaceOne(
                             {"_id": str(new_user.telegram_chat_id)},
@@ -143,7 +145,7 @@ class Mixin:
             except Exception as e:
                 print(e)
             try:
-                mess = f"Hey <b>{new_user.first_name}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='{self.login_link(new_user.token)}'>link</a> to login on CCDExplorer with your new account. {LINK_LIFETIME_NOTE}"
+                mess = f"Hey <b>{html.escape(new_user.first_name or '')}</b>! Welcome to CCDExplorer. I've created an account for you. Use this <a href='{self.login_link(new_user.token)}'>link</a> to login on CCDExplorer with your new account. {LINK_LIFETIME_NOTE}"
                 await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
             except Exception as e:
                 console.log(f"Exception sending message to newly created user: {e}")
@@ -218,7 +220,7 @@ class Mixin:
         except Exception as e:
             console.log(f"Exception sending notification for linked account: {e}")
 
-        mess = f"Hey <b>{account.first_name}</b>! I've connected this Telegram to your CCDExplorer account. You'll now receive notifications here. Use this <a href='{self.login_link(account.token)}'>link</a> to login on the site. {LINK_LIFETIME_NOTE}"
+        mess = f"Hey <b>{html.escape(account.first_name or '')}</b>! I've connected this Telegram to your CCDExplorer account. You'll now receive notifications here. Use this <a href='{self.login_link(account.token)}'>link</a> to login on the site. {LINK_LIFETIME_NOTE}"
         await update.message.reply_html(mess, link_preview_options=NO_PREVIEW)
         return True
 
@@ -233,12 +235,18 @@ class Mixin:
         if user:
             for account_index, account in user.accounts.items():
                 account: AccountForUser
-                account_info = self.connections.grpcclient.get_account_info(
-                    "last_final", account_index=int(account_index)
+                # gRPC calls block; each one waits on a node, and awaiting
+                # nothing here stopped every other handler for as long as
+                # they took.
+                account_info = await asyncio.to_thread(
+                    self.connections.grpcclient.get_account_info,
+                    "last_final",
+                    account_index=int(account_index),
                 )
                 if account_info.stake.baker:
-                    earliest_win_time = self.connections.grpcclient.get_baker_earliest_win_time(
-                        int(account_index)
+                    earliest_win_time = await asyncio.to_thread(
+                        self.connections.grpcclient.get_baker_earliest_win_time,
+                        int(account_index),
                     )
                     if earliest_win_time:
                         ewt = messages_logic.verbose_timedelta(
@@ -262,6 +270,11 @@ class Mixin:
         """Either send login for existing user, or create an account and send login for new user."""
         telegram_user = update.effective_user
         user: SiteUser | None = self.users.get(str(telegram_user.id))
+        if not user:
+            await update.message.reply_text(
+                "I don't know you yet. Send /start and I'll make you an account."
+            )
+            return
         if user:
             for account_index, account in user.accounts.items():
                 account: AccountForUser
@@ -351,4 +364,12 @@ class Mixin:
                         if (t != "❌") or (e != "❌"):
                             message += f"\n{field}\n - T: {t}{tl} - E: {e}{el}\n"
 
-        await update.message.reply_text(message)
+        # Telegram refuses an empty message. Accounts have each been answered
+        # above; this is what is left, so say something only if there is
+        # something to say -- or if nothing was said at all.
+        if message.strip():
+            await update.message.reply_text(message)
+        elif not user.accounts:
+            await update.message.reply_text(
+                "Nothing is set up yet. Add an account on the site to get notifications."
+            )

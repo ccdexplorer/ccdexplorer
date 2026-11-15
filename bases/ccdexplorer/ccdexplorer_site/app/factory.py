@@ -17,12 +17,14 @@ import importlib
 import kaleido
 import urllib3
 from cachetools import TTLCache
+from ccdexplorer.ccdexplorer_site.app.node_files import NodeModulesFiles
+from ccdexplorer.ccdexplorer_site.app.path_guard import guard_path_params
 from ccdexplorer.ccdexplorer_site.app.utils import *  # noqa: F403
 from ccdexplorer.grpc_client.CCD_Types import (
     CCD_AccountInfo,
     CCD_IpInfo,
 )
-from fastapi import FastAPI, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -92,7 +94,15 @@ from ccdexplorer.ccdexplorer_site.app.utils import (
     plot_warm_targets,
 )
 from ccdexplorer.charts.registry import spec_for_plot
-from ccdexplorer.env import ADMIN_CHAT_ID, BUILD_TAG, LOGIN_SECRET, environment, sentry_dsn
+from ccdexplorer.env import (
+    ADMIN_CHAT_ID,
+    BUILD_TAG,
+    LOGIN_SECRET,
+    environment,
+    scrub_sentry_event,
+    sentry_dsn,
+    sentry_traces_sample_rate,
+)
 from fastapi.middleware.gzip import GZipMiddleware
 
 scheduler = AsyncIOScheduler(timezone=dt.UTC)
@@ -117,8 +127,13 @@ HOME_TABLES_IDLE_GRACE_SECONDS = 4
 if environment["SITE_URL"] != "http://127.0.0.1:8000":
     sentry_sdk.init(
         dsn=sentry_dsn(environment["SENTRY_DSN"]),
-        traces_sample_rate=1.0,
-        _experiments={"continuous_profiling_auto_start": True},
+        # A fraction, not every request; and no continuous profiling, which
+        # sent a stack profile of the whole process for as long as it ran.
+        traces_sample_rate=sentry_traces_sample_rate(),
+        # Login codes, reset links and identity tokens travel in url paths
+        # here; none of them leave.
+        before_send=scrub_sentry_event,
+        before_send_transaction=scrub_sentry_event,
     )
 
 
@@ -395,14 +410,6 @@ class SiteSessionMiddleware(BaseHTTPMiddleware):
 #     return humanize.precisedelta(value, suppress=["days"], format="%0.0f")
 
 
-if environment["SITE_URL"] != "http://127.0.0.1:8000":
-    sentry_sdk.init(
-        dsn=sentry_dsn(environment["SENTRY_DSN"]),
-        traces_sample_rate=1.0,
-        _experiments={"continuous_profiling_auto_start": True},
-    )
-
-
 async def log_request(request):
     print(
         f"Request event hook: {request.method} {request.url} {request.headers} - Waiting for response"
@@ -648,6 +655,8 @@ def create_app(app_settings: AppSettings) -> FastAPI:
 
     app = FastAPI(
         lifespan=lifespan,
+        # Before any handler: `net` is a network, and no parameter is a dot-segment.
+        dependencies=[Depends(guard_path_params)],
         # No API docs on the site. This is a server-rendered app, not an API:
         # the documented API is a separate service, and the docs people are
         # meant to read are at docs.ccdexplorer.io.
@@ -704,7 +713,9 @@ def create_app(app_settings: AppSettings) -> FastAPI:
             return Response(status_code=404)
         return FileResponse(lottie_file, media_type="text/html")
 
-    app.mount("/node", StaticFiles(directory=app_settings.node_modules_dir), name="node_modules")
+    app.mount(
+        "/node", NodeModulesFiles(directory=app_settings.node_modules_dir), name="node_modules"
+    )
     app.mount("/addresses", StaticFiles(directory=app_settings.addresses_dir), name="addresses")
 
     app.state.templates = Jinja2Templates(directory=app_settings.templates_dir)
@@ -713,7 +724,6 @@ def create_app(app_settings: AppSettings) -> FastAPI:
     # So the shared chart tile can find the page for whatever plot_name it was
     # given, without every dashboard template having to pass it in.
     app.state.templates.env.globals["spec_for_plot"] = spec_for_plot
-
 
     Instrumentator().instrument(app)
 

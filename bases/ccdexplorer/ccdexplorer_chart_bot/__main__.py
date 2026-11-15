@@ -4,7 +4,7 @@ Separate from ccdexplorer_bot on purpose. That one pushes notifications to
 people who asked for them and holds Mongo, gRPC and a notifier token to do it.
 This one answers inline queries inside other people's conversations and needs
 none of that -- no database, no node, no chain data, and no credential beyond
-its own token. Keeping them apart keeps the blast radius of an inline bot,
+its own token and one low-tier api key of its own (CHART_BOT_API_KEY). Keeping them apart keeps the blast radius of an inline bot,
 which by design runs where strangers can reach it, down to nothing.
 
 Enable inline mode for the bot in BotFather (/setinline) or Telegram never

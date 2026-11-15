@@ -18,6 +18,7 @@ from fastapi.responses import (
     RedirectResponse,
 )
 import html
+import html as html_module
 import datetime as dt
 
 from ccdexplorer.env import *
@@ -325,6 +326,19 @@ async def cancel_edit_user_account_response(
     )
 
 
+def contract_search_result_html(instance_id: str, name: str) -> str:
+    """One contract in the picker's results.
+
+    The name is whatever the contract's deployer put in its init function's
+    name -- anyone on the chain -- so it is text here, never markup.
+    """
+    return (
+        "<div id='search-results'><span class=' text-secondary-emphasis'>"
+        f"<p>{html_module.escape(str(instance_id))} | {html_module.escape(name)}</p>"
+        "</span></div>"
+    )
+
+
 @router.put("/settings/userv2/save/email-address", response_class=HTMLResponse)
 async def save_email_address_response(
     request: Request,
@@ -470,7 +484,7 @@ async def search_instance_response(
                 name = r.v0.name.split("_")[1]
             else:
                 name = r.v1.name.split("_")[1]
-            html = f"<div id='search-results'><span class=' text-secondary-emphasis'><p>{r.id} | {name}</p></span></div>"
+            html = contract_search_result_html(r.id, name)
         else:
             html = "<div id='search-results'><span class='small .text-danger '><p>Not a valid contract index</p></span></div>"
     elif response_as_dict["search"] == "":
