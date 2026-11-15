@@ -356,7 +356,9 @@ async def test_reset_password_rejects_expired_token():
     )
     with pytest.raises(HTTPException) as exc:
         await site_auth.reset_password(
-            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="new-password-1"),
+            body=site_auth.ResetPasswordRequest(
+                reset_password_token="rt", password="new-password-1"
+            ),
             mongomotor=mongo,
         )
     assert exc.value.status_code == 404
@@ -368,7 +370,9 @@ async def test_reset_password_rejects_token_without_expiry():
     mongo = FakeMongo(FakeCollection([_user_doc(reset_password_token="rt")]))
     with pytest.raises(HTTPException) as exc:
         await site_auth.reset_password(
-            body=site_auth.ResetPasswordRequest(reset_password_token="rt", password="x-long-enough-1"),
+            body=site_auth.ResetPasswordRequest(
+                reset_password_token="rt", password="x-long-enough-1"
+            ),
             mongomotor=mongo,
         )
     assert exc.value.status_code == 404

@@ -133,14 +133,12 @@ async def test_a_password_reset_retires_the_token(monkeypatch):
     monkeypatch.setattr(auth, "get_user_by_reset_password_token", find)
     db = SimpleNamespace(utilities_db={"api_users": users})
 
-    async def body():
-        return b"password=new-pw&reset_password_token=rt"
-
     request = SimpleNamespace(
-        body=body,
         app=SimpleNamespace(tooter=SimpleNamespace(email_api=lambda **k: None)),
     )
-    await auth.set_new_password_after_forgot(request, Response(), db)
+    await auth.set_new_password_after_forgot(
+        request, Response(), db, password="new-password-1", reset_password_token="rt"
+    )
 
     assert users.writes[0][0]._doc["token"] != "old-token"
 

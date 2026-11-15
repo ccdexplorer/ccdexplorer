@@ -25,7 +25,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, get_u
 from ccdexplorer.env import API_NET, API_URL, environment
 from ccdexplorer.mongodb import MongoMotor
 from ccdexplorer.tooter import Tooter, is_acceptable_email_address
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pymongo import ReplaceOne
@@ -230,15 +230,14 @@ async def forgot_password_action(
     request: Request,
     response: Response,
     db: MongoMotor = Depends(get_mongo_motor),
+    username: str = Form(""),
 ) -> HTMLResponse:
     """
     The user has forgotten its password. Ask for email and send a reset email.
     """
-    username = None
+    # Parsed as a form, so "+" and "%2B" in an address are what was typed.
     user = None
-    body = await request.body()
-    if body:
-        username = body.decode("utf-8").split("=")[1].replace("%40", "@")
+    username = username.strip().lower()
 
     # Counted whether or not the address has an account, and answered the same
     # either way, so the limit cannot be used to tell which ones do.
@@ -284,19 +283,16 @@ async def set_new_password_after_forgot(
     request: Request,
     response: Response,
     db: MongoMotor = Depends(get_mongo_motor),
+    # The form's password input is named "username" (it shares the login
+    # form's styling); the alias keeps the page as it is.
+    password: str = Form("", alias="username"),
+    reset_password_token: str = Form(""),
 ) -> HTMLResponse:
     """
     The user has forgotten its password. Asks for email and clicked on the link. Now sets new password.
     """
-    password = None
-    reset_password_token = None
     user = None
-    body = await request.body()
-    if body:
-        components = body.decode("utf-8").split("&")
-
-        password = components[0].split("=")[1]
-        reset_password_token = components[1].split("=")[1]
+    if password and reset_password_token:
         user = await get_user_by_reset_password_token(reset_password_token, db)
 
     if user:
@@ -325,27 +321,37 @@ async def set_new_password_after_forgot(
     return response  # type: ignore
 
 
-async def get_next_alias_id_and_account_id(db: MongoMotor):
-    pipeline = [
-        # accounts should be valid on all scopes
-        # {"$match": {"scope": API_URL}},
-        {"$sort": {"alias_id": -1}},
-        {"$limit": 1},
-    ]
-    result = await (await db.utilities_db["api_users"].aggregate(pipeline)).to_list(length=1)
-    if len(result) > 0:
-        max_alias_id = result[0]["alias_id"]
-    else:
-        # no users found, so start at 0
-        max_alias_id = -1
-    next_alias_id = int(max_alias_id) + 1
-    pipeline = [
-        {"$match": {"net": API_NET}},
-        {"$match": {"alias_id": next_alias_id}},
-    ]
-    result = await (await db.utilities_db["api_aliases"].aggregate(pipeline)).to_list(length=1)
-    alias_account_id = result[0]["alias"]
-    return next_alias_id, alias_account_id
+#: How many aliases past the highest in use a claim will try before giving up.
+ALIAS_CLAIM_ATTEMPTS = 25
+
+
+async def claim_alias(db: MongoMotor, api_account_id: str) -> tuple[int, str]:
+    """Take the next free alias for an account, atomically.
+
+    The alias was the highest in use plus one, read and then used: two
+    registrations at once read the same number and shared one alias -- and
+    with it each other's payments, which are found by alias. A claim is a
+    single update that only succeeds on an alias nobody holds, so the loser
+    of a race simply moves on to the next.
+
+    Running out is an answer, not an IndexError.
+    """
+    pipeline = [{"$sort": {"alias_id": -1}}, {"$limit": 1}]
+    top = await (await db.utilities_db["api_users"].aggregate(pipeline)).to_list(length=1)
+    start = int(top[0]["alias_id"]) + 1 if top else 0
+    aliases = db.utilities_db["api_aliases"]
+    for candidate in range(start, start + ALIAS_CLAIM_ATTEMPTS):
+        claimed = await aliases.find_one_and_update(
+            {"net": API_NET, "alias_id": candidate, "claimed_by": {"$exists": False}},
+            {"$set": {"claimed_by": api_account_id}},
+        )
+        if claimed:
+            return candidate, claimed["alias"]
+        if not await aliases.find_one({"net": API_NET, "alias_id": candidate}):
+            break  # past the last alias that exists
+    raise HTTPException(
+        status_code=503, detail="No account addresses are available right now. Please try later."
+    )
 
 
 @router.post("/register", status_code=201)
@@ -371,11 +377,12 @@ async def register(
         return _refused(request, "auth/register.html")
     await _record_attempt(request, "api-register-ip", ip, EMAIL_WINDOW_SECONDS)
     user = await get_user_by_email(form_data.username, db)
-    next_alias_id, alias_account_id = await get_next_alias_id_and_account_id(db)
     if user is None:
+        api_account_id = str(uuid4())
+        next_alias_id, alias_account_id = await claim_alias(db, api_account_id)
         user = User(
             scope=API_URL,  # type: ignore
-            api_account_id=str(uuid4()),
+            api_account_id=api_account_id,
             alias_id=next_alias_id,
             alias_account_id=alias_account_id,
             token=str(uuid4()),
