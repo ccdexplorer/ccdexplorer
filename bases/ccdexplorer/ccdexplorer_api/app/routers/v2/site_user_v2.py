@@ -16,7 +16,10 @@ from ccdexplorer.mongodb import (
     CollectionsUtilities,
 )
 from ccdexplorer.ccdexplorer_api.app.ratelimiting import require_internal_api_auth
-from ccdexplorer.ccdexplorer_api.app.state_getters import get_mongo_motor, site_users_collection_name
+from ccdexplorer.ccdexplorer_api.app.state_getters import (
+    get_mongo_motor,
+    site_users_collection_name,
+)
 from ccdexplorer.ccdexplorer_api.app.utils import apply_docstring_router_wrappers
 from fastapi.encoders import jsonable_encoder
 import httpx2 as httpx
@@ -131,50 +134,6 @@ async def get_user(request: Request, token: str):
         return SiteUser(**response.json())
     else:
         return None
-
-
-@router.put("/site_user/{user_token}/save/email-address", response_class=JSONResponse)
-async def post_user_email_address(
-    request: Request,
-    user_token: str,
-    response_form: dict,
-    mongomotor: MongoMotor = Depends(get_mongo_motor),
-    api_key: str = Security(API_KEY_HEADER),
-) -> bool:
-    """Persist an updated email address for the site user identified by the token.
-
-    Args:
-        request: FastAPI request context used to call helper endpoints.
-        user_token: Token that identifies the user.
-        response_form: JSON payload sent by the UI containing ``email_address``.
-        mongomotor: Mongo client dependency used to persist the user document.
-        api_key: API key extracted from the request headers.
-
-    Returns:
-        ``True`` once the document has been upserted.
-
-    Raises:
-        HTTPException: If the user token cannot be resolved.
-    """
-    user: SiteUser | None = await get_user(request, user_token)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found.")
-    response_as_dict = jsonable_encoder(response_form)
-    # Update only the email address. A ReplaceOne here would drop the server-only
-    # secrets (password hash, reset/verification tokens) that the read endpoint
-    # no longer returns and therefore can't be echoed back by the caller.
-    await mongomotor.utilities[site_users_collection_name()].update_one(
-        {"token": str(user.token)},
-        {
-            "$set": {
-                "email_address": response_as_dict["email_address"],
-                "last_modified": dt.datetime.now().astimezone(tz=dt.timezone.utc),
-            }
-        },
-        upsert=True,
-    )
-
-    return True
 
 
 @router.put("/site_user/{user_token}/save/user", response_class=JSONResponse)

@@ -1,9 +1,9 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Request, Response
 from fastapi_login import LoginManager
 from passlib.context import CryptContext
 from ccdexplorer.mongodb import MongoMotor
 
-from ccdexplorer.env import LOGIN_SECRET
+from ccdexplorer.env import API_URL, LOGIN_SECRET
 
 manager = LoginManager(
     LOGIN_SECRET,  # type: ignore
@@ -13,6 +13,35 @@ manager = LoginManager(
     use_header=False,
 )
 pwd_context = CryptContext(schemes=["bcrypt"])
+
+
+def set_session_cookie(response: Response, token: str) -> None:
+    """The api's login cookie, with the flags fastapi_login leaves off.
+
+    HttpOnly was all it set. Secure keeps it off plain http wherever the api
+    is served over https (a local http api would never see it come back
+    otherwise), and SameSite=Lax means another site's form or script cannot
+    make the browser attach it to a POST.
+    """
+    response.set_cookie(
+        key=manager.cookie_name,
+        value=token,
+        httponly=True,
+        secure=str(API_URL).startswith("https://"),
+        samesite="lax",
+        path="/",
+    )
+
+
+async def require_htmx(request: Request) -> None:
+    """Only a request made by the page's own htmx gets to change an account.
+
+    A form or fetch from another site cannot add a custom header without a
+    CORS preflight, which this api does not grant for them -- so this is a
+    second wall behind SameSite for the routes that change plans and keys.
+    """
+    if request.headers.get("hx-request") != "true":
+        raise HTTPException(status_code=403, detail="Forbidden.")
 
 
 @manager.user_loader()

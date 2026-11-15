@@ -1,12 +1,13 @@
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pymongo import ReplaceOne, DeleteOne
 from ccdexplorer.mongodb import (
     CollectionsUtilities,
 )
 from ccdexplorer.ccdexplorer_api.app.models import SELECTABLE_PLANS, User
+from ccdexplorer.ccdexplorer_api.app.security import require_htmx
 from ccdexplorer.ccdexplorer_api.app.state_getters import get_user_details
 import datetime as dt
 
@@ -32,9 +33,7 @@ def chosen_plan(body: bytes) -> str:
     return plan
 
 
-@router.post(
-    "/plans/set",
-)
+@router.post("/plans/set", dependencies=[Depends(require_htmx)])
 async def plans_set_plan(
     request: Request,
 ):
@@ -68,9 +67,7 @@ async def plans_set_plan(
         return response
 
 
-@router.post(
-    "/plans/reset",
-)
+@router.post("/plans/reset", dependencies=[Depends(require_htmx)])
 async def plans_reset_plan(
     request: Request,
 ):

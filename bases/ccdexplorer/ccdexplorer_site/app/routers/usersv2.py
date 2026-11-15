@@ -17,6 +17,7 @@ from fastapi.responses import (
     HTMLResponse,
     RedirectResponse,
 )
+import html
 import datetime as dt
 
 from ccdexplorer.env import *
@@ -135,6 +136,16 @@ async def connect_telegram(request: Request):
 
 
 @router.get("/settings/user/logout")
+async def logout_get():
+    """Nothing happens on a GET.
+
+    A link, an image tag or a redirect on another site is a GET, and signing
+    someone out is not something they should be able to trigger.
+    """
+    return RedirectResponse(url="/settings/user/overview", status_code=303)
+
+
+@router.post("/settings/user/logout")
 async def logout(request: Request, response: Response):
     response = RedirectResponse(url="/", status_code=302)
     user = await get_user_detailsv2(request)
@@ -326,17 +337,22 @@ async def save_email_address_response(
     response_as_dict = jsonable_encoder(response_form)
     email_address = response_as_dict["email_address"]
     # Every email change goes through verification so all addresses end up verified.
+    # An account with a password says it here, so a stolen session cannot repoint
+    # the account's reset links.
     api_response: APIResponseResult = await post_url_from_api(
         f"{request.app.api_url}/site-auth/{user.token}/set-email",
         request.app.httpx_client,
-        json_post_content={"email": email_address},
+        json_post_content={
+            "email": email_address,
+            "current_password": response_as_dict.get("current_password") or None,
+        },
     )
     if api_response.ok:
         if api_response.return_value.get("needs_verification"):
             return (
                 '<div hx-target="this" hx-swap="outerHTML">'
                 '<div class="alert alert-info" role="alert">'
-                f"We've sent a verification link to <b>{email_address}</b>. "
+                f"We've sent a verification link to <b>{html.escape(email_address)}</b>. "
                 "Please click the link in that email to verify your address. "
                 "Email notifications become available once your address is verified."
                 "</div></div>"
@@ -351,7 +367,7 @@ async def save_email_address_response(
         error = api_response.return_value.get("detail", error)
     return (
         '<div hx-target="this" hx-swap="outerHTML">'
-        f'<div class="alert alert-danger" role="alert">{error}</div>'
+        f'<div class="alert alert-danger" role="alert">{html.escape(str(error))}</div>'
         '<button class="btn mt-0 btn-link ms-0 ps-0" hx-get="/settings/userv2/edit/email-address">'
         "Try again</button></div>"
     )
