@@ -7,7 +7,8 @@ they can react to.
 
 The bot fetches nothing and renders nothing. Telegram is handed a URL and
 collects the image itself, so this process holds no chain data, no database
-connection and no credentials beyond its own token -- and a chart it has never
+connection and no credentials beyond its own token (inline answers; the direct
+replies in direct.py also hold a low-tier api key) -- and a chart it has never
 seen still works the moment the site can draw it.
 """
 

@@ -9,7 +9,7 @@ from ccdexplorer.env import *  # type: ignore
 
 from .commands import command_handlers
 from telegram.ext import ApplicationBuilder
-from ccdexplorer.env import API_TOKEN
+from ccdexplorer.env import API_TOKEN, scrub_sentry_event
 
 # bump
 grpcclient = GRPCClient()
@@ -24,9 +24,14 @@ logging.getLogger("apscheduler").propagate = False
 import sentry_sdk
 
 sentry_sdk.init(
+    # Not read from SENTRY_DSN, on purpose: the stack's SENTRY_DSN is the
+    # SENTRY_DSN_BOT variable, which has not been checked against this
+    # project, and reading it would move this bot's reports without anyone
+    # having decided to. A DSN only lets events in; it is not a secret.
     dsn=sentry_dsn(
         "https://9e4d7daa546f8e53fae6a8ce4ba6cac0@o4503924901347328.ingest.us.sentry.io/4510815580389376"
     ),
+    before_send=scrub_sentry_event,
     # No send_default_pii here. This process handles Telegram messages, so
     # "request headers and IP for users" means named people's chat identifiers
     # and message content going to a third party. The site and the API both

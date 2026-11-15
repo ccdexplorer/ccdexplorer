@@ -68,6 +68,20 @@ CATEGORY_ORDER = (
 )
 
 
+def api_headers() -> dict[str, str]:
+    """The key the chart bot presents to the api.
+
+    CHART_BOT_API_KEY if there is one: this process answers strangers in
+    other people's chats, so what it carries should be a key of its own on a
+    low tier -- one that can be revoked without touching the site's. Until it
+    is set the bot uses the shared one, which keeps it working, and no more.
+    """
+    from ccdexplorer.env import environment
+
+    key = environment.get("CHART_BOT_API_KEY") or environment["CCDEXPLORER_API_KEY"]
+    return {"x-ccdexplorer-key": key}
+
+
 def keyboard_for(chart: Chart, state: ChartState | None = None) -> InlineKeyboardMarkup | None:
     """The rows this chart can actually offer, or None if it has none.
 
@@ -257,7 +271,7 @@ async def fetch_validator(index: int) -> dict | None:
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
-            headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
+            headers=api_headers(),
         ) as client:
             responses = await asyncio.gather(
                 *(client.get(f"{API_URL.rstrip('/')}/v2/{path}") for path in paths.values())
@@ -340,7 +354,7 @@ async def fetch_price() -> dict | None:
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=10.0),
-            headers={"x-ccdexplorer-key": environment["CCDEXPLORER_API_KEY"]},
+            headers=api_headers(),
         ) as client:
             responses = await asyncio.gather(
                 *(client.get(f"{API_URL.rstrip('/')}/v2/{path}") for path in paths.values())
