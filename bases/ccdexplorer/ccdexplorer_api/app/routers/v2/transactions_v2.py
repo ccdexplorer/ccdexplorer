@@ -28,6 +28,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_memos,
 )
 from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
     await_await,
     tx_type_translation,
     TypeContents,
@@ -109,10 +110,7 @@ async def get_transaction_types(
         return await await_await(db_to_use, Collections.tx_types_count, pipeline)
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving transaction types on {net}. {error}.",
-        )
+        raise failure(404, f"Error retrieving transaction types on {net}.", error)
 
 
 @router.get("/{net}/transactions/last/{count}", response_class=JSONResponse)
@@ -224,10 +222,7 @@ async def get_last_transactions_newer_than(
         )
         return result
     except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving transactions on {net} newer than {since}. {error}",
-        )
+        raise failure(500, f"Error retrieving transactions on {net} newer than {since}.", error)
 
 
 @router.get("/{net}/transactions/{count}/{skip}/{filter}", response_class=JSONResponse)
@@ -312,10 +307,7 @@ async def get_transactions_with_filter(
             "tx_type": filter,
         }
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving last {count} transactions on {net}, {error}.",
-        )
+        raise failure(404, f"Error retrieving last {count} transactions on {net}.", error)
 
 
 class SortItem(BaseModel):
@@ -426,10 +418,7 @@ async def post_transactions_with_filter(
             "tx_type": filters_dict["type"],
         }
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving last {count} transactions on {net}, {error}.",
-        )
+        raise failure(404, f"Error retrieving last {count} transactions on {net}.", error)
 
 
 @router.get("/{net}/transactions/info/tps", response_class=JSONResponse)
@@ -475,10 +464,7 @@ async def get_transactions_tps(
     if result:
         return result
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving last transactions tps, {error_message}.",
-        )
+        raise failure(404, "Error retrieving last transactions tps.", error_message)
 
 
 @router.get("/{net}/transactions/info/count", response_class=JSONResponse)
@@ -518,10 +504,7 @@ async def get_transactions_count_estimate(
     if result:
         return result
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving transactions count on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving transactions count on {net}.", error_message)
 
 
 ### search
@@ -821,10 +804,7 @@ async def get_paginated_transactions(
 
     except Exception as e:
         # log e if you like, then:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error retrieving transactions: {e}",
-        )
+        raise failure(500, "Error retrieving transactions.", e)
 
     return {
         "total_rows": total_docs,

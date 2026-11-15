@@ -26,6 +26,7 @@ from ccdexplorer.ccdexplorer_api.app.state_getters import (
     get_mongo_motor,
 )
 from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
     PLTToken,
     TokenHolding,
     category_to_types,
@@ -1332,9 +1333,8 @@ async def get_staking_rewards_bucketed(
         result_pp = await await_await(db_to_use, Collections.paydays_v2_rewards, pp)
         return result_pp
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve staking rewards for account at {account_id} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve staking rewards for account at {account_id} on {net}.", error
         )
 
 
@@ -1397,9 +1397,8 @@ async def get_staking_rewards_for_year_month(
 
         return result_pp
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve staking rewards for account at {account_id} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve staking rewards for account at {account_id} on {net}.", error
         )
 
 
@@ -1432,9 +1431,8 @@ async def get_validator_performance(
         )
         return result
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve validator performance for validator {index} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve validator performance for validator {index} on {net}.", error
         )
 
 
@@ -1470,9 +1468,8 @@ async def get_validator_inactive(
         result = await await_await(db_to_use, Collections.validator_logs, pipeline)
         return {item["_id"]: item["count"] for item in result}
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve validator inactive actions for validator {index} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve validator inactive actions for validator {index} on {net}.", error
         )
 
 
@@ -1511,9 +1508,8 @@ async def get_paginated_account_rewards(
         result_pp = await await_await(db_to_use, Collections.paydays_v2_rewards, pp)
         return {"data": result_pp, "total_rows": total_rows}
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve staking rewards for account at {account_id} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve staking rewards for account at {account_id} on {net}.", error
         )
 
 
@@ -1543,9 +1539,8 @@ async def get_bool_account_rewards_available(
         return result is not None
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
+        raise failure(
+            404, f"Can't determine whether account {account_id} on {net} has rewards.", error
         )
 
 
@@ -1734,10 +1729,7 @@ async def get_validator_tally(
 
             return {"data": data, "total_row_count": result[0]["total"]}
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve validator tally with error {error}.",
-        )
+        raise failure(404, "Can't retrieve validator tally.", error)
 
 
 @router.get("/{net}/account/{index}/pool/delegators/{skip}/{limit}", response_class=JSONResponse)
@@ -1817,10 +1809,7 @@ async def get_account_pool_delegators(
                 "total_delegators": len(delegators_current_payday),
             }
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve delegators with error {error}.",
-        )
+        raise failure(404, "Can't retrieve delegators.", error)
 
 
 @router.get("/{net}/account/{index_or_hash}/apy-data/{type}", response_class=JSONResponse)
@@ -1886,10 +1875,7 @@ async def get_account_apy_data_v2(
         return records
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve account APY data with error {error}.",
-        )
+        raise failure(404, "Can't retrieve account APY data.", error)
 
 
 @router.get("/{net}/account/{index}/node", response_class=JSONResponse)
@@ -2408,9 +2394,10 @@ async def get_account_validator_txs(
         tx_result = [CCD_BlockItemSummary(**x) for x in int_result]
         return {"transactions": tx_result, "total_tx_count": total_tx_count}
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve validator transactions for account at {account_id} on {net} with error {error}.",
+        raise failure(
+            404,
+            f"Can't retrieve validator transactions for account at {account_id} on {net}.",
+            error,
         )
 
 
@@ -2473,9 +2460,8 @@ async def get_account_transactions_for_flow_graph(
         return txs_for_account
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
+        raise failure(
+            404, f"Can't determine whether account {account_id} on {net} has rewards.", error
         )
 
 
@@ -2540,10 +2526,7 @@ async def get_account_plt_transactions_for_flow_graph(
         return txs_for_account
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't find PLT txs for account {account_id} on {net} with error {error}.",
-        )
+        raise failure(404, f"Can't find PLT txs for account {account_id} on {net}.", error)
 
 
 @router.get(
@@ -2610,9 +2593,8 @@ async def get_account_token_transactions_for_flow_graph(
         return txs_for_account
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't determine whether account {account_id} on {net}  has token txs with error {error}.",
+        raise failure(
+            404, f"Can't determine whether account {account_id} on {net} has token txs.", error
         )
 
 
@@ -2711,9 +2693,8 @@ async def get_account_rewards_for_flow_graph(
         return account_rewards_total
 
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't determine whether account {account_id} on {net}  has rewards with error {error}.",
+        raise failure(
+            404, f"Can't determine whether account {account_id} on {net} has rewards.", error
         )
 
 
@@ -2849,9 +2830,8 @@ async def get_account_graph(
 
         return result
     except Exception as error:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Can't retrieve transactions for account at {account_id} on {net} with error {error}.",
+        raise failure(
+            404, f"Can't retrieve transactions for account at {account_id} on {net}.", error
         )
 
 

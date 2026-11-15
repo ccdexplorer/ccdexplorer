@@ -12,7 +12,11 @@ from datetime import timedelta
 from enum import Enum
 from typing import Any
 
-from ccdexplorer.ccdexplorer_api.app.utils import await_await, apply_docstring_router_wrappers
+from ccdexplorer.ccdexplorer_api.app.utils import (
+    apply_docstring_router_wrappers,
+    await_await,
+    failure,
+)
 import dateutil
 import grpc
 import httpx2 as httpx
@@ -1275,10 +1279,7 @@ async def get_consensus_detailed_status(
     try:
         cds = grpcclient.get_consensus_detailed_status(net=NET(net))
     except Exception as e:  # noqa: E722
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error getting consensus detailed status on {net}. {e}",
-        )
+        raise failure(404, f"Error getting consensus detailed status on {net}.", e)
 
     return cds.model_dump(exclude_none=True)
 

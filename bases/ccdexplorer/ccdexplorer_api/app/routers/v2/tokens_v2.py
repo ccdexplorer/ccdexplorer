@@ -7,6 +7,7 @@
 # pyright: reportPossiblyUnboundVariable=false
 # pyright: reportArgumentType=false
 from ccdexplorer.ccdexplorer_api.app.utils import (
+    failure,
     SEARCH_LIMIT,
     SEARCH_MAX_TIME_MS,
     apply_docstring_router_wrappers,
@@ -89,10 +90,7 @@ async def get_tokens_count_estimate(
     if result:
         return result
     else:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Error retrieving tokens count on {net}, {error_message}.",
-        )
+        raise failure(404, f"Error retrieving tokens count on {net}.", error_message)
 
 
 @router.get(
