@@ -325,6 +325,20 @@ class TabulatorRequest(BaseModel):
     filter: Optional[list[FilterItem]] = []
 
 
+def filter_values(filters: list[FilterItem]) -> tuple[str, bool]:
+    """(transaction type, only sponsored) out of whatever filters were sent.
+
+    A filter that was not given is a filter that is off. The route used to
+    index the filters by name, so a body that named only one of them -- or
+    none, which the model allows -- raised KeyError before any query ran
+    (Sentry API-CCDEXPLORER-IO-AR). "no_tx" is what an empty type has always
+    meant; sponsored is on only for a real boolean true, as before.
+    """
+    by_field = {x.field: x.value for x in filters}
+    tx_type = by_field.get("type") or "no_tx"
+    return tx_type, by_field.get("sponsored") is True
+
+
 @router.post("/{net}/transactions/{count}/{skip}", response_class=JSONResponse)
 async def post_transactions_with_filter(
     request: Request,
@@ -363,15 +377,13 @@ async def post_transactions_with_filter(
     filters = body.filter or []
     type_filter = any([x.field == "type" for x in filters])
     total_for_type = 0
-    filters_dict = {x.field: x.value for x in filters}
-    filters_dict["type"] = "no_tx" if filters_dict["type"] == "" else filters_dict["type"]
-    filter_on_sponsored = filters_dict["sponsored"] is True
+    tx_type, filter_on_sponsored = filter_values(filters)
     if type_filter:
-        filter_dict = {"type.contents": filters_dict["type"]}
+        filter_dict = {"type.contents": tx_type}
         pipeline_total = [
             {
                 "$match": {
-                    f"{'sponsored_' if filter_on_sponsored else ''}counts.{filters_dict['type']}": {
+                    f"{'sponsored_' if filter_on_sponsored else ''}counts.{tx_type}": {
                         "$exists": True
                     }
                 }
@@ -380,7 +392,7 @@ async def post_transactions_with_filter(
                 "$group": {
                     "_id": None,
                     "count": {
-                        "$sum": f"${'sponsored_' if filter_on_sponsored else ''}counts.{filters_dict['type']}"
+                        "$sum": f"${'sponsored_' if filter_on_sponsored else ''}counts.{tx_type}"
                     },
                 }
             },
@@ -415,7 +427,7 @@ async def post_transactions_with_filter(
                 CCD_BlockItemSummary(**x).model_dump(exclude_none=True) for x in result
             ],
             "total_for_type": total_for_type,
-            "tx_type": filters_dict["type"],
+            "tx_type": tx_type,
         }
     except Exception as error:
         raise failure(404, f"Error retrieving last {count} transactions on {net}.", error)
