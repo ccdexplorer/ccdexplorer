@@ -166,7 +166,8 @@ def test_every_init_site_routes_its_dsn_through_the_guard():
         guarded = (
             isinstance(dsn, ast.Call)
             and isinstance(dsn.func, ast.Name)
-            and dsn.func.id == "sentry_dsn"
+            # sentry_dsn_from_env hands what it finds to sentry_dsn itself.
+            and dsn.func.id in ("sentry_dsn", "sentry_dsn_from_env")
         )
         if not guarded:
             offenders.append(
