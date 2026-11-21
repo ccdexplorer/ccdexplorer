@@ -141,6 +141,28 @@ def sentry_dsn(dsn: str | None) -> str | None:
     return dsn
 
 
+def sentry_dsn_from_env(name: str) -> str | None:
+    """The DSN in environment variable `name`, or "" -- off -- if there is none.
+
+    A DSN does not belong in source. Two were written into this public
+    repository, and anyone who ran the code anywhere reported into the project
+    as `production` (two issues on 2026-11-21 came from a machine running a
+    copy from /tmp). Read from the environment, a copy of the code with no DSN
+    reports nowhere.
+
+    Absent is "", not None, for the reason `sentry_dsn` gives: None lets the
+    SDK read SENTRY_DSN itself, which a container with another service's DSN
+    would obey. And absent is announced: a service that quietly stopped
+    reporting looks exactly like a healthy one.
+    """
+    dsn = os.environ.get(name, "").strip()
+    if not dsn:
+        if os.environ.get("SENTRY_DISABLED") != "1" and "pytest" not in sys.modules:
+            print(f"Sentry is off: {name} is not set.", flush=True)
+        return ""
+    return sentry_dsn(dsn)
+
+
 SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT")
 HEARTBEAT_PROGRESS_DOCUMENT_ID = os.environ.get(
     "HEARTBEAT_PROGRESS_DOCUMENT_ID", "heartbeat_last_processed_block"
