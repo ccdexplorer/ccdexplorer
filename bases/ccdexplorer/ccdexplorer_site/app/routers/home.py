@@ -381,6 +381,13 @@ async def search(request: Request, search_request: SearchRequest):
     if search_request.net not in ["mainnet", "testnet", "devnet"]:
         raise HTTPException(status_code=404, detail="Not found")
 
+    # What was typed is not url text. A pasted word carries a trailing space,
+    # and a header value may not end in whitespace: the server refused to send
+    # "/mainnet/search_all/Bahamas " and the person got an error page
+    # (Sentry CCDEXPLORER-IO-2Q6). The edges of a search are not part of it;
+    # whatever is left is encoded below, once, for every selector.
+    search_request.value = search_request.value.strip()
+
     url = None
     if search_request.selector == "all":
         url = f"/{search_request.net}/search_all/{search_request.value}"
@@ -432,6 +439,9 @@ async def search(request: Request, search_request: SearchRequest):
                 url = f"/{search_request.net}/token/{contract_index}/0/{token_id}"
 
     if url:
+        # Spaces, control characters, non-ASCII and a "?" or "#" that would cut
+        # the path short all become %XX; the slashes the route built stay.
+        url = urllib.parse.quote(url, safe="/")
         response = RedirectResponse(url=url, status_code=200)
         # note do not remove this header! Very strange things will happen.
         # The new route is requested, however the browser page remains the same!
@@ -1371,4 +1381,3 @@ async def partners_acn(
             "request": request,
         },
     )
-
