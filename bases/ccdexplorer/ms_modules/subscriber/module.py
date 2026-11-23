@@ -58,9 +58,18 @@ def verify_failure_explanation(stderr: str) -> str:
     build was wrong when ours was.
     """
     text = _ANSI.sub("", stderr or "").strip()
-    if not text:
+    # cargo ends with its verdict or its error; everything before is the
+    # build's progress and warnings, and the end of a fixed-size window over
+    # that began wherever it happened to cut.
+    marker = text.rfind("Error:")
+    reason = text[marker + len("Error:") :] if marker >= 0 else text[-EXPLANATION_CHARS:]
+    reason = " ".join(reason.split())[:EXPLANATION_CHARS]
+    if not reason:
         return "Verification did not complete: cargo concordium verify-build exited with an error."
-    return "Verification did not complete: " + text[-EXPLANATION_CHARS:].strip()
+    if "does not correspond" in reason or "do not match" in reason:
+        # A verdict: the build ran and the result differs.
+        return reason
+    return "Verification did not complete: " + reason
 
 
 class Module:

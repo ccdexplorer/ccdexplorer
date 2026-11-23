@@ -221,3 +221,40 @@ async def test_verify_build_runs_the_cargo_that_matches_the_image(world):
 
     verify = next(c for c in world.calls if "module_arg" in c)
     assert verify["args"][0] == "cargo-concordium-5"
+
+
+# --- the explanation is cargo's last error, not the end of a page of warnings -----
+
+REAL_MISMATCH_STDERR = (
+    "   Compiling concordium v0.1.0 (/b)\n"
+    "warning: unused variable: `state`\n"
+    "   --> src/lib.rs:466:9\n"
+    "    |\n"
+    "466 |         state: &mut State,\n"
+    "    |         ^^^^^ help: if this is intentional, prefix it with an underscore\n"
+    "    Finished release [optimized] target(s) in 47.72s\n"
+    "Error: \n"
+    "The source does not correspond to the module.\n"
+)
+
+
+def test_a_real_mismatch_is_reported_as_the_verdict_cargo_gave():
+    """The first version cut the last 500 characters wherever they began, which
+    on a build with warnings started mid-way through a source snippet."""
+    explanation = verify_failure_explanation(REAL_MISMATCH_STDERR)
+
+    assert explanation == "The source does not correspond to the module."
+
+
+def test_another_error_is_cargos_last_error_not_the_noise_before_it():
+    stderr = (
+        "warning: unused variable\n    |\n    ^^^^\n"
+        "Error: Failed reading file: No such file or directory (os error 2)\n\n"
+        "Caused by:\n    No such file or directory (os error 2)\n"
+    )
+
+    explanation = verify_failure_explanation(stderr)
+
+    assert explanation.startswith("Verification did not complete: Failed reading file")
+    assert "unused variable" not in explanation
+    assert "\n" not in explanation
