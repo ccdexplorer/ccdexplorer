@@ -28,6 +28,40 @@ from ccdexplorer.concordium_client import ConcordiumClient
 
 console = Console()
 
+_ANSI = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+#: How much of cargo's stderr is kept as the reason a verification failed.
+#: A build prints pages of progress before the line that matters, and that
+#: line is at the end.
+EXPLANATION_CHARS = 500
+
+
+def cargo_concordium_for(build_image: str | None) -> str:
+    """The cargo-concordium that can rebuild a module made with `build_image`.
+
+    Version 5 builds for wasm32v1-none in a different image, and the images of
+    4.x and 5.x are not interchangeable in either direction: 4.x run against
+    the wasm32v1 image stops at "cannot stat wasm32-unknown-unknown/release".
+    So both are installed and the image the module names picks between them.
+    """
+    if build_image and "wasm32v1" in build_image:
+        return "cargo-concordium-5"
+    return "cargo-concordium"
+
+
+def verify_failure_explanation(stderr: str) -> str:
+    """Why verify-build failed, in cargo's own words.
+
+    Every non-zero exit used to be reported as "the source does not
+    correspond to the module", including the ones where nothing was compared
+    because cargo could not open the file -- which told the author their
+    build was wrong when ours was.
+    """
+    text = _ANSI.sub("", stderr or "").strip()
+    if not text:
+        return "Verification did not complete: cargo concordium verify-build exited with an error."
+    return "Verification did not complete: " + text[-EXPLANATION_CHARS:].strip()
+
 
 class Module:
     async def process_block_for_module(self, db_to_use, block_height: int, net: NET):
@@ -49,9 +83,6 @@ class Module:
                     print(f"Verified module: {module_ref}")
 
     # Add this helper at class level
-    def get_project_root(self):
-        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
     def get_module_metadata(self, net: NET, block_hash: str, module_ref: str) -> dict[str, str]:
         """
         Retrieves metadata for a specified module. Parses the web assembly source code.
@@ -196,7 +227,7 @@ class Module:
                 verified=False,
                 verification_status="verified_failed",
                 verification_timestamp=dt.datetime.now().astimezone(dt.UTC),
-                explanation=e,  # type: ignore
+                explanation=str(e),
                 build_image_used=None,
                 build_command_used=None,
                 archive_hash=None,
@@ -266,7 +297,7 @@ class Module:
                         fileobj=io.BytesIO(source_code_at_verification_time), mode="r:*"
                     )
                     print(f"{link_to_source_code=} retrieved.")
-                    module_folder.extractall(path=f"tmp/source_{module_ref}")
+                    module_folder.extractall(path=f"tmp/source_{module_ref}", filter="data")
                     module_name_on_disk = next(os.walk(f"tmp/source_{module_ref}"))[1][0]
                     with open(
                         f"tmp/source_{module_ref}/{module_name_on_disk}/src/lib.rs", "r"
@@ -279,7 +310,7 @@ class Module:
                         verified=False,
                         verification_status="verified_failed",
                         verification_timestamp=dt.datetime.now().astimezone(dt.UTC),
-                        explanation=e,  # type: ignore
+                        explanation=str(e),
                         build_image_used=build_image_used,
                         build_command_used=build_command_used,
                         archive_hash=archive_hash,
@@ -293,9 +324,11 @@ class Module:
                     f"{dt.datetime.now().astimezone(dt.UTC)}: Starting subprocess.run for verify-build..."
                 )
 
-                module_path = f"tmp/{module_ref}.out"
-                project_root = self.get_project_root()
-                module_path = os.path.join(project_root, "tmp", f"{module_ref}.out")
+                # Where concordium_client.save_module wrote it, made absolute:
+                # cargo runs inside the unpacked source, where a relative path
+                # points nowhere. It used to be worked out from this file's
+                # own location, which is a different directory.
+                module_path = os.path.abspath(f"tmp/{module_ref}.out")
 
                 source_dir = f"tmp/source_{module_ref}"
                 if os.path.exists(source_dir):
@@ -303,14 +336,14 @@ class Module:
                 os.makedirs(source_dir, exist_ok=True)
 
                 try:
-                    module_folder.extractall(path=source_dir)
+                    module_folder.extractall(path=source_dir, filter="data")
                     module_name_on_disk = next(os.walk(source_dir))[1][0]
                     build_dir = os.path.join(source_dir, module_name_on_disk)
 
                     # Run verify-build from source directory
                     cargo_run = subprocess.run(
                         [
-                            "cargo",
+                            cargo_concordium_for(build_image_used),
                             "concordium",
                             "verify-build",
                             "--module",
@@ -327,7 +360,7 @@ class Module:
                         verified=False,
                         verification_status="verified_failed",
                         verification_timestamp=dt.datetime.now().astimezone(dt.UTC),
-                        explanation=e,  # type: ignore
+                        explanation=str(e),
                         build_image_used=build_image_used,
                         build_command_used=build_command_used,
                         archive_hash=archive_hash,
@@ -343,7 +376,7 @@ class Module:
                         verified=False,
                         verification_status="verified_failed",
                         verification_timestamp=dt.datetime.now().astimezone(dt.UTC),
-                        explanation="The source does not correspond to the module.",
+                        explanation=verify_failure_explanation(cargo_run.stderr),
                         build_image_used=build_image_used,
                         build_command_used=build_command_used,
                         archive_hash=archive_hash,
