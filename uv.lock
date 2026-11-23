@@ -544,7 +544,7 @@ requires-dist = [
     { name = "requests" },
     { name = "rich" },
     { name = "scheduler", specifier = ">=0.8.8" },
-    { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.41.0" },
+    { name = "sentry-sdk", extras = ["fastapi"], specifier = ">=2.41.0,<3" },
     { name = "sortedcontainers", specifier = ">=2.4.0" },
     { name = "sqlalchemy", specifier = "<2.1" },
     { name = "typing-inspect", specifier = ">=0.9.0" },
