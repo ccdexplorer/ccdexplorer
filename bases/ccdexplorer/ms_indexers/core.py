@@ -50,8 +50,7 @@ def process_block(self, processor: str, payload: dict[str, Any]) -> dict | None:
     try:
         height = payload.get("height")
         assert height is not None
-        subscriber.generate_indices_based_on_transactions(height)
-        subscriber.do_specials(height)
+        subscriber.index_block(height)
         # success
         task_doc = TaskResult(
             _id=self.request.id,

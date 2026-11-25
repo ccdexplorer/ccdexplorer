@@ -43,7 +43,6 @@ from ccdexplorer.cis import (
 from ccdexplorer.domain.generic import NET
 from ccdexplorer.grpc_client import GRPCClient
 from ccdexplorer.grpc_client.CCD_Types import (
-    CCD_BlockInfo,
     CCD_BlockItemSummary,
     CCD_ContractAddress,
     CCD_ShortBlockInfo,
@@ -947,9 +946,13 @@ class LoggedEvent:
         #         {"block_info.height": block_height}
         #     )
         # )
-        block_info: CCD_BlockInfo = self.grpc_client.get_block_info(block_height, net)
+        # Two ~40 ms node calls that do not depend on each other: ask together.
+        # The block itself is still handled alone; this only overlaps the waiting.
+        block_info, ccd_block = await asyncio.gather(
+            asyncio.to_thread(self.grpc_client.get_block_info, block_height, net),
+            asyncio.to_thread(self.grpc_client.get_block_transaction_events, block_height, net),
+        )
         short_block_info: CCD_ShortBlockInfo = CCD_ShortBlockInfo(**block_info.model_dump())
-        ccd_block = self.grpc_client.get_block_transaction_events(block_height, net)
         block_transactions = ccd_block.transaction_summaries
 
         logged_events_from_tx: LoggedEventsFromTX = LoggedEventsFromTX()
