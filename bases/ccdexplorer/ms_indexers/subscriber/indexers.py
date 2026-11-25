@@ -16,10 +16,16 @@ from pymongo import ReplaceOne
 from pymongo.results import ClientBulkWriteResult
 
 from rich.console import Console
+from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from .utils import Utils, Queue
 
 console = Console()
+
+# One block is still indexed at a time (the worker is a solo pool); this only
+# lets the three node calls that block needs overlap. The gRPC channel is
+# thread-safe and each call is ~35-45 ms of waiting, not computing.
+_node_calls = ThreadPoolExecutor(max_workers=3, thread_name_prefix="indexers-node")
 
 
 class ClassificationResult:
@@ -168,7 +174,28 @@ class Indexers(Utils):
 
         return result
 
-    def generate_indices_based_on_transactions(self, block_height: int):
+    def index_block(self, block_height: int) -> None:
+        """Index one block: ask the node for what it needs together, then write.
+
+        These used to be four calls one after another (block_info twice), which
+        was ~156 of the ~180 ms a block took on the devnet catch-up. If any call
+        raises, nothing has been written yet, so celery can retry the block.
+        """
+        net = NET(self.net)
+        txs = _node_calls.submit(self.grpc_client.get_block_transaction_events, block_height, net)
+        info = _node_calls.submit(self.grpc_client.get_block_info, block_height, net)
+        specials = _node_calls.submit(self.grpc_client.get_block_special_events, block_height, net)
+        block_txs, block_info, se = txs.result(), info.result(), specials.result()
+
+        self.generate_indices_based_on_transactions(block_height, block_txs, block_info)
+        self.do_specials(block_height, block_info, se)
+
+    def generate_indices_based_on_transactions(
+        self,
+        block_height: int,
+        block_txs: Optional[CCD_Block] = None,
+        block_info: Optional[CCD_BlockInfo] = None,
+    ):
         """
         Given a list of transactions, apply rules to determine which index needs to be updated.
         Add this to a to_be_sent_to_mongo list and do insert_many.
@@ -179,10 +206,10 @@ class Indexers(Utils):
         self.net: str
         self.grpc_client: GRPCClient
         self.queues[Queue.involved_transfer] = []
-        block_txs: CCD_Block = self.grpc_client.get_block_transaction_events(
-            block_height, NET(self.net)
-        )
-        block_info: CCD_BlockInfo = self.grpc_client.get_block_info(block_height, NET(self.net))
+        if block_txs is None:
+            block_txs = self.grpc_client.get_block_transaction_events(block_height, NET(self.net))
+        if block_info is None:
+            block_info = self.grpc_client.get_block_info(block_height, NET(self.net))
 
         for tx in block_txs.transaction_summaries:
             tx.block_info = CCD_ShortBlockInfo(
@@ -223,17 +250,24 @@ class Indexers(Utils):
             if write_result.modified_count > 0:
                 console.log(f"Modified: {write_result.modified_count:,.0f}")
 
-    def do_specials(self, block_height: int):
+    def do_specials(
+        self,
+        block_height: int,
+        block_info: Optional[CCD_BlockInfo] = None,
+        se: Optional[list] = None,
+    ):
         self.queues: dict[Enum, list]
         self.db: dict[Collections, Collection]
         self.mongodb: MongoDB
         self.net: str
         self.grpc_client: GRPCClient
 
-        block_info: CCD_BlockInfo = self.grpc_client.get_block_info(block_height, NET(self.net))
+        if block_info is None:
+            block_info = self.grpc_client.get_block_info(block_height, NET(self.net))
 
         # add special events
-        se = self.grpc_client.get_block_special_events(block_info.height, NET(self.net))
+        if se is None:
+            se = self.grpc_client.get_block_special_events(block_info.height, NET(self.net))
 
         if self.net == "mainnet":
             suspended = any([x.validator_suspended is not None for x in se])
